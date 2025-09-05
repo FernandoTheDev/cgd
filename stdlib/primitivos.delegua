@@ -1,33 +1,235 @@
-estrutura inteiro {
-    type: i32;
+importa { len, alloc, free } de "core_builtin"
+
+// Tipo base para todos os primitivos
+estrutura tipo_base {
+    type_id: i32;
+    size: i32;
+    
+    fn tipo_nome(): string {
+        // Implementação baseada em type_id
+    }
+}
+
+estrutura void : tipo_base {
+    fn novo(): void {
+        isto.type_id = 0;
+        isto.size = 0;
+        retorna isto;
+    }
+    
+    fn (): void* {
+        retorna nulo;
+    }
+}
+
+estrutura inteiro : tipo_base {
     value: i32;
-
+    
+    fn novo(valor: i32): inteiro {
+        isto.type_id = 1;
+        isto.size = 4;
+        isto.value = valor;
+        retorna isto;
+    }
+    
     fn (): i32 {
-        retorna valor
+        retorna isto.value;
+    }
+    
+    fn texto(): string {
+        // Converte para string
+        retorna novo string(int_para_str(isto.value));
+    }
+    
+    fn +(outro: inteiro): inteiro {
+        retorna novo inteiro(isto.value + outro.value);
+    }
+    
+    fn ==(outro: inteiro): booleano {
+        retorna novo booleano(isto.value == outro.value);
     }
 }
 
-estrutura string {
-    type: *i8;
-    value: *i8;
+estrutura real : tipo_base {
+    value: f32;
+    
+    fn novo(valor: f32): real {
+        isto.type_id = 2;
+        isto.size = 4;
+        isto.value = valor;
+        retorna isto;
+    }
+    
+    fn (): f32 {
+        retorna isto.value;
+    }
+    
+    fn +(outro: real): real {
+        retorna novo real(isto.value + outro.value);
+    }
+}
+
+estrutura booleano : tipo_base {
+    value: i8;
+    
+    fn novo(valor: i8): booleano {
+        isto.type_id = 3;
+        isto.size = 1;
+        isto.value = valor;
+        retorna isto;
+    }
+    
+    fn (): i8 {
+        retorna isto.value;
+    }
+    
+    fn &&(outro: booleano): booleano {
+        retorna novo booleano(isto.value && outro.value);
+    }
+    
+    fn ||(outro: booleano): booleano {
+        retorna novo booleano(isto.value || outro.value);
+    }
+}
+
+estrutura string : tipo_base {
+    data: *i8;
     length: i32;
-
+    capacity: i32;
+    
+    fn novo(valor: *i8): string {
+        isto.type_id = 4;
+        isto.length = len(valor);
+        isto.capacity = isto.length + 1; // +1 para \0
+        isto.size = isto.capacity;
+        
+        // Aloca e copia
+        isto.data = alloc(isto.capacity);
+        copiar_memoria(isto.data, valor, isto.length + 1);
+        
+        retorna isto;
+    }
+    
+    fn destruir(): void {
+        se (isto.data != nulo) {
+            free(isto.data);
+            isto.data = nulo;
+        }
+    }
+    
     fn (): *i8 {
-        retorna valor
+        retorna isto.data;
     }
-
-    fn tamanho(): inteiro
-    {
-        retorna novo inteiro(length)
+    
+    fn tamanho(): inteiro {
+        retorna novo inteiro(isto.length);
+    }
+    
+    fn +(outra: string): string {
+        var nova_len = isto.length + outra.length;
+        var nova_data = alloc(nova_len + 1);
+        
+        cpmem(nova_data, isto.data, isto.length);
+        cpmem(nova_data + isto.length, outra.data, outra.length);
+        nova_data[nova_len] = '\0';
+        
+        var resultado = novo string();
+        resultado.data = nova_data;
+        resultado.length = nova_len;
+        resultado.capacity = nova_len + 1;
+        
+        retorna resultado;
+    }
+    
+    fn ==(outra: string): booleano {
+        se (isto.length != outra.length) {
+            retorna novo booleano(0);
+        }
+        retorna novo booleano(comparar_strings(isto.data, outra.data) == 0);
+    }
+    
+    fn [](indice: inteiro): i8 {
+        se (indice() < 0 || indice() >= isto.length) {
+            // erro de bounds
+        }
+        retorna isto.data[indice()];
     }
 }
 
-template<T>
-estrutura array<T> {
-    // ...
+template<T> estrutura vetor : tipo_base {
+    data: *T;
+    length: i32;
+    capacity: i32;
+    
+    fn novo(tamanho_inicial: inteiro): vetor<T> {
+        isto.type_id = 5; // ou hash do tipo T
+        isto.length = 0;
+        isto.capacity = tamanho_inicial();
+        isto.size = isto.capacity * tamanho_de<T>();
+        
+        isto.data = alloc(isto.size);
+        
+        retorna isto;
+    }
+    
+    fn destruir(): void {
+        se (isto.data != nulo) {
+            free(isto.data);
+            isto.data = nulo;
+        }
+    }
+    
+    fn adicionar(item: T): void {
+        se (isto.length >= isto.capacity) {
+            isto.redimensionar(isto.capacity * 2);
+        }
+        
+        isto.data[isto.length] = item;
+        isto.length++;
+    }
+    
+    fn [](indice: inteiro): *T {
+        se (indice() < 0 || indice() >= isto.length) {
+            // erro de bounds
+        }
+        retorna &isto.data[indice()];
+    }
+    
+    fn tamanho(): inteiro {
+        retorna novo inteiro(isto.length);
+    }
+    
+    fn capacidade(): inteiro {
+        retorna novo inteiro(isto.capacity);
+    }
+    
+    privado fn redimensionar(nova_capacidade: i32): void {
+        var nova_data = alloc(nova_capacidade * tamanho_de<T>());
+        copiar_memoria(nova_data, isto.data, isto.length * tamanho_de<T>());
+        
+        free(isto.data);
+        isto.data = nova_data;
+        isto.capacity = nova_capacidade;
+        isto.size = isto.capacity * tamanho_de<T>();
+    }
 }
 
-template<T>
-estrutura class<T> {
-    // ...
+// Exemplo de uso:
+função main(): inteiro {
+    var num = 42;
+    var texto = "Hello";
+    var numeros: vetor<inteiro> = [10];
+    
+    numeros.adicionar(num);
+    numeros.adicionar(100);
+    
+    var soma = numeros[0] + numeros[1];
+    
+    printf("%s: %d\n", texto(), soma());
+    
+    // Limpeza automática ou manual
+    texto.destruir();
+    numeros.destruir();
+    
+    retorna 0;
 }
