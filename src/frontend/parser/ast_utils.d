@@ -19,8 +19,8 @@ FTypeInfo inferUnaryType(string operator, Stmt operand)
     case "-":
         return operand.type;
     case "!":
-        return createTypeInfo(TypesNative.BOOL);
+        return createTypeInfo(TypesNative.I1);
     default:
-        return createTypeInfo(TypesNative.NULL);
+        return createTypeInfo(TypesNative.NULO);
     }
 }

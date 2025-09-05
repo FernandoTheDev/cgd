@@ -92,29 +92,27 @@ private:
 
         switch (value)
         {
-        case "int":
-        case "inteiro":
-        case "número":
-        case "numero":
-            return TypesNative.LONG;
+        case "i8":
+            return TypesNative.I8;
+        case "i16":
+            return TypesNative.I16;
+        case "i32":
+            return TypesNative.I32;
+        case "i64":
+            return TypesNative.I64;
         case "float":
-        case "decimal":
-            return TypesNative.FLOAT;
-        case "string":
-        case "texto":
-            return TypesNative.STRING;
+            return TypesNative.F32;
+        case "double":
+            return TypesNative.F64;
+        case "i8*":
+            return TypesNative.I8P;
         case "void":
-        case "vazio":
-            return TypesNative.VOID;
+            // return TypesNative.NULO;
         case "null":
-        case "nulo":
-            return TypesNative.NULL;
+            return TypesNative.NULO;
         case "bool":
-        case "logica":
-        case "lógica":
-            return TypesNative.BOOL;
+            return TypesNative.I1;
         default:
-            return TypesNative.CLASS;
             throw new Exception("Unknown native type: " ~ value);
         }
     }

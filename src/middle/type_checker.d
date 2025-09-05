@@ -23,17 +23,45 @@ class TypeChecker
     {
         this.semanticAnalyzer = semanticAnalyzer;
 
+        // Updated hierarchy with all LLVM types
         typeHierarchy = [
+            // Boolean/1-bit types
             "i1": 1,
             "bool": 1,
-            "int": 2,
-            "i32": 2,
-            "binary": 2,
-            "i64": 3,
-            "i128": 3,
-            "long": 3,
+            "booleano": 1,
+
+            // 8-bit types
+            "i8": 2,
+            "byte": 2,
+            "char": 2,
+
+            // 16-bit types
+            "i16": 3,
+            "short": 3,
+            "half": 3, // 16-bit float
+
+            // 32-bit types
+            "i32": 4,
+            "int": 4,
+            "inteiro": 4,
+            "binary": 4,
+            "f32": 4,
             "float": 4,
-            "double": 5
+
+            // 64-bit types
+            "i64": 5,
+            "long": 5,
+            "f64": 5,
+            "double": 5,
+            "flutuante": 5,
+
+            // 128-bit types
+            "i128": 6,
+            "cent": 6,
+            "fp128": 6,
+            "x86_fp80": 6,
+            "ppc_fp128": 6,
+            "real": 6
         ];
 
         initializeTypeMap();
@@ -41,6 +69,7 @@ class TypeChecker
 
     private void initializeTypeMap()
     {
+        // Original mappings
         typeMap["int"] = "long";
         typeMap["long"] = "long";
         typeMap["float"] = "double";
@@ -52,6 +81,47 @@ class TypeChecker
         typeMap["void"] = "void";
         typeMap["void*"] = "void*";
         typeMap["class"] = "void*";
+
+        // LLVM integer types
+        typeMap["i1"] = "bool";
+        typeMap["i8"] = "byte";
+        typeMap["i16"] = "short";
+        typeMap["i32"] = "int";
+        typeMap["i64"] = "long";
+        typeMap["i128"] = "cent";
+
+        // LLVM floating point types
+        typeMap["half"] = "float";
+        typeMap["f32"] = "float";
+        typeMap["f64"] = "double";
+        typeMap["fp128"] = "real";
+        typeMap["x86_fp80"] = "real";
+        typeMap["ppc_fp128"] = "real";
+
+        // LLVM special types
+        typeMap["label"] = "void*";
+        typeMap["metadata"] = "void*";
+        typeMap["token"] = "void*";
+
+        // Composite types
+        typeMap["pointer"] = "ptr";
+        typeMap["array"] = "array";
+        typeMap["vector"] = "vector";
+        typeMap["struct"] = "struct";
+        typeMap["function"] = "function";
+
+        // Portuguese types
+        typeMap["vazio"] = "void";
+        typeMap["inteiro"] = "int";
+        typeMap["flutuante"] = "double";
+        typeMap["booleano"] = "bool";
+        typeMap["nulo"] = "null";
+
+        // Additional D native types
+        typeMap["byte"] = "byte";
+        typeMap["short"] = "short";
+        typeMap["cent"] = "cent";
+        typeMap["real"] = "real";
     }
 
     public bool isValidType(string type)
@@ -68,33 +138,6 @@ class TypeChecker
         throw new Exception("Unsupported type mapping for " ~ sourceType);
     }
 
-    public string getTypeStringFromNative(TypesNative nativeType)
-    {
-        final switch (nativeType)
-        {
-        case TypesNative.NULL:
-            return "typeof(null)";
-        case TypesNative.BOOL:
-            return "bool";
-        case TypesNative.FLOAT:
-            return "double";
-        case TypesNative.STRING:
-            return "string";
-        case TypesNative.LONG:
-            return "long";
-        case TypesNative.CHAR:
-            return "char";
-        case TypesNative.VOID:
-            return "void";
-        case TypesNative.ID:
-            return "void*";
-        case TypesNative.CLASS:
-            return "class";
-        case TypesNative.T:
-            return "T";
-        }
-    }
-
     public void registerClass(string className, ClassDeclaration classDecl)
     {
         availableClasses[className] = classDecl;
@@ -108,28 +151,53 @@ class TypeChecker
     public bool isNumericType(string type)
     {
         string[] numericTypes = [
-            "int", "i32", "i64", "long", "float", "double", "binary", "id", "auto"
+            // Original types
+            "int", "i32", "i64", "long", "float", "double", "binary", "id", "auto",
+            // LLVM integer types
+            "i1", "i8", "i16", "i128", "byte", "short", "cent",
+            // LLVM floating point types
+            "half", "f32", "f64", "fp128", "x86_fp80", "ppc_fp128", "real",
+            // Portuguese
+            "inteiro", "flutuante"
         ];
         return numericTypes.canFind(type);
     }
 
+    public bool isFloatType(string type)
+    {
+        string[] floatTypes = [
+            "float", "double", "real", "half", "f32", "f64",
+            "fp128", "x86_fp80", "ppc_fp128", "flutuante"
+        ];
+        return floatTypes.canFind(type);
+    }
+
+    public bool isIntegerType(string type)
+    {
+        string[] intTypes = [
+            "int", "long", "byte", "short", "cent",
+            "i1", "i8", "i16", "i32", "i64", "i128",
+            "bool", "binary", "inteiro", "booleano"
+        ];
+        return intTypes.canFind(type);
+    }
+
     public bool isFloat(string left, string right)
     {
-        return left == "float" || right == "float" ||
-            left == "double" || right == "double";
+        return isFloatType(left) || isFloatType(right);
     }
 
     // Gets the promoted type between two numeric types
-    private FTypeInfo promoteTypes(string leftType, string rightType)
+    private FTypeInfo promoteTypes(TypesNative leftType, TypesNative rightType)
     {
-        int leftRank = typeHierarchy.get(leftType, 0);
-        int rightRank = typeHierarchy.get(rightType, 0);
+        int leftRank = typeHierarchy.get(cast(string) leftType, 0);
+        int rightRank = typeHierarchy.get(cast(string) rightType, 0);
 
         if (leftRank >= rightRank)
         {
-            return createTypeInfo(leftType);
+            return createTypeInfo(cast(TypesNative) leftType);
         }
-        return createTypeInfo(stringToTypesNative(rightType));
+        return createTypeInfo(rightType);
     }
 
     public bool areTypesCompatible(string sourceType, string targetType)
@@ -140,23 +208,59 @@ class TypeChecker
         if (isNumericType(sourceType) && isNumericType(targetType))
             return true;
 
+        // Extended compatibility map with LLVM types
         string[][string] compatibilityMap = [
-            "int": ["float", "double", "i64", "long", "bool", "i128", "string"],
-            "i32": ["float", "double", "i64", "long", "bool"],
-            "float": ["double", "int", "i32", "i64", "long", "bool", "string"],
-            "double": ["int", "i32", "float", "i64", "long", "bool", "string"],
+            // Original compatibility
+            "int": [
+                "float", "double", "i64", "long", "bool", "i128", "string", "i32",
+                "i16", "i8"
+            ],
+            "i32": [
+                "float", "double", "i64", "long", "bool", "int", "i16", "i8",
+                "f32", "f64"
+            ],
+            "float": [
+                "double", "int", "i32", "i64", "long", "bool", "string", "f64",
+                "real"
+            ],
+            "double": [
+                "int", "i32", "float", "i64", "long", "bool", "string", "f32",
+                "f64"
+            ],
             "binary": ["int", "i32", "i64", "long"],
-            "i64": ["float", "double", "bool"],
-            "long": ["float", "double", "bool", "string"],
+            "i64": ["float", "double", "bool", "long", "i32", "i16", "i8"],
+            "long": ["float", "double", "bool", "string", "i64", "i32"],
             "string": ["const char", "char", "long", "double"],
-            "bool": ["int", "i32", "long", "float", "double", "string", "i64"]
+            "bool": [
+                "int", "i32", "long", "float", "double", "string", "i64", "i1"
+            ],
+
+            // LLVM integer types
+            "i1": ["bool", "i8", "i16", "i32", "i64", "i128"],
+            "i8": ["i16", "i32", "i64", "i128", "float", "double", "byte"],
+            "i16": ["i32", "i64", "i128", "float", "double", "short"],
+            "i128": ["float", "double", "real", "cent"],
+
+            // LLVM floating point types
+            "half": ["float", "double", "real", "f32", "f64"],
+            "f32": ["f64", "double", "real", "float"],
+            "f64": ["real", "double", "fp128"],
+            "fp128": ["real"],
+            "x86_fp80": ["real", "double"],
+            "ppc_fp128": ["real", "double"],
+
+            // D native types
+            "byte": [
+                "short", "int", "long", "float", "double", "i8", "i16", "i32",
+                "i64"
+            ],
+            "short": ["int", "long", "float", "double", "i16", "i32", "i64"],
+            "cent": ["real", "double", "i128"],
+            "real": ["double", "float"]
         ];
 
         if (sourceType in compatibilityMap &&
             compatibilityMap[sourceType].canFind(targetType))
-            return true;
-
-        if (sourceType == "id" || targetType == "id")
             return true;
 
         if (sourceType.startsWith("class") && targetType.startsWith("class"))
@@ -167,12 +271,10 @@ class TypeChecker
 
     public FTypeInfo checkBinaryExprTypes(Stmt left, Stmt right, string operator)
     {
-        // import std.stdio;
+        TypesNative leftType = left.type.baseType;
+        TypesNative rightType = right.type.baseType;
 
-        string leftType = left.type.baseType;
-        string rightType = right.type.baseType;
-
-        if (leftType != rightType && !areTypesCompatible(leftType, rightType))
+        if (leftType != rightType && !areTypesCompatible(cast(string) leftType, cast(string) rightType))
         {
             throw new Exception(
                 "Operator '" ~ operator ~ "' cannot be applied to types '" ~
@@ -183,9 +285,9 @@ class TypeChecker
         switch (operator)
         {
         case "+":
-            if (leftType == "string" || rightType == "string")
+            if (leftType == TypesNative.I8P || rightType == TypesNative.I8P)
             {
-                return createTypeInfo("string");
+                return createTypeInfo(TypesNative.I8P);
             }
             if (isNumericType(leftType) && isNumericType(rightType))
             {
@@ -213,7 +315,8 @@ class TypeChecker
             );
 
         case "%":
-            if (isNumericType(leftType) && isNumericType(rightType))
+            // Modulo only works with integer types
+            if (isIntegerType(leftType) && isIntegerType(rightType))
             {
                 return promoteTypes(leftType, rightType);
             }
@@ -222,7 +325,7 @@ class TypeChecker
                 throw new Exception("Division by zero detected during type checking");
             }
             throw new Exception(
-                "Operator '%' cannot be applied to types '" ~
+                "Operator '%' can only be applied to integer types, got '" ~
                     leftType ~ "' and '" ~ rightType ~ "'"
             );
 
@@ -240,7 +343,7 @@ class TypeChecker
         case "!=":
             if (areTypesCompatible(leftType, rightType))
             {
-                return createTypeInfo("bool");
+                return createTypeInfo(TypesNative.I1);
             }
             throw new Exception(
                 "Operator '" ~ operator ~ "' cannot be applied to incompatible types '" ~
@@ -251,13 +354,10 @@ class TypeChecker
         case "<=":
         case ">":
         case ">=":
-            if (isNumericType(leftType) && isNumericType(rightType))
+            if ((isNumericType(leftType) && isNumericType(rightType)) || (leftType == TypesNative.I8P && rightType == TypesNative
+                    .I8P))
             {
-                return createTypeInfo("bool");
-            }
-            if (leftType == "string" && rightType == "string")
-            {
-                return createTypeInfo("bool");
+                return createTypeInfo(TypesNative.I1);
             }
             throw new Exception(
                 "Operator '" ~ operator ~ "' cannot be applied to types '" ~
@@ -266,27 +366,29 @@ class TypeChecker
 
         case "&&":
         case "||":
-            if (leftType == "bool" && rightType == "bool")
+            if (leftType == TypesNative.I1 && rightType == TypesNative.I1)
             {
-                return createTypeInfo("bool");
+                return createTypeInfo(TypesNative.I1);
             }
             throw new Exception(
                 "Operator '" ~ operator ~ "' cannot be applied to types '" ~
                     leftType ~ "' and '" ~ rightType ~ "'"
             );
+
         case "~":
-            if (leftType == "string" || rightType == "string")
+            if (leftType == TypesNative.I8P || rightType == TypesNative.I8P)
             {
-                return createTypeInfo("string");
+                return createTypeInfo(TypesNative.I8P);
             }
             throw new Exception(
                 "Operator '" ~ operator ~ "' cannot be applied to types '" ~
                     leftType ~ "' and '" ~ rightType ~ "'"
             );
+
         case "&":
         case "|":
         case "^":
-            if (isNumericType(leftType) && isNumericType(rightType))
+            if (isIntegerType(leftType) && isIntegerType(rightType))
             {
                 return promoteTypes(leftType, rightType);
             }
@@ -297,7 +399,7 @@ class TypeChecker
 
         case "<<":
         case ">>":
-            if (isNumericType(leftType) && isNumericType(rightType))
+            if (isIntegerType(leftType) && isIntegerType(rightType))
             {
                 return createTypeInfo(leftType);
             }
@@ -309,7 +411,9 @@ class TypeChecker
         case "&=":
         case "|=":
         case "^=":
-            if (isNumericType(leftType) && isNumericType(rightType))
+        case "<<=":
+        case ">>=":
+            if (isIntegerType(leftType) && isIntegerType(rightType))
             {
                 return createTypeInfo(leftType);
             }
@@ -317,16 +421,7 @@ class TypeChecker
                 "Operator '" ~ operator ~ "' can only be applied to integer types, got '" ~
                     leftType ~ "' and '" ~ rightType ~ "'"
             );
-        case "<<=":
-        case ">>=":
-            if (isNumericType(leftType) && isNumericType(rightType))
-            {
-                return createTypeInfo(leftType);
-            }
-            throw new Exception(
-                "Shift assignment operators can only be applied to integer types, got '" ~
-                    leftType ~ "' and '" ~ rightType ~ "'"
-            );
+
         default:
             throw new Exception("Unknown operator: " ~ operator);
         }
@@ -334,7 +429,7 @@ class TypeChecker
 
     public FTypeInfo checkUnaryExprType(Stmt operand, string operator, bool isPostfix = false)
     {
-        string operandType = this.getTypeStringFromNative(operand.type.baseType);
+        string operandType = cast(string) operand.type.baseType;
 
         switch (operator)
         {
@@ -361,16 +456,20 @@ class TypeChecker
             return operand.type;
 
         case "!":
-            return createTypeInfo(TypesNative.BOOL);
+            return createTypeInfo(TypesNative.I1);
 
         case "~":
-            if (!isNumericType(operandType) || operandType == "float" || operandType == "double")
+            if (!isIntegerType(operandType))
             {
                 throw new Exception(
                     "Bitwise NOT operator '~' can only be applied to integer types, got '" ~
                         operandType ~ "'"
                 );
             }
+            return operand.type;
+
+        case "*":
+        case "&":
             return operand.type;
 
         default:
@@ -399,7 +498,7 @@ class TypeChecker
                 auto numValue = value.get!double();
                 if (!isNaN(numValue))
                 {
-                    if (targetType == "float" || targetType == "double")
+                    if (isFloatType(targetType))
                     {
                         string strValue = to!string(value);
                         if (to!long(numValue) == numValue && !strValue.canFind("."))
@@ -428,13 +527,25 @@ class TypeChecker
     {
         return type.isPointer;
     }
+
+    // Helper method to get optimal numeric type for a value
+    public string getOptimalNumericType(long value)
+    {
+        if (value >= -128 && value <= 127)
+            return "i8";
+        else if (value >= -32_768 && value <= 32_767)
+            return "i16";
+        else if (value >= -2_147_483_648L && value <= 2_147_483_647L)
+            return "i32";
+        else
+            return "i64";
+    }
 }
 
 // Singleton instance for global access
 private __gshared TypeChecker typeCheckerInstance;
 
-public TypeChecker getTypeChecker(
-    Semantic semanticAnalyzer = null)
+public TypeChecker getTypeChecker(Semantic semanticAnalyzer = null)
 {
     if (typeCheckerInstance is null)
     {

@@ -38,7 +38,7 @@ class FunctionBuilder
     FunctionBuilder returns(FTypeInfo type)
     {
         this.func.returnType = type;
-        this.func.targetType = createTypeInfo(this.typeChecker.mapToDType(type.baseType));
+        // this.func.targetType = createTypeInfo(this.typeChecker.mapToDType(type.baseType));
         return this;
     }
 
@@ -63,6 +63,12 @@ class FunctionBuilder
     FunctionBuilder targetName(string name)
     {
         this.func.targetName = name;
+        return this;
+    }
+
+    FunctionBuilder ir(string ir)
+    {
+        this.func.ir = ir;
         return this;
     }
 
@@ -187,7 +193,7 @@ class FunctionBuilder
         }
 
         // Auto-generate if not provided
-        this.generate();
+        // this.generate();
 
         this.moduleBuilder.addCompleteFunction(this.func);
         return this.moduleBuilder;

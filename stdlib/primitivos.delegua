@@ -1,0 +1,33 @@
+estrutura inteiro {
+    type: i32;
+    value: i32;
+
+    fn (): i32 {
+        retorna valor
+    }
+}
+
+estrutura string {
+    type: *i8;
+    value: *i8;
+    length: i32;
+
+    fn (): *i8 {
+        retorna valor
+    }
+
+    fn tamanho(): inteiro
+    {
+        retorna novo inteiro(length)
+    }
+}
+
+template<T>
+estrutura array<T> {
+    // ...
+}
+
+template<T>
+estrutura class<T> {
+    // ...
+}

@@ -156,6 +156,19 @@ private:
         );
     }
 
+    TokenType getNumType(long n)
+    {
+
+        // i32 range: -2,147,483,648 to 2,147,483,647
+        if (n >= -2_147_483_648L && n <= 2_147_483_647L)
+        {
+            return TokenType.I32;
+        }
+        // i64 range: fits in long (D's long is 64-bit)
+        return TokenType.I64;
+
+    }
+
     void lexHexadecimal(ulong startPos)
     {
         this.offset += 2; // Skip "0x" or "0X"
@@ -172,7 +185,7 @@ private:
         long value = to!long(hexDigits, 16);
 
         this.createTokenWithLocation(
-            TokenType.INT,
+            getNumType(value),
             Variant(value),
             startPos,
             fullHex.length,
@@ -195,7 +208,7 @@ private:
         long value = to!long(octalDigits, 8);
 
         this.createTokenWithLocation(
-            TokenType.INT,
+            getNumType(value),
             Variant(value),
             startPos,
             fullOctal.length,
@@ -218,7 +231,7 @@ private:
         long value = to!long(binaryDigits, 2);
 
         this.createTokenWithLocation(
-            TokenType.INT,
+            getNumType(value),
             Variant(value),
             startPos,
             fullBinary.length,
@@ -282,7 +295,7 @@ private:
 
         this.offset++;
         this.createTokenWithLocation(
-            TokenType.STRING,
+            TokenType.I8P,
             Variant(value),
             startPos,
             this.offset - startPos - this.lineOffset + startPos
@@ -499,8 +512,8 @@ private:
             this.source[0 .. this.offset] == "..")
         {
             this.createTokenWithLocation(
-                TokenType.INT,
-                Variant(number),
+                getNumType(to!long(number)),
+                Variant(to!long(number)),
                 startPos,
                 number.length,
             );
@@ -523,8 +536,16 @@ private:
                 this.offset++;
                 number ~= this.consumeDigits();
 
+                TokenType type = TokenType.DOUBLE;
+
+                if (this.source[this.offset] == 'f' && this.source[this.offset] == 'F')
+                {
+                    type = TokenType.FLOAT;
+                    this.offset++;
+                }
+
                 this.createTokenWithLocation(
-                    TokenType.FLOAT,
+                    type,
                     Variant(number),
                     startPos,
                     number.length,
@@ -545,7 +566,7 @@ private:
             long binaryValue = to!long(number, 2);
 
             this.createTokenWithLocation(
-                TokenType.INT,
+                getNumType(binaryValue),
                 Variant(binaryValue),
                 startPos,
                 number.length + 1
@@ -554,7 +575,7 @@ private:
         }
 
         this.createTokenWithLocation(
-            TokenType.INT,
+            getNumType(to!long(number)),
             Variant(to!long(number)),
             startPos,
             number.length,
@@ -716,7 +737,7 @@ unittest
     assert(tokens[3].kind == TokenType.INT);
     assert(tokens[3].value.get!long == 42);
     assert(tokens[4].kind == TokenType.SEMICOLON);
-    assert(tokens[$-1].kind == TokenType.EOF);
+    assert(tokens[$ - 1].kind == TokenType.EOF);
 
     writeln("✓ Teste de tokenização básica passou!");
 }
@@ -757,11 +778,17 @@ unittest
     assert(tokens2[0].kind == TokenType.FLOAT);
     // Como pode ser string ou double, vou verificar se é um valor numérico válido
     // usando conversão segura
-    if (tokens2[0].value.type == typeid(string)) {
+    if (tokens2[0].value.type == typeid(string))
+    {
         import std.conv : to;
-        double val = tokens2[0].value.get!string.to!double;
+
+        double val = tokens2[0].value
+            .get!string
+            .to!double;
         assert(val == 12.34);
-    } else {
+    }
+    else
+    {
         assert(tokens2[0].value.get!double == 12.34);
     }
 

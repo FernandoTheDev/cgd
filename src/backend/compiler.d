@@ -35,8 +35,8 @@ public:
 
     void compile()
     {
-        CodeGenerator codegen = this.builder.codegen;
-        codegen.saveToFile(filename);
+        // CodeGenerator codegen = this.builder;
+        // codegen.saveToFile(filename);
         compileWithLDC();
     }
 

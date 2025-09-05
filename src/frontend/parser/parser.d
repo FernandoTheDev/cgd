@@ -48,11 +48,21 @@ private:
         switch (token.kind)
         {
             // Literals
-        case TokenType.INT:
-            return new IntLiteral(token.value.get!long, token.loc);
+        case TokenType.I8:
+            return new IntLiteral(token.value.get!long, createTypeInfo(TypesNative.I8), token.loc);
+        case TokenType.I16:
+            return new IntLiteral(token.value.get!long, createTypeInfo(TypesNative.I16), token.loc);
+        case TokenType.I32:
+            return new IntLiteral(token.value.get!long, createTypeInfo(TypesNative.I32), token.loc);
+        case TokenType.I64:
+            return new IntLiteral(token.value.get!long, createTypeInfo(TypesNative.I64), token.loc);
         case TokenType.FLOAT:
-            return new FloatLiteral(to!float(token.value.get!string), token.loc);
-        case TokenType.STRING:
+            return new FloatLiteral(to!double(token.value.get!string), createTypeInfo(
+                    TypesNative.F32), token.loc);
+        case TokenType.DOUBLE:
+            return new FloatLiteral(to!double(token.value.get!string), createTypeInfo(
+                    TypesNative.F64), token.loc);
+        case TokenType.I8P:
             auto literal = new StringLiteral(token.value.get!string, token.loc);
             if (this.peek()
                 .kind == TokenType.LBRACKET)
@@ -79,6 +89,43 @@ private:
         case TokenType.BANG:
             Stmt operand = this.parseExpression(Precedence.LOWEST);
             return new UnaryExpr("!", operand, this.makeLoc(token.loc, operand.loc));
+
+        case TokenType.ASTERISK:
+        case TokenType.EXPONENTIATION:
+            int count = 1;
+
+            if (token.kind == TokenType.EXPONENTIATION)
+            {
+                count++;
+            }
+
+            while (
+                this.peek().kind == TokenType.ASTERISK ||
+                this.peek()
+                .kind == TokenType.EXPONENTIATION
+                )
+            {
+                count++;
+                if (this.peek().kind == TokenType.EXPONENTIATION)
+                    count++;
+                this.advance();
+            }
+
+            Stmt operand = this.parseExpression(Precedence.PREFIX);
+            for (int i = 0; i < count; i++)
+            {
+                operand = new UnaryExpr(
+                    "*",
+                    operand,
+                    this.makeLoc(token.loc, operand.loc),
+                );
+            }
+
+            return operand;
+
+        case TokenType.BIT_AND:
+            Stmt operand = this.parseExpression(Precedence.PREFIX);
+            return new UnaryExpr("&", operand, this.makeLoc(token.loc, operand.loc));
 
             // Keywords
         case TokenType.VAR:
@@ -112,8 +159,6 @@ private:
                         .loc));
             return new ThisExpr(token.loc);
 
-            // Define como ID temporariamente
-        case TokenType.ARGS:
             // Others
         case TokenType.IDENTIFIER:
             if (this.peek()
@@ -182,7 +227,8 @@ private:
     {
         Loc start = this.previous().loc;
         Stmt[] elements;
-        Tuple!(bool, FTypeInfo) type = Tuple!(bool, FTypeInfo)(false, createTypeInfo("void"));
+        Tuple!(bool, FTypeInfo) type = Tuple!(bool, FTypeInfo)(false, createTypeInfo(
+                TypesNative.NULO));
         while (this.peek().kind != TokenType.RBRACKET && !this.isAtEnd())
         {
             // primeiro argumento
@@ -419,7 +465,7 @@ private:
         Identifier name = new Identifier(nameToken.value.get!string, nameToken.loc);
 
         FunctionArgs args = this.parseFnArguments();
-        FTypeInfo returnType = createTypeInfo(TypesNative.VOID);
+        FTypeInfo returnType = createTypeInfo(TypesNative.NULO);
 
         if (this.match([TokenType.COLON]))
         {
@@ -468,7 +514,7 @@ private:
         }
 
         this.match([TokenType.DE]);
-        Token _from = this.consume(TokenType.STRING, "Esperado uma string para a importação."); // TODO: melhorar esse cu
+        Token _from = this.consume(TokenType.I8P, "Esperado uma string para a importação."); // TODO: melhorar esse cu
         from = _from.value.get!string;
 
         if (this.match([TokenType.COMO]))
@@ -732,9 +778,9 @@ private:
                 .loc;
         }
 
-        FTypeInfo type = returnStmt is null ? createTypeInfo(TypesNative.VOID) : returnStmt
+        FTypeInfo type = returnStmt is null ? createTypeInfo(TypesNative.NULO) : returnStmt
             .type;
-        Variant value = type.baseType == TypesNative.VOID ? Variant("void") : Variant(
+        Variant value = type.baseType == TypesNative.NULO ? Variant("void") : Variant(
             returnStmt.value);
 
         return new ElseStatement(body, type, value, this.makeLoc(start.loc, end));
@@ -787,9 +833,9 @@ private:
             }
         }
 
-        FTypeInfo type = returnStmt is null ? createTypeInfo(TypesNative.VOID) : returnStmt
+        FTypeInfo type = returnStmt is null ? createTypeInfo(TypesNative.NULO) : returnStmt
             .type;
-        Variant value = type.baseType == TypesNative.VOID ? Variant("void") : Variant(
+        Variant value = type.baseType == TypesNative.NULO ? Variant("void") : Variant(
             returnStmt.value);
 
         return new IfStatement(condition, body, type, value, this.makeLoc(start.loc, end), bodySecond);
@@ -800,7 +846,7 @@ private:
         Token start = this.previous();
         Token id = this.consume(TokenType.IDENTIFIER, "Esperava-se um identificador para o nome da função.");
         FunctionArgs args = this.parseFnArguments();
-        FTypeInfo returnType = createTypeInfo(TypesNative.VOID);
+        FTypeInfo returnType = createTypeInfo(TypesNative.NULO);
 
         if (this.match([TokenType.COLON]))
         {
@@ -810,6 +856,7 @@ private:
                 // caiu em loop
                 if (fnTokens.length > 3)
                 {
+                    writeln(fnTokens);
                     this.error.addError(Diagnostic("Tipo desconhecido.", fnTokens[0].loc));
                     throw new Exception("Tipo desconhecido.");
                 }
@@ -817,12 +864,6 @@ private:
             }
             returnType = new ParseType(fnTokens).parse();
         }
-
-        // TODO: suportar funções template
-        // if (this.match([TokenType.SEMICOLON]))
-        // {
-
-        // }
 
         Stmt[] body;
 
@@ -868,7 +909,7 @@ private:
             Token argToken = this.consume(TokenType.IDENTIFIER,
                 "Esperava-se um identificador para o nome do argumento.");
             Identifier argId = new Identifier(argToken.value.get!string, argToken.loc);
-            FTypeInfo argType = createTypeInfo(TypesNative.ID);
+            FTypeInfo argType;
             NullStmt def = null;
 
             this.consume(TokenType.COLON, "Esperava-se ':' após o nome do argumento para tipagem.");
@@ -908,7 +949,7 @@ private:
     Stmt parseReturnStatement()
     {
         Stmt expr = new NullLiteral(this.previous().loc);
-        expr.type.baseType = TypesNative.VOID;
+        expr.type.baseType = TypesNative.NULO;
         if (!this.match([TokenType.SEMICOLON]))
             expr = this.parseExpression(Precedence.LOWEST);
         return new ReturnStatement(expr, this.previous().loc);
@@ -957,7 +998,7 @@ private:
             }
         }
 
-        FTypeInfo declaredType = createTypeInfo("void");
+        FTypeInfo declaredType = createTypeInfo(TypesNative.NULO);
         if (this.match([TokenType.COLON]))
         {
             Token[] typeTokens;
@@ -977,7 +1018,7 @@ private:
 
         if (this.match([TokenType.SEMICOLON]))
         {
-            if (declaredType.baseType == TypesNative.NULL)
+            if (declaredType.baseType == TypesNative.NULO)
             {
                 error.addError(Diagnostic(
                         "Tipo deve ser especificado para variáveis não inicializadas.", firstIdToken
@@ -1044,7 +1085,7 @@ private:
         else
         {
             Stmt value = this.parseExpression(Precedence.LOWEST);
-            FTypeInfo finalType = declaredType.baseType != TypesNative.NULL ? declaredType
+            FTypeInfo finalType = declaredType.baseType != TypesNative.NULO ? declaredType
                 : value.type;
 
             return VariableDeclarationFactory.createInitialized(
@@ -1144,9 +1185,9 @@ private:
         bool nextTokenIsValidCastTarget =
             this.peek().kind == TokenType.IDENTIFIER ||
             this.peek()
-            .kind == TokenType.INT ||
+            .kind == TokenType.I32 ||
             this.peek().kind == TokenType.FLOAT ||
-            this.peek().kind == TokenType.STRING ||
+            this.peek().kind == TokenType.I8P ||
             this.peek()
             .kind == TokenType.ASTERISK ||
             this.peek().kind == TokenType.LPAREN;
@@ -1193,9 +1234,9 @@ private:
         if (tokens.length == 1)
         {
             return tokens[0].kind == TokenType.IDENTIFIER ||
-                tokens[0].kind == TokenType.INT ||
+                tokens[0].kind == TokenType.I32 ||
                 tokens[0].kind == TokenType.FLOAT ||
-                tokens[0].kind == TokenType.STRING;
+                tokens[0].kind == TokenType.I8P;
         }
 
         ulong position = 0;
@@ -1333,7 +1374,7 @@ public:
     Program parse()
     {
         Program program = new Program([]);
-        program.type = createTypeInfo(TypesNative.NULL);
+        program.type = createTypeInfo(TypesNative.NULO);
         program.value = null;
 
         try
@@ -1484,14 +1525,14 @@ private:
     {
         if (left.type.baseType == "string" || right.type.baseType == "string")
         {
-            return createTypeInfo(TypesNative.STRING);
+            return createTypeInfo(TypesNative.I8P);
         }
 
         if (left.type.baseType == "float" || right.type.baseType == "float")
         {
-            return createTypeInfo(TypesNative.FLOAT);
+            return createTypeInfo(TypesNative.F32);
         }
-        return createTypeInfo(TypesNative.LONG);
+        return createTypeInfo(TypesNative.I32);
     }
 
     Loc makeLoc(ref Loc start, ref Loc end)

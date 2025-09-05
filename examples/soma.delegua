@@ -1,0 +1,13 @@
+função soma(x: i32, y: i32): i32 
+{
+    retorna x + y
+}
+
+var x = 9
+var y = 20 * 3
+var result = soma(x, y)
+
+printf("%d\n", result)
+
+var nome: i8* = "Fernando"
+printf("Nome: %s\n", nome)

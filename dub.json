@@ -8,6 +8,13 @@
 	"license": "MIT",
 	"name": "cgd",
 	"targetType": "executable",
+	"libs": ["LLVM-18"],
+	"lflags": [
+		"-L/usr/lib64/llvm18/lib",
+		"-L-rpath=/usr/lib64/llvm18/lib",
+		"-ldl"
+	],
+	"dflags": ["-I/usr/lib64/llvm18/include"],
 	"buildTypes": {
 		"debug": {
 			"dflags-dmd": ["-g", "-debug"],

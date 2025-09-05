@@ -40,42 +40,17 @@ public:
         // TODO: Criar uma classe para setar os módulos|libs
         // Vamos adicionar isso aqui temporariamente
         StdLibModuleBuilder mod_io = new StdLibModuleBuilder("io")
-            .defineFunction("escreva")
-            .returns(createTypeInfo(TypesNative.NULL))
+            .defineFunction("printf")
+            .returns(createTypeInfo(TypesNative.I32))
             .variadic()
-            .customTargetType(createTypeInfo("void"))
-            .libraryName("io_escreva")
-            .generateDExternWithPragma()
-            .done()
-
-            .defineFunction("leia")
-            .returns(createTypeInfo(TypesNative.STRING))
-            .customTargetType(createTypeInfo("string"))
-            .withParams(createTypeInfo("string"))
-            .libraryName("io_leia")
-            .opt(1)
-            .generateDExternWithPragma()
-            .done()
-
-            .defineFunction("escrevaln")
-            .returns(createTypeInfo(TypesNative.NULL))
-            .variadic()
-            .customTargetType(createTypeInfo("void"))
-            .libraryName("io_escrevaln")
-            .generateDExternWithPragma()
+            .customTargetType(createTypeInfo(TypesNative.I8P))
+            .libraryName("printf")
+            .ir("declare i32 @printf(ptr, ...)")
             .done();
 
-        StdLibModuleBuilder mod_type = new StdLibModuleBuilder("type")
-            .defineFunction("sdecimal")
-            .returns(createTypeInfo(TypesNative.FLOAT))
-            .customTargetType(createTypeInfo("double"))
-            .withParams(createTypeInfo("string"))
-            .libraryName("type_sdecimal")
-            .generateDExternWithPragma()
-            .done();
+        availableStdFunctions["printf"] = mod_io.getFunction("printf");
 
         this.stdLibs["io"] = mod_io.moduleData;
-        this.stdLibs["type"] = mod_type.moduleData;
     }
 
     Program semantic(Program program)
@@ -183,8 +158,8 @@ private:
         case NodeType.BoolLiteral:
         case NodeType.ArrayLiteral:
             analyzedNode = node;
-            string baseType = this.typeChecker.getTypeStringFromNative(analyzedNode.type.baseType);
-            analyzedNode.type.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
+            string baseType = cast(string) analyzedNode.type.baseType;
+            // analyzedNode.type.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
             return analyzedNode;
         default:
             throw new Exception(format("Nó desconhecido '%s'.", to!string(node.kind)));
@@ -235,8 +210,8 @@ private:
         // Analisar propriedades
         foreach (ref prop; node.properties)
         {
-            string baseType = this.typeChecker.getTypeStringFromNative(prop.type.baseType);
-            prop.type.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
+            string baseType = cast(string) prop.type.baseType;
+            // prop.type.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
 
             if (prop.defaultValue !is null)
             {
@@ -265,8 +240,8 @@ private:
             foreach (arg; method.args)
             {
                 string argName = arg.id.value.get!string;
-                string baseType = this.typeChecker.getTypeStringFromNative(arg.type.baseType);
-                arg.type.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
+                string baseType = cast(string) arg.type.baseType;
+                // arg.type.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
                 this.addSymbol(argName, SymbolInfo(argName, arg.type, true, false, arg.id.loc));
             }
 
@@ -313,8 +288,8 @@ private:
         foreach (arg; node.args)
         {
             string argName = arg.id.value.get!string;
-            string baseType = this.typeChecker.getTypeStringFromNative(arg.type.baseType);
-            arg.type.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
+            string baseType = cast(string) arg.type.baseType;
+            // arg.type.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
             this.addSymbol(argName, SymbolInfo(argName, arg.type, true, false, arg.id.loc));
         }
 
@@ -428,20 +403,20 @@ private:
 
     void validateObjectType(MemberCallExpr node)
     {
-        if (node.object.type.baseType == TypesNative.CLASS)
-        {
-            string className = node.object.type.className;
+        // if (node.object.type.baseType == TypesNative.CLASS)
+        // {
+        //     string className = node.object.type.className;
 
-            if (!this.typeChecker.isValidClass(className))
-            {
-                string errorMsg = format("Classe '%s' não encontrada.", className);
-                this.error.addError(Diagnostic(errorMsg, node.object.loc));
-                throw new Exception(errorMsg);
-            }
+        //     if (!this.typeChecker.isValidClass(className))
+        //     {
+        //         string errorMsg = format("Classe '%s' não encontrada.", className);
+        //         this.error.addError(Diagnostic(errorMsg, node.object.loc));
+        //         throw new Exception(errorMsg);
+        //     }
 
-            // TODO: Implementar verificação de membros da classe
-            // validateClassMember(className, node.member);
-        }
+        //     // TODO: Implementar verificação de membros da classe
+        //     // validateClassMember(className, node.member);
+        // }
     }
 
     void analyzeMethodArguments(MemberCallExpr node)
@@ -523,10 +498,10 @@ private:
             return primitive.get(objectType, args).type;
         }
 
-        if (node.object.type.baseType == TypesNative.CLASS)
-        {
-            return determineClassMemberType(node);
-        }
+        // if (node.object.type.baseType == TypesNative.CLASS)
+        // {
+        //     return determineClassMemberType(node);
+        // }
 
         // Fallback: retorna o tipo do objeto
         return node.object.type;
@@ -622,14 +597,14 @@ private:
     {
         if (node.ids !is null && node.ids.length > 0)
         {
-            if (node.commonType.baseType == TypesNative.NULL)
+            if (node.commonType.baseType == TypesNative.NULO)
             {
                 throw new Exception(
                     "Tipo comum deve ser especificado para declarações múltiplas não inicializadas.");
             }
 
-            string baseType = this.typeChecker.getTypeStringFromNative(node.commonType.baseType);
-            node.commonType.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
+            string baseType = cast(string) node.commonType.baseType;
+            // node.commonType.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
             node.type = node.commonType;
 
             foreach (id; node.ids)
@@ -674,8 +649,8 @@ private:
                         id, cast(int) node.id.loc.line, cast(int) node.id.loc.start));
             }
 
-            string baseType = this.typeChecker.getTypeStringFromNative(node.type.baseType);
-            node.type.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
+            string baseType = cast(string) node.type.baseType;
+            // node.type.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
 
             this.addSymbol(id, SymbolInfo(id, node.type, node.mut, true, node.loc));
         }
@@ -716,23 +691,21 @@ private:
             Stmt analyzedValue = this.analyzeNode(decl.value);
 
             FTypeInfo finalType;
-            if (node.commonType.baseType != TypesNative.NULL)
+            if (node.commonType.baseType != TypesNative.NULO)
             {
                 finalType = node.commonType;
 
-                if (analyzedValue.type.baseType == TypesNative.VOID)
+                if (analyzedValue.type.baseType == TypesNative.NULO)
                     analyzedValue.type = finalType;
 
-                if (node.commonType.baseType == TypesNative.VOID)
+                if (node.commonType.baseType == TypesNative.NULO)
                 {
                     node.commonType = analyzedValue.type;
                     finalType = node.commonType;
                 }
 
-                string valueTypeStr = this.typeChecker.getTypeStringFromNative(
-                    analyzedValue.type.baseType);
-                string commonTypeStr = this.typeChecker.getTypeStringFromNative(
-                    node.commonType.baseType);
+                string valueTypeStr = cast(string) analyzedValue.type.baseType;
+                string commonTypeStr = cast(string) node.commonType.baseType;
 
                 if (!this.typeChecker.areTypesCompatible(valueTypeStr, commonTypeStr))
                 {
@@ -747,8 +720,8 @@ private:
                 finalType = analyzedValue.type;
             }
 
-            string baseType = this.typeChecker.getTypeStringFromNative(finalType.baseType);
-            finalType.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
+            string baseType = cast(string) finalType.baseType;
+            // finalType.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
 
             VariablePair analyzedPair = VariablePair(decl.id, analyzedValue, finalType, decl.mut);
             analyzedDeclarations ~= analyzedPair;
@@ -758,10 +731,10 @@ private:
 
         node.declarations = analyzedDeclarations;
 
-        if (node.commonType.baseType != TypesNative.NULL)
+        if (node.commonType.baseType != TypesNative.NULO)
         {
-            string baseType = this.typeChecker.getTypeStringFromNative(node.commonType.baseType);
-            node.commonType.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
+            string baseType = cast(string) node.commonType.baseType;
+            // node.commonType.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
         }
 
         return node;
@@ -853,10 +826,10 @@ private:
         node.id = cast(Identifier) this.analyzeIdentifier(node.id);
         node.value = this.analyzeNode(node.value.get!Stmt);
 
-        if (node.value.get!Stmt.type.baseType == TypesNative.VOID)
+        if (node.value.get!Stmt.type.baseType == TypesNative.NULO)
             node.value.get!Stmt.type = node.type;
 
-        if (node.type.baseType == TypesNative.VOID)
+        if (node.type.baseType == TypesNative.NULO)
             node.type = node.value.get!Stmt.type;
 
         return node;
@@ -1068,8 +1041,8 @@ private:
             // string baseType = to!string(arg.type.baseType).toLower();
             // writeln("FN BASE TYPE: ", baseType);
             // writeln("C: ", baseType);
-            string baseType = this.typeChecker.getTypeStringFromNative(arg.type.baseType);
-            arg.type.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
+            string baseType = cast(string) arg.type.baseType;
+            // arg.type.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
             // arg.type.baseType = cast(TypesNative) this.typeChecker.mapToDType(
             //     baseType);
             // writeln("ARG BASE TYPE: ", arg.type.baseType);
@@ -1120,7 +1093,7 @@ private:
             }
         }
 
-        if (returnType.baseType != TypesNative.VOID && !hasReturn)
+        if (returnType.baseType != TypesNative.NULO && !hasReturn)
         {
             this.error.addError(Diagnostic(format(
                     "A função esperava um retorno '%s', mas não foi encontrado qualquer tipo de retorno nela.", t2),
@@ -1147,7 +1120,7 @@ private:
         // TODO: implementar direito
         if (id == "ARGS" && !symbol)
         {
-            this.addSymbol(id, SymbolInfo(id, createArrayType(TypesNative.STRING), false, true, node
+            this.addSymbol(id, SymbolInfo(id, createArrayType(TypesNative.I8P), false, true, node
                     .loc));
             symbol = this.lookupSymbol(id); // seta novamente
         }
@@ -1177,18 +1150,18 @@ private:
         if (node.op == "&" || node.op == "|" || node.op == "^" ||
             node.op == "<<" || node.op == ">>")
         {
-            if (left.type.baseType != TypesNative.LONG)
+            if (left.type.baseType != TypesNative.I64)
             {
-                left.type.baseType = TypesNative.LONG;
+                left.type.baseType = TypesNative.I64;
             }
-            if (right.type.baseType != TypesNative.LONG)
+            if (right.type.baseType != TypesNative.I64)
             {
-                right.type.baseType = TypesNative.LONG;
+                right.type.baseType = TypesNative.I64;
             }
         }
 
-        if (node.op == "+" && (left.type.baseType == TypesNative.STRING || right.type.baseType == TypesNative
-                .STRING))
+        if (node.op == "+" && (left.type.baseType == TypesNative.I8P || right.type.baseType == TypesNative
+                .I8P))
         {
             // Concat
             node.op = "~";
@@ -1223,10 +1196,10 @@ private:
         Stmt analyzedValue = this.analyzeNode(node.value.get!Stmt);
         node.value = analyzedValue;
 
-        if (node.value.get!Stmt.type.baseType == TypesNative.VOID)
+        if (node.value.get!Stmt.type.baseType == TypesNative.NULO)
             node.value.get!Stmt.type = node.type;
 
-        if (node.type.baseType == TypesNative.VOID)
+        if (node.type.baseType == TypesNative.NULO)
             node.type = node.value.get!Stmt.type;
 
         node.type.className = analyzedValue.type.className;

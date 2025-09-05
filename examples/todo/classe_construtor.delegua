@@ -4,7 +4,7 @@ classe Usuario
 {
     nome: texto;
 
-    construtor(nome: texto = "...")
+    construtor(nome: texto)
     {
         isto.nome = nome;
     }

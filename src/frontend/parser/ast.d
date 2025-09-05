@@ -56,7 +56,9 @@ enum NodeType
     NewExpr,
     ThisExpr,
     IndexExpr,
-    IndexExprAssignment
+
+    IndexExprAssignment,
+    MemberAssignment,
 }
 
 class Stmt
@@ -96,10 +98,10 @@ class BinaryExpr : Stmt
 
 class IntLiteral : Stmt
 {
-    this(long value, Loc loc)
+    this(long value, FTypeInfo type, Loc loc)
     {
         this.kind = NodeType.IntLiteral;
-        this.type = createTypeInfo(TypesNative.LONG);
+        this.type = type;
         this.value = value;
         this.loc = loc;
     }
@@ -110,7 +112,7 @@ class NullLiteral : Stmt
     this(Loc loc)
     {
         this.kind = NodeType.NullLiteral;
-        this.type = createTypeInfo(TypesNative.NULL);
+        this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
         this.loc = loc;
     }
@@ -121,7 +123,7 @@ class BoolLiteral : Stmt
     this(bool value, Loc loc)
     {
         this.kind = NodeType.BoolLiteral;
-        this.type = createTypeInfo(TypesNative.BOOL);
+        this.type = createTypeInfo(TypesNative.I1);
         this.value = value;
         this.loc = loc;
     }
@@ -129,10 +131,10 @@ class BoolLiteral : Stmt
 
 class FloatLiteral : Stmt
 {
-    this(float value, Loc loc)
+    this(double value, FTypeInfo type, Loc loc)
     {
         this.kind = NodeType.FloatLiteral;
-        this.type = createTypeInfo(TypesNative.FLOAT);
+        this.type = type;
         this.value = value;
         this.loc = loc;
     }
@@ -143,7 +145,7 @@ class StringLiteral : Stmt
     this(string value, Loc loc)
     {
         this.kind = NodeType.StringLiteral;
-        this.type = createTypeInfo(TypesNative.STRING);
+        this.type = createTypeInfo(TypesNative.I8P);
         this.value = value;
         this.loc = loc;
     }
@@ -181,7 +183,7 @@ class Identifier : Stmt
     this(string id, Loc loc)
     {
         this.kind = NodeType.Identifier;
-        this.type = createTypeInfo(TypesNative.ID);
+        this.type = createTypeInfo(TypesNative.POINTER);
         this.value = id;
         this.loc = loc;
     }
@@ -230,7 +232,7 @@ class MultipleVariableDeclaration : Stmt
         this.declarations = declarations;
         this.commonType = commonType;
         this.loc = loc;
-        this.type = createTypeInfo(TypesNative.VOID);
+        this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
     }
 
@@ -333,7 +335,7 @@ class VariableDeclarationFactory
         VariablePair[] pairs;
         foreach (i; 0 .. ids.length)
         {
-            FTypeInfo finalType = commonType.baseType != TypesNative.NULL ? commonType
+            FTypeInfo finalType = commonType.baseType != TypesNative.NULO ? commonType
                 : values[i].type;
             pairs ~= VariablePair(ids[i], values[i], finalType, mut);
         }
@@ -348,7 +350,7 @@ class VariableDeclarationFactory
         Loc loc
     )
     {
-        if (commonType.baseType == TypesNative.NULL)
+        if (commonType.baseType == TypesNative.NULO)
         {
             throw new Exception(
                 "Tipo deve ser especificado para declarações múltiplas não inicializadas");
@@ -369,7 +371,7 @@ class CallExpr : Stmt
         this.calle = calle;
         this.loc = loc;
         this.args = args;
-        this.type = createTypeInfo(TypesNative.NULL);
+        this.type = createTypeInfo(TypesNative.NULO);
     }
 }
 
@@ -426,7 +428,7 @@ class UnaryExpr : Stmt
         this.postFix = postFix;
         this.operand = operand;
         this.value = null;
-        this.type = createTypeInfo(TypesNative.NULL);
+        this.type = createTypeInfo(TypesNative.NULO);
         this.loc = loc;
     }
 }
@@ -440,7 +442,7 @@ class DereferenceExpr : Stmt
         this.kind = NodeType.DereferenceExpr;
         this.operand = operand;
         this.value = null;
-        this.type = createTypeInfo(TypesNative.NULL);
+        this.type = createTypeInfo(TypesNative.NULO);
         this.loc = loc;
     }
 }
@@ -454,7 +456,7 @@ class AddressOfExpr : Stmt
         this.kind = NodeType.AddressOfExpr;
         this.operand = operand;
         this.value = null;
-        this.type = createTypeInfo(TypesNative.NULL);
+        this.type = createTypeInfo(TypesNative.NULO);
         this.loc = loc;
     }
 }
@@ -507,7 +509,7 @@ class ReturnStatement : Stmt
         this.expr = expr;
         this.value = null;
         this.loc = loc;
-        this.type = createTypeInfo(TypesNative.NULL);
+        this.type = createTypeInfo(TypesNative.NULO);
     }
 }
 
@@ -530,7 +532,7 @@ class ForStatement : Stmt
         this.expr = expr;
         this.body = body;
         this.loc = loc;
-        this.type = createTypeInfo(TypesNative.NULL);
+        this.type = createTypeInfo(TypesNative.NULO);
     }
 }
 
@@ -547,7 +549,7 @@ class WhileStatement : Stmt
         this.cond = cond;
         this.body = body;
         this.loc = loc;
-        this.type = createTypeInfo(TypesNative.NULL);
+        this.type = createTypeInfo(TypesNative.NULO);
     }
 }
 
@@ -564,7 +566,7 @@ class DoWhileStatement : Stmt
         this.cond = cond;
         this.body = body;
         this.loc = loc;
-        this.type = createTypeInfo(TypesNative.NULL);
+        this.type = createTypeInfo(TypesNative.NULO);
     }
 }
 
@@ -597,7 +599,7 @@ class MemberCallExpr : Stmt
         this.args = args;
         this.isMethodCall = isMethodCall;
         this.loc = loc;
-        this.type = createTypeInfo(TypesNative.NULL);
+        this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
     }
 }
@@ -615,7 +617,7 @@ class SwitchStatement : Stmt
         this.cases = cases;
         this.defaultCase = defaultCase;
         this.loc = loc;
-        this.type = createTypeInfo(TypesNative.VOID);
+        this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
     }
 }
@@ -631,7 +633,7 @@ class CaseStatement : Stmt
         this.value = value;
         this.body = body;
         this.loc = loc;
-        this.type = createTypeInfo(TypesNative.VOID);
+        this.type = createTypeInfo(TypesNative.NULO);
     }
 }
 
@@ -644,7 +646,7 @@ class DefaultStatement : Stmt
         this.kind = NodeType.DefaultStatement;
         this.body = body;
         this.loc = loc;
-        this.type = createTypeInfo(TypesNative.VOID);
+        this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
     }
 }
@@ -655,7 +657,7 @@ class BreakStatement : Stmt
     {
         this.kind = NodeType.BreakStatement;
         this.loc = loc;
-        this.type = createTypeInfo(TypesNative.VOID);
+        this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
     }
 }
@@ -712,7 +714,7 @@ class ClassDeclaration : Stmt
         this.properties = p;
         this.methods = m;
         this.value = null;
-        this.type = createTypeInfo("null");
+        this.type = createTypeInfo(TypesNative.NULO);
         this.loc = loc;
     }
 }
@@ -731,7 +733,7 @@ class ConstructorDeclaration : Stmt
         this.args = args;
         this.body = body;
         this.loc = loc;
-        this.type = createTypeInfo(TypesNative.VOID);
+        this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
     }
 }
@@ -746,7 +748,7 @@ class DestructorDeclaration : Stmt
         this.kind = NodeType.DestructorDeclaration;
         this.body = body;
         this.loc = loc;
-        this.type = createTypeInfo(TypesNative.VOID);
+        this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
     }
 }
@@ -762,7 +764,7 @@ class NewExpr : Stmt
         this.className = className;
         this.args = args;
         this.loc = loc;
-        this.type = createTypeInfo(TypesNative.NULL); // Será definido durante análise semântica
+        this.type = createTypeInfo(TypesNative.NULO); // Será definido durante análise semântica
         this.value = null;
     }
 }
@@ -773,7 +775,7 @@ class ThisExpr : Stmt
     {
         this.kind = NodeType.ThisExpr;
         this.loc = loc;
-        this.type = createTypeInfo(TypesNative.NULL); // Será definido durante análise semântica
+        this.type = createTypeInfo(TypesNative.NULO); // Será definido durante análise semântica
         this.value = null;
     }
 }
@@ -796,7 +798,7 @@ class ImportStatement : Stmt
         this._alias = _alias;
         this.targets = targets;
         this.loc = loc;
-        this.type = createTypeInfo("null");
+        this.type = createTypeInfo(TypesNative.NULO);
     }
 }
 
@@ -822,6 +824,19 @@ class IndexExprAssignment : Stmt
         this.kind = NodeType.IndexExprAssignment;
         this.left = left;
         this.index = index;
+        this.type = left.type; // permite encadeamento
+        this.value = value;
+        this.loc = loc;
+    }
+}
+
+class MemberAssignment : Stmt
+{
+    Stmt left, index, value;
+    this(Stmt left, Stmt value, Loc loc)
+    {
+        this.kind = NodeType.MemberAssignment;
+        this.left = left;
         this.type = left.type; // permite encadeamento
         this.value = value;
         this.loc = loc;

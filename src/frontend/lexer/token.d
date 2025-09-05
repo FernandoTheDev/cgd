@@ -25,7 +25,6 @@ enum TokenType
     TENTE, // tente
     FINALMENTE, // finalmente
     INSTANCEOF, // instanceof
-    TYPEOF, // typeof
     NOVO, // novo
     PEGUE, // pegue
     RETORNA, // retorna/retorne
@@ -46,7 +45,6 @@ enum TokenType
     PROTEGIDO, // protegido
     CONSTRUTOR, // construtor
     DESTRUTOR, // destrutor
-    ARGS, // ARGS
 
     // Future Reserved Words
     ENUM, // enum
@@ -57,12 +55,27 @@ enum TokenType
 
     IDENTIFIER, // x
 
-    // Types
-    STRING, // "omg"
-    INT, // 10
-    FLOAT, // 10.1
+    // TYPES
     NULL, // null
-    BOOL, // true | false
+    I1, // i1 type
+    I8P, // i8 type / "string literals"
+    I8, // i8 type
+    I16, // i16 type
+    I32, // i32 type  
+    I64, // i64 type
+    I128, // i128 type
+    // Floating point types
+    HALF, // half type
+    FLOAT, // float type / 10.1
+    DOUBLE, // double type
+    FP128, // fp128 type
+    X86_FP80, // x86_fp80 type
+    PPC_FP128, // ppc_fp128 type
+    // Special types
+    VOID, // void type
+    LABEL, // label type
+    METADATA, // metadata type
+    TOKEN, // token type
 
     // Symbols
     EQUALS, // =
@@ -157,12 +170,11 @@ TokenType[string] keywords;
 shared static this()
 {
     keywords["var"] = TokenType.VAR;
+
     keywords["false"] = TokenType.FALSE;
     keywords["falso"] = TokenType.FALSE;
     keywords["verdadeiro"] = TokenType.TRUE;
-    keywords["true"] = TokenType.TRUE;
-    keywords["bool"] = TokenType.BOOL;
-    keywords["logico"] = TokenType.BOOL;
+
     keywords["sustar"] = TokenType.SUSTAR;
     keywords["faca"] = TokenType.DO;
     keywords["faça"] = TokenType.DO;
@@ -182,7 +194,6 @@ shared static this()
     keywords["tente"] = TokenType.TENTE;
     keywords["finalmente"] = TokenType.FINALMENTE;
     keywords["instanceof"] = TokenType.INSTANCEOF;
-    keywords["typeof"] = TokenType.TYPEOF;
     keywords["novo"] = TokenType.NOVO;
     keywords["pegue"] = TokenType.PEGUE;
     keywords["retorna"] = TokenType.RETORNA;
@@ -204,7 +215,6 @@ shared static this()
     keywords["protegido"] = TokenType.PROTEGIDO;
     keywords["construtor"] = TokenType.CONSTRUTOR;
     keywords["destrutor"] = TokenType.DESTRUTOR;
-    keywords["ARGS"] = TokenType.ARGS;
 
     // Future Reserved Words
     keywords["enum"] = TokenType.ENUM;
@@ -222,13 +232,27 @@ bool isTypeToken(Token token)
         return false;
 
     static immutable bool[string] typeKeywords = [
-        "int": true,
-        "float": true,
-        "string": true,
-        "bool": true,
-        "void": true,
         "null": true,
-        "vazio": true, // void
+        "i1": true, // 1-bit integer (boolean)
+        "i8": true, // 8-bit integer (byte)
+        "i16": true, // 16-bit integer
+        "i32": true, // 32-bit integer
+        "i64": true, // 64-bit integer
+        "i128": true, // 128-bit integer
+
+        // Floating point types
+        "half": true, // 16-bit floating point
+        "float": true, // 32-bit floating point
+        "double": true, // 64-bit floating point
+        "fp128": true, // 128-bit floating point
+        "x86_fp80": true, // x86 80-bit floating point
+        "ppc_fp128": true, // PowerPC 128-bit floating point
+
+        // Other basic types
+        "void": true, // void type
+        "label": true, // label type
+        "metadata": true, // metadata type
+        "token": true, // token type
     ];
 
     try

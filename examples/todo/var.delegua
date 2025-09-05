@@ -1,0 +1,4 @@
+importar "io"
+
+var x = 100
+escreva(x)

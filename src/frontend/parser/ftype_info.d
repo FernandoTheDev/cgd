@@ -15,64 +15,6 @@ struct FTypeInfo
     string className;
 }
 
-TypesNative stringToTypesNative(string typeStr)
-{
-    switch (typeStr.toLower())
-    {
-    case "double":
-    case "float":
-        return TypesNative.FLOAT;
-    case "string":
-    case "texto":
-        return TypesNative.STRING;
-    case "bool":
-    case "logico":
-        return TypesNative.BOOL;
-    case "int":
-    case "long":
-    case "inteiro":
-        return TypesNative.LONG;
-    case "char":
-    case "caracter":
-        return TypesNative.CHAR;
-    case "null":
-    case "nulo":
-        return TypesNative.NULL;
-    case "void":
-    case "id":
-        return TypesNative.VOID;
-    default:
-        return TypesNative.CLASS;
-        throw new Exception("Tipo não suportado para conversão: " ~ typeStr);
-    }
-}
-
-FTypeInfo createTypeInfoRef(string baseType, bool s = false)
-{
-    return FTypeInfo(
-        stringToTypesNative(baseType),
-        false,
-        0,
-        false,
-        s,
-        0,
-        true
-    );
-}
-
-FTypeInfo createTypeInfo(string baseType, bool s = false)
-{
-    return FTypeInfo(
-        stringToTypesNative(baseType),
-        false,
-        0,
-        false,
-        s,
-        0,
-        false
-    );
-}
-
 FTypeInfo createTypeInfo(TypesNative baseType, bool s = false)
 {
     return FTypeInfo(
@@ -89,7 +31,7 @@ FTypeInfo createTypeInfo(TypesNative baseType, bool s = false)
 FTypeInfo createClassType(string className)
 {
     FTypeInfo info;
-    info.baseType = TypesNative.CLASS;
+    info.baseType = TypesNative.NULO;
     info.className = className;
     return info;
 }

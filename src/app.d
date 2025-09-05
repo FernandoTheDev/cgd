@@ -116,7 +116,7 @@ void main(string[] args)
 			arquivoSaida = nomeBase;
 			if (comando == "transpilar")
 			{
-				arquivoSaida = nomeBase ~ ".d";
+				arquivoSaida = nomeBase ~ ".ll";
 			}
 		}
 
@@ -183,7 +183,7 @@ void mostrarMensagemAjuda()
 	writeln("");
 	writeln("Exemplos:");
 	writeln("  cgd compilar arquivo.delegua");
-	writeln("  cgd transpilar arquivo.delegua -o saida.d");
+	writeln("  cgd transpilar arquivo.delegua -o saida.ll");
 	writeln("  cgd compilar arquivo.delegua --output meuapp");
 	writeln("  cgd atualizar --verbose");
 	writeln("");
@@ -292,7 +292,7 @@ void processarArquivo(string arquivo, string arquivoSaida, string comando, bool 
 
 		if (comando == "compilar")
 		{
-			Compiler compiler = new Compiler(builder, nomeArquivo ~ ".d", arquivoSaida, STDLIB_DIR);
+			Compiler compiler = new Compiler(builder, nomeArquivo ~ ".ll", arquivoSaida, STDLIB_DIR);
 			compiler.compile();
 
 			if (verboso)
@@ -306,18 +306,19 @@ void processarArquivo(string arquivo, string arquivoSaida, string comando, bool 
 		}
 		else // transpilar
 		{
-			string codigoGerado = builder.codegen.generate();
+			builder.saveModule(cast(const char*) arquivoSaida);
+			// string codigoGerado = builder.builder();
 
-			fileWrite(arquivoSaida, codigoGerado);
+			// fileWrite(arquivoSaida, codigoGerado);
 
-			if (verboso)
-			{
-				writefln("Transpilação concluída com sucesso. Arquivo D gerado: %s", arquivoSaida);
-			}
-			else
-			{
-				writefln("Transpilação de '%s' concluída.", arquivo);
-			}
+			// if (verboso)
+			// {
+			// 	writefln("Transpilação concluída com sucesso. Arquivo D gerado: %s", arquivoSaida);
+			// }
+			// else
+			// {
+			// 	writefln("Transpilação de '%s' concluída.", arquivo);
+			// }
 		}
 
 	}

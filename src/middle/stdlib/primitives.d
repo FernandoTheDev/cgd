@@ -54,50 +54,50 @@ public:
     this()
     {
         // String
-        PrimitiveProperty[] str_properties;
-        str_properties ~= PrimitiveProperty("tamanho", createTypeInfo("long"), "string_tamanho", [
-                createTypeInfo("string")
-            ], 1);
-        str_properties ~= PrimitiveProperty("substituir", createTypeInfo("string"), "string_substituir", [
-                createTypeInfo("string"), createTypeInfo("string"),
-                createTypeInfo("string")
-            ], 1);
-        str_properties ~= PrimitiveProperty("dividir", createArrayType(TypesNative.STRING), "string_dividir",
-            [
-                createTypeInfo("string"), createTypeInfo("string")
-            ], 1);
+        // PrimitiveProperty[] str_properties;
+        // str_properties ~= PrimitiveProperty("tamanho", createTypeInfo("long"), "string_tamanho", [
+        //         createTypeInfo("string")
+        //     ], 1);
+        // str_properties ~= PrimitiveProperty("substituir", createTypeInfo("string"), "string_substituir", [
+        //         createTypeInfo("string"), createTypeInfo("string"),
+        //         createTypeInfo("string")
+        //     ], 1);
+        // str_properties ~= PrimitiveProperty("dividir", createArrayType(TypesNative.STRING), "string_dividir",
+        //     [
+        //         createTypeInfo("string"), createTypeInfo("string")
+        //     ], 1);
 
-        Primitive str = Primitive("string", str_properties);
-        primitives["string"] = str;
+        // Primitive str = Primitive("string", str_properties);
+        // primitives["string"] = str;
 
-        // Long
-        PrimitiveProperty[] long_properties;
-        long_properties ~= PrimitiveProperty("tamanho", createTypeInfo("long"), "long_tamanho", [
-                createTypeInfo("long")
-            ], 1);
-        Primitive lng = Primitive("long", long_properties);
-        primitives["long"] = lng;
+        // // Long
+        // PrimitiveProperty[] long_properties;
+        // long_properties ~= PrimitiveProperty("tamanho", createTypeInfo("long"), "long_tamanho", [
+        //         createTypeInfo("long")
+        //     ], 1);
+        // Primitive lng = Primitive("long", long_properties);
+        // primitives["long"] = lng;
 
-        // Vetores
-        PrimitiveProperty[] arr_properties;
-        arr_properties ~= PrimitiveProperty("tamanho", createTypeInfo("long"), "array_tamanho", [
-                createArrayType(TypesNative.STRING)
-            ]);
-        arr_properties ~= PrimitiveProperty("adicionar", createTypeInfo("void"), "array_string_adicionar",
-            [
-                createArrayTypeRef(TypesNative.T),
-                createTypeInfo("string"),
-            ], 1);
-        arr_properties ~= PrimitiveProperty("adicionar", createTypeInfo("void"), "array_long_adicionar", [
-                createArrayTypeRef(TypesNative.T),
-                createTypeInfo("long"),
-            ], 1);
-        arr_properties ~= PrimitiveProperty("adicionar", createTypeInfo("void"), "array_double_adicionar", [
-                createArrayTypeRef(TypesNative.T),
-                createTypeInfo("double"),
-            ], 1);
-        Primitive arr = Primitive("array", arr_properties);
-        primitives["array"] = arr;
+        // // Vetores
+        // PrimitiveProperty[] arr_properties;
+        // arr_properties ~= PrimitiveProperty("tamanho", createTypeInfo("long"), "array_tamanho", [
+        //         createArrayType(TypesNative.STRING)
+        //     ]);
+        // arr_properties ~= PrimitiveProperty("adicionar", createTypeInfo("void"), "array_string_adicionar",
+        //     [
+        //         createArrayTypeRef(TypesNative.T),
+        //         createTypeInfo("string"),
+        //     ], 1);
+        // arr_properties ~= PrimitiveProperty("adicionar", createTypeInfo("void"), "array_long_adicionar", [
+        //         createArrayTypeRef(TypesNative.T),
+        //         createTypeInfo("long"),
+        //     ], 1);
+        // arr_properties ~= PrimitiveProperty("adicionar", createTypeInfo("void"), "array_double_adicionar", [
+        //         createArrayTypeRef(TypesNative.T),
+        //         createTypeInfo("double"),
+        //     ], 1);
+        // Primitive arr = Primitive("array", arr_properties);
+        // primitives["array"] = arr;
     }
 
     bool exists(string type, FTypeInfo[] args)

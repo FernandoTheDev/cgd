@@ -30,13 +30,13 @@ private:
     {
         switch (type)
         {
-        case TypesNative.LONG:
-            return new IntLiteral(result.get!long(), loc);
-        case TypesNative.FLOAT:
-            return new FloatLiteral(result.get!float(), loc);
-        case TypesNative.BOOL:
+        case TypesNative.I32:
+            return new IntLiteral(result.get!long(), createTypeInfo(type), loc);
+        case TypesNative.F32:
+            return new FloatLiteral(result.get!double(), createTypeInfo(type), loc);
+        case TypesNative.I1:
             return new BoolLiteral(result.get!bool(), loc);
-        case TypesNative.STRING:
+        case TypesNative.I8P:
             return new StringLiteral(result.get!string(), loc);
         default:
             throw new Exception(format("Tipo não suportado para literal: %s", type));
@@ -192,15 +192,15 @@ private:
     TypesNative getResultType(Stmt left, Stmt right, string op)
     {
         if (op == "==" || op == "!=" || op == "<" || op == "<=" || op == ">" || op == ">=")
-            return TypesNative.BOOL;
+            return TypesNative.I1;
 
         if (op == "&&" || op == "||")
-            return TypesNative.BOOL;
+            return TypesNative.I1;
 
         if (left.kind == NodeType.FloatLiteral || right.kind == NodeType.FloatLiteral)
-            return TypesNative.FLOAT;
+            return TypesNative.F32;
 
-        return TypesNative.LONG;
+        return TypesNative.I32;
     }
 
     Stmt binaryExpr(BinaryExpr binary)
@@ -273,12 +273,12 @@ private:
                 if (unary.operand.kind == NodeType.IntLiteral)
                 {
                     long val = unary.operand.value.get!long();
-                    return new IntLiteral(-val, unary.loc);
+                    return new IntLiteral(-val, unary.operand.type, unary.loc);
                 }
                 else if (unary.operand.kind == NodeType.FloatLiteral)
                 {
                     float val = unary.operand.value.get!float();
-                    return new FloatLiteral(-val, unary.loc);
+                    return new FloatLiteral(-val, unary.operand.type, unary.loc);
                 }
                 break;
             case "!":
