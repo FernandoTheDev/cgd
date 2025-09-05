@@ -1,0 +1,15 @@
+classe Usuario {
+    nome: *i8;
+    
+    construtor(nome: *i8) {
+        isto.nome = nome
+    }
+        
+    get(): *i8 {
+        retorna nome
+    }
+}
+
+var u: Usuario = novo Usuario("Fernando")
+printf("Nome: %s\n", u.nome)
+printf("Nome: %s\n", u.get())

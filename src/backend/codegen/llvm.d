@@ -157,7 +157,7 @@ enum LLVMDWARFAddressSpace
 };
 
 // Tipos de valores
-enum
+enum LLVMTypeKind
 {
         LLVMVoidTypeKind = 0,
         LLVMHalfTypeKind,
@@ -478,6 +478,7 @@ LLVMTypeRef LLVMVectorType(LLVMTypeRef ElementType, uint ElementCount);
 LLVMTypeRef LLVMFunctionType(LLVMTypeRef ReturnType, LLVMTypeRef* ParamTypes, uint ParamCount, LLVMBool IsVarArg);
 
 // Valores
+LLVMValueRef LLVMConstNull(LLVMTypeRef Ty);
 LLVMValueRef LLVMConstInt(LLVMTypeRef IntTy, ulong N, LLVMBool SignExtend);
 LLVMValueRef LLVMConstReal(LLVMTypeRef RealTy, double N);
 LLVMValueRef LLVMConstStringInContext(LLVMContextRef C, const(char)* Str, uint Length, LLVMBool DontNullTerminate);
@@ -543,8 +544,7 @@ LLVMValueRef LLVMBuildAlloca(LLVMBuilderRef, LLVMTypeRef Ty, const(char)* Name);
 LLVMValueRef LLVMBuildArrayAlloca(LLVMBuilderRef, LLVMTypeRef Ty, LLVMValueRef Size, const(char)* Name);
 LLVMValueRef LLVMBuildLoad2(LLVMBuilderRef, LLVMTypeRef Ty, LLVMValueRef PointerVal, const(char)* Name);
 LLVMValueRef LLVMBuildStore(LLVMBuilderRef, LLVMValueRef Val, LLVMValueRef Ptr);
-LLVMValueRef LLVMBuildGEP(LLVMBuilderRef, LLVMValueRef Pointer, LLVMValueRef* Indices, uint NumIndices, const(
-                char)* Name);
+LLVMValueRef LLVMBuildGEP2(LLVMBuilderRef B, LLVMTypeRef Ty, LLVMValueRef Pointer, LLVMValueRef* Indices, uint NumIndices, const char* Name);
 LLVMValueRef LLVMBuildInBoundsGEP(LLVMBuilderRef, LLVMValueRef Pointer, LLVMValueRef* Indices, uint NumIndices, const(
                 char)* Name);
 LLVMValueRef LLVMBuildStructGEP(LLVMBuilderRef, LLVMValueRef Pointer, uint Idx, const(char)* Name);
@@ -829,3 +829,9 @@ void LLVMSetCurrentDebugLocation(LLVMBuilderRef Builder, LLVMMetadataRef Loc);
 LLVMMetadataRef LLVMGetCurrentDebugLocation(LLVMBuilderRef Builder);
 void LLVMSetInstDebugLocation(LLVMBuilderRef Builder, LLVMValueRef Inst);
 LLVMValueRef LLVMRunPasses(LLVMModuleRef M, const(char)* Passes, LLVMTargetMachineRef TM, void* Options);
+void LLVMStructSetBody(LLVMTypeRef StructTy, LLVMTypeRef* ElementTypes, uint ElementCount, LLVMBool Packed);
+LLVMTypeRef LLVMGetReturnType(LLVMTypeRef FunctionTy);
+LLVMTypeKind LLVMGetTypeKind(LLVMTypeRef Ty);
+LLVMTypeRef LLVMGetElementType(LLVMTypeRef Ty);
+LLVMTypeRef LLVMGlobalGetValueType(LLVMValueRef Global);
+uint LLVMCountParams(LLVMValueRef Fn);

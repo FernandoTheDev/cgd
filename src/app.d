@@ -13,7 +13,6 @@ import middle.semantic;
 import middle.optmizer.constant_folding;
 import backend.builder;
 import backend.compiler;
-import updater;
 import error;
 
 alias fileWrite = std.file.write;
@@ -47,6 +46,7 @@ void main(string[] args)
 
 	string arquivoSaida = "";
 	bool mostrarVersao = false;
+	bool emitir_ll = false;
 	bool mostrarAjuda = false;
 	bool verboso = false;
 	bool bigO;
@@ -55,6 +55,7 @@ void main(string[] args)
 	{
 		getopt(args,
 			"o|output", "Especifica o arquivo de saída", &arquivoSaida,
+			"eir|emitir-ir", "Salva o código IR gerado pelo compilador", &emitir_ll,
 			"v|version", "Mostra a versão do compilador", &mostrarVersao,
 			"0|optimize", "Aplica otimizações ao código", &bigO,
 			"h|help", "Mostra esta mensagem de ajuda", &mostrarAjuda,
@@ -73,30 +74,14 @@ void main(string[] args)
 			return;
 		}
 
-		string comando = args[1];
-
-		if (comando == "atualizar" || comando == "upgrade")
-		{
-			executarAtualizacao(verboso);
-			return;
-		}
-
-		if (args.length < 3)
+		if (args.length < 2)
 		{
 			writeln("cgd: erro: arquivo não especificado");
 			writeln("Digite 'cgd --help' para mais informações.");
 			return;
 		}
 
-		string arquivo = args[2];
-
-		if (comando != "compilar" && comando != "transpilar")
-		{
-			writefln("cgd: erro: comando desconhecido '%s'", comando);
-			writeln("Comandos disponíveis: compilar, transpilar, atualizar");
-			writeln("Digite 'cgd --help' para mais informações.");
-			return;
-		}
+		string arquivo = args[1];
 
 		if (!exists(arquivo))
 		{
@@ -114,20 +99,15 @@ void main(string[] args)
 		if (arquivoSaida.length == 0)
 		{
 			arquivoSaida = nomeBase;
-			if (comando == "transpilar")
-			{
-				arquivoSaida = nomeBase ~ ".ll";
-			}
 		}
 
 		if (verboso)
 		{
 			writefln("Processando arquivo: %s", arquivo);
-			writefln("Comando: %s", comando);
 			writefln("Arquivo de saída: %s", arquivoSaida);
 		}
 
-		processarArquivo(arquivo, arquivoSaida, comando, verboso, bigO);
+		processarArquivo(arquivo, arquivoSaida, verboso, bigO, emitir_ll);
 
 	}
 	catch (GetOptException e)
@@ -146,46 +126,22 @@ void main(string[] args)
 	}
 }
 
-void executarAtualizacao(bool verboso)
-{
-	try
-	{
-		UpdaterConfig config = UpdaterConfig(verboso, false, true, "");
-		Updater updater = new Updater("FernandoTheDev", "cgd", VERSAO, config);
-		updater.performUpdate();
-	}
-	catch (Exception e)
-	{
-		writefln("cgd: erro na atualização: %s", e.msg);
-		if (verboso)
-		{
-			writeln("Detalhes do erro:");
-			writeln(e.toString());
-		}
-	}
-}
-
 void mostrarMensagemAjuda()
 {
-	writeln("Uso: cgd [OPÇÕES] COMANDO [ARQUIVO]");
-	writeln("");
-	writeln("Comandos:");
-	writeln("  compilar    Compila o arquivo Delegua para código executável");
-	writeln("  transpilar  Transpila o arquivo Delegua para código D");
-	writeln("  atualizar   Verifica e instala atualizações do compilador");
+	writeln("Uso: cgd [ARQUIVO] [OPÇÕES]");
 	writeln("");
 	writeln("Opções:");
 	writeln("  -o, --output ARQUIVO  Especifica o arquivo de saída");
 	writeln("  -v, --version         Mostra a versão do compilador");
 	writeln("  -h, --help            Mostra esta mensagem de ajuda");
 	writeln("  -0, --optimize        Aplica otimizações ao código");
+	writeln("  --eir, --emitir-ir    Salva o código IR gerado pelo compilador");
 	writeln("  --verbose             Modo verboso - mostra informações detalhadas");
 	writeln("");
 	writeln("Exemplos:");
-	writeln("  cgd compilar arquivo.delegua");
-	writeln("  cgd transpilar arquivo.delegua -o saida.ll");
-	writeln("  cgd compilar arquivo.delegua --output meuapp");
-	writeln("  cgd atualizar --verbose");
+	writeln("  cgd arquivo.delegua");
+	writeln("  cgd arquivo.delegua --emitir-ir -o saida.ll");
+	writeln("  cgd arquivo.delegua --output meuapp");
 	writeln("");
 	mostrarCopyright();
 }
@@ -216,7 +172,7 @@ bool checkErrors(DiagnosticError error)
 	return false;
 }
 
-void processarArquivo(string arquivo, string arquivoSaida, string comando, bool verboso, bool bigO)
+void processarArquivo(string arquivo, string arquivoSaida, bool verboso, bool bigO, bool emitir_ll)
 {
 	DiagnosticError error = new DiagnosticError();
 	try
@@ -248,6 +204,9 @@ void processarArquivo(string arquivo, string arquivoSaida, string comando, bool 
 			return;
 
 		if (verboso)
+			program.print();
+
+		if (verboso)
 		{
 			writeln("Análise sintática concluída.");
 			writeln("Iniciando análise semântica...");
@@ -271,56 +230,27 @@ void processarArquivo(string arquivo, string arquivoSaida, string comando, bool 
 			newProgram = cf.prog(newProgram);
 		}
 
-		if (verboso)
-		{
-			writeln("Otimização concluída.");
-			if (comando == "compilar")
-			{
-				writeln("Iniciando geração de código...");
-			}
-			else
-			{
-				writeln("Iniciando Transpilação...");
-			}
-		}
-
 		Builder builder = new Builder(newProgram, semantic);
 		builder.build();
 
 		if (checkErrors(error))
 			return;
 
-		if (comando == "compilar")
-		{
-			Compiler compiler = new Compiler(builder, nomeArquivo ~ ".ll", arquivoSaida, STDLIB_DIR);
-			compiler.compile();
+		string file = nomeArquivo ~ ".ll";
 
-			if (verboso)
-			{
-				writefln("Compilação concluída com sucesso. Executável gerado: %s", arquivoSaida);
-			}
-			else
-			{
-				writefln("Compilação de '%s' concluída.", arquivo);
-			}
-		}
-		else // transpilar
+		if (emitir_ll && arquivoSaida != "")
 		{
 			builder.saveModule(cast(const char*) arquivoSaida);
-			// string codigoGerado = builder.builder();
-
-			// fileWrite(arquivoSaida, codigoGerado);
-
-			// if (verboso)
-			// {
-			// 	writefln("Transpilação concluída com sucesso. Arquivo D gerado: %s", arquivoSaida);
-			// }
-			// else
-			// {
-			// 	writefln("Transpilação de '%s' concluída.", arquivo);
-			// }
+			return;
 		}
 
+		builder.saveModule(cast(const char*) file);
+
+		Compiler compiler = new Compiler(builder, file, arquivoSaida, STDLIB_DIR);
+		compiler.compile();
+
+		remove(file);
+		writefln("Compilação concluída com sucesso. Executável gerado: %s", arquivoSaida);
 	}
 	catch (FileException e)
 	{

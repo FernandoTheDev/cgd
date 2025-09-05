@@ -1,0 +1,32 @@
+classe Inteiro {
+    valor: i32;
+
+    construtor(valor: i32) {
+        isto.valor = valor
+    }
+
+    get(): i32 {
+        retorna isto.valor
+    }
+}
+
+classe Texto {
+    valor: *i8;
+
+    construtor(valor: *i8) {
+        isto.valor = valor
+    }
+
+    get(): *i8 {
+        retorna isto.valor
+    }
+
+    tamanho(): Inteiro {
+        // retorna novo Inteiro(__builtin_core_strlen(isto.valor))
+        retorna novo Inteiro(8)
+    }
+}
+
+var nome: Texto = novo Texto("Fernando")
+printf("Nome: %s\nTamanho do nome: %d\n", nome.get(), nome.tamanho())
+// printf("Nome: %s\nTamanho do nome: %d\n", nome, nome.tamanho())

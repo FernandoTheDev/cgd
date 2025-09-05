@@ -337,10 +337,19 @@ private:
 
             if (this.check(TokenType.CONSTRUTOR))
             {
-                methods ~= cast(ClassMethodDeclaration) this.parseConstructor(visibility);
+                ConstructorDeclaration cons = this.parseConstructor(visibility);
+                methods ~= new ClassMethodDeclaration(
+                    cons.id,
+                    cons.args,
+                    cons.body,
+                    cons.type,
+                    cons.visibility,
+                    cons.loc
+                );
             }
             else if (this.check(TokenType.DESTRUTOR))
             {
+                // TODO: corrigir isso
                 methods ~= cast(ClassMethodDeclaration) this.parseDestructor(visibility);
             }
             else if (this.check(TokenType.IDENTIFIER))
@@ -384,7 +393,7 @@ private:
     }
 
     // Implementar parseConstructor:
-    Stmt parseConstructor(ClassVisibility visibility)
+    ConstructorDeclaration parseConstructor(ClassVisibility visibility)
     {
         Loc start = this.advance().loc; // consome 'construtor'
         FunctionArgs args = this.parseFnArguments();
@@ -475,6 +484,7 @@ private:
                 fnTokens ~= this.advance();
             }
             returnType = new ParseType(fnTokens).parse();
+            returnType.className = fnTokens[0].value.get!string;
         }
 
         this.consume(TokenType.LBRACE, "Esperado '{' antes do corpo do método.");
@@ -635,6 +645,13 @@ private:
                 }
 
                 this.consume(TokenType.RPAREN, "Esperava-se ')' após os argumentos do método.");
+            }
+
+            if (this.peek().kind == TokenType.EQUALS && !isMethodCall)
+            {
+                this.match([TokenType.EQUALS]);
+                Stmt value = this.parseExpression(Precedence.LOWEST);
+                return new MemberAssignment(object, value, value.loc);
             }
 
             Loc loc = this.makeLoc(object.loc, this.previous().loc);
@@ -856,7 +873,6 @@ private:
                 // caiu em loop
                 if (fnTokens.length > 3)
                 {
-                    writeln(fnTokens);
                     this.error.addError(Diagnostic("Tipo desconhecido.", fnTokens[0].loc));
                     throw new Exception("Tipo desconhecido.");
                 }

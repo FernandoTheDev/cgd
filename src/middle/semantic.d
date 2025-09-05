@@ -150,6 +150,8 @@ private:
             return this.analyzeIndexExpr(cast(IndexExpr) node);
         case NodeType.IndexExprAssignment:
             return this.analyzeIndexExprAssignment(cast(IndexExprAssignment) node);
+        case NodeType.MemberAssignment:
+            return this.analyzeMemberAssignment(cast(MemberAssignment) node);
 
         case NodeType.StringLiteral:
         case NodeType.IntLiteral:
@@ -164,6 +166,22 @@ private:
         default:
             throw new Exception(format("Nó desconhecido '%s'.", to!string(node.kind)));
         }
+    }
+
+    MemberAssignment analyzeMemberAssignment(MemberAssignment node)
+    {
+        // TODO: verificar se o left é um array e verificar acesso a um local inválido
+        node.left = this.analyzeNode(node.left);
+        node.value = this.analyzeNode(node.value);
+        node.type = node.left.type; // "Str" -> str[str]
+
+        // TODO: validar isso
+        if (node.value.type != node.type)
+        {
+            //
+        }
+
+        return node;
     }
 
     IndexExprAssignment analyzeIndexExprAssignment(IndexExprAssignment node)
@@ -211,7 +229,6 @@ private:
         foreach (ref prop; node.properties)
         {
             string baseType = cast(string) prop.type.baseType;
-            // prop.type.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
 
             if (prop.defaultValue !is null)
             {
@@ -251,9 +268,11 @@ private:
             {
                 analyzedBody ~= this.analyzeNode(stmt);
             }
+
             method.body = analyzedBody;
             method.context = this.currentScope();
-            method.type.className = className;
+            if (method.type.className == "")
+                method.type.className = className;
 
             analyzedMethods ~= method;
             this.popScope();

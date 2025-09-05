@@ -129,7 +129,7 @@ class TypeChecker
         return (type in typeMap) !is null;
     }
 
-    public string mapToDType(string sourceType)
+    public string mapToType(string sourceType)
     {
         if (sourceType in typeMap)
         {

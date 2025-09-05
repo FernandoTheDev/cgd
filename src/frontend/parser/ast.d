@@ -61,6 +61,14 @@ enum NodeType
     MemberAssignment,
 }
 
+string repeat(string s, int times)
+{
+    string result;
+    foreach (_; 0 .. times)
+        result ~= s;
+    return result;
+}
+
 class Stmt
 {
     NodeType kind;
@@ -68,6 +76,20 @@ class Stmt
     Variant value;
     Loc loc;
     Stmt[] args;
+
+    void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── Stmt [%s]", spaces, kind);
+        if (args.length > 0)
+        {
+            writefln("%s    ├── args:", spaces);
+            foreach (arg; args)
+            {
+                arg.print(indent + 8);
+            }
+        }
+    }
 }
 
 class Program : Stmt
@@ -78,6 +100,24 @@ class Program : Stmt
     {
         this.kind = NodeType.Program;
         this.body = body;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── Program", spaces);
+        if (body.length > 0)
+        {
+            writefln("%s    ├── body (%d statements):", spaces, body.length);
+            foreach (i, stmt; body)
+            {
+                if (i == body.length - 1)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                stmt.print(indent + 12);
+            }
+        }
     }
 }
 
@@ -94,6 +134,16 @@ class BinaryExpr : Stmt
         this.op = op;
         this.loc = loc;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── BinaryExpr [%s]", spaces, op);
+        writefln("%s    ├── left:", spaces);
+        left.print(indent + 8);
+        writefln("%s    └── right:", spaces);
+        right.print(indent + 8);
+    }
 }
 
 class IntLiteral : Stmt
@@ -104,6 +154,12 @@ class IntLiteral : Stmt
         this.type = type;
         this.value = value;
         this.loc = loc;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── IntLiteral: %d", spaces, value.get!long);
     }
 }
 
@@ -116,6 +172,12 @@ class NullLiteral : Stmt
         this.value = null;
         this.loc = loc;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── NullLiteral: null", spaces);
+    }
 }
 
 class BoolLiteral : Stmt
@@ -126,6 +188,12 @@ class BoolLiteral : Stmt
         this.type = createTypeInfo(TypesNative.I1);
         this.value = value;
         this.loc = loc;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── BoolLiteral: %s", spaces, value.get!bool ? "true" : "false");
     }
 }
 
@@ -138,6 +206,12 @@ class FloatLiteral : Stmt
         this.value = value;
         this.loc = loc;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── FloatLiteral: %.2f", spaces, value.get!double);
+    }
 }
 
 class StringLiteral : Stmt
@@ -148,6 +222,12 @@ class StringLiteral : Stmt
         this.type = createTypeInfo(TypesNative.I8P);
         this.value = value;
         this.loc = loc;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── StringLiteral: \"%s\"", spaces, value.get!string);
     }
 }
 
@@ -161,6 +241,24 @@ class ArrayLiteral : Stmt
         this.elements = elements;
         this.value = null;
         this.loc = loc;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── ArrayLiteral [%d elements]", spaces, elements.length);
+        if (elements.length > 0)
+        {
+            writefln("%s    └── elements:", spaces);
+            foreach (i, element; elements)
+            {
+                if (i == elements.length - 1)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                element.print(indent + 12);
+            }
+        }
     }
 }
 
@@ -176,6 +274,14 @@ class CastExpr : Stmt
         this.value = null;
         this.loc = loc;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── CastExpr", spaces);
+        writefln("%s    └── expr:", spaces);
+        expr.print(indent + 8);
+    }
 }
 
 class Identifier : Stmt
@@ -186,6 +292,12 @@ class Identifier : Stmt
         this.type = createTypeInfo(TypesNative.POINTER);
         this.value = id;
         this.loc = loc;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── Identifier: %s", spaces, value.get!string);
     }
 }
 
@@ -203,6 +315,15 @@ class UninitializedVariableDeclaration : Stmt
         this.loc = loc;
         this.value = null;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── UninitializedVariableDeclaration [mut: %s]", spaces, mut ? "true"
+                : "false");
+        writefln("%s    └── id:", spaces);
+        id.print(indent + 8);
+    }
 }
 
 struct VariablePair
@@ -219,6 +340,16 @@ struct VariablePair
         this.type = type;
         this.mut = mut;
     }
+
+    void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── VariablePair [mut: %s]", spaces, mut ? "true" : "false");
+        writefln("%s    ├── id:", spaces);
+        id.print(indent + 8);
+        writefln("%s    └── value:", spaces);
+        value.print(indent + 8);
+    }
 }
 
 class MultipleVariableDeclaration : Stmt
@@ -234,6 +365,25 @@ class MultipleVariableDeclaration : Stmt
         this.loc = loc;
         this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── MultipleVariableDeclaration [%d declarations]", spaces, declarations
+                .length);
+        if (declarations.length > 0)
+        {
+            writefln("%s    └── declarations:", spaces);
+            foreach (i, decl; declarations)
+            {
+                if (i == declarations.length - 1)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                decl.print(indent + 12);
+            }
+        }
     }
 
     Identifier[] getIdentifiers()
@@ -283,6 +433,25 @@ class MultipleUninitializedVariableDeclaration : Stmt
         this.type = commonType;
         this.value = null;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── MultipleUninitializedVariableDeclaration [mut: %s, %d ids]", spaces, mut ? "true"
+                : "false", ids.length);
+        if (ids.length > 0)
+        {
+            writefln("%s    └── ids:", spaces);
+            foreach (i, id; ids)
+            {
+                if (i == ids.length - 1)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                id.print(indent + 12);
+            }
+        }
+    }
 }
 
 class VariableDeclaration : Stmt
@@ -298,6 +467,19 @@ class VariableDeclaration : Stmt
         this.type = type;
         this.mut = mut;
         this.loc = loc;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── VariableDeclaration [mut: %s]", spaces, mut ? "true" : "false");
+        writefln("%s    ├── id:", spaces);
+        id.print(indent + 8);
+        if (value.hasValue())
+        {
+            writefln("%s    └── value:", spaces);
+            value.get!Stmt.print(indent + 8);
+        }
     }
 
     bool isInitialized()
@@ -373,6 +555,26 @@ class CallExpr : Stmt
         this.args = args;
         this.type = createTypeInfo(TypesNative.NULO);
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── CallExpr", spaces);
+        writefln("%s    ├── calle:", spaces);
+        calle.print(indent + 8);
+        if (args.length > 0)
+        {
+            writefln("%s    └── args [%d]:", spaces, args.length);
+            foreach (i, arg; args)
+            {
+                if (i == args.length - 1)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                arg.print(indent + 12);
+            }
+        }
+    }
 }
 
 class IfStatement : Stmt
@@ -391,6 +593,28 @@ class IfStatement : Stmt
         this.loc = loc;
         this.type = type;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── IfStatement", spaces);
+        writefln("%s    ├── condition:", spaces);
+        condition.print(indent + 8);
+        writefln("%s    ├── primary [%d statements]:", spaces, primary.length);
+        foreach (i, stmt; primary)
+        {
+            if (i == primary.length - 1 && secondary.isNull())
+                writefln("%s        └──", spaces);
+            else
+                writefln("%s        ├──", spaces);
+            stmt.print(indent + 12);
+        }
+        if (!secondary.isNull())
+        {
+            writefln("%s    └── secondary:", spaces);
+            secondary.get().print(indent + 8);
+        }
+    }
 }
 
 class ElifStatement : IfStatement
@@ -398,6 +622,28 @@ class ElifStatement : IfStatement
     this(Stmt condition, Stmt[] primary, FTypeInfo type, Variant value, Loc loc, NullStmt secondary = null)
     {
         super(condition, primary, type, value, loc);
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── ElifStatement", spaces);
+        writefln("%s    ├── condition:", spaces);
+        condition.print(indent + 8);
+        writefln("%s    ├── primary [%d statements]:", spaces, primary.length);
+        foreach (i, stmt; primary)
+        {
+            if (i == primary.length - 1 && secondary.isNull())
+                writefln("%s        └──", spaces);
+            else
+                writefln("%s        ├──", spaces);
+            stmt.print(indent + 12);
+        }
+        if (!secondary.isNull())
+        {
+            writefln("%s    └── secondary:", spaces);
+            secondary.get().print(indent + 8);
+        }
     }
 }
 
@@ -412,6 +658,24 @@ class ElseStatement : Stmt
         this.value = value;
         this.loc = loc;
         this.type = type;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── ElseStatement [%d statements]", spaces, primary.length);
+        if (primary.length > 0)
+        {
+            writefln("%s    └── primary:", spaces);
+            foreach (i, stmt; primary)
+            {
+                if (i == primary.length - 1)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                stmt.print(indent + 12);
+            }
+        }
     }
 }
 
@@ -431,6 +695,14 @@ class UnaryExpr : Stmt
         this.type = createTypeInfo(TypesNative.NULO);
         this.loc = loc;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── UnaryExpr [%s] (postfix: %s)", spaces, op, postFix ? "true" : "false");
+        writefln("%s    └── operand:", spaces);
+        operand.print(indent + 8);
+    }
 }
 
 class DereferenceExpr : Stmt
@@ -445,6 +717,14 @@ class DereferenceExpr : Stmt
         this.type = createTypeInfo(TypesNative.NULO);
         this.loc = loc;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── DereferenceExpr", spaces);
+        writefln("%s    └── operand:", spaces);
+        operand.print(indent + 8);
+    }
 }
 
 class AddressOfExpr : Stmt
@@ -458,6 +738,14 @@ class AddressOfExpr : Stmt
         this.value = null;
         this.type = createTypeInfo(TypesNative.NULO);
         this.loc = loc;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── AddressOfExpr", spaces);
+        writefln("%s    └── operand:", spaces);
+        operand.print(indent + 8);
     }
 }
 
@@ -474,6 +762,20 @@ class FunctionArg
         this.id = id;
         this.type = type;
         this.def = def;
+    }
+
+    void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── FunctionArg", spaces);
+        writefln("%s    ├── id:", spaces);
+        id.print(indent + 8);
+        if (!def.isNull())
+        {
+            writefln("%s    └── default:", spaces);
+            if (def.get() !is null)
+                def.get().print(indent + 8);
+        }
     }
 }
 
@@ -496,11 +798,39 @@ class FunctionDeclaration : Stmt
         this.type = type;
         this.value = null;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── FunctionDeclaration", spaces);
+        writefln("%s    ├── id:", spaces);
+        id.print(indent + 8);
+        if (args.length > 0)
+        {
+            writefln("%s    ├── args [%d]:", spaces, args.length);
+            foreach (i, arg; args)
+            {
+                if (i == args.length - 1)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                arg.print(indent + 12);
+            }
+        }
+        writefln("%s    └── body [%d statements]:", spaces, body.length);
+        foreach (i, stmt; body)
+        {
+            if (i == body.length - 1)
+                writefln("%s        └──", spaces);
+            else
+                writefln("%s        ├──", spaces);
+            stmt.print(indent + 12);
+        }
+    }
 }
 
 class ReturnStatement : Stmt
 {
-
     Stmt expr;
 
     this(Stmt expr, Loc loc)
@@ -510,6 +840,17 @@ class ReturnStatement : Stmt
         this.value = null;
         this.loc = loc;
         this.type = createTypeInfo(TypesNative.NULO);
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── ReturnStatement", spaces);
+        if (expr !is null)
+        {
+            writefln("%s    └── expr:", spaces);
+            expr.print(indent + 8);
+        }
     }
 }
 
@@ -534,6 +875,30 @@ class ForStatement : Stmt
         this.loc = loc;
         this.type = createTypeInfo(TypesNative.NULO);
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── ForStatement", spaces);
+        writefln("%s    ├── init:", spaces);
+        if (_init !is null)
+            _init.print(indent + 8);
+        writefln("%s    ├── condition:", spaces);
+        if (cond !is null)
+            cond.print(indent + 8);
+        writefln("%s    ├── expr:", spaces);
+        if (expr !is null)
+            expr.print(indent + 8);
+        writefln("%s    └── body [%d statements]:", spaces, body.length);
+        foreach (i, stmt; body)
+        {
+            if (i == body.length - 1)
+                writefln("%s        └──", spaces);
+            else
+                writefln("%s        ├──", spaces);
+            stmt.print(indent + 12);
+        }
+    }
 }
 
 class WhileStatement : Stmt
@@ -550,6 +915,23 @@ class WhileStatement : Stmt
         this.body = body;
         this.loc = loc;
         this.type = createTypeInfo(TypesNative.NULO);
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── WhileStatement", spaces);
+        writefln("%s    ├── condition:", spaces);
+        cond.print(indent + 8);
+        writefln("%s    └── body [%d statements]:", spaces, body.length);
+        foreach (i, stmt; body)
+        {
+            if (i == body.length - 1)
+                writefln("%s        └──", spaces);
+            else
+                writefln("%s        ├──", spaces);
+            stmt.print(indent + 12);
+        }
     }
 }
 
@@ -568,6 +950,23 @@ class DoWhileStatement : Stmt
         this.loc = loc;
         this.type = createTypeInfo(TypesNative.NULO);
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── DoWhileStatement", spaces);
+        writefln("%s    ├── body [%d statements]:", spaces, body.length);
+        foreach (i, stmt; body)
+        {
+            if (i == body.length - 1)
+                writefln("%s        └──", spaces);
+            else
+                writefln("%s        ├──", spaces);
+            stmt.print(indent + 12);
+        }
+        writefln("%s    └── condition:", spaces);
+        cond.print(indent + 8);
+    }
 }
 
 class AssignmentDeclaration : Stmt
@@ -581,6 +980,16 @@ class AssignmentDeclaration : Stmt
         this.value = value;
         this.type = type;
         this.loc = loc;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── AssignmentDeclaration", spaces);
+        writefln("%s    ├── id:", spaces);
+        id.print(indent + 8);
+        writefln("%s    └── value:", spaces);
+        value.get!Stmt.print(indent + 8);
     }
 }
 
@@ -602,6 +1011,28 @@ class MemberCallExpr : Stmt
         this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── MemberCallExpr [%s]", spaces, isMethodCall ? "method" : "property");
+        writefln("%s    ├── object:", spaces);
+        object.print(indent + 8);
+        writefln("%s    ├── member:", spaces);
+        member.print(indent + 8);
+        if (args.length > 0)
+        {
+            writefln("%s    └── args [%d]:", spaces, args.length);
+            foreach (i, arg; args)
+            {
+                if (i == args.length - 1)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                arg.print(indent + 12);
+            }
+        }
+    }
 }
 
 class SwitchStatement : Stmt
@@ -620,6 +1051,31 @@ class SwitchStatement : Stmt
         this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── SwitchStatement", spaces);
+        writefln("%s    ├── condition:", spaces);
+        condition.print(indent + 8);
+        if (cases.length > 0)
+        {
+            writefln("%s    ├── cases [%d]:", spaces, cases.length);
+            foreach (i, caseStmt; cases)
+            {
+                if (i == cases.length - 1 && defaultCase is null)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                caseStmt.print(indent + 12);
+            }
+        }
+        if (defaultCase !is null)
+        {
+            writefln("%s    └── default:", spaces);
+            defaultCase.print(indent + 8);
+        }
+    }
 }
 
 class CaseStatement : Stmt
@@ -635,6 +1091,23 @@ class CaseStatement : Stmt
         this.loc = loc;
         this.type = createTypeInfo(TypesNative.NULO);
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── CaseStatement", spaces);
+        writefln("%s    ├── value:", spaces);
+        value.print(indent + 8);
+        writefln("%s    └── body [%d statements]:", spaces, body.length);
+        foreach (i, stmt; body)
+        {
+            if (i == body.length - 1)
+                writefln("%s        └──", spaces);
+            else
+                writefln("%s        ├──", spaces);
+            stmt.print(indent + 12);
+        }
+    }
 }
 
 class DefaultStatement : Stmt
@@ -649,6 +1122,24 @@ class DefaultStatement : Stmt
         this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── DefaultStatement [%d statements]", spaces, body.length);
+        if (body.length > 0)
+        {
+            writefln("%s    └── body:", spaces);
+            foreach (i, stmt; body)
+            {
+                if (i == body.length - 1)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                stmt.print(indent + 12);
+            }
+        }
+    }
 }
 
 class BreakStatement : Stmt
@@ -659,6 +1150,12 @@ class BreakStatement : Stmt
         this.loc = loc;
         this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── BreakStatement", spaces);
     }
 }
 
@@ -675,6 +1172,19 @@ struct ClassProperty
     FTypeInfo type;
     ClassVisibility visibility;
     Stmt defaultValue;
+
+    void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── ClassProperty [%s]", spaces, visibility);
+        writefln("%s    ├── name:", spaces);
+        name.print(indent + 8);
+        if (defaultValue !is null)
+        {
+            writefln("%s    └── defaultValue:", spaces);
+            defaultValue.print(indent + 8);
+        }
+    }
 }
 
 // a() {}
@@ -697,6 +1207,35 @@ class ClassMethodDeclaration : Stmt
         this.visibility = visibility;
         this.value = null;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── ClassMethodDeclaration [%s]", spaces, visibility);
+        writefln("%s    ├── id:", spaces);
+        id.print(indent + 8);
+        if (args.length > 0)
+        {
+            writefln("%s    ├── args [%d]:", spaces, args.length);
+            foreach (i, arg; args)
+            {
+                if (i == args.length - 1)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                arg.print(indent + 12);
+            }
+        }
+        writefln("%s    └── body [%d statements]:", spaces, body.length);
+        foreach (i, stmt; body)
+        {
+            if (i == body.length - 1)
+                writefln("%s        └──", spaces);
+            else
+                writefln("%s        ├──", spaces);
+            stmt.print(indent + 12);
+        }
+    }
 }
 
 class ClassDeclaration : Stmt
@@ -717,24 +1256,100 @@ class ClassDeclaration : Stmt
         this.type = createTypeInfo(TypesNative.NULO);
         this.loc = loc;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── ClassDeclaration", spaces);
+        if (id !is null)
+        {
+            writefln("%s    ├── id:", spaces);
+            id.print(indent + 8);
+        }
+        if (properties.length > 0)
+        {
+            writefln("%s    ├── properties [%d]:", spaces, properties.length);
+            foreach (i, prop; properties)
+            {
+                if (i == properties.length - 1 && methods.length == 0 && construct is null && destruct is null)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                prop.print(indent + 12);
+            }
+        }
+        if (methods.length > 0)
+        {
+            writefln("%s    ├── methods [%d]:", spaces, methods.length);
+            foreach (i, method; methods)
+            {
+                if (i == methods.length - 1 && construct is null && destruct is null)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                method.print(indent + 12);
+            }
+        }
+        if (construct !is null)
+        {
+            writefln("%s    ├── constructor:", spaces);
+            construct.print(indent + 8);
+        }
+        if (destruct !is null)
+        {
+            writefln("%s    └── destructor:", spaces);
+            destruct.print(indent + 8);
+        }
+    }
 }
 
 // Adicionar novas classes AST:
 
 class ConstructorDeclaration : Stmt
 {
+    Identifier id;
     FunctionArgs args;
     Stmt[] body;
     SymbolInfo[string] context;
+    ClassVisibility visibility;
 
     this(FunctionArgs args, Stmt[] body, Loc loc)
     {
+        this.id = new Identifier("_", loc);
+        this.visibility = ClassVisibility.PUBLIC;
         this.kind = NodeType.ConstructorDeclaration;
         this.args = args;
         this.body = body;
         this.loc = loc;
         this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── ConstructorDeclaration [%s]", spaces, visibility);
+        if (args.length > 0)
+        {
+            writefln("%s    ├── args [%d]:", spaces, args.length);
+            foreach (i, arg; args)
+            {
+                if (i == args.length - 1)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                arg.print(indent + 12);
+            }
+        }
+        writefln("%s    └── body [%d statements]:", spaces, body.length);
+        foreach (i, stmt; body)
+        {
+            if (i == body.length - 1)
+                writefln("%s        └──", spaces);
+            else
+                writefln("%s        ├──", spaces);
+            stmt.print(indent + 12);
+        }
     }
 }
 
@@ -750,6 +1365,24 @@ class DestructorDeclaration : Stmt
         this.loc = loc;
         this.type = createTypeInfo(TypesNative.NULO);
         this.value = null;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── DestructorDeclaration [%d statements]", spaces, body.length);
+        if (body.length > 0)
+        {
+            writefln("%s    └── body:", spaces);
+            foreach (i, stmt; body)
+            {
+                if (i == body.length - 1)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                stmt.print(indent + 12);
+            }
+        }
     }
 }
 
@@ -767,6 +1400,26 @@ class NewExpr : Stmt
         this.type = createTypeInfo(TypesNative.NULO); // Será definido durante análise semântica
         this.value = null;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── NewExpr", spaces);
+        writefln("%s    ├── className:", spaces);
+        className.print(indent + 8);
+        if (args.length > 0)
+        {
+            writefln("%s    └── args [%d]:", spaces, args.length);
+            foreach (i, arg; args)
+            {
+                if (i == args.length - 1)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                arg.print(indent + 12);
+            }
+        }
+    }
 }
 
 class ThisExpr : Stmt
@@ -777,6 +1430,12 @@ class ThisExpr : Stmt
         this.loc = loc;
         this.type = createTypeInfo(TypesNative.NULO); // Será definido durante análise semântica
         this.value = null;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── ThisExpr", spaces);
     }
 }
 
@@ -800,6 +1459,29 @@ class ImportStatement : Stmt
         this.loc = loc;
         this.type = createTypeInfo(TypesNative.NULO);
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── ImportStatement", spaces);
+        writefln("%s    ├── from: \"%s\"", spaces, from);
+        if (_alias != "")
+        {
+            writefln("%s    ├── alias: \"%s\"", spaces, _alias);
+        }
+        if (targets.length > 0)
+        {
+            writefln("%s    └── targets [%d]:", spaces, targets.length);
+            foreach (i, target; targets)
+            {
+                if (i == targets.length - 1)
+                    writefln("%s        └──", spaces);
+                else
+                    writefln("%s        ├──", spaces);
+                target.print(indent + 12);
+            }
+        }
+    }
 }
 
 class IndexExpr : Stmt
@@ -813,6 +1495,16 @@ class IndexExpr : Stmt
         this.type = left.type; // permite encadeamento
         this.value = null;
         this.loc = loc;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── IndexExpr", spaces);
+        writefln("%s    ├── left:", spaces);
+        left.print(indent + 8);
+        writefln("%s    └── index:", spaces);
+        index.print(indent + 8);
     }
 }
 
@@ -828,8 +1520,21 @@ class IndexExprAssignment : Stmt
         this.value = value;
         this.loc = loc;
     }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── IndexExprAssignment", spaces);
+        writefln("%s    ├── left:", spaces);
+        left.print(indent + 8);
+        writefln("%s    ├── index:", spaces);
+        index.print(indent + 8);
+        writefln("%s    └── value:", spaces);
+        value.print(indent + 8);
+    }
 }
 
+// x.o = v
 class MemberAssignment : Stmt
 {
     Stmt left, index, value;
@@ -840,6 +1545,16 @@ class MemberAssignment : Stmt
         this.type = left.type; // permite encadeamento
         this.value = value;
         this.loc = loc;
+    }
+
+    override void print(int indent = 0)
+    {
+        string spaces = " ".repeat(indent);
+        writefln("%s└── MemberAssignment", spaces);
+        writefln("%s    ├── left:", spaces);
+        left.print(indent + 8);
+        writefln("%s    └── value:", spaces);
+        value.print(indent + 8);
     }
 }
 

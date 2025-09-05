@@ -120,11 +120,11 @@ class FunctionBuilder
 
         foreach (i, p; this.func.params)
         {
-            string dType = this.typeChecker.mapToDType(p.baseType);
+            string dType = this.typeChecker.mapToType(p.baseType);
             paramDecls ~= dType ~ " param" ~ to!string(i);
         }
 
-        string returnType = this.typeChecker.mapToDType(this.func.targetType.baseType);
+        string returnType = this.typeChecker.mapToType(this.func.targetType.baseType);
         string paramList = paramDecls.join(", ");
 
         if (this.func.isVariadic)
