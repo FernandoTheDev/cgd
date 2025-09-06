@@ -17,7 +17,7 @@ class TypeChecker
     private string[string] typeMap;
     private int[string] typeHierarchy;
     private Semantic semanticAnalyzer;
-    private ClassDeclaration[string] availableClasses;
+    public ClassDeclaration[string] availableClasses;
 
     this(Semantic semanticAnalyzer = null)
     {

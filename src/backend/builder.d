@@ -265,7 +265,7 @@ private:
 
     void genConstructor(ConstructorDeclaration constructor, string className)
     {
-        string methodName = className ~ "_constructor";
+        string methodName = className ~ "__";
         ClassInfo* classInfo = &classes[className];
 
         // Construtor sempre retorna void e recebe 'this' como primeiro parâmetro
@@ -278,7 +278,12 @@ private:
         // Adicionar parâmetros do construtor
         foreach (arg; constructor.args)
         {
-            paramTypes ~= getType(arg.type);
+            LLVMTypeRef argType = getType(arg.type);
+            if (arg.type.isStruct || arg.type.baseType == TypesNative.STRUCT)
+            {
+                argType = LLVMPointerType(argType, 0);
+            }
+            paramTypes ~= argType;
         }
 
         LLVMTypeRef functionType = LLVMFunctionType(
@@ -410,44 +415,11 @@ private:
         }
     }
 
-    Symbol genMemberAccess(LLVMValueRef objectPtr, string memberName, string className)
-    {
-        if (className !in classes)
-        {
-            throw new Exception(format("Classe '%s' não encontrada", className));
-        }
-
-        ClassInfo classInfo = classes[className];
-        if (memberName !in classInfo.fields)
-        {
-            throw new Exception(format("Campo '%s' não encontrado na classe '%s'", memberName, className));
-        }
-
-        Symbol field = classInfo.fields[memberName];
-
-        // Criar GEP para acessar o campo
-        LLVMValueRef[2] indices;
-        indices[0] = LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0);
-        indices[1] = LLVMConstInt(LLVMInt32TypeInContext(context), field.fieldIndex, 0);
-
-        LLVMValueRef fieldPtr = LLVMBuildGEP2(
-            builder,
-            classInfo.structType,
-            objectPtr,
-            indices.ptr,
-            2,
-            (memberName ~ "_ptr").toStringz()
-        );
-
-        LLVMValueRef fieldValue = LLVMBuildLoad2(builder, field.type, fieldPtr, memberName.toStringz());
-        return Symbol(fieldValue, field.type, true, true, className, field.fieldIndex);
-    }
-
     Symbol genMemberAssignment(MemberAssignment node)
     {
         // obj.field = value
         Symbol objectSymbol = genStmt(node.left);
-        string memberName = node.value.value.get!string;
+        string memberName = node.member.value.get!string;
         Symbol value = genStmt(node.value);
 
         if (!objectSymbol.isStruct)
@@ -510,14 +482,8 @@ private:
 
         ClassInfo classInfo = classes[className];
 
-        // Alocar memória para o objeto
-        LLVMValueRef objectPtr;
-
-        if (alloca !is null)
-            objectPtr = alloca;
-        else
-            objectPtr = LLVMBuildAlloca(builder, classInfo.structType,
-                (className ~ "_instance").toStringz());
+        LLVMValueRef objectPtr = LLVMBuildAlloca(builder, classInfo.structType,
+            (className ~ "_instance").toStringz());
 
         // Inicializar campos com valores padrão
         foreach (i, prop; classInfo.properties)
@@ -600,7 +566,12 @@ private:
 
         foreach (arg; method.args)
         {
-            paramTypes ~= getType(arg.type);
+            LLVMTypeRef argType = getType(arg.type);
+
+            if (arg.type.isStruct || arg.type.baseType == TypesNative.STRUCT)
+                argType = LLVMPointerType(argType, 0);
+
+            paramTypes ~= argType;
         }
 
         LLVMTypeRef functionType = LLVMFunctionType(
@@ -610,7 +581,8 @@ private:
             0
         );
 
-        LLVMValueRef function_ = LLVMAddFunction(mod, methodName.toStringz(), functionType);
+        const char* methodNameCStr = methodName.toStringz();
+        LLVMValueRef function_ = LLVMAddFunction(mod, methodNameCStr, functionType);
 
         auto curFn = currentFunction;
         currentFunction = function_;
@@ -871,7 +843,6 @@ private:
         return Symbol(result, getType(node.type), false);
     }
 
-    // Implementação corrigida do genMemberCallExpr
     Symbol genMemberCallExpr(MemberCallExpr node)
     {
         // Avaliar o objeto (lado esquerdo do ponto)
@@ -882,71 +853,159 @@ private:
         if (!node.isMethodCall)
         {
             // Acesso a propriedade/campo
-            if (objectSymbol.isStruct)
-            {
-                return genMemberAccess(objectSymbol.value, memberName, objectSymbol.structName);
-            }
-            else
+            if (!objectSymbol.isStruct)
             {
                 throw new Exception(format("Tentativa de acessar propriedade '%s' em tipo não-struct", memberName));
             }
+
+            return genMemberAccess(objectSymbol.value, memberName, objectSymbol.structName);
         }
         else
         {
             // Chamada de método
             if (objectSymbol.isStruct)
             {
-                // Chamada de método em classe/struct
-                string className = objectSymbol.structName;
-                if (className !in classes)
-                {
-                    throw new Exception(format("Classe '%s' não encontrada", className));
-                }
-
-                // Nome do método mangled (className_methodName)
-                string mangledMethodName = className ~ "_" ~ memberName;
-
-                // Verificar se o método existe
-                Symbol* method = currentContext.findFunction(mangledMethodName);
-                if (method is null)
-                {
-                    throw new Exception(format("Método '%s' não encontrado na classe '%s'", memberName, className));
-                }
-
-                // Preparar argumentos: primeiro é sempre 'this'
-                LLVMValueRef[] args;
-                args ~= objectSymbol.value; // 'this' pointer
-
-                // Adicionar outros argumentos
-                if (node.args !is null)
-                {
-                    foreach (arg; node.args)
-                    {
-                        Symbol argSymbol = genStmt(arg);
-                        args ~= argSymbol.value;
-                    }
-                }
-
-                // Fazer a chamada
-                LLVMValueRef call = LLVMBuildCall2(
-                    builder,
-                    method.type,
-                    method.value,
-                    args.ptr,
-                    cast(uint) args.length,
-                    (memberName ~ "_call").toStringz()
-                );
-
-                // Determinar o tipo de retorno correto
-                LLVMTypeRef returnType = LLVMGetReturnType(method.type);
-
-                return Symbol(call, returnType, false);
+                return genClassMethodCall(objectSymbol, memberName, node.args);
             }
             else
             {
-                throw new Exception(format("Chamada de método '%s' em tipo primitivo não implementada", memberName));
+                return genPrimitiveMethodCall(objectSymbol, memberName, node.args);
             }
         }
+    }
+
+    // Separar em métodos específicos para melhor organização
+    Symbol genClassMethodCall(Symbol objectSymbol, string methodName, Stmt[] args)
+    {
+        string className = objectSymbol.structName;
+
+        // Verificar se a classe existe no registry (se você implementar)
+        // ou usar o sistema atual
+        if (className !in classes)
+        {
+            throw new Exception(format("Classe '%s' não encontrada", className));
+        }
+
+        // Nome do método mangled (className_methodName)  
+        string mangledMethodName = className ~ "_" ~ methodName;
+
+        // Verificar se o método existe
+        Symbol* method = currentContext.findFunction(mangledMethodName);
+        if (method is null)
+        {
+            throw new Exception(format("Método '%s' não encontrado na classe '%s'", methodName, className));
+        }
+
+        // Preparar argumentos: primeiro é sempre 'this'
+        LLVMValueRef[] llvmArgs;
+        llvmArgs ~= objectSymbol.value; // 'this' pointer
+
+        // Adicionar outros argumentos
+        if (args !is null)
+        {
+            foreach (arg; args)
+            {
+                Symbol argSymbol = genStmt(arg);
+                llvmArgs ~= argSymbol.value;
+            }
+        }
+
+        // Fazer a chamada
+        LLVMValueRef call = LLVMBuildCall2(
+            builder,
+            method.type,
+            method.value,
+            llvmArgs.ptr,
+            cast(uint) llvmArgs.length,
+            (methodName ~ "_call").toStringz()
+        );
+
+        // Determinar o tipo de retorno correto
+        LLVMTypeRef returnType = LLVMGetReturnType(method.type);
+
+        // Para métodos que retornam struct por valor, pode precisar de tratamento especial
+        bool isStructReturn = (LLVMGetTypeKind(returnType) == LLVMTypeKind.LLVMStructTypeKind);
+        string returnClassName = "";
+
+        if (isStructReturn)
+        {
+            // Determinar o nome da classe de retorno baseado no método
+            ClassInfo classInfo = classes[className];
+            foreach (methodDecl; classInfo.methods)
+            {
+                if (methodDecl.id.value.get!string == methodName)
+                {
+                    if (methodDecl.type.isStruct)
+                    {
+                        returnClassName = methodDecl.type.className;
+                    }
+                    break;
+                }
+            }
+        }
+
+        return Symbol(call, returnType, false, isStructReturn, returnClassName);
+    }
+
+    Symbol genPrimitiveMethodCall(Symbol objectSymbol, string methodName, Stmt[] args)
+    {
+        // Implementação para métodos de tipos primitivos
+        // Por exemplo: string.length(), array.size(), etc.
+
+        throw new Exception(format("Chamada de método '%s' em tipo primitivo não implementada ainda", methodName));
+    }
+
+    // Melhorar o genMemberAccess também
+    Symbol genMemberAccess(LLVMValueRef objectPtr, string memberName, string className)
+    {
+        if (className !in classes)
+        {
+            throw new Exception(format("Classe '%s' não encontrada", className));
+        }
+
+        ClassInfo classInfo = classes[className];
+        if (memberName !in classInfo.fields)
+        {
+            throw new Exception(format("Campo '%s' não encontrado na classe '%s'", memberName, className));
+        }
+
+        Symbol field = classInfo.fields[memberName];
+
+        // Criar GEP para acessar o campo
+        LLVMValueRef[2] indices;
+        indices[0] = LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0);
+        indices[1] = LLVMConstInt(LLVMInt32TypeInContext(context), field.fieldIndex, 0);
+
+        LLVMValueRef fieldPtr = LLVMBuildGEP2(
+            builder,
+            classInfo.structType,
+            objectPtr,
+            indices.ptr,
+            2,
+            (memberName ~ "_ptr").toStringz()
+        );
+
+        // Carregar o valor do campo
+        LLVMValueRef fieldValue = LLVMBuildLoad2(builder, field.type, fieldPtr, memberName.toStringz());
+
+        // Determinar se o campo é struct
+        bool isFieldStruct = (LLVMGetTypeKind(field.type) == LLVMTypeKind.LLVMStructTypeKind);
+        string fieldClassName = "";
+
+        if (isFieldStruct)
+        {
+            // Buscar informações da propriedade para obter o nome da classe
+            foreach (prop; classInfo.properties)
+            {
+                if (prop.name.value.get!string == memberName && prop.type.isStruct)
+                {
+                    fieldClassName = prop.type.className;
+                    break;
+                }
+            }
+        }
+
+        return Symbol(fieldValue, field.type, true, isFieldStruct, fieldClassName, field.fieldIndex);
     }
 
     // Correção no genVarDeclaration para lidar com FTypeInfo corretamente
@@ -954,12 +1013,18 @@ private:
     {
         FTypeInfo type = node.value.get!Stmt.type;
 
-        // Para strings
         if (type.baseType == TypesNative.I8P)
         {
             Symbol stringSymbol = genStmt(node.value.get!Stmt);
-            currentContext.variables[node.id.value.get!string] = stringSymbol;
-            return stringSymbol;
+
+            // Criar variável local que aponta para a string
+            LLVMValueRef var = LLVMBuildAlloca(builder, stringSymbol.type,
+                node.id.value.get!string.toStringz());
+            LLVMBuildStore(builder, stringSymbol.value, var);
+
+            Symbol symbol = Symbol(var, stringSymbol.type, true);
+            currentContext.variables[node.id.value.get!string] = symbol;
+            return symbol;
         }
 
         LLVMValueRef var = LLVMBuildAlloca(builder, getType(type),
@@ -974,6 +1039,13 @@ private:
             LLVMBuildStore(builder, valueSymbol.value, var);
 
         Symbol symbol = Symbol(var, getType(type), true);
+
+        if (valueSymbol.isStruct)
+        {
+            LLVMValueRef loadedValue = LLVMBuildLoad2(builder,
+                getType(type), valueSymbol.value, "loaded_value");
+            LLVMBuildStore(builder, loadedValue, var);
+        }
 
         // Se for struct, configurar informações adicionais
         if (type.isStruct || type.baseType == TypesNative.STRUCT)

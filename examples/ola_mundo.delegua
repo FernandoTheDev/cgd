@@ -11,13 +11,13 @@ classe Inteiro {
 }
 
 classe Texto {
-    valor: *i8;
+    valor: i8p;
 
-    construtor(valor: *i8) {
+    construtor(valor: i8p) {
         isto.valor = valor
     }
 
-    get(): *i8 {
+    get(): i8p {
         retorna isto.valor
     }
 

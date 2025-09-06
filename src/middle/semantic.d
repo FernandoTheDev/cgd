@@ -12,6 +12,7 @@ import middle.stdlib.function_builder;
 import middle.stdlib.std_lib_module_builder;
 import middle.type_checker;
 import middle.stdlib.primitives;
+import middle.class_registry;
 import frontend.parser.ast;
 import frontend.values;
 import frontend.parser.ftype_info;
@@ -29,6 +30,7 @@ public:
     bool[string] identifiersUsed;
     string currentClassName = ""; // Para rastrear contexto de classe
     StdPrimitive primitive;
+    ClassRegistry classRegistry;
 
     this(DiagnosticError e)
     {
@@ -51,6 +53,8 @@ public:
         availableStdFunctions["printf"] = mod_io.getFunction("printf");
 
         this.stdLibs["io"] = mod_io.moduleData;
+
+        this.classRegistry = new ClassRegistry();
     }
 
     Program semantic(Program program)
@@ -66,6 +70,7 @@ public:
             catch (Exception e)
             {
                 // da pra ignorar isso não ironicamente
+                writeln(e);
                 writeln("Erro no semantic: ", e.message);
                 writeln("Erro no semantic: ", e.file);
                 writeln("Erro no semantic: ", e.line);
@@ -170,8 +175,8 @@ private:
 
     MemberAssignment analyzeMemberAssignment(MemberAssignment node)
     {
-        // TODO: verificar se o left é um array e verificar acesso a um local inválido
         node.left = this.analyzeNode(node.left);
+        node.member = cast(Identifier) this.analyzeIdentifier(node.member);
         node.value = this.analyzeNode(node.value);
         node.type = node.left.type; // "Str" -> str[str]
 
@@ -224,6 +229,7 @@ private:
 
         // Registrar a classe no TypeChecker
         this.typeChecker.registerClass(className, node);
+        classRegistry.registerClass(className, node);
 
         // Analisar propriedades
         foreach (ref prop; node.properties)
@@ -308,7 +314,7 @@ private:
         {
             string argName = arg.id.value.get!string;
             string baseType = cast(string) arg.type.baseType;
-            // arg.type.baseType = stringToTypesNative(this.typeChecker.mapToDType(baseType));
+            writeln("Cons: ", arg);
             this.addSymbol(argName, SymbolInfo(argName, arg.type, true, false, arg.id.loc));
         }
 
@@ -405,17 +411,52 @@ private:
         // Analisa o objeto à esquerda do ponto
         node.object = this.analyzeNode(node.object);
 
-        // Valida e processa o objeto base
-        validateObjectType(node);
+        // Obter informações do objeto base
+        FTypeInfo objectType = node.object.type;
+        string memberName = node.member.value.get!string;
 
-        // Analisa argumentos se for uma chamada de método
-        if (node.isMethodCall)
+        if (objectType.baseType == TypesNative.STRUCT && objectType.className != "")
         {
-            analyzeMethodArguments(node);
-        }
+            string className = objectType.className;
 
-        // Determina o tipo de retorno do membro
-        node.type = determineMemberReturnType(node);
+            if (node.isMethodCall)
+            {
+                // Analisar argumentos
+                FTypeInfo[] argTypes;
+                if (node.args !is null)
+                {
+                    foreach (arg; node.args)
+                    {
+                        node.args ~= this.analyzeNode(arg);
+                        argTypes ~= arg.type;
+                    }
+                }
+
+                // Validar e obter tipo de retorno
+                node.type = classRegistry.validateMethodCall(className, memberName, argTypes);
+            }
+            else
+            {
+                // Acesso a propriedade - muito mais simples agora!
+                node.type = classRegistry.validateMemberAccess(className, memberName, false);
+            }
+        }
+        else
+        {
+            // Tipo primitivo - usar análise de primitivos existente
+            node.member = cast(Identifier) this.analyzeNode(node.member);
+
+            if (node.isMethodCall)
+            {
+                analyzeMethodArguments(node);
+                node.type = determineMemberReturnType(node);
+            }
+            else
+            {
+                // Para tipos primitivos, o tipo geralmente é o mesmo do objeto
+                node.type = node.object.type;
+            }
+        }
 
         return node;
     }
@@ -1135,14 +1176,6 @@ private:
     {
         string id = node.value.get!string;
         SymbolInfo* symbol = this.lookupSymbol(id);
-
-        // TODO: implementar direito
-        if (id == "ARGS" && !symbol)
-        {
-            this.addSymbol(id, SymbolInfo(id, createArrayType(TypesNative.I8P), false, true, node
-                    .loc));
-            symbol = this.lookupSymbol(id); // seta novamente
-        }
 
         if (!symbol)
         {

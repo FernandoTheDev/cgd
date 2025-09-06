@@ -651,7 +651,7 @@ private:
             {
                 this.match([TokenType.EQUALS]);
                 Stmt value = this.parseExpression(Precedence.LOWEST);
-                return new MemberAssignment(object, value, value.loc);
+                return new MemberAssignment(object, member, value, value.loc);
             }
 
             Loc loc = this.makeLoc(object.loc, this.previous().loc);

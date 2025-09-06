@@ -1,0 +1,46 @@
+classe Inteiro {
+    valor: i32;
+
+    construtor(v: i32) {
+        isto.valor = v
+    }
+
+    get(): i32 {
+        retorna isto.valor
+    }
+}
+
+classe Texto {
+    valor: i8p;
+
+    construtor(v: i8p) {
+        isto.valor = v
+    }
+
+    get(): i8p {
+        retorna isto.valor
+    }
+
+    tamanho(): Inteiro {
+        // retorna novo Inteiro(__builtin_core_strlen(isto.valor))
+        retorna novo Inteiro(8)
+    }
+}
+
+// uma Macro do compilador
+// vira o tipo "texto", recebe o i8p (string)
+// por padrão os tipos que são classes devem ter um método get()
+// esse método será chamado sempre que normalizar o valor para um literal
+// @settype Texto -> "texto", ["I8P"]
+
+classe Usuario {
+    nome: Texto;
+
+    construtor(n: Texto) {
+        isto.nome = n
+    }
+}
+
+var u = novo Usuario(novo Texto("Fefas"))
+printf("%s\n", u.nome.get())
+

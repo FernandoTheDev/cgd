@@ -1537,11 +1537,13 @@ class IndexExprAssignment : Stmt
 // x.o = v
 class MemberAssignment : Stmt
 {
-    Stmt left, index, value;
-    this(Stmt left, Stmt value, Loc loc)
+    Stmt left, value;
+    Identifier member;
+    this(Stmt left, Identifier member, Stmt value, Loc loc)
     {
         this.kind = NodeType.MemberAssignment;
         this.left = left;
+        this.member = member;
         this.type = left.type; // permite encadeamento
         this.value = value;
         this.loc = loc;

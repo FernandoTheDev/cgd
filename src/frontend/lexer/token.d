@@ -234,6 +234,7 @@ bool isTypeToken(Token token)
     static immutable bool[string] typeKeywords = [
         "null": true,
         "i1": true, // 1-bit integer (boolean)
+        "i8p": true, // string
         "i8": true, // 8-bit integer (byte)
         "i16": true, // 16-bit integer
         "i32": true, // 32-bit integer

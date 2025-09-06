@@ -125,6 +125,8 @@ private:
             return TypesNative.METADATA;
         case "token":
             return TypesNative.TOKEN;
+        case "i8p":
+            return TypesNative.I8P;
 
         default:
             return TypesNative.STRUCT; // fallback
@@ -153,7 +155,17 @@ private:
         else
         {
             TypesNative baseType = this.tokenValueToTypesNative(this.advance());
-            return createTypeInfo(baseType);
+            FTypeInfo type = createTypeInfo(baseType);
+
+            import frontend.lexer.token : isTypeToken;
+
+            if (!isTypeToken(tokens[0]))
+            {
+                type.isStruct = true;
+                type.className = tokens[0].value.get!string;
+            }
+
+            return type;
         }
     }
 
