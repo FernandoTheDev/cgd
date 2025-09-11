@@ -1,0 +1,2 @@
+@bultin_function
+funcao printf(i8p, ...): i32;

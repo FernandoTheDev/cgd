@@ -1,11 +1,11 @@
 classe Usuario {
-    nome: *i8;
+    nome: i8p;
     
-    construtor(nome: *i8) {
+    construtor(nome: i8p) {
         isto.nome = nome
     }
         
-    get(): *i8 {
+    get(): i8p {
         retorna nome
     }
 }

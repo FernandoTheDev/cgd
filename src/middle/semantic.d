@@ -48,9 +48,17 @@ public:
             .customTargetType(createTypeInfo(TypesNative.I8P))
             .libraryName("printf")
             .ir("declare i32 @printf(ptr, ...)")
+            .done()
+            .defineFunction("raiz")
+            .returns(createTypeInfo(TypesNative.F64))
+            .customTargetType(createTypeInfo(TypesNative.F64))
+            .withParams(createTypeInfo(TypesNative.F64))
+            .libraryName("raiz")
+            .ir("declare double @llvm.sqrt.f64(double %Val)")
             .done();
 
         availableStdFunctions["printf"] = mod_io.getFunction("printf");
+        availableStdFunctions["raiz"] = mod_io.getFunction("raiz");
 
         this.stdLibs["io"] = mod_io.moduleData;
 
@@ -1061,6 +1069,7 @@ private:
                 argType.baseType != expectedParamType.baseType)
                 analyzedArg.type = expectedParamType;
 
+            analyzedArg.type = expectedParamType;
             analyzedArgs ~= analyzedArg;
         }
 

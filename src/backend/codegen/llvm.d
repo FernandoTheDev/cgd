@@ -349,7 +349,7 @@ enum
 };
 
 // OpCodes
-enum
+enum LLVMOpcode
 {
         LLVMRet = 1,
         LLVMBr,
@@ -835,3 +835,47 @@ LLVMTypeKind LLVMGetTypeKind(LLVMTypeRef Ty);
 LLVMTypeRef LLVMGetElementType(LLVMTypeRef Ty);
 LLVMTypeRef LLVMGlobalGetValueType(LLVMValueRef Global);
 uint LLVMCountParams(LLVMValueRef Fn);
+ulong LLVMSizeOfTypeInBits(LLVMTargetDataRef TD, LLVMTypeRef Ty);
+const(char)* LLVMGetDefaultTargetTriple();
+LLVMTargetDataRef LLVMCreateTargetDataLayout(LLVMTargetMachineRef T);
+const(char)* LLVMCopyStringRepOfTargetData(LLVMTargetDataRef TD);
+void LLVMDisposeMessage(char* Message);
+
+// TARGETS //
+
+// X86
+void LLVMInitializeX86Target();
+void LLVMInitializeX86TargetInfo();
+void LLVMInitializeX86TargetMC();
+void LLVMInitializeX86AsmPrinter();
+void LLVMInitializeX86AsmParser();
+
+// AArch64
+void LLVMInitializeAArch64Target();
+void LLVMInitializeAArch64TargetInfo();
+void LLVMInitializeAArch64TargetMC();
+void LLVMInitializeAArch64AsmPrinter();
+void LLVMInitializeAArch64AsmParser();
+
+// ARM
+void LLVMInitializeARMTarget();
+void LLVMInitializeARMTargetInfo();
+void LLVMInitializeARMTargetMC();
+void LLVMInitializeARMAsmPrinter();
+void LLVMInitializeARMAsmParser();
+
+uint LLVMCountParamTypes(LLVMTypeRef FunctionType);
+void LLVMGetParamTypes(LLVMTypeRef FunctionType, LLVMTypeRef* ParamTypes);
+
+uint LLVMGetIntTypeWidth(LLVMTypeRef IntegerTy);
+
+void LLVMAddIncoming(
+        LLVMValueRef PhiNode,
+        LLVMValueRef* IncomingValues,
+        LLVMBasicBlockRef* IncomingBlocks,
+        uint Count
+);
+
+LLVMOpcode LLVMGetInstructionOpcode(LLVMValueRef Inst);
+LLVMValueRef LLVMGetLastInstruction(LLVMBasicBlockRef BasicBlock);
+char* LLVMPrintModuleToString(LLVMModuleRef M);

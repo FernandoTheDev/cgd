@@ -22,3 +22,8 @@ classe void : tipo_base {
     }
 }
 
+
+@template T
+classe Vetor {
+    valor: T;
+}

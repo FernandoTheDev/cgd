@@ -159,14 +159,13 @@ private:
     TokenType getNumType(long n)
     {
 
-        // i32 range: -2,147,483,648 to 2,147,483,647
-        if (n >= -2_147_483_648L && n <= 2_147_483_647L)
-        {
-            return TokenType.I32;
-        }
         // i64 range: fits in long (D's long is 64-bit)
         return TokenType.I64;
-
+        // i32 range: -2,147,483,648 to 2,147,483,647
+        // if (n >= -2_147_483_648L && n <= 2_147_483_647L)
+        // {
+        //     return TokenType.I32;
+        // }
     }
 
     void lexHexadecimal(ulong startPos)

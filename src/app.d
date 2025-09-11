@@ -4,7 +4,9 @@ import std.file;
 import std.path;
 import std.process : environment;
 import std.array : split;
-import std.string : format;
+import std.string : format, strip, toLower;
+import std.algorithm : canFind;
+import std.conv : to;
 import frontend.lexer.lexer;
 import frontend.lexer.token;
 import frontend.parser.parser;
@@ -14,141 +16,451 @@ import middle.optmizer.constant_folding;
 import backend.builder;
 import backend.compiler;
 import error;
+import target;
 
 alias fileWrite = std.file.write;
 
+immutable string VERSAO = "v0.0.7";
+immutable string NOME_PROGRAMA = "cgd";
+immutable string NOME_COMPLETO = "Compilador Geral Delégua";
+immutable string[] EXTENSOES_VALIDAS = [".delegua", ".del"];
+
 string HOME, MAIN_DIR, STDLIB_DIR;
 
-enum string VERSAO = "v0.0.6";
-enum string NOME_PROGRAMA = "cgd";
-enum string NOME_COMPLETO = "Compilador Geral Delégua";
+struct CompilerOptions
+{
+	string arquivoSaida;
+	string targetTriple;
+	string arquivoEntrada;
+	bool mostrarVersao;
+	bool emitirIR;
+	bool mostrarAjuda;
+	bool verboso;
+	bool otimizar;
+	bool mostrarTokens;
+	bool mostrarAST;
+}
+
+enum ExitCode : int
+{
+	Success = 0,
+	InvalidArguments = 1,
+	FileNotFound = 2,
+	CompileError = 3,
+	InternalError = 4,
+	DirectoryNotFound = 5
+}
 
 void main(string[] args)
 {
-	version (Posix)
-	{
-		HOME = environment.get("HOME");
-		MAIN_DIR = HOME ~ "/.cgd/";
-		STDLIB_DIR = HOME ~ "/.cgd/stdlib/";
-
-		if (!exists(MAIN_DIR) || !exists(STDLIB_DIR))
-		{
-			// erro
-			writefln("Erro ao buscar diretório principal '%s', reinstale o compilador.", MAIN_DIR);
-			return;
-		}
-	}
-	else version (Windows)
-	{
-		// sem suporte.
-		return;
-	}
-
-	string arquivoSaida = "";
-	bool mostrarVersao = false;
-	bool emitir_ll = false;
-	bool mostrarAjuda = false;
-	bool verboso = false;
-	bool bigO;
-
 	try
 	{
-		getopt(args,
-			"o|output", "Especifica o arquivo de saída", &arquivoSaida,
-			"eir|emitir-ir", "Salva o código IR gerado pelo compilador", &emitir_ll,
-			"v|version", "Mostra a versão do compilador", &mostrarVersao,
-			"0|optimize", "Aplica otimizações ao código", &bigO,
-			"h|help", "Mostra esta mensagem de ajuda", &mostrarAjuda,
-			"verbose", "Modo verboso - mostra informações detalhadas", &verboso
-		);
+		if (!inicializarDiretorios())
+		{
+			exit(ExitCode.DirectoryNotFound);
+		}
 
-		if (mostrarVersao)
+		CompilerOptions opcoes = processarArgumentos(args);
+
+		if (opcoes.mostrarVersao)
 		{
 			mostrarVersaoPrograma();
-			return;
+			exit(ExitCode.Success);
 		}
 
-		if (mostrarAjuda || args.length < 2)
+		if (opcoes.mostrarAjuda)
 		{
 			mostrarMensagemAjuda();
-			return;
+			exit(ExitCode.Success);
 		}
 
-		if (args.length < 2)
+		if (opcoes.arquivoEntrada.length == 0)
 		{
 			writeln("cgd: erro: arquivo não especificado");
 			writeln("Digite 'cgd --help' para mais informações.");
-			return;
+			exit(ExitCode.InvalidArguments);
 		}
 
-		string arquivo = args[1];
-
-		if (!exists(arquivo))
+		if (!validarArquivoEntrada(opcoes.arquivoEntrada))
 		{
-			writefln("cgd: erro: arquivo '%s' não encontrado", arquivo);
-			return;
+			exit(ExitCode.FileNotFound);
 		}
 
-		if (!isFile(arquivo))
+		TargetInfo target = obterTarget(opcoes.targetTriple, opcoes.verboso);
+
+		string arquivoSaida = determinarArquivoSaida(opcoes.arquivoEntrada, opcoes.arquivoSaida);
+
+		if (opcoes.verboso)
 		{
-			writefln("cgd: erro: '%s' não é um arquivo válido", arquivo);
-			return;
+			mostrarInformacoesCompilacao(opcoes.arquivoEntrada, arquivoSaida, target);
 		}
 
-		string nomeBase = baseName(stripExtension(arquivo));
-		if (arquivoSaida.length == 0)
-		{
-			arquivoSaida = nomeBase;
-		}
+		bool sucesso = processarArquivo(opcoes.arquivoEntrada, arquivoSaida, opcoes, target);
 
-		if (verboso)
-		{
-			writefln("Processando arquivo: %s", arquivo);
-			writefln("Arquivo de saída: %s", arquivoSaida);
-		}
-
-		processarArquivo(arquivo, arquivoSaida, verboso, bigO, emitir_ll);
-
+		exit(sucesso ? ExitCode.Success : ExitCode.CompileError);
 	}
 	catch (GetOptException e)
 	{
-		writefln("cgd: erro: %s", e.msg);
+		writefln("cgd: erro nos argumentos: %s", e.msg);
 		writeln("Digite 'cgd --help' para mais informações.");
+		exit(ExitCode.InvalidArguments);
 	}
 	catch (Exception e)
 	{
 		writefln("cgd: erro interno: %s", e.msg);
-		if (verboso)
+		stderr.writeln("Um erro inesperado ocorreu. Por favor, reporte este bug.");
+		exit(ExitCode.InternalError);
+	}
+}
+
+bool inicializarDiretorios()
+{
+	version (Posix)
+	{
+		HOME = environment.get("HOME");
+		if (HOME.length == 0)
 		{
-			writeln("Informações de debug:");
-			writeln(e.toString());
+			writeln("cgd: erro: variável HOME não definida");
+			return false;
+		}
+
+		MAIN_DIR = buildPath(HOME, ".cgd");
+		STDLIB_DIR = buildPath(MAIN_DIR, "stdlib");
+
+		if (!exists(MAIN_DIR))
+		{
+			writefln("cgd: erro: diretório principal '%s' não encontrado", MAIN_DIR);
+			writeln("Execute 'cgd --install' ou reinstale o compilador.");
+			return false;
+		}
+
+		if (!exists(STDLIB_DIR))
+		{
+			writefln("cgd: erro: biblioteca padrão '%s' não encontrada", STDLIB_DIR);
+			writeln("Execute 'cgd --install' ou reinstale o compilador.");
+			return false;
+		}
+
+		return true;
+	}
+	else version (Windows)
+	{
+		writeln("cgd: erro: plataforma Windows não suportada atualmente");
+		writeln("Contribuições para suporte ao Windows são bem-vindas!");
+		return false;
+	}
+	else
+	{
+		writeln("cgd: erro: plataforma não suportada");
+		return false;
+	}
+}
+
+CompilerOptions processarArgumentos(string[] args)
+{
+	CompilerOptions opcoes;
+
+	auto result = getopt(args,
+		"o|output", "Especifica o arquivo de saída", &opcoes.arquivoSaida,
+		"target", "Especifica o alvo de saída (x86_64-gnu-linux, i386-gnu-linux)", &opcoes.targetTriple,
+		"eir|emitir-ir", "Salva o código IR LLVM gerado pelo compilador", &opcoes.emitirIR,
+		"v|version", "Mostra a versão do compilador", &opcoes.mostrarVersao,
+		"0|optimize", "Aplica otimizações ao código", &opcoes.otimizar,
+		"h|help", "Mostra esta mensagem de ajuda", &opcoes.mostrarAjuda,
+		"verbose", "Modo verboso - mostra informações detalhadas", &opcoes.verboso,
+		"tokens", "Mostra os tokens gerados (debug)", &opcoes.mostrarTokens,
+		"ast", "Mostra a árvore sintática abstrata (debug)", &opcoes.mostrarAST
+	);
+
+	if (args.length > 1)
+	{
+		opcoes.arquivoEntrada = args[1];
+	}
+
+	if (args.length < 2 && !opcoes.mostrarVersao && !opcoes.mostrarAjuda)
+	{
+		opcoes.mostrarAjuda = true;
+	}
+
+	return opcoes;
+}
+
+bool validarArquivoEntrada(string arquivo)
+{
+	if (!exists(arquivo))
+	{
+		writefln("cgd: erro: arquivo '%s' não encontrado", arquivo);
+		return false;
+	}
+
+	if (!isFile(arquivo))
+	{
+		writefln("cgd: erro: '%s' não é um arquivo válido", arquivo);
+		return false;
+	}
+
+	string extensao = extension(arquivo).toLower();
+	if (!EXTENSOES_VALIDAS.canFind(extensao))
+	{
+		writefln("cgd: aviso: arquivo '%s' não possui extensão reconhecida", arquivo);
+		writefln("Extensões suportadas: %s", EXTENSOES_VALIDAS);
+	}
+
+	return true;
+}
+
+TargetInfo obterTarget(string targetTriple, bool verboso)
+{
+	TargetInfo target;
+
+	try
+	{
+		if (targetTriple.length > 0)
+		{
+			target = createCustomTarget(targetTriple);
+			if (verboso)
+				writefln("Usando target personalizado: %s", target.triple);
+		}
+		else
+		{
+			target = getTarget();
+			if (verboso)
+				writefln("Usando target padrão: %s", target.triple);
 		}
 	}
+	catch (Exception e)
+	{
+		writefln("cgd: erro: target inválido '%s': %s", targetTriple, e.msg);
+		writeln("Targets suportados: x86_64-gnu-linux, i386-gnu-linux");
+		throw e;
+	}
+
+	return target;
+}
+
+string determinarArquivoSaida(string arquivoEntrada, string arquivoSaidaEspecificado)
+{
+	if (arquivoSaidaEspecificado.length > 0)
+		return arquivoSaidaEspecificado;
+
+	return baseName(stripExtension(arquivoEntrada));
+}
+
+void mostrarInformacoesCompilacao(string entrada, string saida, TargetInfo target)
+{
+	writeln("=== Informações da Compilação ===");
+	writefln("Arquivo de entrada: %s", entrada);
+	writefln("Arquivo de saída: %s", saida);
+	writefln("Target: %s", target.triple);
+	writefln("Diretório stdlib: %s", STDLIB_DIR);
+	writeln("================================");
+}
+
+void safeRemove(string path)
+{
+	try
+	{
+		remove(path);
+	}
+	catch (Exception)
+	{
+		// ignora
+	}
+}
+
+bool processarArquivo(string arquivo, string arquivoSaida, CompilerOptions opcoes, TargetInfo target)
+{
+	DiagnosticError error = new DiagnosticError();
+	string arquivoTemporarioLL;
+
+	try
+	{
+		scope (exit)
+			if (arquivoTemporarioLL.length > 0 && exists(arquivoTemporarioLL))
+				safeRemove(arquivoTemporarioLL);
+
+		if (opcoes.verboso)
+			writeln("[1/6] Iniciando análise léxica...");
+
+		string conteudoArquivo = readText(arquivo);
+		Lexer lexer = new Lexer(arquivo, conteudoArquivo, ".", error);
+		Token[] tokens = lexer.tokenize();
+
+		if (verificarErros(error))
+			return false;
+
+		if (opcoes.verboso)
+			writefln("✓ Análise léxica concluída. %d tokens gerados.", tokens.length);
+
+		if (opcoes.mostrarTokens)
+			mostrarTokens(tokens);
+
+		if (opcoes.verboso)
+			writeln("[2/6] Iniciando análise sintática...");
+
+		Parser parser = new Parser(tokens, error);
+		Program program = parser.parse();
+
+		if (verificarErros(error))
+			return false;
+
+		if (opcoes.verboso)
+			writeln("✓ Análise sintática concluída.");
+
+		if (opcoes.mostrarAST)
+			program.print();
+
+		if (opcoes.verboso)
+			writeln("[3/6] Iniciando análise semântica...");
+
+		Semantic semantic = new Semantic(error);
+		Program programaSemantico = semantic.semantic(program);
+
+		if (verificarErros(error))
+			return false;
+
+		if (opcoes.verboso)
+			writeln("✓ Análise semântica concluída.");
+
+		if (opcoes.verboso)
+			writeln("[4/6] Iniciando otimização...");
+
+		if (opcoes.otimizar)
+		{
+			ConstantFolding cf = new ConstantFolding(error);
+			programaSemantico = cf.prog(programaSemantico);
+
+			if (verificarErros(error))
+				return false;
+
+			if (opcoes.verboso)
+				writeln("✓ Otimizações aplicadas.");
+		}
+		else if (opcoes.verboso)
+		{
+			writeln("- Otimizações desabilitadas.");
+		}
+
+		if (opcoes.verboso)
+			writeln("[5/6] Gerando código IR...");
+
+		Builder builder = new Builder(programaSemantico, semantic, target);
+		builder.build();
+
+		if (verificarErros(error))
+			return false;
+
+		string nomeBase = baseName(stripExtension(arquivo));
+		arquivoTemporarioLL = nomeBase ~ ".ll";
+
+		if (opcoes.emitirIR)
+		{
+			string arquivoIR = opcoes.arquivoSaida.length > 0 ? opcoes.arquivoSaida
+				: arquivoTemporarioLL;
+			builder.saveModule(arquivoIR);
+			writefln("✓ Código IR salvo em: %s", arquivoIR);
+			return true;
+		}
+
+		builder.saveModule(arquivoTemporarioLL);
+
+		if (opcoes.verboso)
+			writeln("✓ Código IR gerado.");
+
+		if (opcoes.verboso)
+			writeln("[6/6] Compilando para executável...");
+
+		Compiler compiler = new Compiler(builder, arquivoTemporarioLL, arquivoSaida, STDLIB_DIR);
+		compiler.compile();
+
+		writefln("✓ Compilação concluída com sucesso!");
+		writefln("Executável gerado: %s", arquivoSaida);
+
+		return true;
+	}
+	catch (FileException e)
+	{
+		writefln("cgd: erro: não foi possível acessar o arquivo '%s': %s", arquivo, e.msg);
+		return false;
+	}
+	catch (Exception e)
+	{
+		if (verificarErros(error))
+			return false;
+
+		writefln("cgd: erro durante o processamento: %s", e.msg);
+
+		if (opcoes.verboso)
+		{
+			writeln("\n=== Informações de Debug ===");
+			writeln(e.toString());
+			writeln("===========================");
+		}
+
+		return false;
+	}
+}
+
+bool verificarErros(DiagnosticError error)
+{
+	if (error.hasErrors() || error.hasWarnings())
+	{
+		error.printDiagnostics();
+		return error.hasErrors(); // Continuar se só há warnings
+	}
+	return false;
+}
+
+void mostrarTokens(Token[] tokens)
+{
+	writeln("\n=== Tokens Gerados ===");
+	foreach (i, token; tokens)
+	{
+		writefln("%3d: %s", i + 1, to!string(token.value));
+	}
+	writeln("=====================");
 }
 
 void mostrarMensagemAjuda()
 {
-	writeln("Uso: cgd [ARQUIVO] [OPÇÕES]");
-	writeln("");
-	writeln("Opções:");
-	writeln("  -o, --output ARQUIVO  Especifica o arquivo de saída");
-	writeln("  -v, --version         Mostra a versão do compilador");
-	writeln("  -h, --help            Mostra esta mensagem de ajuda");
-	writeln("  -0, --optimize        Aplica otimizações ao código");
-	writeln("  --eir, --emitir-ir    Salva o código IR gerado pelo compilador");
-	writeln("  --verbose             Modo verboso - mostra informações detalhadas");
-	writeln("");
+	writefln("Uso: %s [ARQUIVO] [OPÇÕES]", NOME_PROGRAMA);
+	writeln();
+	writeln("ARQUIVO deve ser um arquivo fonte Delégua (.delegua ou .del)");
+	writeln();
+	writeln("Opções principais:");
+	writeln("  -o, --output ARQUIVO     Especifica o arquivo de saída");
+	writeln("  -v, --version            Mostra a versão do compilador");
+	writeln("  -h, --help               Mostra esta mensagem de ajuda");
+	writeln();
+	writeln("Opções de compilação:");
+	writeln("  -0, --optimize           Aplica otimizações ao código");
+	writeln("  --eir, --emitir-ir       Salva o código IR LLVM gerado");
+	writeln("  --target TARGET          Especifica o alvo de saída");
+	writeln("  --verbose                Modo verboso - mostra informações detalhadas");
+	writeln();
+	writeln("Opções de debug:");
+	writeln("  --tokens                 Mostra os tokens gerados (debug)");
+	writeln("  --ast                    Mostra a árvore sintática abstrata (debug)");
+	writeln();
+	writeln("Targets suportados:");
+	writeln("  x86_64-gnu-linux         64-bit x86, Linux (padrão)");
+	writeln("  i386-gnu-linux           32-bit x86, Linux");
+	writeln();
 	writeln("Exemplos:");
-	writeln("  cgd arquivo.delegua");
-	writeln("  cgd arquivo.delegua --emitir-ir -o saida.ll");
-	writeln("  cgd arquivo.delegua --output meuapp");
-	writeln("");
+	writeln("  cgd programa.delegua                    # Compila para executável");
+	writeln("  cgd programa.delegua -o meuapp          # Especifica nome do executável");
+	writeln("  cgd programa.delegua -O --verbose       # Compila com otimizações e modo verboso");
+	writeln("  cgd programa.delegua --emitir-ir        # Gera apenas código IR LLVM");
+	writeln("  cgd programa.delegua --target i386-gnu-linux  # Compila para 32-bit");
+	writeln();
 	mostrarCopyright();
 }
 
 void mostrarVersaoPrograma()
 {
 	writefln("%s (%s) %s", NOME_COMPLETO, NOME_PROGRAMA, VERSAO);
+	writeln();
+	mostrarCopyright();
 }
 
 void mostrarCopyright()
@@ -156,116 +468,15 @@ void mostrarCopyright()
 	writeln("MIT License");
 	writeln("Copyright (C) 2025 Fernando");
 	writeln("GitHub: https://github.com/fernandothedev");
-	writeln("");
+	writeln();
 	writeln("Este é um software livre; veja o código-fonte para condições de cópia.");
 	writeln("NÃO há garantia; nem mesmo para COMERCIALIZAÇÃO ou ADEQUAÇÃO A UM");
 	writeln("PROPÓSITO PARTICULAR.");
 }
 
-bool checkErrors(DiagnosticError error)
+void exit(ExitCode code)
 {
-	if (error.hasErrors() || error.hasWarnings())
-	{
-		error.printDiagnostics();
-		return true;
-	}
-	return false;
-}
+	import core.stdc.stdlib : exit;
 
-void processarArquivo(string arquivo, string arquivoSaida, bool verboso, bool bigO, bool emitir_ll)
-{
-	DiagnosticError error = new DiagnosticError();
-	try
-	{
-		if (verboso)
-		{
-			writeln("Iniciando análise léxica...");
-		}
-
-		string nomeArquivo = baseName(stripExtension(arquivo));
-		string conteudoArquivo = readText(arquivo);
-
-		Lexer lexer = new Lexer(arquivo, conteudoArquivo, ".", error);
-		Token[] tokens = lexer.tokenize();
-
-		if (checkErrors(error))
-			return;
-
-		if (verboso)
-		{
-			writefln("Análise léxica concluída. %d tokens gerados.", tokens.length);
-			writeln("Iniciando análise sintática...");
-		}
-
-		Parser parser = new Parser(tokens, error);
-		Program program = parser.parse();
-
-		if (checkErrors(error))
-			return;
-
-		if (verboso)
-			program.print();
-
-		if (verboso)
-		{
-			writeln("Análise sintática concluída.");
-			writeln("Iniciando análise semântica...");
-		}
-
-		Semantic semantic = new Semantic(error);
-		Program newProgram = semantic.semantic(program);
-
-		if (checkErrors(error))
-			return;
-
-		if (verboso)
-		{
-			writeln("Análise semântica concluída.");
-			writeln("Iniciando otimização...");
-		}
-
-		if (bigO)
-		{
-			ConstantFolding cf = new ConstantFolding(error);
-			newProgram = cf.prog(newProgram);
-		}
-
-		Builder builder = new Builder(newProgram, semantic);
-		builder.build();
-
-		if (checkErrors(error))
-			return;
-
-		string file = nomeArquivo ~ ".ll";
-
-		if (emitir_ll && arquivoSaida != "")
-		{
-			builder.saveModule(cast(const char*) arquivoSaida);
-			return;
-		}
-
-		builder.saveModule(cast(const char*) file);
-
-		Compiler compiler = new Compiler(builder, file, arquivoSaida, STDLIB_DIR);
-		compiler.compile();
-
-		remove(file);
-		writefln("Compilação concluída com sucesso. Executável gerado: %s", arquivoSaida);
-	}
-	catch (FileException e)
-	{
-		writefln("cgd: erro: não foi possível ler o arquivo '%s': %s", arquivo, e.msg);
-	}
-	catch (Exception e)
-	{
-		if (checkErrors(error))
-			return;
-
-		writefln("cgd: erro durante o processamento: %s", e.msg);
-		if (verboso)
-		{
-			writeln("Detalhes do erro:");
-			writeln(e.toString());
-		}
-	}
+	exit(cast(int) code);
 }

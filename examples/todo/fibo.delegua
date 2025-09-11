@@ -1,13 +1,17 @@
-importar "io"
-
-função fibonacci(n: inteiro): inteiro {
-    se n <= 1 retorna n
-    retorna fibonacci(n - 1) + fibonacci(n - 2)
+função fibonacci_otimizado(n: i64, a: i64, b: i64): i64 {
+    se n == 0 retorna a
+    se n == 1 retorna b
+    retorna fibonacci_otimizado(n - 1, b, a + b)
 }
 
-var resultado = fibonacci(50)
-escrevaln('resultado: ', resultado)
+função fibonacci(n: i64): i64 {
+    se n <= 1 retorna n
+    retorna fibonacci_otimizado(n, 0, 1)
+}
 
-se (resultado != 12586269025) {
-    escrevaln('o resultado está errado!')
+var resultado = fibonacci(100)
+printf("resultado: %lld\n", resultado)
+
+se (resultado != 3736710778780434371) {
+    printf("o resultado está errado!")
 }

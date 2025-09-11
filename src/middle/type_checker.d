@@ -188,7 +188,7 @@ class TypeChecker
     }
 
     // Gets the promoted type between two numeric types
-    private FTypeInfo promoteTypes(TypesNative leftType, TypesNative rightType)
+    FTypeInfo promoteTypes(TypesNative leftType, TypesNative rightType)
     {
         int leftRank = typeHierarchy.get(cast(string) leftType, 0);
         int rightRank = typeHierarchy.get(cast(string) rightType, 0);

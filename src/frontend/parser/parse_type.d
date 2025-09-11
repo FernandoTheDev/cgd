@@ -106,8 +106,10 @@ private:
             // Floating-point types
         case "half":
         case "float":
+        case "f32":
             return TypesNative.F32;
         case "double":
+        case "f64":
             return TypesNative.F64;
         case "fp128":
             return TypesNative.FP128;

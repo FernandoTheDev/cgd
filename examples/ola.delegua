@@ -23,7 +23,7 @@ classe Texto {
 
     tamanho(): Inteiro {
         // retorna novo Inteiro(__builtin_core_strlen(isto.valor))
-        retorna novo Inteiro(8)
+        retorna novo Inteiro(69)
     }
 }
 
@@ -39,8 +39,13 @@ classe Usuario {
     construtor(n: Texto) {
         isto.nome = n
     }
+
+    get(): Texto {
+        retorna isto.nome
+    }
 }
 
 var u = novo Usuario(novo Texto("Fefas"))
-printf("%s\n", u.nome.get())
 
+printf("%s\n", u.get().get())
+printf("%d\n", u.get().tamanho())

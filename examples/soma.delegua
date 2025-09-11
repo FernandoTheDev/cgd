@@ -9,5 +9,5 @@ var result = soma(x, y)
 
 printf("%d\n", result)
 
-var nome: i8* = "Fernando"
+var nome: i8p = "Fernando"
 printf("Nome: %s\n", nome)
