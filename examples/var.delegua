@@ -1,0 +1,7 @@
+var x = 3
+var y = 9223372036854775807
+
+var z = raiz(x)
+z = raiz(y)
+
+printf("%d %lld %f\n", x, y, z)

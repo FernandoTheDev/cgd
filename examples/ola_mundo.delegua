@@ -28,5 +28,5 @@ classe Texto {
 }
 
 var nome: Texto = novo Texto("Fernando")
-printf("Nome: %s\nTamanho do nome: %d\n", nome.get(), nome.tamanho())
+printf("Nome: %s\nTamanho do nome: %d\n", nome.get(), nome.tamanho().get())
 // printf("Nome: %s\nTamanho do nome: %d\n", nome, nome.tamanho())

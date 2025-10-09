@@ -1,0 +1,21 @@
+função ehPrimo(n: i64): i1 {
+    se n < 2 retorna falso
+    se n == 2 retorna verdadeiro
+    se n % 2 == 0 retorna falso
+    
+    var limite = raiz(n)
+    para var i = 3; i <= limite; i = i + 2
+        se n % i == 0 retorna falso
+    retorna verdadeiro
+}
+
+função contarPrimos(limite: i64): i64 {
+    var contador = 0
+    para var numero = 2; numero <= limite; numero++
+        se (ehPrimo(numero)) contador++
+    retorna contador
+}
+
+var limite = 1000000
+var resultado = contarPrimos(limite)
+printf("RESULT: %lld\n", resultado)

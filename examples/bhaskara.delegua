@@ -1,0 +1,21 @@
+função bhaskara(a: double, b: double, c: double): i64 {
+    var delta = b * b - 4.0 * a * c
+    var d = raiz(delta)
+    var x1 = (-b + d) / (2.0 * a)
+    var x2 = (-b - d) / (2.0 * a)
+    var r1 = (a * x1 * x1) + (b * x1) + c
+    var r2 = (a * x2 * x2) + (b * x2) + c
+
+    printf("O valor de Delta é: %f\n", delta)
+    printf("O valor de X1 é: %f\n", x1)
+    printf("O valor de X2 é: %f\n", x2)
+    printf("Substituindo X1 na equação obtém-se: %f\n", r1)
+    printf("Substituindo X2 na equação obtém-se: %f\n", r2)
+
+    retorna 0
+}
+
+var a = 1.0
+var b = -1.0
+var c = -30.0
+bhaskara(a, b, c)

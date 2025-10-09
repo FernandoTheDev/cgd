@@ -1,0 +1,16 @@
+para var i = 0; i < 10; i++ {
+    printf("I: %d\n", i)
+    para var j = 0; j < 5; j++
+        printf("J: %d\n", j)
+}
+
+/* equivalent:
+
+for (var i = 0; i < 10; i++) {
+    console.log(`I: ${i}`)
+    for (var j = 0; j < 5; j++) {
+        console.log(`J: ${j}`)
+    }
+}
+
+*/

@@ -1,0 +1,6 @@
+var a = 0
+para var i = 0; i < 5; i++
+    a++
+
+se a == 5
+    printf("Para: OK!\n")

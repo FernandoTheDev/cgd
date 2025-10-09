@@ -1,0 +1,8 @@
+[book]
+authors = ["Fernando Dev"]
+language = "ptbr"
+src = "src"
+title = "CGD"
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
