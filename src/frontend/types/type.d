@@ -7,12 +7,15 @@ enum BaseType : string
 {
     String = "texto",
     Int = "inteiro",
+    Long = "long",
+    Float = "decimal",
+    Double = "duplo",
     Bool = "logico",
     Void = "vazio",
     Any = "qualquer",
 }
 
-immutable int[string] TYPE_HIERARCHY = [
+const int[string] TYPE_HIERARCHY = [
     "logico": 1,
     "inteiro": 2,
     "real": 3
@@ -135,9 +138,8 @@ class PrimitiveType : Type
     }
 
     // Mapas de compatibilidade
-    private static immutable string[][string] STRICT_COMPAT = null;
-
-    private static immutable string[][string] LIBERAL_COMPAT = null;
+    private static const string[][string] STRICT_COMPAT = null;
+    private static const string[][string] LIBERAL_COMPAT = null;
 }
 
 class VoidType : Type

@@ -211,10 +211,9 @@ private:
 
     void lexNumber()
     {
-        long startOffset = offset;
         long startCol = column;
         string n;
-        bool isDouble = false;
+        bool isFloat = false;
 
         // Números decimais normais
         while (offset < source.length && (isDigit(peek()) || peek() == '_'))
@@ -230,7 +229,7 @@ private:
         {
             n ~= ".";
             advance();
-            isDouble = true;
+            isFloat = true;
             long offsetSave = offset;
 
             while (offset < source.length && isDigit(peek()))
@@ -278,18 +277,16 @@ private:
                 advance();
                 kind = TokenKind.F64;
                 break;
-            case 'L':
+            case 'L', 'l':
                 advance();
-                kind = TokenKind.F128;
+                kind = TokenKind.I64;
                 break;
             default:
-                kind = isDouble ? TokenKind.F64 : TokenKind.I64;
+                kind = isFloat ? TokenKind.F32 : TokenKind.I32;
             }
         }
         else
-        {
-            kind = isDouble ? TokenKind.F64 : TokenKind.I64;
-        }
+            kind = isFloat ? TokenKind.F32 : TokenKind.I32;
 
         tokens ~= Token(kind, Variant(intern(n)), createLoc(startCol, column - 1));
     }
