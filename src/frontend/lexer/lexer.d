@@ -716,7 +716,7 @@ unittest
     assert(tokens[3].kind == TokenType.INT);
     assert(tokens[3].value.get!long == 42);
     assert(tokens[4].kind == TokenType.SEMICOLON);
-    assert(tokens[$-1].kind == TokenType.EOF);
+    assert(tokens[$ - 1].kind == TokenType.EOF);
 
     writeln("✓ Teste de tokenização básica passou!");
 }
@@ -757,11 +757,17 @@ unittest
     assert(tokens2[0].kind == TokenType.FLOAT);
     // Como pode ser string ou double, vou verificar se é um valor numérico válido
     // usando conversão segura
-    if (tokens2[0].value.type == typeid(string)) {
+    if (tokens2[0].value.type == typeid(string))
+    {
         import std.conv : to;
-        double val = tokens2[0].value.get!string.to!double;
+
+        double val = tokens2[0].value
+            .get!string
+            .to!double;
         assert(val == 12.34);
-    } else {
+    }
+    else
+    {
         assert(tokens2[0].value.get!double == 12.34);
     }
 
