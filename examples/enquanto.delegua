@@ -1,7 +1,0 @@
-importar { escreva } de "io"
-
-var i = 0
-enquanto i < 10 {
-    escreva('Fernando dev: ', i, '\\n')
-    i++
-}

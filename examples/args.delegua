@@ -1,6 +1,0 @@
-importar { escrevaln } de "io"
-
-escrevaln("Args: ", ARGS)
-
-para var i = 0; i < ARGS.tamanho; i++
-    escrevaln("Argumento: ", ARGS[i])

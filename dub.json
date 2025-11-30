@@ -1,42 +1,11 @@
 {
-	"authors": [
-		"Fernando Dev",
-		"Italo Brito Brandão"
-	],
+	"name": "cgd",
 	"copyright": "Copyright © 2025, Fernando Dev",
 	"description": "Compilador Geral Delégua",
 	"license": "MIT",
-	"name": "cgd",
 	"targetType": "executable",
-	"buildTypes": {
-		"debug": {
-			"dflags-dmd": ["-g", "-debug"],
-			"dflags-ldc": ["-g", "-O0", "-wi"],
-			"dflags-gdc": ["-g", "-O0"]
-		},
-		"release": {
-			"dflags-dmd": ["-O", "-release", "-inline"],
-			"dflags-ldc": ["-O2", "-release", "-enable-inlining", "-wi"],
-			"dflags-gdc": ["-O2", "-frelease"]
-		},
-		"release-fast": {
-			"dflags-dmd": [
-				"-O",
-				"-release",
-				"-inline",
-				"-boundscheck=off"
-			],
-			"dflags-ldc": [
-				"-O3",
-				"-release",
-				"-enable-inlining",
-				"-boundscheck=off",
-				"-wi"
-			],
-			"dflags-gdc": ["-O3", "-frelease", "-fbounds-check=off"]
-		},
-		"unittest": {
-			"dflags-ldc": ["-g", "-O0", "-unittest", "-wi"]
-		}
-	}
+	"authors": [
+		"Fernando Dev",
+		"Italo Brito Brandão"
+	]
 }

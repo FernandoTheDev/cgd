@@ -1,0 +1,8 @@
+var nome: texto = "Fernando"
+var idade;
+idade = 17
+escreva(nome, " ", idade)
+
+var x = 60
+var y = 9
+escreva(x + y)

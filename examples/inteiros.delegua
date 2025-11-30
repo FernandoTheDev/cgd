@@ -1,9 +1,0 @@
-importar "io"
-
-var hexadecimal = 0x45
-var octal = 0o105
-var binario = 01000101b // 0b1000101
-
-escrevaln("Binario:     ", binario)
-escrevaln("Hexadecimal: ", hexadecimal)
-escrevaln("Octal:       ", octal)

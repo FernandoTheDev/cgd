@@ -1,5 +1,0 @@
-importar { escrevaln } de "io"
-
-var name = "Fernando"
-escrevaln('Criado por: ', name)
-

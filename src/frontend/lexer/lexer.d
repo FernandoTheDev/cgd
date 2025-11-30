@@ -1,808 +1,541 @@
 module frontend.lexer.lexer;
 
-import std.variant;
-import std.stdio;
-import std.conv;
-import std.array;
-import std.string;
-import std.ascii : toLower;
-import frontend.lexer.token;
-import error;
+import std.stdio, std.conv, std.variant, std.ascii, std.format, std.exception, frontend
+    .lexer.token, common.reporter;
 
 class Lexer
 {
 private:
-    string source;
-    string file;
-    string dir;
+    string source = "";
+    string filename = "";
+    string dir = ".";
+    long offset = 0;
+    long line = 1;
+    long column = 1;
+    Token[] tokens = [];
     DiagnosticError error;
 
-    ulong line = 1;
-    ulong offset = 0;
-    ulong lineOffset = 0;
-    ulong start = 1;
-    Token[] tokens = [];
+    TokenKind[string] keywords;
+    TokenKind[string] symbols;
 
-    // Estaticos e imutaveis
-    static immutable TokenType[string] SINGLE_CHAR_TOKENS = initSingleCharTokens();
-    static immutable TokenType[string] MULTI_CHAR_TOKENS = initMultiCharTokens();
-    static immutable bool[char] ALPHA_CHARS = initCharSet(
-        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_áÁãÃâÂàÀéÉêÊíÍóÓõÕôÔúÚçÇ");
-    static immutable bool[char] DIGIT_CHARS = initCharSet("0123456789");
-    static immutable bool[char] HEX_CHARS = initCharSet("0123456789abcdefABCDEF");
-    static immutable bool[char] OCTAL_CHARS = initCharSet("01234567");
-    static immutable bool[char] BINARY_CHARS = initCharSet("01");
-    static immutable bool[char] WHITESPACE_CHARS = initCharSet(" \t\r");
+    // Otimizações
+    string[256] charToStr;
+    string[string] internedStrings;
+    bool[256] isIdentStart;
+    bool[256] isIdentCont;
 
-    static TokenType[string] initSingleCharTokens()
+    string intern(string s)
     {
-        TokenType[string] m;
-        m["+"] = TokenType.PLUS;
-        m["-"] = TokenType.MINUS;
-        m["*"] = TokenType.ASTERISK;
-        m["/"] = TokenType.SLASH;
-        m[">"] = TokenType.GREATER_THAN;
-        m["<"] = TokenType.LESS_THAN;
-        m[","] = TokenType.COMMA;
-        m[";"] = TokenType.SEMICOLON;
-        m[":"] = TokenType.COLON;
-        m["("] = TokenType.LPAREN;
-        m[")"] = TokenType.RPAREN;
-        m["{"] = TokenType.LBRACE;
-        m["}"] = TokenType.RBRACE;
-        m["."] = TokenType.DOT;
-        m["%"] = TokenType.MODULO;
-        m["="] = TokenType.EQUALS;
-        m["["] = TokenType.LBRACKET;
-        m["]"] = TokenType.RBRACKET;
-        m["!"] = TokenType.BANG;
-        m["?"] = TokenType.QUESTION;
-        m["&"] = TokenType.BIT_AND;
-        m["|"] = TokenType.BIT_OR;
-        m["^"] = TokenType.BIT_XOR;
-        m["~"] = TokenType.BIT_NOT;
-        return m;
+        if (auto cached = s in internedStrings)
+            return *cached;
+        internedStrings[s] = s;
+        return s;
     }
 
-    static TokenType[string] initMultiCharTokens()
+    pragma(inline, true)
+    void setCharToStrAndAsIdent()
     {
-        TokenType[string] m;
-        m["++"] = TokenType.INCREMENT;
-        m["--"] = TokenType.DECREMENT;
-        m["**"] = TokenType.EXPONENTIATION;
-        m["%%"] = TokenType.REMAINDER;
-        m["=="] = TokenType.EQUALS_EQUALS;
-        m[">="] = TokenType.GREATER_THAN_OR_EQUALS;
-        m["<="] = TokenType.LESS_THAN_OR_EQUALS;
-        m["&&"] = TokenType.AND;
-        m["||"] = TokenType.OR;
-        m["!="] = TokenType.NOT_EQUALS;
-        m[".."] = TokenType.RANGE;
-        m["<<"] = TokenType.LEFT_SHIFT;
-        m[">>"] = TokenType.RIGHT_SHIFT;
-        m["&="] = TokenType.BIT_AND_ASSIGN;
-        m["|="] = TokenType.BIT_OR_ASSIGN;
-        m["^="] = TokenType.BIT_XOR_ASSIGN;
-        m["<<="] = TokenType.LEFT_SHIFT_ASSIGN;
-        m[">>="] = TokenType.RIGHT_SHIFT_ASSIGN;
-        return m;
-    }
+        foreach (i; 0 .. 256)
+            charToStr[i] = [cast(char) i];
 
-    static bool[char] initCharSet(string chars)
-    {
-        bool[char] set;
-        foreach (c; chars)
+        foreach (c; 'a' .. 'z' + 1)
         {
-            set[c] = true;
+            isIdentStart[c] = true;
+            isIdentCont[c] = true;
         }
-        return set;
-    }
-
-    Loc getLocation(ulong start, ulong end, ulong line = 0)
-    {
-        ulong currentLine = line == 0 ? this.line : line;
-        return Loc(
-            this.file,
-            currentLine,
-            start,
-            end,
-            this.dir
-        );
-    }
-
-    void reportError(
-        string message,
-        Loc loc,
-        string suggestion = "",
-    )
-    {
-        error.addError(Diagnostic(message, loc, [
-                    error.makeSuggestion(
-                    suggestion)
-                ]));
-        return;
-    }
-
-    void reportUnexpectedChar(char ch)
-    {
-        error.addError(
-            Diagnostic(format("Caractere inesperado '%c'", ch),
-                this.getLocation(this.start, this.start + 1),
-                [
-                    error.makeSuggestion(
-                    "Remova o caractere e verifique se o erro não persiste mais.",
-                    error.getLineText(this.line, this.file).replace(ch, ""),
-                    ),
-                ])
-        );
-    }
-
-    Token createToken(TokenType kind, Variant value, ulong skipChars = 1, ulong startAdd = 0)
-    {
-        auto valueLength = to!string(value).length;
-        ulong st = this.start + startAdd;
-        Token token = Token(kind, value, this.getLocation(st, cast(ulong) st + valueLength));
-        this.tokens ~= token;
-        this.offset += skipChars;
-        return token;
-    }
-
-    void createTokenWithLocation(TokenType kind, Variant value, ulong start, ulong length)
-    {
-        this.tokens ~= Token(
-            kind,
-            value,
-            this.getLocation(start, start + length)
-        );
-    }
-
-    void lexHexadecimal(ulong startPos)
-    {
-        this.offset += 2; // Skip "0x" or "0X"
-        const hexDigits = this.consumeHexDigits();
-
-        if (hexDigits.length == 0)
+        foreach (c; 'A' .. 'Z' + 1)
         {
-            this.reportError("Número hexadecimal inválido: dígitos ausentes após '0x'", this.getLocation(startPos, this
-                    .offset));
-            return;
+            isIdentStart[c] = true;
+            isIdentCont[c] = true;
         }
-
-        auto fullHex = "0x" ~ hexDigits;
-        long value = to!long(hexDigits, 16);
-
-        this.createTokenWithLocation(
-            TokenType.INT,
-            Variant(value),
-            startPos,
-            fullHex.length,
-        );
+        isIdentStart['_'] = true;
+        isIdentCont['_'] = true;
+        foreach (c; '0' .. '9' + 1)
+            isIdentCont[c] = true;
     }
 
-    void lexOctal(ulong startPos)
+    pragma(inline, true)
+    void setKeywords()
     {
-        this.offset += 2; // Skip "0o" or "0O"
-        const octalDigits = this.consumeOctalDigits();
-
-        if (octalDigits.length == 0)
-        {
-            this.reportError("Número octal inválido: dígitos ausentes após '0o'", this.getLocation(startPos, this
-                    .offset));
-            return;
-        }
-
-        auto fullOctal = "0o" ~ octalDigits;
-        long value = to!long(octalDigits, 8);
-
-        this.createTokenWithLocation(
-            TokenType.INT,
-            Variant(value),
-            startPos,
-            fullOctal.length,
-        );
+        keywords["var"] = TokenKind.Var;
+        keywords["funcao"] = TokenKind.Funcao;
     }
 
-    void lexBinaryWithPrefix(ulong startPos)
+    pragma(inline, true)
+    void setSymbols()
     {
-        this.offset += 2; // Skip "0b" or "0B"
-        const binaryDigits = this.consumeBinaryDigits();
+        // Agrupadores
+        symbols["("] = TokenKind.LParen;
+        symbols[")"] = TokenKind.RParen;
+        symbols["{"] = TokenKind.LBrace;
+        symbols["}"] = TokenKind.RBrace;
+        symbols["["] = TokenKind.LBracket;
+        symbols["]"] = TokenKind.RBracket;
 
-        if (binaryDigits.length == 0)
-        {
-            this.reportError("Número binário inválido: dígitos ausentes após '0b'", this.getLocation(startPos, this
-                    .offset));
-            return;
-        }
+        // Operadores aritméticos básicos
+        symbols["+"] = TokenKind.Plus;
+        symbols["-"] = TokenKind.Minus;
+        symbols["*"] = TokenKind.Star;
+        symbols["/"] = TokenKind.Slash;
+        symbols["%"] = TokenKind.Modulo;
 
-        auto fullBinary = "0b" ~ binaryDigits;
-        long value = to!long(binaryDigits, 2);
+        // Operadores de comparação
+        symbols[">"] = TokenKind.GreaterThan;
+        symbols["<"] = TokenKind.LessThan;
+        symbols["!"] = TokenKind.Bang;
+        symbols[">="] = TokenKind.GreaterThanEquals;
+        symbols["<="] = TokenKind.LessThanEquals;
+        symbols["=="] = TokenKind.EqualsEquals;
+        symbols["!="] = TokenKind.NotEquals;
 
-        this.createTokenWithLocation(
-            TokenType.INT,
-            Variant(value),
-            startPos,
-            fullBinary.length,
-        );
+        // Pontuação
+        symbols["."] = TokenKind.Dot;
+        symbols[":"] = TokenKind.Colon;
+        symbols[","] = TokenKind.Comma;
+        symbols[";"] = TokenKind.SemiColon;
+        symbols["="] = TokenKind.Equals;
+
+        // Operadores bitwise
+        symbols["&"] = TokenKind.BitAnd;
+        symbols["|"] = TokenKind.BitOr;
+        symbols["^"] = TokenKind.BitXor;
+        symbols["~"] = TokenKind.BitNot;
+        symbols["<<"] = TokenKind.BitSHL;
+        symbols[">>"] = TokenKind.BitSHR;
+        symbols[">>>"] = TokenKind.BitSAR;
+
+        // Operadores lógicos
+        symbols["||"] = TokenKind.Or;
+        symbols["&&"] = TokenKind.And;
+
+        // Operadores de incremento/decremento
+        symbols["++"] = TokenKind.PlusPlus;
+        symbols["--"] = TokenKind.MinusMinus;
+
+        // Operadores de atribuição composta
+        symbols["+="] = TokenKind.PlusEquals;
+        symbols["-="] = TokenKind.MinusEquals;
+        symbols["/="] = TokenKind.SlashEquals;
+        symbols["*="] = TokenKind.StarEquals;
+        symbols["%="] = TokenKind.ModuloEquals;
+        symbols["&="] = TokenKind.BitAndEquals;
+        symbols["|="] = TokenKind.BitOrEquals;
+        symbols["^="] = TokenKind.BitXorEquals;
+        symbols["~="] = TokenKind.TildeEquals;
+        symbols[">>="] = TokenKind.BitSHREquals;
+        symbols["<<="] = TokenKind.BitSHLEquals;
     }
 
-    bool lexString()
+    bool lexSymbol(char c)
     {
-        string value = ""; // Buffer
-        ulong startLine = this.line;
-        ulong startPos = this.start;
-        char openingQuote = this.source[this.offset];
-        this.offset++; // Skip opening quote
+        string ch = charToStr[c];
 
-        while (this.offset < this.source.length && this.source[this.offset] != openingQuote)
+        // Tenta operadores de 3, 2 e 1 caractere(s)
+        foreach (len; [3, 2, 1])
         {
-            char ch = this.source[this.offset];
-
-            if (ch == '\n')
+            if (offset + len - 1 < source.length)
             {
-                this.line += 1;
-                value ~= ch;
-                this.offset++;
-                this.lineOffset = this.offset;
-                continue;
-            }
-
-            // Handle escape sequences
-            if (ch == '\\')
-            {
-                this.offset++;
-                if (this.offset >= this.source.length)
-                    break;
-
-                value ~= this.getEscapedChar(this.source[this.offset]);
-                this.offset++;
-            }
-            else
-            {
-                value ~= ch;
-                this.offset++;
-            }
-        }
-
-        // Check for unclosed string
-        if (this.offset >= this.source.length || this.source[this.offset] != openingQuote)
-        {
-            ulong errorStart = startPos;
-            ulong errorEnd = this.offset - this.lineOffset;
-
-            Loc loc = this.getLocation(errorStart, errorEnd);
-            loc.line = startLine;
-
-            this.reportError(
-                "A string não foi fechada",
-                loc,
-                format("Adicione '%c' ao final da string.", openingQuote)
-            );
-            return false;
-        }
-
-        this.offset++;
-        this.createTokenWithLocation(
-            TokenType.STRING,
-            Variant(value),
-            startPos,
-            this.offset - startPos - this.lineOffset + startPos
-        );
-        return true;
-    }
-
-    char getEscapedChar(char ch)
-    {
-        switch (ch)
-        {
-        case 'n':
-            return '\n';
-        case 't':
-            return '\t';
-        case 'r':
-            return '\r';
-        case '\\':
-            return '\\';
-        case '\'':
-            return '\'';
-        case '0':
-            return '\0';
-        default:
-            return ch;
-        }
-    }
-
-    bool lexComment()
-    {
-        ulong startPos = this.offset;
-        this.offset++; // Skip the first '/'
-
-        if (this.source[this.offset] == '/')
-        {
-            this.offset++;
-            while (this.offset < this.source.length && this.source[this.offset] != '\n')
-            {
-                this.offset++;
-            }
-            return true;
-        }
-
-        if (this.source[this.offset] == '*')
-        {
-            // Multiple-line body comment
-            this.offset++;
-
-            while (this.offset + 1 < this.source.length)
-            {
-                if (this.source[this.offset] == '*' &&
-                    this.source[this.offset + 1] == '/')
+                string op = source[offset .. offset + len];
+                if (op in symbols)
                 {
-                    this.offset += 2;
+                    createToken(symbols[op], Variant(op), len);
                     return true;
                 }
-
-                if (this.source[this.offset] == '\n')
-                {
-                    this.line++;
-                    this.lineOffset = this.offset + 1;
-                }
-                this.offset++;
             }
-            // Error
-            this.reportError("Corpo do comentário não foi fechado.", this.getLocation(startPos, this
-                    .offset));
-            return false;
         }
 
-        this.offset--;
         return false;
+    }
+
+    pragma(inline, true)
+    Loc createLoc(ulong startCol, ulong endCol, long line_ = -1)
+    {
+        long actualLine = (line_ == -1) ? line : line_;
+        return Loc(
+            filename,
+            dir,
+            LocLine(startCol - 1, actualLine),
+            LocLine(endCol - 1, line)
+        );
+    }
+
+    pragma(inline, true)
+    void createToken(TokenKind kind, Variant value, ulong len)
+    {
+        tokens ~= Token(kind, value, createLoc(column - len, column - 1));
+    }
+
+    pragma(inline, true)
+    void reportError(string message, long startCol, long startLine = -1, Suggestion[] suggestions = null)
+    {
+        error.addError(Diagnostic(message, createLoc(startCol, column - 1, startLine), suggestions));
+    }
+
+    void advance(int count = 1)
+    {
+        for (int i; i < count; i++)
+        {
+            if (offset < source.length)
+            {
+                if (source[offset] == '\n')
+                {
+                    line++;
+                    column = 1;
+                }
+                else
+                    column++;
+                offset++;
+            }
+        }
+    }
+
+    pragma(inline, true)
+    char peek(int lookahead = 0)
+    {
+        long pos = offset + lookahead;
+        return (pos < source.length) ? source[pos] : '\0';
     }
 
     void lexIdentifier()
     {
-        const ulong startOffset = this.offset;
-        while (this.offset < this.source.length)
-        {
-            char c = this.source[this.offset];
-            if (!(c in this.ALPHA_CHARS) && !(
-                    c in this.DIGIT_CHARS))
-            {
-                break;
-            }
-            this.offset++;
-        }
+        long startOffset = offset;
+        long startCol = column;
 
-        string identifier = this.source[startOffset .. this.offset];
-        TokenType tokenType = TokenType
-            .IDENTIFIER;
-        if (auto keywordType = identifier in keywords)
-        {
-            tokenType = *keywordType;
-        }
+        while (offset < source.length && (isIdentCont[peek()] || peek() == '_'))
+            advance();
 
-        this.createTokenWithLocation(tokenType, Variant(identifier), startOffset - this.lineOffset, identifier
-                .length);
-    }
-
-    bool lexSingleCharToken()
-    {
-        string currentChar = this.source[this.offset .. this.offset + 1];
-
-        if (auto tokenType = currentChar in SINGLE_CHAR_TOKENS)
-        {
-            this.createToken(*tokenType, Variant(currentChar));
-            return true;
-        }
-        return false;
-    }
-
-    bool lexMultiCharToken()
-    {
-        if (this.offset + 1 >= this.source.length)
-            return false;
-        string twoChars = this
-            .source[this.offset .. this.offset + 2];
-
-        if (auto tokenType = twoChars in MULTI_CHAR_TOKENS)
-        {
-            this.createToken(*tokenType, Variant(twoChars), 2);
-            return true;
-        }
-        return false;
-    }
-
-    string consumeDigits()
-    {
-        ulong _start = this.offset;
-        while (this.offset < this.source.length && this
-            .source[this.offset] in this.DIGIT_CHARS)
-        {
-            this.offset++;
-        }
-        return this.source[_start .. this.offset];
-    }
-
-    string consumeHexDigits()
-    {
-        ulong _start = this.offset;
-        while (this.offset < this.source.length && this
-            .source[this.offset] in this.HEX_CHARS)
-        {
-            this.offset++;
-        }
-        return this.source[_start .. this.offset];
-    }
-
-    string consumeOctalDigits()
-    {
-        ulong _start = this.offset;
-        while (
-            this.offset < this.source.length && this
-            .source[this.offset] in this.OCTAL_CHARS)
-        {
-            this.offset++;
-        }
-        return this.source[_start .. this.offset];
-    }
-
-    string consumeBinaryDigits()
-    {
-        ulong _start = this.offset;
-        while (this.offset < this.source.length && this
-            .source[this.offset] in this
-            .BINARY_CHARS)
-        {
-            this.offset++;
-        }
-        return this
-            .source[_start .. this.offset];
+        string id = source[startOffset .. offset];
+        TokenKind kind = (id in keywords) ? keywords[id] : TokenKind.Identifier;
+        tokens ~= Token(kind, Variant(intern(id)), createLoc(startCol, column - 1));
     }
 
     void lexNumber()
     {
-        ulong startPos = this.offset;
+        long startOffset = offset;
+        long startCol = column;
+        string n;
+        bool isDouble = false;
 
-        if (
-            this.source[this.offset] == '0' && this.offset + 1 < this
-            .source.length
-            )
+        // Números decimais normais
+        while (offset < source.length && (isDigit(peek()) || peek() == '_'))
         {
-            const prefix = toLower(
-                this.source[this.offset + 1]);
-
-            // Hexadecimal (0x or 0X)
-            if (prefix == 'x')
-            {
-                this.lexHexadecimal(startPos);
-                return;
-            }
-
-            // Octal (0o or 0O)
-            if (prefix == 'o')
-            {
-                this.lexOctal(startPos);
-                return;
-            }
-
-            // Binary (0b or 0B)
-            if (prefix == 'b')
-            {
-                this.lexBinaryWithPrefix(
-                    startPos);
-                return;
-            }
+            if (peek() != '_')
+                n ~= charToStr[peek()];
+            advance();
         }
 
-        string number = this.consumeDigits();
-
-        // Handle range operator (e.g., 123..456)
-        if (
-            this.source[0 .. this.offset] == "..")
+        // Verifica ponto decimal
+        if (offset < source.length && peek() == '.' && offset + 1 < source.length && isDigit(
+                source[offset + 1]))
         {
-            this.createTokenWithLocation(
-                TokenType.INT,
-                Variant(number),
-                startPos,
-                number.length,
-            );
-            this.createToken(TokenType.RANGE, Variant(
-                    ".."), 2);
+            n ~= ".";
+            advance();
+            isDouble = true;
+            long offsetSave = offset;
+
+            while (offset < source.length && isDigit(peek()))
+                advance();
+            n ~= source[offsetSave .. offset];
+        }
+
+        // Números hexadecimais
+        if (n.length == 1 && n[0] == '0' && offset < source.length && (peek() == 'x' || peek() == 'X'))
+        {
+            n ~= "x";
+            advance();
+            long offsetSave = offset;
+
+            while (offset < source.length && isHexDigit(peek()))
+                advance();
+
+            n ~= source[offsetSave .. offset];
+            auto hexOnly = n[2 .. $];
+
+            if (hexOnly.length == 0)
+            {
+                reportError("Número hexadecimal vazio", startCol);
+                tokens ~= Token(TokenKind.I64, Variant(intern("0")), createLoc(startCol, column - 1));
+                return;
+            }
+
+            tokens ~= Token(TokenKind.I64, Variant(intern(to!string(parse!long(hexOnly, 16)))),
+                createLoc(startCol, column - 1));
             return;
         }
 
-        // Handle floating point numbers
-        if (this.offset < this.source.length && this
-            .source[this.offset] == '.')
+        // Determina o tipo do token baseado no sufixo ou se é double
+        TokenKind kind;
+        if (offset < source.length)
         {
-            const nextChar = this
-                .source[this.offset + 1];
-            if (
-                nextChar in this
-                .DIGIT_CHARS)
+            char suffix = peek();
+            switch (suffix)
             {
-                number ~= ".";
-                this.offset++;
-                number ~= this.consumeDigits();
+            case 'F', 'f':
+                advance();
+                kind = TokenKind.F32;
+                break;
+            case 'D', 'd':
+                advance();
+                kind = TokenKind.F64;
+                break;
+            case 'L':
+                advance();
+                kind = TokenKind.F128;
+                break;
+            default:
+                kind = isDouble ? TokenKind.F64 : TokenKind.I64;
+            }
+        }
+        else
+        {
+            kind = isDouble ? TokenKind.F64 : TokenKind.I64;
+        }
 
-                this.createTokenWithLocation(
-                    TokenType.FLOAT,
-                    Variant(number),
-                    startPos,
-                    number.length,
-                );
-                return;
+        tokens ~= Token(kind, Variant(intern(n)), createLoc(startCol, column - 1));
+    }
+
+    void lexString()
+    {
+        long startLine = line;
+        long startCol = column;
+        advance(); // Consome '"'
+        string buff;
+
+        while (offset < source.length && peek() != '"')
+        {
+            char pk = peek();
+
+            if (pk == '\\')
+            {
+                processEscapeSequence(buff, startCol, startLine);
+            }
+            else if (pk == '\n')
+            {
+                buff ~= '\n';
+                advance();
+            }
+            else
+            {
+                buff ~= pk;
+                advance();
             }
         }
 
-        // Handle binary literals with suffix (e.g., 101b)
-        if (
-            this.offset < this.source.length &&
-            toLower(
-                this
-                .source[this.offset]) == 'b'
-            )
+        if (offset < source.length && peek() == '"')
         {
-            this.offset++;
-            long binaryValue = to!long(number, 2);
+            advance();
+        }
+        else
+        {
+            reportError("Texto não terminado", startCol, startLine,
+                [error.makeSuggestion("Adicione um '\"' ao fim do texto.")]);
+        }
 
-            this.createTokenWithLocation(
-                TokenType.INT,
-                Variant(binaryValue),
-                startPos,
-                number.length + 1
-            );
+        tokens ~= Token(TokenKind.String, Variant(buff), createLoc(startCol, column - 1, startLine));
+    }
+
+    void processEscapeSequence(ref string buff, long startCol, long startLine)
+    {
+        advance(); // Consome '\'
+
+        if (offset >= source.length)
+        {
+            reportError("Sequência de escape incompleta no final do arquivo", startCol, startLine);
             return;
         }
 
-        this.createTokenWithLocation(
-            TokenType.INT,
-            Variant(to!long(number)),
-            startPos,
-            number.length,
-        );
+        char escaped = peek();
+
+        switch (escaped)
+        {
+        case 'n':
+            buff ~= '\n';
+            break;
+        case 't':
+            buff ~= '\t';
+            break;
+        case 'r':
+            buff ~= '\r';
+            break;
+        case '\\':
+            buff ~= '\\';
+            break;
+        case '"':
+            buff ~= '"';
+            break;
+        case '0':
+            buff ~= '\0';
+            break;
+        case 'b':
+            buff ~= '\b';
+            break;
+        case 'f':
+            buff ~= '\f';
+            break;
+        case 'v':
+            buff ~= '\v';
+            break;
+        case '\'':
+            buff ~= '\'';
+            break;
+        case 'x':
+            processHexEscape(buff, 2, startCol, startLine);
+            return;
+        case 'u':
+            processUnicodeEscape(buff, startCol, startLine);
+            return;
+        default:
+            reportError(format("Sequência de escape desconhecida \\%s", escaped), startCol, startLine);
+            buff ~= escaped;
+            break;
+        }
+        advance();
+    }
+
+    void processHexEscape(ref string buff, int digits, long startCol, long startLine)
+    {
+        advance(); // Consome 'x'
+        if (offset + digits - 1 < source.length)
+        {
+            string hexStr = source[offset .. offset + digits];
+            try
+            {
+                int hexValue = parse!int(hexStr, 16);
+                buff ~= cast(char) hexValue;
+                advance(digits - 1);
+            }
+            catch (Exception e)
+            {
+                reportError(format("Sequência hexadecimal inválida \\x%s", hexStr), startCol, startLine);
+                buff ~= 'x';
+            }
+        }
+        else
+        {
+            reportError("Sequência hexadecimal incompleta", startCol, startLine);
+            buff ~= 'x';
+        }
+    }
+
+    void processUnicodeEscape(ref string buff, long startCol, long startLine)
+    {
+        advance(); // Consome 'u'
+        if (offset + 3 < source.length)
+        {
+            string hexStr = source[offset .. offset + 4];
+            try
+            {
+                int unicodeValue = parse!int(hexStr, 16);
+                import std.utf : encode;
+
+                char[4] utf8Buf;
+                long len = encode(utf8Buf, cast(dchar) unicodeValue);
+                buff ~= utf8Buf[0 .. len];
+                advance(3);
+            }
+            catch (Exception e)
+            {
+                reportError(format("Sequência de escape unicode inválida \\u%s", hexStr), startCol, startLine);
+                buff ~= 'u';
+            }
+        }
+        else
+        {
+            reportError("Escape unicode incompleto", startCol, startLine);
+            buff ~= 'u';
+        }
     }
 
 public:
-    this(string file, string source, string dir, DiagnosticError e)
+    this(string filename = "", string source = "", string dir = ".", DiagnosticError error = null)
     {
-        this.file = file;
+        this.filename = filename;
         this.source = source;
         this.dir = dir;
-        this.error = e;
+        this.error = error;
+        setKeywords();
+        setSymbols();
+        setCharToStrAndAsIdent();
     }
 
-    Token[] tokenize(
-        bool ignoreNewLine = false)
+    Token[] tokenize()
     {
-        try
+        while (offset < source.length)
         {
-            ulong sourceLength = cast(
-                ulong) this.source
-                .length;
+            char ch = source[offset];
 
-            while (
-                this.offset < sourceLength)
+            // Pula quebras de linha
+            if (ch == '\n')
             {
-                this.start = this.offset - this
-                    .lineOffset;
-                char c = this
-                    .source[this
-                        .offset];
-
-                if (c == '\n')
-                {
-                    if (
-                        ignoreNewLine)
-                    {
-                        this
-                            .offset++;
-                        continue;
-                    }
-                    this.line++;
-                    this
-                        .offset++;
-                    this.lineOffset = this
-                        .offset;
-                    continue;
-                }
-
-                if (
-                    c in this
-                    .WHITESPACE_CHARS)
-                {
-                    this.offset++;
-                    continue;
-                }
-
-                if (c == '/' && this.offset + 1 < sourceLength)
-                {
-                    char nextChar = this
-                        .source[this.offset + 1];
-                    if (nextChar == '/' || nextChar == '*')
-                    {
-                        if (
-                            !this.lexComment())
-                        {
-                            if (!this
-                                .lexSingleCharToken())
-                            {
-                                this.reportUnexpectedChar(
-                                    c);
-                            }
-                        }
-                        continue;
-                    }
-                }
-
-                // Handle string literals
-                if (c == '"' || c == '\'')
-                {
-                    if (
-                        !this.lexString())
-                        return null; // Error
-                    continue;
-                }
-
-                if (
-                    c in this
-                    .ALPHA_CHARS)
-                {
-                    this.lexIdentifier();
-                    continue;
-                }
-
-                if (
-                    c in this
-                    .DIGIT_CHARS)
-                {
-                    this.lexNumber();
-                    continue;
-                }
-
-                if (
-                    this.lexMultiCharToken())
-                {
-                    continue;
-                }
-
-                if (
-                    this.lexSingleCharToken())
-                {
-                    continue;
-                }
-
-                this.reportUnexpectedChar(
-                    c);
-                this.offset++; // skip
+                advance();
                 continue;
             }
 
-            this.createToken(TokenType.EOF, Variant(
-                    "\0"), 0);
-            return this.tokens;
+            // Pula espaços em branco
+            if (isWhite(ch))
+            {
+                advance();
+                continue;
+            }
+
+            // Comentários
+            if ((ch == '/' && offset + 1 < source.length && source[offset + 1] == '/') || ch == '#')
+            {
+                while (offset < source.length && peek() != '\n')
+                    advance();
+                continue;
+            }
+
+            // Identificadores e palavras-chave
+            if (isIdentStart[ch])
+            {
+                lexIdentifier();
+                continue;
+            }
+
+            // Números
+            if (isDigit(ch))
+            {
+                lexNumber();
+                continue;
+            }
+
+            // Strings
+            if (ch == '"')
+            {
+                lexString();
+                continue;
+            }
+
+            // Símbolos e operadores
+            if (lexSymbol(ch))
+            {
+                // Determina o tamanho do operador encontrado
+                int opLen = 1;
+                foreach (len; [3, 2])
+                {
+                    if (offset + len - 1 < source.length)
+                    {
+                        string op = source[offset .. offset + len];
+                        if (op in symbols)
+                        {
+                            opLen = len;
+                            break;
+                        }
+                    }
+                }
+                advance(opLen);
+                continue;
+            }
+
+            // Caractere inválido
+            reportError(format("Caractere inválido '%c'", ch), column, -1, [
+                    error.makeSuggestion("Remova o caractere.")
+                ]);
+            advance();
         }
-        catch (Exception e)
-        {
-            // ignore
-            throw e;
-        }
+
+        tokens ~= Token(TokenKind.Eof, Variant(null), createLoc(column, column));
+        return tokens;
     }
-}
-
-unittest
-{
-    writeln("Testando Lexer básico...");
-
-    auto error = new DiagnosticError();
-    auto lexer = new Lexer("test.delegua", "", ".", error);
-
-    assert(lexer !is null);
-
-    writeln("✓ Teste de criação do Lexer passou!");
-}
-
-unittest
-{
-    writeln("Testando tokenização básica...");
-
-    auto error = new DiagnosticError();
-    auto lexer = new Lexer("test.delegua", "var x = 42;", ".", error);
-    auto tokens = lexer.tokenize();
-
-    assert(tokens.length >= 6);
-    assert(tokens[0].kind == TokenType.VAR);
-    assert(tokens[1].kind == TokenType.IDENTIFIER);
-    assert(tokens[1].value.get!string == "x");
-    assert(tokens[2].kind == TokenType.EQUALS);
-    assert(tokens[3].kind == TokenType.INT);
-    assert(tokens[3].value.get!long == 42);
-    assert(tokens[4].kind == TokenType.SEMICOLON);
-    assert(tokens[$-1].kind == TokenType.EOF);
-
-    writeln("✓ Teste de tokenização básica passou!");
-}
-
-unittest
-{
-    writeln("Testando tokenização de strings...");
-
-    auto error = new DiagnosticError();
-    auto lexer = new Lexer("test.delegua", `"hello world"`, ".", error);
-    auto tokens = lexer.tokenize();
-
-    assert(tokens.length == 2);
-    assert(tokens[0].kind == TokenType.STRING);
-    assert(tokens[0].value.get!string == "hello world");
-    assert(tokens[1].kind == TokenType.EOF);
-
-    writeln("✓ Teste de tokenização de strings passou!");
-}
-
-unittest
-{
-    writeln("Testando tokenização de números...");
-
-    auto error = new DiagnosticError();
-
-    // Teste número inteiro
-    auto lexer1 = new Lexer("test.delegua", "123", ".", error);
-    auto tokens1 = lexer1.tokenize();
-    assert(tokens1.length == 2);
-    assert(tokens1[0].kind == TokenType.INT);
-    assert(tokens1[0].value.get!long == 123);
-
-    // Teste número float - vou verificar primeiro o tipo retornado
-    auto lexer2 = new Lexer("test.delegua", "12.34", ".", error);
-    auto tokens2 = lexer2.tokenize();
-    assert(tokens2.length == 2);
-    assert(tokens2[0].kind == TokenType.FLOAT);
-    // Como pode ser string ou double, vou verificar se é um valor numérico válido
-    // usando conversão segura
-    if (tokens2[0].value.type == typeid(string)) {
-        import std.conv : to;
-        double val = tokens2[0].value.get!string.to!double;
-        assert(val == 12.34);
-    } else {
-        assert(tokens2[0].value.get!double == 12.34);
-    }
-
-    writeln("✓ Teste de tokenização de números passou!");
-}
-
-unittest
-{
-    writeln("Testando keywords em português...");
-
-    auto error = new DiagnosticError();
-    auto lexer = new Lexer("test.delegua", "se verdadeiro então", ".", error);
-    auto tokens = lexer.tokenize();
-
-    assert(tokens.length == 4);
-    assert(tokens[0].kind == TokenType.SE);
-    assert(tokens[1].kind == TokenType.TRUE);
-    assert(tokens[2].kind == TokenType.IDENTIFIER);
-    assert(tokens[3].kind == TokenType.EOF);
-
-    writeln("✓ Teste de keywords em português passou!");
-}
-
-unittest
-{
-    writeln("Testando operadores...");
-
-    auto error = new DiagnosticError();
-    auto lexer = new Lexer("test.delegua", "+ - * / == != >= <=", ".", error);
-    auto tokens = lexer.tokenize();
-
-    assert(tokens.length == 9);
-    assert(tokens[0].kind == TokenType.PLUS);
-    assert(tokens[1].kind == TokenType.MINUS);
-    assert(tokens[2].kind == TokenType.ASTERISK);
-    assert(tokens[3].kind == TokenType.SLASH);
-    assert(tokens[4].kind == TokenType.EQUALS_EQUALS);
-    assert(tokens[5].kind == TokenType.NOT_EQUALS);
-    assert(tokens[6].kind == TokenType.GREATER_THAN_OR_EQUALS);
-    assert(tokens[7].kind == TokenType.LESS_THAN_OR_EQUALS);
-    assert(tokens[8].kind == TokenType.EOF);
-
-    writeln("✓ Teste de operadores passou!");
 }

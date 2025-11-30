@@ -1,6 +1,0 @@
-importar "io"
-
-funcao ola(): texto[]
-    | retorna "Fernando Cabral".substituir("Cabral", "Dev").dividir(" ")
-
-escrevaln(ola().tamanho)

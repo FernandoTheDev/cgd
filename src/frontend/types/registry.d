@@ -1,0 +1,1 @@
+module frontend.types.registry;
