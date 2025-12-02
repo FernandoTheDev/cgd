@@ -58,7 +58,24 @@ private:
     void setKeywords()
     {
         keywords["var"] = TokenKind.Var;
+        keywords["const"] = TokenKind.Const;
         keywords["funcao"] = TokenKind.Funcao;
+        keywords["verdadeiro"] = TokenKind.Verdadeiro;
+        keywords["falso"] = TokenKind.Falso;
+        keywords["nulo"] = TokenKind.Nulo;
+
+        // keywords["texto"] = TokenKind.String;
+        // keywords["txt"] = TokenKind.String;
+        // keywords["i32"] = TokenKind.I32;
+        // keywords["inteiro"] = TokenKind.I32;
+        // keywords["i64"] = TokenKind.I64;
+        // keywords["longo"] = TokenKind.I64;
+        // keywords["f32"] = TokenKind.F32;
+        // keywords["real"] = TokenKind.F32;
+        // keywords["f64"] = TokenKind.F64;
+        // keywords["duplo"] = TokenKind.F64;
+        // keywords["logico"] = TokenKind.Bool;
+        // keywords["vazio"] = TokenKind.Void;
     }
 
     pragma(inline, true)
@@ -154,8 +171,8 @@ private:
         return Loc(
             filename,
             dir,
-            LocLine(startCol - 1, actualLine),
-            LocLine(endCol - 1, line)
+            LocLine(startCol, actualLine),
+            LocLine(endCol, line)
         );
     }
 
@@ -206,7 +223,7 @@ private:
 
         string id = source[startOffset .. offset];
         TokenKind kind = (id in keywords) ? keywords[id] : TokenKind.Identifier;
-        tokens ~= Token(kind, Variant(intern(id)), createLoc(startCol, column - 1));
+        tokens ~= Token(kind, Variant(intern(id)), createLoc(startOffset, startOffset + id.length - 1));
     }
 
     void lexNumber()

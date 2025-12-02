@@ -7,8 +7,8 @@ enum BaseType : string
 {
     String = "texto",
     Int = "inteiro",
-    Long = "long",
-    Float = "decimal",
+    Long = "longo",
+    Float = "real",
     Double = "duplo",
     Bool = "logico",
     Void = "vazio",
@@ -18,7 +18,9 @@ enum BaseType : string
 const int[string] TYPE_HIERARCHY = [
     "logico": 1,
     "inteiro": 2,
-    "real": 3
+    "real": 2,
+    "longo": 3,
+    "duplo": 3,
 ];
 
 abstract class Type
@@ -37,7 +39,7 @@ abstract class Type
         return false;
     }
 
-    bool isStruct()
+    bool isClass()
     {
         return false;
     }
@@ -154,7 +156,7 @@ class VoidType : Type
         return _instance;
     }
 
-    private this()
+    this()
     {
     }
 
@@ -176,5 +178,56 @@ class VoidType : Type
     override Type clone()
     {
         return instance();
+    }
+}
+
+class ArrayType : Type
+{
+    Type elementType;
+    int dimensions;
+
+    this(Type elementType, int dimensions = 1)
+    {
+        this.elementType = elementType;
+        this.dimensions = dimensions;
+    }
+
+    override bool isArray()
+    {
+        return true;
+    }
+
+    override bool isCompatibleWith(Type other, bool strict = true)
+    {
+        if (auto otherArray = cast(ArrayType) other)
+        {
+            // Arrays devem ter o mesmo número de dimensões
+            if (dimensions != otherArray.dimensions)
+                return false;
+
+            // O tipo dos elementos deve ser compatível
+            return elementType.isCompatibleWith(otherArray.elementType, strict);
+        }
+
+        return false;
+    }
+
+    override string toStr()
+    {
+        string result = elementType.toStr();
+        for (int i = 0; i < dimensions; i++)
+            result ~= "[]";
+        return result;
+    }
+
+    override Type clone()
+    {
+        return new ArrayType(elementType.clone(), dimensions);
+    }
+
+    // Retorna o tipo base (sem as dimensões de array)
+    Type getBaseType()
+    {
+        return elementType;
     }
 }

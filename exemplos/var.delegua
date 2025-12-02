@@ -1,0 +1,17 @@
+const nome;
+const idade: inteiro;
+var x: i32 = 100
+var z: i64 = 200L
+var b = 3.1415
+var c = 3.1415D
+
+var teste = nulo
+teste = 10
+var x = verdadeiro
+var x = falso
+var chamada = soma(10, 20)
+
+var arr: []i32 = [10, 20]
+var p: *[]i32 = &arr
+
+var calc = 3.1415f * (60 | 10 - -1)

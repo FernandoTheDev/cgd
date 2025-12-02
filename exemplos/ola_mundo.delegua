@@ -1,8 +1,18 @@
 var nome: texto = "Fernando"
+
+// recebe "nulo" por padrão
 var idade;
+// define o tipo e o valor da idade
 idade = 17
+
 escreva(nome, " ", idade)
 
-var x = 60
-var y = 9
+// todos com o mesmo tipo
+var a, b: i64 = 60L, 9L
+
+// inferencia total
+var c, d = 60, 9
+
+// cada um com um tipo
+var x: i32, y: i64 = 60, 9L
 escreva(x + y)

@@ -5,15 +5,20 @@ import std.variant, std.stdio, std.conv;
 enum TokenKind
 {
     Var,
+    Const,
     Funcao,
+    Verdadeiro,
+    Falso,
+    Nulo,
 
     Identifier, // identificador
+    I32,
     I64,
-    I128,
     F32,
     F64,
-    F128,
     String, // "FernandoDev"
+    Bool,
+    Void,
 
     LParen, // (
     RParen, // )
@@ -78,7 +83,7 @@ struct Token
     {
         writeln("Tipo: ", kind);
         writeln("Valor: ", to!string(value));
-        writeln("Localização: ", loc);
+        writeln("Localização: ", loc, "\n");
     }
 }
 
