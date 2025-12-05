@@ -7,6 +7,11 @@ enum TokenKind
     Var,
     Const,
     Funcao,
+    Tipo,
+    Retorna,
+    Se,
+    Senao,
+
     Verdadeiro,
     Falso,
     Nulo,
@@ -38,6 +43,7 @@ enum TokenKind
     Equals, // =
     Dot, // .
     Bang, // !
+    Question, // ?
     Modulo, // %
 
     GreaterThan, // >

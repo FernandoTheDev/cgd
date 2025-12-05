@@ -31,58 +31,6 @@ private:
         error.addError(Diagnostic(message, loc, suggestions));
     }
 
-    // BinaryExpr parseBinaryExpr(Node left)
-    // {
-    //     Token op = this.advance();
-    //     Node right = this.parseExpression(this.getPrecedence(op.kind));
-    //     return new BinaryExpr(left, right, op.value.get!string, this.getLoc(left.loc, right.loc));
-    // }
-
-    // void infix(ref Node leftOld)
-    // {
-    //     switch (this.peek().kind)
-    //     {
-    //     case TokenKind.Plus:
-    //     case TokenKind.Minus:
-    //     case TokenKind.Star:
-    //     case TokenKind.Slash:
-
-    //     case TokenKind.And:
-    //     case TokenKind.Or:
-
-    //     case TokenKind.BitAnd:
-    //     case TokenKind.BitOr:
-    //     case TokenKind.BitXor:
-    //     case TokenKind.BitSHL:
-    //     case TokenKind.BitSHR:
-    //     case TokenKind.BitSAR:
-
-    //     case TokenKind.PlusEquals:
-    //     case TokenKind.MinusEquals:
-    //     case TokenKind.StarEquals:
-    //     case TokenKind.SlashEquals:
-    //     case TokenKind.ModuloEquals:
-
-    //     case TokenKind.BitAndEquals:
-    //     case TokenKind.BitOrEquals:
-    //     case TokenKind.BitXorEquals:
-    //     case TokenKind.BitSHLEquals:
-    //     case TokenKind.BitSHREquals:
-
-    //     case TokenKind.EqualsEquals:
-    //     case TokenKind.GreaterThan:
-    //     case TokenKind.GreaterThanEquals:
-    //     case TokenKind.LessThanEquals:
-    //     case TokenKind.LessThan:
-    //     case TokenKind.NotEquals:
-    //     case TokenKind.TildeEquals:
-    //         leftOld = parseBinaryExpr(leftOld);
-    //         return;
-    //     default:
-    //         return;
-    //     }
-    // }
-
     mixin ParseDecl!();
     mixin ParseExpr!();
     mixin ParseStmt!();
@@ -118,6 +66,7 @@ private:
         case TokenKind.Var:
         case TokenKind.Const:
         case TokenKind.Funcao:
+        case TokenKind.Tipo:
             return true;
         default:
             return false;
@@ -223,7 +172,9 @@ private:
         case TokenKind.Minus:
         case TokenKind.PlusPlus:
         case TokenKind.MinusMinus:
+        case TokenKind.Question:
             return Precedence.SUM;
+
         case TokenKind.Star:
         case TokenKind.Slash:
         case TokenKind.Modulo:
@@ -236,6 +187,7 @@ private:
 
         case TokenKind.LParen:
         case TokenKind.LBracket:
+        case TokenKind.Dot:
             return Precedence.CALL;
 
         default:
@@ -252,7 +204,7 @@ private:
     pragma(inline, true);
     Loc getLoc(ref Loc start, ref Loc end)
     {
-        return Loc(start.filename, start.dir, start.start, start.end);
+        return Loc(start.filename, start.dir, start.start, end.end);
     }
 
 public:

@@ -5,7 +5,21 @@ mixin template ParseType()
 {
     TypeExpr parseType()
     {
-        return this.parsePrimaryType();
+        Loc start = this.peek().loc;
+        TypeExpr type = this.parsePrimaryType();
+
+        if (this.check(TokenKind.BitOr))
+        {
+            TypeExpr[] types = [type];
+            while (this.match([TokenKind.BitOr]))
+                types ~= this.parsePrimaryType();
+            return new UnionTypeExpr(types, this.getLoc(start, this.previous().loc));
+        }
+
+        if (this.check(TokenKind.LBracket))
+            return this.parseArrayType(type);
+
+        return type;
     }
 
     TypeExpr parsePrimaryType()
@@ -14,34 +28,6 @@ mixin template ParseType()
 
         switch (token.kind)
         {
-            // case TokenKind.I32:
-            //     this.advance();
-            //     return new NamedTypeExpr(BaseType.Int, token.loc);
-
-            // case TokenKind.I64:
-            //     this.advance();
-            //     return new NamedTypeExpr(BaseType.Long, token.loc);
-
-            // case TokenKind.F32:
-            //     this.advance();
-            //     return new NamedTypeExpr(BaseType.Float, token.loc);
-
-            // case TokenKind.F64:
-            //     this.advance();
-            //     return new NamedTypeExpr(BaseType.Double, token.loc);
-
-            // case TokenKind.String:
-            //     this.advance();
-            //     return new NamedTypeExpr(BaseType.String, token.loc);
-
-            // case TokenKind.Bool:
-            //     this.advance();
-            //     return new NamedTypeExpr("bool", token.loc);
-
-            // case TokenKind.Void:
-            //     this.advance();
-            //     return new NamedTypeExpr(BaseType.Void, token.loc);
-
         case TokenKind.Identifier:
             Token name = this.advance();
             return new NamedTypeExpr(name.value.get!string, name.loc);
@@ -52,9 +38,9 @@ mixin template ParseType()
         case TokenKind.Star:
             return this.parsePointerType();
 
-            //     // Função: (int, string) -> bool
-            // case TokenKind.LParen:
-            //     return this.parseFunctionType();
+            // Função: (int, string): bool
+        case TokenKind.LParen:
+            return this.parseFunctionType();
 
         default:
             reportError("Esperado tipo, encontrado: " ~ to!string(token.value),
@@ -80,9 +66,16 @@ mixin template ParseType()
         // }
 
         this.consume(TokenKind.RBracket, "Esperado ']' em tipo array");
-
         TypeExpr elementType = this.parseType();
+        return new ArrayTypeExpr(elementType,
+            this.getLoc(start, elementType.loc));
+    }
 
+    // // int[]
+    ArrayTypeExpr parseArrayType(TypeExpr elementType)
+    {
+        Loc start = this.advance().loc; // consome '['
+        this.consume(TokenKind.RBracket, "Esperado ']' em tipo array");
         return new ArrayTypeExpr(elementType,
             this.getLoc(start, elementType.loc));
     }
@@ -97,34 +90,30 @@ mixin template ParseType()
             this.getLoc(start, pointeeType.loc));
     }
 
-    // // Tipo de função: (int, string) -> bool
-    // FunctionType parseFunctionType()
-    // {
-    //     Loc start = this.advance().loc; // consome '('
+    // // Tipo de função: (int, string): bool
+    FunctionTypeExpr parseFunctionType()
+    {
+        Loc start = this.advance().loc; // consome '('
 
-    //     TypeExpr[] paramTypes;
-    //     if (!this.check(TokenKind.RParen))
-    //     {
-    //         do
-    //         {
-    //             paramTypes ~= this.parseType();
-    //         }
-    //         while (this.match(TokenKind.Comma));
-    //     }
+        TypeExpr[] paramTypes;
+        if (!this.check(TokenKind.RParen))
+        {
+            do
+                paramTypes ~= this.parseType();
+            while (this.match([TokenKind.Comma]));
+        }
 
-    //     this.consume(TokenKind.RParen, "Esperado ')' em tipo de função");
+        this.consume(TokenKind.RParen, "Esperado ')' em tipo de função");
 
-    //     TypeExpr returnType = null;
-    //     if (this.match(TokenKind.Arrow))
-    //     {
-    //         returnType = this.parseType();
-    //     }
+        TypeExpr returnType = null;
+        if (this.match([TokenKind.Colon]))
+            returnType = this.parseType();
 
-    //     Loc loc = returnType ? this.getLoc(start, returnType.loc) : this.getLoc(start, this.previous()
-    //             .loc);
+        Loc loc = returnType ? this.getLoc(start, returnType.loc) : this.getLoc(start, this.previous()
+                .loc);
 
-    //     return new FunctionType(paramTypes, returnType, loc);
-    // }
+        return new FunctionTypeExpr(paramTypes, returnType, loc);
+    }
 
     // // Tipo opcional: int?
     // OptionalType parseOptionalType(TypeExpr baseType)

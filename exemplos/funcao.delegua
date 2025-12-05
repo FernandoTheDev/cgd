@@ -1,0 +1,10 @@
+tipo Numero = inteiro | real
+
+funcao soma_tipada(x: Numero = 10, y: Numero): Numero {
+    retorna x + y
+}
+
+const PI = 3.141592F
+var soma = soma_tipada(60, PI)
+
+

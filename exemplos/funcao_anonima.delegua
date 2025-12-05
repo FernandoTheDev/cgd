@@ -1,0 +1,6 @@
+tipo fn = (inteiro, inteiro): inteiro
+var soma: fn = funcao(x: inteiro, y: inteiro): inteiro { 
+    retorna x + y 
+}
+
+soma(10, 20)

@@ -18,14 +18,25 @@ enum NodeKind
 
     FuncDecl,
     VarDecl,
+    TypeDecl,
+    ClassDecl,
 
     BinaryExpr,
     CallExpr,
     UnaryExpr,
-    AssignExpr,
+    AssignDecl,
     GroupedExpr,
     IndexExpr,
     MemberExpr,
+    TernaryExpr,
+    NewExpr,
+    ThisExpr,
+    FuncExpr,
+
+    BlockStmt,
+    IfStmt,
+    ForStmt,
+    ReturnStmt,
 }
 
 abstract class Node
@@ -33,6 +44,7 @@ abstract class Node
     NodeKind kind;
     Variant value;
     TypeExpr type;
+    Type resolvedType = Type.init;
     Loc loc;
     string nameMangling;
 
@@ -85,6 +97,7 @@ class VarDecl : Node
 
         println(prefix ~ "VarDecl: " ~ id, ident);
         println(continuation ~ "├── Tipo: " ~ type.toStr(), ident);
+        println(continuation ~ "├── Tipo resolvido: " ~ (resolvedType is null ? "nulo" : resolvedType.toStr()), ident);
         if (value.get!Node is null)
             println(continuation ~ "└── Valor: nulo", ident);
         else
@@ -235,6 +248,7 @@ class CallExpr : Node
 
         println(prefix ~ "CallExpr: " ~ id ~ "()", ident);
         println(continuation ~ "├── Tipo: " ~ type.toStr(), ident);
+        println(continuation ~ "├── Tipo resolvido: " ~ (resolvedType is null ? "nulo" : resolvedType.toStr()), ident);
         println(continuation ~ "└── Argumentos (" ~ to!string(args.length) ~ "):", ident);
 
         foreach (long i, Node arg; args)
@@ -252,7 +266,7 @@ class Identifier : Node
     this(string id, Loc loc)
     {
         this.kind = NodeKind.Identifier;
-        this.type = new NamedTypeExpr("void", loc);
+        this.type = new NamedTypeExpr(BaseType.Any, loc);
         this.value = id;
         this.loc = loc;
     }
@@ -263,7 +277,8 @@ class Identifier : Node
         string continuation = isLast ? "    " : "│   ";
 
         println(prefix ~ "Identifier: " ~ value.get!string, ident);
-        println(continuation ~ "└── Tipo: " ~ type.toStr(), ident);
+        println(continuation ~ "├── Tipo: " ~ type.toStr(), ident);
+        println(continuation ~ "└── Tipo resolvido: " ~ (resolvedType is null ? "nulo" : resolvedType.toStr()), ident);
     }
 }
 
@@ -288,6 +303,7 @@ class BinaryExpr : Node
 
         println(prefix ~ "BinaryExpr: (" ~ op ~ ")", ident);
         println(continuation ~ "├── Tipo: " ~ type.toStr(), ident);
+        println(continuation ~ "├── Tipo resolvido: " ~ (resolvedType is null ? "nulo" : resolvedType.toStr()), ident);
         println(continuation ~ "├── Esquerda:", ident);
 
         if (left !is null)
@@ -333,7 +349,7 @@ class ArrayLit : Node
         this.kind = NodeKind.ArrayLit;
         this.elements = elements;
         this.loc = loc;
-        this.type = new NamedTypeExpr("array", loc);
+        this.type = new ArrayTypeExpr(new NamedTypeExpr(BaseType.Any, loc), loc);
     }
 
     override void print(ulong ident = 0, bool isLast = false)
@@ -343,6 +359,7 @@ class ArrayLit : Node
 
         println(prefix ~ "ArrayLiteral (" ~ to!string(elements.length) ~ " elementos)", ident);
         println(continuation ~ "├── Tipo: " ~ type.toStr(), ident);
+        println(continuation ~ "├── Tipo resolvido: " ~ (resolvedType is null ? "nulo" : resolvedType.toStr()), ident);
         println(continuation ~ "└── Elementos:", ident);
 
         foreach (long i, Node elem; elements)
@@ -360,12 +377,12 @@ class UnaryExpr : Node
     Node operand;
     string op;
 
-    this(Node operand, string op, Loc loc)
+    this(Node operand, TypeExpr type, string op, Loc loc)
     {
         this.kind = NodeKind.UnaryExpr;
         this.operand = operand;
         this.op = op;
-        this.type = operand.type;
+        this.type = type;
         this.loc = loc;
     }
 
@@ -376,6 +393,7 @@ class UnaryExpr : Node
 
         println(prefix ~ "UnaryExpr: (" ~ op ~ ")", ident);
         println(continuation ~ "├── Tipo: " ~ type.toStr(), ident);
+        println(continuation ~ "├── Tipo resolvido: " ~ (resolvedType is null ? "nulo" : resolvedType.toStr()), ident);
         println(continuation ~ "└── Operando:", ident);
 
         if (operand !is null)
@@ -385,14 +403,14 @@ class UnaryExpr : Node
     }
 }
 
-class AssignExpr : Node
+class AssignDecl : Node
 {
     Node left, right;
     string op;
 
     this(Node left, Node right, string op, Loc loc)
     {
-        this.kind = NodeKind.AssignExpr;
+        this.kind = NodeKind.AssignDecl;
         this.left = left;
         this.right = right;
         this.op = op;
@@ -405,8 +423,9 @@ class AssignExpr : Node
         string prefix = isLast ? "└── " : "├── ";
         string continuation = isLast ? "    " : "│   ";
 
-        println(prefix ~ "AssignExpr: (" ~ op ~ ")", ident);
+        println(prefix ~ "AssignDecl: (" ~ op ~ ")", ident);
         println(continuation ~ "├── Tipo: " ~ type.toStr(), ident);
+        println(continuation ~ "├── Tipo resolvido: " ~ (resolvedType is null ? "nulo" : resolvedType.toStr()), ident);
         println(continuation ~ "├── Destino:", ident);
 
         if (left !is null)
@@ -442,6 +461,7 @@ class GroupedExpr : Node
 
         println(prefix ~ "GroupedExpr: ( ... )", ident);
         println(continuation ~ "├── Tipo: " ~ type.toStr(), ident);
+        println(continuation ~ "├── Tipo resolvido: " ~ (resolvedType is null ? "nulo" : resolvedType.toStr()), ident);
         println(continuation ~ "└── Expressão:", ident);
 
         if (expr !is null)
@@ -463,7 +483,7 @@ class IndexExpr : Node
         this.index = index;
         this.loc = loc;
         // Tipo será determinado depois (elemento do array/string)
-        this.type = new NamedTypeExpr("unknown", loc);
+        this.type = new NamedTypeExpr(BaseType.Any, loc);
     }
 
     override void print(ulong ident = 0, bool isLast = false)
@@ -473,6 +493,7 @@ class IndexExpr : Node
 
         println(prefix ~ "IndexExpr: [ ... ]", ident);
         println(continuation ~ "├── Tipo: " ~ type.toStr(), ident);
+        println(continuation ~ "├── Tipo resolvido: " ~ (resolvedType is null ? "nulo" : resolvedType.toStr()), ident);
         println(continuation ~ "├── Target:", ident);
 
         if (target !is null)
@@ -501,7 +522,7 @@ class MemberExpr : Node
         this.member = member;
         this.loc = loc;
         // Tipo será determinado depois (tipo do membro)
-        this.type = new NamedTypeExpr("unknown", loc);
+        this.type = new NamedTypeExpr(BaseType.Void, loc);
     }
 
     override void print(ulong ident = 0, bool isLast = false)
@@ -511,12 +532,397 @@ class MemberExpr : Node
 
         println(prefix ~ "MemberExpr: ." ~ member, ident);
         println(continuation ~ "├── Tipo: " ~ type.toStr(), ident);
+        println(continuation ~ "├── Tipo resolvido: " ~ (resolvedType is null ? "nulo" : resolvedType.toStr()), ident);
         println(continuation ~ "└── Target:", ident);
 
         if (target !is null)
             target.print(ident + continuation.length + 4, true);
         else
             println(continuation ~ "    └── (nulo)", ident);
+    }
+}
+
+class TypeDecl : Node
+{
+    this(string id, TypeExpr type, Loc loc)
+    {
+        this.kind = NodeKind.TypeDecl;
+        this.type = type;
+        this.value = id;
+        this.loc = loc;
+    }
+
+    override void print(ulong ident = 0, bool isLast = false)
+    {
+        string prefix = isLast ? "└── " : "├── ";
+        string continuation = isLast ? "    " : "│   ";
+
+        println(prefix ~ format("TypeDecl: (%s) ", value.get!string), ident);
+        println(continuation ~ "└── Tipo: " ~ type.toStr(), ident);
+    }
+}
+
+struct FuncArgument
+{
+    string name;
+    TypeExpr type;
+    Type resolvedType;
+    Node value;
+    Loc loc;
+}
+
+class FuncDecl : Node
+{
+    string name;
+    BlockStmt body;
+    FuncArgument[] args;
+
+    this(string name, ref FuncArgument[] args, Node[] body, TypeExpr type, Loc loc)
+    {
+        this.kind = NodeKind.FuncDecl;
+        this.type = type;
+        this.body = new BlockStmt(body, loc);
+        this.name = name;
+        this.args = args;
+        this.loc = loc;
+    }
+
+    override void print(ulong ident = 0, bool isLast = false)
+    {
+        string prefix = isLast ? "└── " : "├── ";
+        string continuation = isLast ? "    " : "│   ";
+
+        println(prefix ~ "FuncDecl: " ~ name, ident);
+        println(continuation ~ "├── Tipo: " ~ type.toStr(), ident);
+        println(continuation ~ "├── Tipo resolvido: " ~ (resolvedType is null ? "nulo" : resolvedType.toStr()), ident);
+        println(continuation ~ "├── Argumentos (" ~ to!string(args.length) ~ "):", ident);
+
+        foreach (long i, FuncArgument arg; args)
+        {
+            string argPrefix = (i == cast(uint) args.length - 1) ? "└── " : "├── ";
+            println(continuation ~ "│   " ~ argPrefix ~ "Argumento: " ~ arg.name, ident);
+            println(continuation ~ "│   " ~ (i == cast(uint) args.length - 1 ? "    " : "│   ") ~
+                    "├── Tipo: " ~ arg.type.toStr(), ident);
+            println(continuation ~ "│   " ~ (i == cast(uint) args.length - 1 ? "    " : "│   ") ~
+                    "└── Tem valor padrão: " ~ (arg.value !is null ? "sim" : "não"), ident);
+        }
+
+        println(continuation ~ "└── Corpo (" ~ to!string(
+                body.statements.length) ~ " nó(s)):", ident);
+        foreach (long i, Node node; body.statements)
+        {
+            if (i == cast(uint)
+                body.statements.length - 1)
+                node.print(ident + continuation.length + 4, true);
+            else
+                node.print(ident + continuation.length + 4, false);
+        }
+    }
+}
+
+class BlockStmt : Node
+{
+    Node[] statements;
+
+    this(Node[] statements, Loc loc)
+    {
+        this.kind = NodeKind.BlockStmt;
+        this.statements = statements;
+        this.loc = loc;
+        this.type = new NamedTypeExpr(BaseType.Void, loc);
+    }
+
+    override void print(ulong ident = 0, bool isLast = false)
+    {
+        string prefix = isLast ? "└── " : "├── ";
+        string continuation = isLast ? "    " : "│   ";
+
+        println(prefix ~ "BlockStmt { ... }", ident);
+        foreach (long i, Node stmt; statements)
+        {
+            bool last = (i == cast(uint) statements.length - 1);
+            stmt.print(ident + continuation.length + 4, last);
+        }
+    }
+}
+
+class IfStmt : Node
+{
+    Node condition;
+    Node thenBranch;
+    Node elseBranch; // Pode ser null
+
+    this(Node condition, Node thenBranch, Node elseBranch, Loc loc)
+    {
+        this.kind = NodeKind.IfStmt;
+        this.condition = condition;
+        this.thenBranch = thenBranch;
+        this.elseBranch = elseBranch;
+        this.loc = loc;
+        this.type = new NamedTypeExpr(BaseType.Void, loc);
+    }
+
+    override void print(ulong ident = 0, bool isLast = false)
+    {
+        string prefix = isLast ? "└── " : "├── ";
+        string continuation = isLast ? "    " : "│   ";
+
+        println(prefix ~ "IfStmt", ident);
+
+        // } senao {
+        if (condition is null)
+            println(continuation ~ "├── Condição: (vazio)", ident);
+        else
+        {
+            println(continuation ~ "├── Condição:", ident);
+            condition.print(ident + continuation.length + 4, false);
+        }
+
+        println(continuation ~ "├── Entao:", ident);
+        thenBranch.print(ident + continuation.length + 4, elseBranch is null); // Se não tiver else, o then é o ultimo visualmente
+
+        if (elseBranch !is null)
+        {
+            println(continuation ~ "└── Senão:", ident);
+            elseBranch.print(ident + continuation.length + 4, true);
+        }
+    }
+}
+
+class ForStmt : Node
+{
+    Node init_; // Pode ser VarDecl ou Expr (ou null)
+    Node condition; // Pode ser null
+    Node increment; // Pode ser Expr (ou null)
+    Node body;
+
+    this(Node init, Node condition, Node increment, Node body, Loc loc)
+    {
+        this.kind = NodeKind.ForStmt;
+        this.init_ = init;
+        this.condition = condition;
+        this.increment = increment;
+        this.body = body;
+        this.loc = loc;
+        this.type = new NamedTypeExpr(BaseType.Void, loc);
+    }
+
+    override void print(ulong ident = 0, bool isLast = false)
+    {
+        string prefix = isLast ? "└── " : "├── ";
+        string continuation = isLast ? "    " : "│   ";
+
+        println(prefix ~ "ForStmt (C-Style)", ident);
+
+        println(continuation ~ "├── Init:", ident);
+        if (init_ !is null)
+            init_.print(ident + continuation.length + 4, false);
+        else
+            println(continuation ~ "│   └── (vazio)", ident);
+
+        println(continuation ~ "├── Condição:", ident);
+        if (condition !is null)
+            condition.print(ident + continuation.length + 4, false);
+        else
+            println(continuation ~ "│   └── (vazio/true)", ident);
+
+        println(continuation ~ "├── Incremento:", ident);
+        if (increment !is null)
+            increment.print(ident + continuation.length + 4, false);
+        else
+            println(continuation ~ "│   └── (vazio)", ident);
+
+        println(continuation ~ "└── Corpo:", ident);
+        body.print(ident + continuation.length + 4, true);
+    }
+}
+
+class ReturnStmt : Node
+{
+    Node value; // Pode ser null (return void)
+
+    this(Node value, Loc loc)
+    {
+        this.kind = NodeKind.ReturnStmt;
+        this.value = value;
+        this.loc = loc;
+        this.type = new NamedTypeExpr(BaseType.Void, loc); // Statement não tem tipo, ou é Bottom
+    }
+
+    override void print(ulong ident = 0, bool isLast = false)
+    {
+        string prefix = isLast ? "└── " : "├── ";
+        string continuation = isLast ? "    " : "│   ";
+
+        println(prefix ~ "ReturnStmt", ident);
+        if (value !is null)
+        {
+            println(continuation ~ "└── Valor:", ident);
+            value.print(ident + continuation.length + 4, true);
+        }
+        else
+            println(continuation ~ "└── (void)", ident);
+    }
+}
+
+class ClassDecl : Node
+{
+    string name;
+    Node[] members; // VarDecl (propriedades) e FuncDecl (métodos)
+
+    this(string name, Node[] members, Loc loc)
+    {
+        this.kind = NodeKind.ClassDecl;
+        this.name = name;
+        this.members = members;
+        this.loc = loc;
+        this.type = new NamedTypeExpr(BaseType.Void, loc);
+    }
+
+    override void print(ulong ident = 0, bool isLast = false)
+    {
+        string prefix = isLast ? "└── " : "├── ";
+        string continuation = isLast ? "    " : "│   ";
+
+        println(prefix ~ "ClassDecl: " ~ name, ident);
+        println(continuation ~ "└── Membros (" ~ to!string(members.length) ~ "):", ident);
+
+        foreach (long i, Node member; members)
+        {
+            bool last = (i == cast(uint) members.length - 1);
+            member.print(ident + continuation.length + 4, last);
+        }
+    }
+}
+
+class NewExpr : Node
+{
+    string className;
+    Node[] args; // Argumentos para o construtor
+
+    this(string className, Node[] args, Loc loc)
+    {
+        this.kind = NodeKind.NewExpr;
+        this.className = className;
+        this.args = args;
+        this.loc = loc;
+        this.type = new NamedTypeExpr(className, loc); // O tipo é o nome da classe
+    }
+
+    override void print(ulong ident = 0, bool isLast = false)
+    {
+        string prefix = isLast ? "└── " : "├── ";
+        string continuation = isLast ? "    " : "│   ";
+
+        println(prefix ~ "NewExpr: " ~ className, ident);
+        println(continuation ~ "└── Args (" ~ to!string(args.length) ~ "):", ident);
+        foreach (long i, Node arg; args)
+        {
+            bool last = (i == cast(uint) args.length - 1);
+            arg.print(ident + continuation.length + 4, last);
+        }
+    }
+}
+
+class ThisExpr : Node
+{
+    this(Loc loc)
+    {
+        this.kind = NodeKind.ThisExpr;
+        this.loc = loc;
+        this.type = new NamedTypeExpr(BaseType.Any, loc); // Resolvido semanticamente depois
+    }
+
+    override void print(ulong ident = 0, bool isLast = false)
+    {
+        string prefix = isLast ? "└── " : "├── ";
+        println(prefix ~ "ThisExpr", ident);
+    }
+}
+
+class TernaryExpr : Node
+{
+    Node condition;
+    Node trueExpr;
+    Node falseExpr;
+
+    this(Node condition, Node trueExpr, Node falseExpr, Loc loc)
+    {
+        this.kind = NodeKind.TernaryExpr;
+        this.condition = condition;
+        this.trueExpr = trueExpr;
+        this.falseExpr = falseExpr;
+        this.loc = loc;
+        this.type = new NamedTypeExpr(BaseType.Any, loc);
+    }
+
+    override void print(ulong ident = 0, bool isLast = false)
+    {
+        string prefix = isLast ? "└── " : "├── ";
+        string continuation = isLast ? "    " : "│   ";
+
+        println(prefix ~ "TernaryExpr (? :)", ident);
+
+        println(continuation ~ "├── Condição:", ident);
+        condition.print(ident + continuation.length + 4, false);
+
+        if (trueExpr !is null)
+        {
+            println(continuation ~ "├── Caso Verdadeiro:", ident);
+            trueExpr.print(ident + continuation.length + 4, false);
+        }
+        else
+            println(continuation ~ "├── Caso Verdadeiro: (nulo)", ident);
+
+        println(continuation ~ "└── Caso Falso:", ident);
+        falseExpr.print(ident + continuation.length + 4, true);
+    }
+}
+
+class FuncExpr : Node
+{
+    BlockStmt body;
+    FuncArgument[] args;
+
+    this(ref FuncArgument[] args, Node[] body, TypeExpr type, Loc loc)
+    {
+        this.kind = NodeKind.FuncExpr;
+        this.type = type;
+        this.body = new BlockStmt(body, loc);
+        this.args = args;
+        this.loc = loc;
+    }
+
+    override void print(ulong ident = 0, bool isLast = false)
+    {
+        string prefix = isLast ? "└── " : "├── ";
+        string continuation = isLast ? "    " : "│   ";
+
+        println(prefix ~ "FuncExpr: ", ident);
+        println(continuation ~ "├── Tipo: " ~ type.toStr(), ident);
+        println(continuation ~ "├── Tipo resolvido: " ~ (resolvedType is null ? "nulo" : resolvedType.toStr()), ident);
+        println(continuation ~ "├── Argumentos (" ~ to!string(args.length) ~ "):", ident);
+
+        foreach (long i, FuncArgument arg; args)
+        {
+            string argPrefix = (i == cast(uint) args.length - 1) ? "└── " : "├── ";
+            println(continuation ~ "│   " ~ argPrefix ~ "Argumento: " ~ arg.name, ident);
+            println(continuation ~ "│   " ~ (i == cast(uint) args.length - 1 ? "    " : "│   ") ~
+                    "├── Tipo: " ~ arg.type.toStr(), ident);
+            println(continuation ~ "│   " ~ (i == cast(uint) args.length - 1 ? "    " : "│   ") ~
+                    "└── Tem valor padrão: " ~ (arg.value !is null ? "sim" : "não"), ident);
+        }
+
+        println(continuation ~ "└── Corpo (" ~ to!string(
+                body.statements.length) ~ " nó(s)):", ident);
+        foreach (long i, Node node; body.statements)
+        {
+            if (i == cast(uint)
+                body.statements.length - 1)
+                node.print(ident + continuation.length + 4, true);
+            else
+                node.print(ident + continuation.length + 4, false);
+        }
     }
 }
 

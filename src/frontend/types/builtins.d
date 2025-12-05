@@ -32,8 +32,8 @@ class BuiltinTypes
         _Void = new PrimitiveType(BaseType.Void);
         _Any = new PrimitiveType(BaseType.Any);
 
-        _Null = new PrimitiveType(BaseType.Void); // ou criar BaseType.Null
-        _Never = new PrimitiveType(BaseType.Void); // ou criar BaseType.Never
+        _Null = new PrimitiveType(BaseType.Void);
+        _Never = new PrimitiveType(BaseType.Void);
 
         registerAliases();
         // writeln("[BuiltinTypes] Tipos built-in inicializados");
@@ -51,6 +51,7 @@ class BuiltinTypes
         aliases["vazio"] = _Void;
         aliases["qualquer"] = _Any;
         aliases["nulo"] = _Null;
+        aliases["null"] = _Null;
         aliases["i32"] = _Int;
         aliases["i64"] = _Long;
         aliases["f32"] = _Float;

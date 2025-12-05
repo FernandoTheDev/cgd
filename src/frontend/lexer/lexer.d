@@ -60,22 +60,16 @@ private:
         keywords["var"] = TokenKind.Var;
         keywords["const"] = TokenKind.Const;
         keywords["funcao"] = TokenKind.Funcao;
+        keywords["função"] = TokenKind.Funcao;
+        keywords["tipo"] = TokenKind.Tipo;
+        keywords["retorna"] = TokenKind.Retorna;
+        keywords["se"] = TokenKind.Se;
+        keywords["senão"] = TokenKind.Senao;
+        keywords["senao"] = TokenKind.Senao;
+
         keywords["verdadeiro"] = TokenKind.Verdadeiro;
         keywords["falso"] = TokenKind.Falso;
         keywords["nulo"] = TokenKind.Nulo;
-
-        // keywords["texto"] = TokenKind.String;
-        // keywords["txt"] = TokenKind.String;
-        // keywords["i32"] = TokenKind.I32;
-        // keywords["inteiro"] = TokenKind.I32;
-        // keywords["i64"] = TokenKind.I64;
-        // keywords["longo"] = TokenKind.I64;
-        // keywords["f32"] = TokenKind.F32;
-        // keywords["real"] = TokenKind.F32;
-        // keywords["f64"] = TokenKind.F64;
-        // keywords["duplo"] = TokenKind.F64;
-        // keywords["logico"] = TokenKind.Bool;
-        // keywords["vazio"] = TokenKind.Void;
     }
 
     pragma(inline, true)
@@ -111,6 +105,7 @@ private:
         symbols[","] = TokenKind.Comma;
         symbols[";"] = TokenKind.SemiColon;
         symbols["="] = TokenKind.Equals;
+        symbols["?"] = TokenKind.Question;
 
         // Operadores bitwise
         symbols["&"] = TokenKind.BitAnd;
@@ -155,7 +150,12 @@ private:
                 string op = source[offset .. offset + len];
                 if (op in symbols)
                 {
-                    createToken(symbols[op], Variant(op), len);
+                    // createToken(symbols[op], Variant(op), len);
+                    tokens ~= Token(
+                        symbols[op],
+                        Variant(op),
+                        createLoc(column - 1, column + len - 2)
+                    );
                     return true;
                 }
             }
@@ -223,7 +223,8 @@ private:
 
         string id = source[startOffset .. offset];
         TokenKind kind = (id in keywords) ? keywords[id] : TokenKind.Identifier;
-        tokens ~= Token(kind, Variant(intern(id)), createLoc(startOffset, startOffset + id.length - 1));
+        // tokens ~= Token(kind, Variant(intern(id)), createLoc(startOffset, startCol - 1));
+        tokens ~= Token(kind, Variant(intern(id)), createLoc(startCol - 1, column - 2));
     }
 
     void lexNumber()
@@ -270,12 +271,12 @@ private:
             if (hexOnly.length == 0)
             {
                 reportError("Número hexadecimal vazio", startCol);
-                tokens ~= Token(TokenKind.I64, Variant(intern("0")), createLoc(startCol, column - 1));
+                tokens ~= Token(TokenKind.I64, Variant(intern("0")), createLoc(startCol - 1, column - 2));
                 return;
             }
 
             tokens ~= Token(TokenKind.I64, Variant(intern(to!string(parse!long(hexOnly, 16)))),
-                createLoc(startCol, column - 1));
+                createLoc(startCol - 1, column - 2));
             return;
         }
 
@@ -305,7 +306,7 @@ private:
         else
             kind = isFloat ? TokenKind.F32 : TokenKind.I32;
 
-        tokens ~= Token(kind, Variant(intern(n)), createLoc(startCol, column - 1));
+        tokens ~= Token(kind, Variant(intern(n)), createLoc(startCol - 1, column - 2));
     }
 
     void lexString()
@@ -320,9 +321,7 @@ private:
             char pk = peek();
 
             if (pk == '\\')
-            {
                 processEscapeSequence(buff, startCol, startLine);
-            }
             else if (pk == '\n')
             {
                 buff ~= '\n';
@@ -336,16 +335,12 @@ private:
         }
 
         if (offset < source.length && peek() == '"')
-        {
             advance();
-        }
         else
-        {
             reportError("Texto não terminado", startCol, startLine,
                 [error.makeSuggestion("Adicione um '\"' ao fim do texto.")]);
-        }
 
-        tokens ~= Token(TokenKind.String, Variant(buff), createLoc(startCol, column - 1, startLine));
+        tokens ~= Token(TokenKind.String, Variant(buff), createLoc(startCol - 1, column - 2, startLine));
     }
 
     void processEscapeSequence(ref string buff, long startCol, long startLine)
@@ -521,10 +516,8 @@ public:
                 continue;
             }
 
-            // Símbolos e operadores
             if (lexSymbol(ch))
             {
-                // Determina o tamanho do operador encontrado
                 int opLen = 1;
                 foreach (len; [3, 2])
                 {
@@ -542,8 +535,7 @@ public:
                 continue;
             }
 
-            // Caractere inválido
-            reportError(format("Caractere inválido '%c'", ch), column, -1, [
+            reportError(format("Caractere inválido '%c'", ch), column - 1, -1, [
                     error.makeSuggestion("Remova o caractere.")
                 ]);
             advance();

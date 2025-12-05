@@ -1,0 +1,9 @@
+tipo string = texto
+tipo t = *string
+
+var nome: string = "Fernando"
+var ptr: *t = &(&nome)
+
+var idades: []i32[] = [[17], [30], [81]]
+var ptr_idade: *i32 = &(idades[0][0])
+var idade: i32 = *&*ptr_idade

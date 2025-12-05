@@ -1,0 +1,21 @@
+classe Pessoa {
+    nome: texto;
+}
+
+classe Usuario herda Pessoa {
+    construtor(nome: texto) {
+        isto.nome = nome
+    }
+}
+
+classe Trabalhador herda Pessoa {
+    construtor(nome: texto) {
+        isto.nome = nome
+    }
+}
+
+tipo U = Usuario
+tipo CLT = Trabalhador
+
+var usuario: U = Usuario("Fernando") 
+var trabaiador: CLT = Trabalhador("Neymar") 

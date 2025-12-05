@@ -1,18 +1,4 @@
-var nome: texto = "Fernando"
+tipo fn = *[]i32
+tipo string = texto
 
-// recebe "nulo" por padrão
-var idade;
-// define o tipo e o valor da idade
-idade = 17
-
-escreva(nome, " ", idade)
-
-// todos com o mesmo tipo
-var a, b: i64 = 60L, 9L
-
-// inferencia total
-var c, d = 60, 9
-
-// cada um com um tipo
-var x: i32, y: i64 = 60, 9L
-escreva(x + y)
+var nome: string = "Fernando"

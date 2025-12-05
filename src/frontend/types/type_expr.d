@@ -123,40 +123,52 @@ class ArrayTypeExpr : TypeExpr
 //     }
 // }
 
-/// Tipo função: (inteiro, texto) -> logico
-// class FunctionTypeExpr : TypeExpr
-// {
-//     TypeExpr[] paramTypes;
-//     TypeExpr returnType;
+/// Tipo função: (inteiro, texto): logico
+class FunctionTypeExpr : TypeExpr
+{
+    TypeExpr[] paramTypes;
+    TypeExpr returnType;
 
-//     this(TypeExpr[] paramTypes, TypeExpr returnType, Loc loc)
-//     {
-//         this.paramTypes = paramTypes;
-//         this.returnType = returnType;
-//         this.loc = loc;
-//     }
+    this(TypeExpr[] paramTypes, TypeExpr returnType, Loc loc)
+    {
+        this.paramTypes = paramTypes;
+        this.returnType = returnType;
+        this.loc = loc;
+    }
 
-//     override string toStr()
-//     {
-//         import std.algorithm : map;
-//         import std.array : join;
+    override string toStr()
+    {
+        import std.algorithm : map;
+        import std.array : join;
 
-//         string params = paramTypes.map!(t => t.toStr()).join(", ");
-//         return "(" ~ params ~ ") -> " ~ returnType.toStr();
-//     }
+        string params = paramTypes.map!(t => t.toStr()).join(", ");
+        return "(" ~ params ~ ") -> " ~ returnType.toStr();
+    }
 
-//     override TypeExpr clone()
-//     {
-//         import std.algorithm : map;
-//         import std.array : array;
+    override TypeExpr clone()
+    {
+        import std.algorithm : map;
+        import std.array : array;
 
-//         return new FunctionTypeExpr(
-//             paramTypes.map!(t => t.clone()).array,
-//             returnType.clone(),
-//             loc
-//         );
-//     }
-// }
+        return new FunctionTypeExpr(
+            paramTypes.map!(t => t.clone()).array,
+            returnType.clone(),
+            loc
+        );
+    }
+
+    override void print(ulong ident = 0, bool isLast = false)
+    {
+        import std.stdio : write, writeln;
+        import std.array : replicate;
+
+        string prefix = "  ".replicate(cast(size_t) ident);
+        string branch = isLast ? "└── " : "├── ";
+
+        writeln(prefix, branch, "FunctionTypeExpr: ");
+        writeln(prefix, branch, toStr());
+    }
+}
 
 class PointerTypeExpr : TypeExpr
 {
@@ -180,5 +192,91 @@ class PointerTypeExpr : TypeExpr
 
     override void print(ulong ident = 0, bool isLast = false)
     {
+        import std.stdio : write, writeln;
+        import std.array : replicate;
+
+        string prefix = "  ".replicate(cast(size_t) ident);
+        string branch = isLast ? "└── " : "├── ";
+
+        writeln(prefix, branch, "PointerTypeExpr");
+        writeln(prefix, branch, toStr());
+    }
+}
+
+class UnionTypeExpr : TypeExpr
+{
+    TypeExpr[] types;
+
+    this(TypeExpr[] types, Loc loc)
+    {
+        this.types = types;
+        this.loc = loc;
+    }
+
+    override string toStr()
+    {
+        import std.algorithm : map;
+        import std.array : join;
+
+        return types.map!(t => t.toStr()).join(" | ");
+    }
+
+    override TypeExpr clone()
+    {
+        import std.algorithm : map;
+        import std.array : array;
+
+        return new UnionTypeExpr(
+            types.map!(t => t.clone()).array,
+            loc
+        );
+    }
+
+    override void print(ulong ident = 0, bool isLast = false)
+    {
+        import std.stdio : write, writeln;
+        import std.array : replicate;
+
+        string prefix = "  ".replicate(cast(size_t) ident);
+        string branch = isLast ? "└── " : "├── ";
+
+        writeln(prefix, branch, "UnionTypeExpr");
+
+        foreach (i, type; types)
+        {
+            type.print(ident + 1, i == cast(int) types.length - 1);
+        }
+    }
+}
+
+class ClassTypeExpr : TypeExpr
+{
+    string className;
+
+    this(string className, Loc loc)
+    {
+        this.className = className;
+        this.loc = loc;
+    }
+
+    override string toStr()
+    {
+        return className;
+    }
+
+    override TypeExpr clone()
+    {
+        return new ClassTypeExpr(className, loc);
+    }
+
+    override void print(ulong ident = 0, bool isLast = false)
+    {
+        import std.stdio : write, writeln;
+        import std.array : replicate;
+
+        string prefix = "  ".replicate(cast(size_t) ident);
+        string branch = isLast ? "└── " : "├── ";
+
+        writeln(prefix, branch, "ClassTypeExpr: ", className);
     }
 }

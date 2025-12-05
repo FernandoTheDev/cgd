@@ -1,0 +1,9 @@
+var condicao = 1 == 1
+
+se condicao {
+    // faça algo
+} senao se 1 > 1 {
+    // faça algo
+} senao {
+    // faça algo
+}

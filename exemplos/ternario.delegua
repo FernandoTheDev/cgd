@@ -1,0 +1,2 @@
+var condicao = verdadeiro
+var idade = condicao ? 10 : 17.01

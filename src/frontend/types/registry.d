@@ -18,10 +18,9 @@ class TypeRegistry
     // Tipos atualmente em processo de definição (detecta ciclos)
     private bool[string] inProgress;
 
-    private this()
+    this()
     {
         BuiltinTypes.initialize();
-        // BuiltinFunctions.initialize();
     }
 
     /// Singleton instance
@@ -160,6 +159,5 @@ class TypeRegistry
         compositeCache.clear();
         inProgress.clear();
         BuiltinTypes.initialize();
-        // BuiltinFunctions.initialize();
     }
 }
