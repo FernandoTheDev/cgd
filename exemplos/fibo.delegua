@@ -1,0 +1,11 @@
+função soma(x, y) {
+    retorne x + y
+}
+
+função fibonacci(n) {
+    se n <= 1 
+        retorne n
+    retorne fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+escreva(fibonacci(soma(5, 5)))

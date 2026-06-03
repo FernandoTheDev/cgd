@@ -1,231 +1,124 @@
 module frontend.parser.parser;
-import frontend, common.reporter;
 
-enum Precedence
-{
-    LOWEST = 1,
-    ASSIGN = 2, // =, +=, -=, |=, &=, <<=, >>=
-    EQUALS = 3, // ==, !=
-    OR = 4, // ||
-    AND = 5, // &&
-    BIT_OR = 6, // |
-    BIT_XOR = 7, // ^
-    BIT_AND = 8, // &
-    SUM = 9, // +, -
-    MUL = 10, // *, /
-    BIT_SHIFT = 11, // <<, >>
-    CALL = 12, // funções, index
-    HIGHEST = 13,
-}
+import std.stdio;
+import std.exception;
+import frontend;
+import frontend.lexer;
+import frontend.parser;
+
 
 class Parser
 {
 private:
     Token[] tokens;
-    ulong pos = 0; // offset
-    DiagnosticError error;
+    uint offset;
 
-    pragma(inline, true)
-    void reportError(string message, Loc loc, Suggestion[] suggestions = null)
+public:
+    ParseType parseType;
+    ParseExpr parseExpr;
+    ParseStmt parseStmt;
+    ParseDecl parseDecl;
+
+    this(Token[] tokens)
     {
-        error.addError(Diagnostic(message, loc, suggestions));
+        this.tokens = tokens;
+        this.parseType = new ParseType(this);
+        this.parseExpr = new ParseExpr(this);
+        this.parseStmt = new ParseStmt(this);
+        this.parseDecl = new ParseDecl(this);
     }
 
-    mixin ParseDecl!();
-    mixin ParseExpr!();
-    mixin ParseStmt!();
-    mixin ParseType!();
-
-    Node parse()
+    Position getPos(Position l, Position r)
     {
-        immutable startPos = this.pos;
-
-        if (this.isDeclaration())
-        {
-            if (auto node = this.parseDeclaration())
-                return node;
-            this.pos = startPos;
-        }
-
-        if (auto node = this.parseStatement())
-            return node;
-
-        this.pos = startPos;
-
-        if (auto node = this.parseExpression())
-            return node;
-
-        throw new Exception("Erro ao fazer parsing na posição " ~ to!string(startPos));
+        return new Position(l.filename, l.start, r.end);
     }
 
-    bool isDeclaration()
+    bool isAtEnd(uint n = 0)
     {
-        Token current = this.peek();
-        switch (current.kind)
-        {
-        case TokenKind.Var:
-        case TokenKind.Const:
-        case TokenKind.Funcao:
-        case TokenKind.Tipo:
-            return true;
-        default:
-            return false;
-        }
+        return (offset + n) >= tokens.length;
     }
 
-    pragma(inline, true);
-    bool isAtEnd()
+    void checkIsAtEnd(uint n = 0)
     {
-        return this.peek().kind == TokenKind.Eof;
+        enforce(!isAtEnd(n), "Source out of bounds in parser.");
     }
 
-    Variant next()
-    {
-        if (this.isAtEnd())
-            return Variant(false);
-        return Variant(this.tokens[this.pos + 1]);
-    }
-
-    pragma(inline, true);
     Token peek()
     {
-        return this.tokens[this.pos];
-    }
-
-    pragma(inline, true);
-    Token previous(ulong i = 1)
-    {
-        return this.tokens[this.pos - i];
+        checkIsAtEnd();
+        return tokens[offset];
     }
 
     Token advance()
     {
-        if (!this.isAtEnd())
-            this.pos++;
-        return this.previous();
+        checkIsAtEnd();
+        return tokens[offset++];
     }
 
-    bool match(TokenKind[] kinds)
+    bool match(TokenKind kind)
     {
-        foreach (kind; kinds)
+        if (peek().kind == kind)
         {
-            if (this.check(kind))
-            {
-                this.advance();
-                return true;
-            }
+            advance();
+            return true;
         }
         return false;
     }
 
     bool check(TokenKind kind)
     {
-        if (this.isAtEnd())
-            return false;
-        return this.peek().kind == kind;
+        checkIsAtEnd();
+        return tokens[offset].kind == kind;
     }
 
-    Token consume(TokenKind expected, string message)
+    Token consume(TokenKind kind, string message)
     {
-        if (this.check(expected))
-            return this.advance();
-        reportError(format("Erro de parsing: %s", message), this.peek().loc);
-        throw new Exception(format("Erro de parsing: %s", message));
+        Token tk = advance();
+        if (tk.kind == kind) return tk;
+        writefln("Erro: %s", message);
+        writefln("Esperado %s, recebido %s", kind, tk.kind);
+        return tk;
     }
 
-    Precedence getPrecedence(TokenKind kind)
+    bool isStmt()
     {
-        switch (kind)
+        switch (peek().kind)
         {
-        case TokenKind.Equals:
-        case TokenKind.PlusEquals:
-        case TokenKind.MinusEquals:
-        case TokenKind.StarEquals:
-        case TokenKind.SlashEquals:
-        case TokenKind.ModuloEquals:
-        case TokenKind.BitAndEquals:
-        case TokenKind.BitOrEquals:
-        case TokenKind.BitXorEquals:
-        case TokenKind.BitSHLEquals:
-        case TokenKind.BitSHREquals:
-        case TokenKind.TildeEquals:
-        case TokenKind.Or:
-        case TokenKind.And:
-            return Precedence.ASSIGN;
-
-        case TokenKind.EqualsEquals:
-        case TokenKind.NotEquals:
-        case TokenKind.GreaterThan:
-        case TokenKind.LessThan:
-        case TokenKind.LessThanEquals:
-        case TokenKind.GreaterThanEquals:
-            return Precedence.EQUALS;
-
-        case TokenKind.BitOr:
-            return Precedence.BIT_OR;
-        case TokenKind.BitXor:
-            return Precedence.BIT_XOR;
-        case TokenKind.BitAnd:
-            return Precedence.BIT_AND;
-
-        case TokenKind.Plus:
-        case TokenKind.Minus:
-        case TokenKind.PlusPlus:
-        case TokenKind.MinusMinus:
-        case TokenKind.Question:
-            return Precedence.SUM;
-
-        case TokenKind.Star:
-        case TokenKind.Slash:
-        case TokenKind.Modulo:
-            return Precedence.MUL;
-
-        case TokenKind.BitSHL:
-        case TokenKind.BitSHR:
-        case TokenKind.BitSAR:
-            return Precedence.BIT_SHIFT;
-
-        case TokenKind.LParen:
-        case TokenKind.LBracket:
-        case TokenKind.Dot:
-            return Precedence.CALL;
-
-        default:
-            return Precedence.LOWEST;
+            case TokenKind.For:
+            case TokenKind.If:
+            case TokenKind.While:
+            case TokenKind.Return:
+                return true;
+            default:
+                return false;
         }
     }
 
-    pragma(inline, true);
-    Precedence peekPrecedence()
+    bool isDecl()
     {
-        return this.getPrecedence(this.peek().kind);
-    }
-
-    pragma(inline, true);
-    Loc getLoc(ref Loc start, ref Loc end)
-    {
-        return Loc(start.filename, start.dir, start.start, end.end);
-    }
-
-public:
-    this(Token[] tokens = [], DiagnosticError error)
-    {
-        this.error = error;
-        this.tokens = tokens;
-    }
-
-    Program parseProgram()
-    {
-        Program program = new Program([]);
-        try
+        switch (peek().kind)
         {
-            while (!this.isAtEnd())
-                program.body ~= this.parse();
-            if (this.tokens.length == 0)
-                return program;
+            case TokenKind.Var:
+            case TokenKind.Const:
+            case TokenKind.Fn:
+                return true;
+            default:
+                return false;
         }
-        catch (Exception e)
-            throw e; // propaga
-        return program;
+    }
+
+    Node parseIntern()
+    {
+        if (isDecl()) return parseDecl.parse();
+        if (isStmt()) return parseStmt.parse();
+        return parseExpr.parse();
+    }
+
+    Program parse()
+    {
+        Node[] body;
+        while (!isAtEnd())
+            body ~= parseIntern();
+        return new Program(body);
     }
 }

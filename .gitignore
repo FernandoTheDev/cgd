@@ -16,5 +16,5 @@ cgd-test-*
 *.lst
 performance
 bench
-bin/*
-bin_tests/*
+out
+*.out

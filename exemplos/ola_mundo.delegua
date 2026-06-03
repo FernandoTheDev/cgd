@@ -1,4 +1,0 @@
-tipo fn = *[]i32
-tipo string = texto
-
-var nome: string = "Fernando"

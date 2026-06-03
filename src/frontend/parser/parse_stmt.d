@@ -1,76 +1,55 @@
 module frontend.parser.parse_stmt;
-import frontend;
 
-mixin template ParseStmt()
+import frontend;
+import frontend.lexer;
+import frontend.parser;
+
+class ParseStmt
 {
-    Node parseStatement()
+private:
+    Parser p;
+
+public:
+    this(Parser p)
     {
-        switch (this.peek().kind)
+        this.p = p;
+    }
+
+    Node parseIfStmt(Position pos)
+    {
+        IfStmt _else = null;
+        Node[] body;
+        Node expr = p.parseExpr.parse();
+        if (p.check(TokenKind.LBrace))
         {
-        case TokenKind.Retorna:
-            return parseReturn();
-        case TokenKind.Se:
-            return parseIfStmt();
+            while (!p.check(TokenKind.RBrace))
+                body ~= p.parseIntern();
+            p.consume(TokenKind.RBrace, "Esperado '}' após o 'se'.");
+        }
+        else
+            body ~= p.parseIntern();
+
+        return new IfStmt(expr, body, _else, pos);
+    }
+
+    Node parseReturnStmt(Position pos)
+    {
+        return new ReturnStmt(p.parseExpr.parse(), pos);
+    }
+
+    Node parse()
+    {
+        Token tk = p.advance();
+        switch (tk.kind)
+        {
+        case TokenKind.If:
+            return parseIfStmt(tk.pos);
+
+        case TokenKind.Return:
+            return parseReturnStmt(tk.pos);
+
         default:
             return null;
         }
-    }
-
-    IfStmt parseIfStmt()
-    {
-        Loc loc = this.advance().loc;
-        Node condition = this.parseExpression();
-        Node[] body = this.parseBody(true);
-        Node else_ = null;
-
-        if (this.peek().kind == TokenKind.Senao)
-        {
-            Loc elseLoc = this.advance().loc;
-
-            if (this.peek().kind == TokenKind.Se)
-            {
-                Node ifStmt = this.parseIfStmt();
-                else_ = ifStmt;
-            }
-            else
-            {
-                Node[] elseBody = this.parseBody(true);
-                Node elseStmt = new IfStmt(null, new BlockStmt(elseBody, elseLoc), null, elseLoc);
-                else_ = elseStmt;
-            }
-        }
-
-        return new IfStmt(condition, new BlockStmt(body, loc), else_, loc);
-
-    }
-
-    ReturnStmt parseReturn()
-    {
-        Loc loc = this.advance().loc;
-        Node value = null;
-        if (!this.match([TokenKind.SemiColon]))
-            value = this.parseExpression();
-        return new ReturnStmt(value, loc);
-    }
-
-    Node[] parseBody(bool uniqueStmt = false)
-    {
-        Node[] body_;
-        if (!this.check(TokenKind.LBrace) && !uniqueStmt)
-        {
-            reportError("Esperava-se '{' para iniciar o corpo.", this.peek().loc);
-            return body_;
-        }
-        if (this.check(TokenKind.LBrace))
-        {
-            this.consume(TokenKind.LBrace, "Era esperado '{' para iniciar o corpo.");
-            while (!this.check(TokenKind.RBrace) && !this.isAtEnd())
-                body_ ~= this.parse();
-            this.consume(TokenKind.RBrace, "Era esperado'}' após o corpo.");
-        }
-        else
-            body_ ~= this.parse();
-
-        return body_;
     }
 }

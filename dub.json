@@ -1,11 +1,12 @@
 {
 	"name": "cgd",
-	"copyright": "Copyright © 2025, Fernando Dev",
 	"description": "Compilador Geral Delégua",
-	"license": "MIT",
+	"targetName": "cgd",
 	"targetType": "executable",
 	"authors": [
-		"Fernando Dev",
-		"Italo Brito Brandão"
-	]
+		"FernandoDev"
+	],
+	"dflags": ["-J src/middle/"],
+	"license": "Apache-2.0",
+	"copyright": "Copyright © 2026, FernandoDev"
 }
