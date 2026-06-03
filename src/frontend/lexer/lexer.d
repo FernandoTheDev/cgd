@@ -1,14 +1,18 @@
 module frontend.lexer.lexer;
 
-import std.stdio;
-import std.exception : enforce;
-import std.conv;
-import frontend.lexer.token;
 import std.utf : decodeFront, decode;
+import std.exception : enforce;
+import std.format;
+import std.stdio;
+import std.conv;
+
+import frontend.lexer.token;
+import errors;
 
 class Lexer
 {
 private:
+    Diagnostics err;
     Token[] tokens;
     string source, filename;
     uint offset, l_offset;
@@ -21,30 +25,34 @@ private:
         "const": TokenKind.Const,
         "fixo": TokenKind.Const,
         "constante": TokenKind.Const,
-        
+
         "funcao": TokenKind.Fn,
         "função": TokenKind.Fn,
 
         "se": TokenKind.If,
         "senao": TokenKind.Else,
         "senão": TokenKind.Else,
-        
+
         "enquanto": TokenKind.While,
         "para": TokenKind.For,
-        
+
         "nulo": TokenKind.Null,
         "verdadeiro": TokenKind.True,
         "falso": TokenKind.False,
-        
+
+        "tipo": TokenKind.Type,
+        "de": TokenKind.Of,
+
         "retorne": TokenKind.Return,
         "retorna": TokenKind.Return,
     ];
 
 public:
-    this(string source, string filename)
+    this(string source, string filename, Diagnostics err)
     {
         this.source = source;
         this.filename = filename;
+        this.err = err;
     }
 
     bool isAlpha(dchar c)
@@ -108,6 +116,29 @@ public:
         return false;
     }
 
+    dstring lexNumer(dchar ch, uint start, out bool isDouble, out bool dotInvalid, bool d = true)
+    {
+        dstring buffer = [ch];
+        while (!isAtEnd() && (isNumeric(peek()) || peek() == '.'))
+        {
+            if (!d && peek() == '.')
+            {
+                err.error(getPosition(start, line), "Sem permissão para numeros flutuantes.");
+                continue;
+            }
+            if (peek() == '.' && isDouble)
+            {
+                dotInvalid = true;
+                advance();
+                continue;
+            }
+            if (peek() == '.' && !isDouble)
+                isDouble = true;
+            buffer ~= [advance()];
+        }
+        return buffer;
+    }
+
     Position getPosition(uint s, uint l)
     {
         return new Position(filename, new PosLine(s, l), new PosLine(l_offset, line));
@@ -132,37 +163,23 @@ public:
             if (isNumeric(ch))
             {
                 uint start = l_offset;
-                dstring buffer = [ch];
-                bool isFloat, isDouble;
+                bool isDouble;
+                bool dotInvalid;
+                dstring buffer = lexNumer(ch, start, isDouble, dotInvalid);
 
-                while ((isNumeric(peek()) || peek() == '_' || peek() == '.') && !isAtEnd())
+                if (dotInvalid)
                 {
-                    if (peek() == '_')
-                        continue;
-                    if (peek() == '.' && isDouble)
-                    {
-                        // TODO: melhorar
-                        writeln("Error: não é permitido usar '.' em um double.");
-                        continue;
-                    }
-                    if (peek() == '.' && !isDouble)
-                        isDouble = true;
-                    buffer ~= [advance()];
+                    err.error(getPosition(start, line), "Uso de '.' inválido.");
+                    continue;
                 }
 
-                isFloat = match('f') || match('F');
                 TokenKind kind = TokenKind.Int;
                 TokenRaw raw;
 
-                if (isDouble && !isFloat)
+                if (isDouble)
                 {
                     kind = TokenKind.Double;
                     raw.d = to!double(buffer);
-                }
-                else if (isFloat)
-                {
-                    kind = TokenKind.Float;
-                    raw.d = to!float(buffer);
                 }
                 else
                     raw.i = to!long(buffer);
@@ -176,7 +193,7 @@ public:
                 uint start = l_offset;
                 dstring buffer = [ch];
 
-                while (isAlphaNumeric(peek()) && !isAtEnd())
+                while (!isAtEnd() && isAlphaNumeric(peek()))
                     buffer ~= [advance()];
 
                 TokenKind kind = TokenKind.Identifier;
@@ -194,12 +211,19 @@ public:
                 dstring buffer;
 
                 // TODO: validar escapes
-                while (peek() != '"' && !isAtEnd())
-                    buffer ~= [advance()];
-
-                if (!match('"'))
+                while (!isAtEnd() && peek() != '"')
                 {
-                    writeln("String não foi fechada.");
+                    if (peek() == '\n')
+                    {
+                        line++;
+                        l_offset = 0;
+                    }
+                    buffer ~= [advance()];
+                }
+
+                if (isAtEnd() || !match('"'))
+                {
+                    err.error(getPosition(start, l), "String não foi fechada.");
                     return tokens;
                 }
 
@@ -212,74 +236,73 @@ public:
 
             switch (ch)
             {
-                case '+':
-                    k = TokenKind.Plus;
-                    break;
-                case '-':
-                    k = TokenKind.Minus;
-                    break;
-                case '=':
-                    k = TokenKind.Equals;
-                    if (peek() == '=')
-                    {
-                        k = TokenKind.EEquals;
-                        advance();
-                    }
-                    break;
-                case '/':
-                    k = TokenKind.Slash;
-                    break;
-                case '*':
-                    k = TokenKind.Star;
-                    break;
-                case '(':
-                    k = TokenKind.LParen;
-                    break;
-                case ')':
-                    k = TokenKind.RParen;
-                    break;
-                case '{':
-                    k = TokenKind.LBrace;
-                    break;
-                case '}':
-                    k = TokenKind.RBrace;
-                    break;
-                case ':':
-                    k = TokenKind.Colon;
-                    break;
-                case ';':
-                    k = TokenKind.Semicolon;
-                    break;
-                case ',':
-                    k = TokenKind.Comma;
-                    break;
-                case '.':
-                    k = TokenKind.Dot;
-                    break;
-                case '<':
-                    k = TokenKind.LThan;
-                    if (peek() == '=')
-                    {
-                        k = TokenKind.LEquals;
-                        advance();
-                    }
-                    break;
-                case '>':
-                    k = TokenKind.GThan;
-                    if (peek() == '=')
-                    {
-                        k = TokenKind.GEquals;
-                        advance();
-                    }
-                    break;
-                default:
-                    writefln("Char desconhecido: '%c'", ch);
-                    continue;
+            case '+':
+                k = TokenKind.Plus;
+                break;
+            case '-':
+                k = TokenKind.Minus;
+                break;
+            case '=':
+                k = TokenKind.Equals;
+                if (peek() == '=')
+                {
+                    k = TokenKind.EEquals;
+                    advance();
+                }
+                break;
+            case '/':
+                k = TokenKind.Slash;
+                break;
+            case '*':
+                k = TokenKind.Star;
+                break;
+            case '(':
+                k = TokenKind.LParen;
+                break;
+            case ')':
+                k = TokenKind.RParen;
+                break;
+            case '{':
+                k = TokenKind.LBrace;
+                break;
+            case '}':
+                k = TokenKind.RBrace;
+                break;
+            case ':':
+                k = TokenKind.Colon;
+                break;
+            case ';':
+                k = TokenKind.Semicolon;
+                break;
+            case ',':
+                k = TokenKind.Comma;
+                break;
+            case '.':
+                k = TokenKind.Dot;
+                break;
+            case '<':
+                k = TokenKind.LThan;
+                if (peek() == '=')
+                {
+                    k = TokenKind.LEquals;
+                    advance();
+                }
+                break;
+            case '>':
+                k = TokenKind.GThan;
+                if (peek() == '=')
+                {
+                    k = TokenKind.GEquals;
+                    advance();
+                }
+                break;
+            default:
+                break;
             }
-            
+
             if (k == TokenKind.Eof)
             {
-                writefln("Char desconhecido: '%c'", ch);
+                err.error(getPosition(start, line), format("Char desconhecido: '%c'", ch));
                 continue;
             }
 

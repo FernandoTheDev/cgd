@@ -38,9 +38,6 @@ public:
             case TokenKind.Int:
                 return new IntLit(tk.value.i, tk.pos);
             
-            case TokenKind.Float:
-                return new FloatLit(tk.value.f, tk.pos);
-            
             case TokenKind.Double:
                 return new DoubleLit(tk.value.d, tk.pos);
             
@@ -48,6 +45,11 @@ public:
                 Node node = parse();
                 p.consume(TokenKind.RParen, "Esperado um ')' após a expressão.");
                 return node;
+
+            case TokenKind.Type:
+                p.consume(TokenKind.Of, "Esperado 'de' após o 'tipo'.");
+                Node val = parse();
+                return new TypeOfExpr(val, p.getPos(tk.pos, val.pos));
             
             default:
                 // TODO: melhorar

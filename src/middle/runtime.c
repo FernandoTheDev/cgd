@@ -12,8 +12,9 @@ void __cgd_erro_interno(char *msg)
 
 typedef struct _CGD_String CGD_String;
 typedef struct _CGD_Int CGD_Int;
-typedef struct _CGD_Float CGD_Float;
 typedef struct _CGD_Double CGD_Double;
+typedef struct _CGD_Bool CGD_Bool;
+
 typedef struct _CGD_Value CGD_Value;
 typedef enum _CGD_ValueKind CGD_ValueKind;
 
@@ -27,11 +28,6 @@ typedef struct _CGD_Int
 {
     long val;
 } CGD_Int;
-
-typedef struct _CGD_Float
-{
-    float val;
-} CGD_Float;
 
 typedef struct _CGD_Double
 {
@@ -47,7 +43,6 @@ typedef enum _CGD_ValueType
 {
     CGD_ValueType_Bool,
     CGD_ValueType_Int,
-    CGD_ValueType_Float,
     CGD_ValueType_Double,
     CGD_ValueType_String,
 } CGD_ValueType;
@@ -58,7 +53,6 @@ typedef struct _CGD_Value
     union
     {
         CGD_Int i;
-        CGD_Float f;
         CGD_String s;
         CGD_Double d;
         CGD_Bool b;
@@ -70,14 +64,6 @@ static inline CGD_Value cgd_int(long val)
     CGD_Value v;
     v.type = CGD_ValueType_Int;
     v.i.val = val;
-    return v;
-}
-
-static inline CGD_Value cgd_float(float val)
-{
-    CGD_Value v;
-    v.type = CGD_ValueType_Float;
-    v.f.val = val;
     return v;
 }
 
@@ -109,8 +95,6 @@ int __cgd_is_truthy(CGD_Value val)
     {
     case CGD_ValueType_Bool:
         return (bool)val.b.val;
-    case CGD_ValueType_Float:
-        return (bool)val.f.val;
     case CGD_ValueType_Double:
         return (bool)val.d.val;
     case CGD_ValueType_Int:
@@ -126,16 +110,16 @@ CGD_Value __cgd_cast(CGD_Value from, CGD_ValueType to)
 {
     if (from.type == to)
         return from;
+
+    CGD_ValueType fromType = from.type;
     // assume que o cast dará certo, se der erro o sistema irá falhar em runtime
     from.type = to;
-    switch (from.type)
+
+    switch (fromType)
     {
     case CGD_ValueType_Int:
         switch (to)
         {
-        case CGD_ValueType_Float:
-            from.f.val = (float)from.i.val;
-            break;
         case CGD_ValueType_Double:
             from.d.val = (double)from.i.val;
             break;
@@ -147,29 +131,9 @@ CGD_Value __cgd_cast(CGD_Value from, CGD_ValueType to)
             break;
         }
         break;
-    case CGD_ValueType_Float:
-        switch (to)
-        {
-        case CGD_ValueType_Int:
-            from.i.val = (long)from.f.val;
-            break;
-        case CGD_ValueType_Double:
-            from.d.val = (double)from.f.val;
-            break;
-        case CGD_ValueType_Bool:
-            from.b.val = from.f.val == 0.0f ? 0 : 1;
-            break;
-        default:
-            __cgd_erro_interno("Erro ao realizar cast de um inteiro.");
-            break;
-        }
-        break;
     case CGD_ValueType_Double:
         switch (to)
         {
-        case CGD_ValueType_Float:
-            from.f.val = (float)from.d.val;
-            break;
         case CGD_ValueType_Int:
             from.i.val = (long)from.d.val;
             break;
@@ -184,9 +148,6 @@ CGD_Value __cgd_cast(CGD_Value from, CGD_ValueType to)
     case CGD_ValueType_Bool:
         switch (to)
         {
-        case CGD_ValueType_Float:
-            from.f.val = (float)from.b.val;
-            break;
         case CGD_ValueType_Int:
             from.i.val = (long)from.b.val;
             break;
@@ -229,12 +190,6 @@ CGD_Value __cgd_binary_op_add(CGD_Value l, CGD_Value r)
         return val;
     }
 
-    if (t == CGD_ValueType_Float)
-    {
-        val.f.val = l.f.val + r.f.val;
-        return val;
-    }
-
     if (t == CGD_ValueType_Int)
     {
         val.i.val = l.i.val + r.i.val;
@@ -266,12 +221,6 @@ CGD_Value __cgd_binary_op_mul(CGD_Value l, CGD_Value r)
     if (t == CGD_ValueType_Double)
     {
         val.d.val = l.d.val * r.d.val;
-        return val;
-    }
-
-    if (t == CGD_ValueType_Float)
-    {
-        val.f.val = l.f.val * r.f.val;
         return val;
     }
 
@@ -309,12 +258,6 @@ CGD_Value __cgd_binary_op_minus(CGD_Value l, CGD_Value r)
         return val;
     }
 
-    if (t == CGD_ValueType_Float)
-    {
-        val.f.val = l.f.val - r.f.val;
-        return val;
-    }
-
     if (t == CGD_ValueType_Int)
     {
         val.i.val = l.i.val - r.i.val;
@@ -343,12 +286,6 @@ CGD_Value __cgd_binary_op_ee(CGD_Value l, CGD_Value r)
     if (t == CGD_ValueType_Double)
     {
         val.b.val = (bool)(l.d.val == r.d.val);
-        return val;
-    }
-
-    if (t == CGD_ValueType_Float)
-    {
-        val.b.val = (bool)(l.f.val == r.f.val);
         return val;
     }
 
@@ -392,15 +329,6 @@ CGD_Value __cgd_binary_op_lt(CGD_Value l, CGD_Value r, int equals)
             val.b.val = (bool)(l.d.val <= r.d.val);
         else
             val.b.val = (bool)(l.d.val < r.d.val);
-        return val;
-    }
-
-    if (t == CGD_ValueType_Float)
-    {
-        if (equals)
-            val.b.val = (bool)(l.f.val <= r.f.val);
-        else
-            val.b.val = (bool)(l.f.val < r.f.val);
         return val;
     }
 
@@ -453,15 +381,6 @@ CGD_Value __cgd_binary_op_gt(CGD_Value l, CGD_Value r, int equals)
         return val;
     }
 
-    if (t == CGD_ValueType_Float)
-    {
-        if (equals)
-            val.b.val = (bool)(l.f.val >= r.f.val);
-        else
-            val.b.val = (bool)(l.f.val > r.f.val);
-        return val;
-    }
-
     if (t == CGD_ValueType_Int)
     {
         if (equals)
@@ -490,9 +409,6 @@ void cgd_escreva(CGD_Value v)
     {
     case CGD_ValueType_Int:
         printf("%ld\n", v.i.val);
-        break;
-    case CGD_ValueType_Float:
-        printf("%g\n", v.f.val);
         break;
     case CGD_ValueType_Double:
         printf("%g\n", v.d.val);

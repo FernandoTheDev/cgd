@@ -16,7 +16,6 @@ public:
         types["inteiro"] = new TypeSemaBuiltin(TypeSemaBase.Int);
         types["numero"] = types["inteiro"];
 
-        types["decimal"] = new TypeSemaBuiltin(TypeSemaBase.Float);
         types["duplo"] = new TypeSemaBuiltin(TypeSemaBase.Double);
 
         types["logico"] = new TypeSemaBuiltin(TypeSemaBase.Logico);

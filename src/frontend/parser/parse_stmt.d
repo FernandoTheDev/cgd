@@ -20,7 +20,7 @@ public:
         IfStmt _else = null;
         Node[] body;
         Node expr = p.parseExpr.parse();
-        if (p.check(TokenKind.LBrace))
+        if (p.match(TokenKind.LBrace))
         {
             while (!p.check(TokenKind.RBrace))
                 body ~= p.parseIntern();

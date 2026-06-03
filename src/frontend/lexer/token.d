@@ -13,11 +13,12 @@ enum TokenKind : ubyte
     Else,
     While,
     For,
+    Type,
+    Of,
 
     // literals
     Identifier,
     Int,
-    Float,
     Double,
     True,
     False,
@@ -56,7 +57,6 @@ union TokenRaw
 {
     long i;
     double d;
-    float f;
     dstring s;
 
     pragma(inline, true)
@@ -72,14 +72,6 @@ union TokenRaw
     {
         TokenRaw _;
         _.d = n;
-        return _;
-    }
-
-    pragma(inline, true)
-    static TokenRaw _f(float n)
-    {
-        TokenRaw _;
-        _.f = n;
         return _;
     }
 
@@ -139,7 +131,6 @@ class Token
     void print()
     {
         import std.stdio : writeln;
-
         writeln("[TOKEN]\n    kind = ", kind, "\n    value = ", value, "\n    pos = ", pos.toStr());
     }
 }

@@ -1,12 +1,16 @@
 // resolve todos os nodes
 module frontend.semantic.sema3;
 
-import utils;
-import std.stdio;
 import std.exception;
-import frontend;
-import frontend.parser;
+import std.format;
+import std.stdio;
+
 import frontend.semantic;
+import frontend.parser;
+import frontend.lexer;
+import frontend;
+import errors;
+import utils;
 
 class Sema3
 {
@@ -14,12 +18,13 @@ private:
     Context context;
     TypeRegistry registry;
     TypeResolver resolver;
+    Diagnostics err;
 
-    void analyze(Node node)
+    Node analyze(Node node)
     {
-        enforce(node !is null, "Node nulo recebido.");
+        d_enforce(node !is null, "Node nulo recebido.", node.pos, err);
         if (node.type_sema !is null)
-            return;
+            return node;
 
         switch (node.kind)
         {
@@ -40,44 +45,56 @@ private:
 
         case NodeKind.ReturnStmt:
             return analyzeReturnStmt(as!ReturnStmt(node));
-        
+
         case NodeKind.Identifier:
             return analyzeIdentifier(as!Identifier(node));
 
+        case NodeKind.TypeOfExpr:
+            return analyzeTypeOfExpr(node);
+
         case NodeKind.StringLit:
         case NodeKind.IntLit:
-        case NodeKind.FloatLit:
         case NodeKind.DoubleLit:
             node.type_sema = resolver.resolver(node.type_expr);
-            return;
+            return node;
 
         default:
-            writeln("Node Desconhecido: ", node);
-            return;
+            err.error(node.pos, "Node desconhecido.");
+            return node;
         }
     }
 
-    void analyzeIdentifier(Identifier node)
+    Node analyzeTypeOfExpr(Node node)
     {
-        Symbol* sym = context.get(node.value);
-        enforce(sym !is null, "Variavel inexistente.");
-        node.type_sema = (cast(SymbolVar*)(*sym)).node.type_sema;
+        TypeOfExpr toe = as!TypeOfExpr(node);
+        analyze(toe.value);
+        return new StringLit(toe.value.type_sema.toStr(), node.pos);
     }
 
-    void analyzeIfStmt(IfStmt node)
+    Node analyzeIdentifier(Identifier node)
+    {
+        Symbol* sym = context.get(node.value);
+        d_enforce(sym !is null, "Variavel inexistente.", node.pos, err);
+        node.type_sema = (cast(SymbolVar*) sym).node.type_sema;
+        return node;
+    }
+
+    Node analyzeIfStmt(IfStmt node)
     {
         // se tiver expresão então tem um If
         if (node.expr !is null)
-            analyze(node.expr);
+            node.expr = analyze(node.expr);
 
         for (uint i; i < node.body.length; i++)
-            analyze(node.body[i]);
+            node.body[i] = analyze(node.body[i]);
 
         if (node._else !is null)
-            analyzeIfStmt(node._else);
+            node._else = as!IfStmt(analyzeIfStmt(node._else));
+
+        return node;
     }
 
-    void analyzeCallExpr(CallExpr node)
+    Node analyzeCallExpr(CallExpr node)
     {
         dstring getName(Node n)
         {
@@ -93,23 +110,26 @@ private:
         }
 
         dstring name = getName(node.fn);
-        enforce(name != "", "Nome inválido para a função.");
+        d_enforce(name != "", "Nome inválido para a função.", node.pos, err);
 
         Symbol* sym = context.get(name);
-        enforce(sym !is null, "Função inexistente.");
-        node.type_sema = (cast(SymbolFn)(*sym)).node.type_sema;
+        d_enforce(sym !is null, "Função inexistente.", node.pos, err);
+        node.type_sema = (cast(SymbolFn*) sym).node.type_sema;
 
         for (uint i; i < node.args.length; i++)
-            analyze(node.args[i]);
+            node.args[i] = analyze(node.args[i]);
+
+        return node;
     }
 
-    void analyzeReturnStmt(ReturnStmt node)
+    Node analyzeReturnStmt(ReturnStmt node)
     {
         if (node.val !is null)
-            analyze(node.val);
+            node.val = analyze(node.val);
+        return node;
     }
 
-    void analyzeFnDecl(FnDecl node)
+    Node analyzeFnDecl(FnDecl node)
     {
         context.push();
         node.type_sema = resolver.resolver(node.type_expr);
@@ -117,43 +137,74 @@ private:
         {
             FnArg arg = node.args[i];
             if (arg.value !is null)
-                analyze(arg.value);
+                arg.value = analyze(arg.value);
             arg.type_sema = resolver.resolver(arg.type_expr);
             context.set(arg.name, new SymbolParam(arg));
         }
         for (uint i; i < node.body.length; i++)
-            analyze(node.body[i]);
+            node.body[i] = analyze(node.body[i]);
         context.pop();
+        return node;
     }
 
-    void analyzeBinaryExpr(BinaryExpr node)
+    Node analyzeBinaryExpr(BinaryExpr node)
     {
-        // TODO: melhorar
-        analyze(node.left);
-        analyze(node.right);
-        node.type_sema = node.left.type_sema;
+        node.left = analyze(node.left);
+        node.right = analyze(node.right);
+
+        TypeSema l = node.left.type_sema;
+        TypeSema r = node.right.type_sema;
+
+        if (!l.isComp(r))
+        {
+            // ERR, tipos invalidos
+            err.error(node.pos, format("Tipos incompativeis, '%s' com '%s'.", l.toStr(), r.toStr()));
+            return node;
+        }
+
+        TypeSema type = l.promote(r);
+        node.left.type_sema = type;
+        node.right.type_sema = type;
+
+        switch (node.op)
+        {
+            case TokenKind.EEquals:
+            case TokenKind.LEquals:
+            case TokenKind.GEquals:
+            case TokenKind.LThan:
+            case TokenKind.GThan:
+                type = new TypeSemaBuiltin(TypeSemaBase.Logico);
+                break;
+            default:
+                break;
+        }
+
+        node.type_sema = type;
+        return node;
     }
 
-    void analyzeVarDecl(VarDecl node)
+    Node analyzeVarDecl(VarDecl node)
     {
         // TODO: validar melhor
-        analyze(node.value);
+        node.value = analyze(node.value);
         node.type_sema = node.value.type_sema;
         context.set(node.name, new SymbolVar(node));
+        return node;
     }
 
 public:
-    this(Context context, TypeRegistry registry, TypeResolver resolver)
+    this(Context context, TypeRegistry registry, TypeResolver resolver, Diagnostics err)
     {
         this.context = context;
         this.registry = registry;
         this.resolver = resolver;
+        this.err = err;
     }
 
     void analyze(Program program)
     {
         context.cursor = 0; // reseta o cursor em -1 e faz context.enter() indo pra 0
-        foreach (Node node; program.body)
-            analyze(node);
+        foreach (ref Node node; program.body)
+            node = analyze(node);
     }
 }

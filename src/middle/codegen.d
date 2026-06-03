@@ -1,25 +1,23 @@
 module middle.codegen;
 
+import frontend.lexer.token : TokenKind;
 import frontend.parser.ast;
 import frontend.type_sema;
+import std.conv : to;
 import std.format;
 import std.array;
-import std.conv : to;
 
 class CodeGen
 {
 private:
     Program program;
-    string[] lines; // linhas do arquivo final
-    uint indent; // indentação atual (dentro de funções)
+    string[] lines;
+    uint indent;
 
     bool[string] fnRuntime = [
         "escreva": true
     ];
 
-    // ----------------------------------------------------
-    // helpers de indentação
-    // ----------------------------------------------------
     void emit(string s)
     {
         string pad;
@@ -33,16 +31,11 @@ private:
         lines ~= s;
     }
 
-    // ----------------------------------------------------
-    // tipos
-    // ----------------------------------------------------
-    // por enquanto tudo é CGD_Value — sem distinção no C gerado
     string cType()
     {
         return "CGD_Value";
     }
 
-    // converte nome dstring -> string
     string name(dstring d)
     {
         return to!string(d);
@@ -61,16 +54,14 @@ public:
 
         // protótipos de funções declaradas
         foreach (node; program.body)
-        {
             if (auto fn = cast(FnDecl) node)
                 emitRaw(emitProto(fn) ~ ";");
-        }
-
+        
         // corpos das funções declaradas
         foreach (node; program.body)
             if (auto fn = cast(FnDecl) node)
                 emitFunction(fn);
-        
+
         // cgd_main: tudo que está no toplevel que não é FnDecl
         emitRaw("void cgd_main(void)");
         emitRaw("{");
@@ -79,36 +70,41 @@ public:
         foreach (node; program.body)
             if (cast(FnDecl) node is null)
                 emitStmt(node);
-        
+
         emit("return;");
         emitRaw("}");
 
         return lines.join("\n");
     }
 
+    string debug_comment(dstring s)
+    {
+        return debug_comment(name(s));
+    }
+
+    string debug_comment(string s)
+    {
+        return " /* " ~ s ~ " */ ";
+    }
+
 private:
-    // ----------------------------------------------------
     // protótipo: "CGD_Value foo(CGD_Value x, CGD_Value y)"
-    // ----------------------------------------------------
     string emitProto(FnDecl fn)
     {
         auto buf = appender!string();
-        buf ~= cType() ~ " " ~ name(fn.fn) ~ "(";
+        buf ~= cType() ~ debug_comment(fn.type_sema.toStr()) ~ " " ~ name(fn.fn) ~ "(";
 
         foreach (i, arg; fn.args)
         {
             if (i > 0)
                 buf ~= ", ";
-            buf ~= cType() ~ " " ~ name(arg.name);
+            buf ~= cType() ~ debug_comment(arg.type_sema.toStr()) ~ " " ~ name(arg.name);
         }
 
         buf ~= ")";
         return buf[];
     }
 
-    // ----------------------------------------------------
-    // corpo completo da função
-    // ----------------------------------------------------
     void emitFunction(FnDecl fn)
     {
         emitRaw(emitProto(fn));
@@ -123,31 +119,28 @@ private:
         emitRaw("");
     }
 
-    // ----------------------------------------------------
-    // statements
-    // ----------------------------------------------------
     void emitStmt(Node node)
     {
-        if (auto r = cast(ReturnStmt) node)
+        if (ReturnStmt r = cast(ReturnStmt) node)
         {
             emit("return " ~ emitExpr(r.val) ~ ";");
             return;
         }
 
-        if (auto v = cast(VarDecl) node)
+        if (VarDecl v = cast(VarDecl) node)
         {
             string val = v.value !is null ? emitExpr(v.value) : "cgd_int(0)";
             emit(cType() ~ " " ~ name(v.name) ~ " = " ~ val ~ ";");
             return;
         }
 
-        if (auto call = cast(CallExpr) node)
+        if (CallExpr call = cast(CallExpr) node)
         {
             emit(emitExpr(call) ~ ";");
             return;
         }
 
-        if (auto iff = cast(IfStmt) node)
+        if (IfStmt iff = cast(IfStmt) node)
         {
             emitIf(iff);
             return;
@@ -157,20 +150,11 @@ private:
         emit("/* stmt não implementado: " ~ node.kind.to!string ~ " */");
     }
 
-    // ----------------------------------------------------
-    // if / else if / else
-    // ----------------------------------------------------
     void emitIf(IfStmt node)
     {
-        // else puro: expr é nulo
         string header = node.expr !is null
             ? "if (__cgd_is_truthy(" ~ emitExpr(node.expr) ~ "))" : "else";
 
-        if (node.expr !is null && node._else !is null && node._else.expr !is null)
-        {
-            // vai virar "} else if" — emitido junto
-        }
-     
         emitRaw(" ".replicate(indent * 4) ~ header);
         emitRaw(" ".replicate(indent * 4) ~ "{");
         indent++;
@@ -182,11 +166,9 @@ private:
         if (node._else !is null)
         {
             if (node._else.expr !is null)
-            {
                 // else if — prefixar com "else "
                 // hack simples: emitir o próximo if e colar "else " na frente
                 emitElseIf(node._else);
-            }
             else
                 emitIf(node._else); // else puro
         }
@@ -194,7 +176,7 @@ private:
 
     void emitElseIf(IfStmt node)
     {
-        string header = "else if (" ~ emitExpr(node.expr) ~ ".i.val)";
+        string header = "else if (__cgd_is_truthy(" ~ emitExpr(node.expr) ~ "))";
         emitRaw(" ".replicate(indent * 4) ~ header);
         emitRaw(" ".replicate(indent * 4) ~ "{");
         indent++;
@@ -212,45 +194,42 @@ private:
         }
     }
 
-    // ----------------------------------------------------
-    // expressões -> string C
-    // ----------------------------------------------------
+    // string emitTypeOf(TypeOfExpr node)
+    // {
+    //     return name(node.value.type_sema.toStr());
+    // }
+
     string emitExpr(Node node)
     {
-        if (auto lit = cast(IntLit) node)
+        if (IntLit lit = cast(IntLit) node)
             return format("cgd_int(%dL)", lit.value);
 
-        if (auto lit = cast(FloatLit) node)
-            return format("cgd_float(%gf)", lit.value);
+        if (DoubleLit lit = cast(DoubleLit) node)
+            return format("cgd_double(%g.0)", lit.value);
 
-        if (auto lit = cast(DoubleLit) node)
-            return format("cgd_double(%g)", lit.value);
-
-        if (auto lit = cast(StringLit) node)
+        if (StringLit lit = cast(StringLit) node)
             return format(`cgd_str("%s")`, to!string(lit.value));
 
-        if (auto id = cast(Identifier) node)
+        if (Identifier id = cast(Identifier) node)
             return name(id.value);
 
-        if (auto bin = cast(BinaryExpr) node)
+        if (BinaryExpr bin = cast(BinaryExpr) node)
             return emitBinary(bin);
 
-        if (auto call = cast(CallExpr) node)
+        if (CallExpr call = cast(CallExpr) node)
             return emitCall(call);
 
-        if (auto u = cast(UnaryExpr) node)
+        if (UnaryExpr u = cast(UnaryExpr) node)
             return emitUnary(u);
+        
+        // if (TypeOfExpr toe = cast(TypeOfExpr) node)
+        //     return emitTypeOf(toe);
 
         return "/* expr? */";
     }
 
-    // ----------------------------------------------------
-    // operações binárias
-    // ----------------------------------------------------
     string emitBinary(BinaryExpr node)
     {
-        import frontend.lexer.token : TokenKind;
-
         string l = emitExpr(node.left);
         string r = emitExpr(node.right);
 
@@ -277,33 +256,24 @@ private:
         }
     }
 
-    // ----------------------------------------------------
-    // unário
-    // ----------------------------------------------------
     string emitUnary(UnaryExpr node)
     {
-        import frontend.lexer.token : TokenKind;
-
         string v = emitExpr(node.value);
         switch (node.op)
         {
         case TokenKind.Minus:
-            return format("cgd_int(-%s.i.val)", v);
+            return format("__cgd_binary_mul(%s, cgd_int(-1L))", v);
         default:
             return format("/* unary %s */(%s)", node.op.to!string, v);
         }
     }
 
-    // ----------------------------------------------------
-    // chamadas de função
-    // ----------------------------------------------------
     string emitCall(CallExpr node)
     {
         auto buf = appender!string();
 
-        // resolve o nome da função
         string fnName;
-        if (auto id = cast(Identifier) node.fn)
+        if (Identifier id = cast(Identifier) node.fn)
         {
             fnName = name(id.value);
             if (fnName in fnRuntime)

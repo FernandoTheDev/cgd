@@ -6,10 +6,10 @@ import frontend;
 import frontend.lexer;
 import frontend.parser;
 
-
 class Parser
 {
 private:
+    Diagnostics err;
     Token[] tokens;
     uint offset;
 
@@ -19,9 +19,10 @@ public:
     ParseStmt parseStmt;
     ParseDecl parseDecl;
 
-    this(Token[] tokens)
+    this(Token[] tokens, Diagnostics err)
     {
         this.tokens = tokens;
+        this.err = err;
         this.parseType = new ParseType(this);
         this.parseExpr = new ParseExpr(this);
         this.parseStmt = new ParseStmt(this);
@@ -75,8 +76,7 @@ public:
     {
         Token tk = advance();
         if (tk.kind == kind) return tk;
-        writefln("Erro: %s", message);
-        writefln("Esperado %s, recebido %s", kind, tk.kind);
+        err.error(tk.pos, message);
         return tk;
     }
 

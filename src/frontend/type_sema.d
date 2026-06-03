@@ -4,7 +4,6 @@ module frontend.type_sema;
 enum TypeSemaBase : dstring
 {
     Int = "numero",
-    Float = "decimal",
     Double = "duplo",
     Logico = "logico",
     String = "texto",
@@ -29,6 +28,7 @@ abstract class TypeSema
     bool isClass() => kind == TypeSemaKind.Class;
     bool isNumeric();
     bool isComp(TypeSema type);
+    TypeSema promote(TypeSema other );
     dstring toStr();
 }
 
@@ -42,22 +42,46 @@ class TypeSemaBuiltin : TypeSema
         this.base = base;
     }
 
-    override bool isComp(TypeSema type)
-    {   
-        if (TypeSemaBuiltin t = cast(TypeSemaBuiltin) type)
-        {
-            // TODO: validar
-            if (base == TypeSemaBase.Any || t.base == TypeSemaBase.Any)
-                return true;
+    override bool isComp(TypeSema other)
+    {
+        TypeSemaBuiltin t = cast(TypeSemaBuiltin) other;
+        if (t is null) return false;
+
+        // Any é compatível com tudo
+        if (base == TypeSemaBase.Any || t.base == TypeSemaBase.Any)
             return true;
-        }
+
+        // tipos iguais são compatíveis
+        if (base == t.base)
+            return true;
+
+        // promoção numérica: Int <-> Double
+        if (isNumeric() && t.isNumeric())
+            return true;
+
         return false;
+    }
+
+    override TypeSema promote(TypeSema other)
+    {
+        TypeSemaBuiltin t = cast(TypeSemaBuiltin) other;
+        if (t is null) return this; // tipos incompatíveis, sem promoção
+        
+        // Double domina Int
+        if (base == TypeSemaBase.Double || t.base == TypeSemaBase.Double)
+            return new TypeSemaBuiltin(TypeSemaBase.Double);
+        
+        // Any domina tudo
+        if (base == TypeSemaBase.Any || t.base == TypeSemaBase.Any)
+            return new TypeSemaBuiltin(TypeSemaBase.Any);
+        
+        // mesmo tipo, sem promoção necessária
+        return this;
     }
 
     override bool isNumeric()
     {
         return base == TypeSemaBase.Int
-            || base == TypeSemaBase.Float
             || base == TypeSemaBase.Double;
     }
 
@@ -80,8 +104,15 @@ class TypeSemaArray : TypeSema
     override bool isComp(TypeSema type)
     {
         if (TypeSemaArray arr = cast(TypeSemaArray) type)
-            return arr.base.isComp(base);
+            return base.isComp(arr.base);
         return false;
+    }
+
+    override TypeSema promote(TypeSema other)
+    {
+        TypeSemaArray arr = cast(TypeSemaArray) other;
+        if (arr is null) return this;
+        return new TypeSemaArray(base.promote(arr.base));
     }
 
     override bool isNumeric()

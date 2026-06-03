@@ -14,12 +14,12 @@ enum NodeKind : ubyte
     Identifier,
     StringLit,
     IntLit,
-    FloatLit,
     DoubleLit,
     
     BinaryExpr,
     UnaryExpr,
     CallExpr,
+    TypeOfExpr,
     
     FnDecl,
     VarDecl,
@@ -115,24 +115,6 @@ class IntLit : Node
     override void print(uint indent = 0)
     {
         writefln("IntLit(%d)", value);
-    }
-}
-
-class FloatLit : Node
-{
-    float value;
-
-    this(float val, Position pos)
-    {
-        this.kind = NodeKind.FloatLit;
-        value = val;
-        this.pos = pos;
-        this.type_expr = new TypeExprNamed(TypeSemaBase.Float, pos);
-    }
-
-    override void print(uint indent = 0)
-    {
-        writefln("FloatLit(%g)", value);
     }
 }
 
@@ -259,9 +241,18 @@ class CallExpr : Node
 
     override void print(uint indent = 0)
     {
-        writef("CallExpr(%s)", fn);
+        writef("CallExpr");
         if (type_sema !is null)
             writef(" : %s", type_sema.toStr());
+        writeln();
+        printIndent(indent, args.length == 0);
+        fn.print(indent + 1);
+        foreach (i, arg; args)
+        {
+            bool isLast = (i == cast(size_t) args.length - 1);
+            printIndent(indent, isLast);
+            arg.print(indent + 1);
+        }
     }
 }
 
@@ -299,6 +290,33 @@ class FnDecl : Node
 
     override void print(uint indent = 0)
     {
+        writef("FnDecl '%s'", fn);
+        if (type_expr !is null)
+            writef(" : %s", type_expr.toStr());
+        if (type_sema !is null)
+            writef(" :> %s", type_sema.toStr());
+        writeln();
+
+        // argumentos
+        foreach (i, arg; args)
+        {
+            bool isLastArg = (i == cast(size_t) args.length - 1) && body.length == 0;
+            printIndent(indent, isLastArg);
+            writef("FnArg '%s'", arg.name);
+            if (arg.type_expr !is null)
+                writef(" : %s", arg.type_expr.toStr());
+            if (arg.type_sema !is null)
+                writef(" :> %s", arg.type_sema.toStr());
+            writeln();
+        }
+
+        // corpo
+        foreach (i, node; body)
+        {
+            bool isLast = (i == cast(size_t) body.length - 1);
+            printIndent(indent, isLast);
+            node.print(indent + 1);
+        }
     }
 }
 
@@ -315,6 +333,12 @@ class ReturnStmt : Node
 
     override void print(uint indent = 0)
     {
+        writeln("ReturnStmt");
+        if (val !is null)
+        {
+            printIndent(indent, true);
+            val.print(indent + 1);
+        }
     }
 }
 
@@ -323,6 +347,7 @@ class IfStmt : Node
     Node expr; // se a expressão for nula então esse node é de um else puro
     Node[] body;
     IfStmt _else; // pode ser 'else' e 'else if'
+    bool opt;
 
     this(Node expr, Node[] body, IfStmt _else, Position pos)
     {
@@ -335,6 +360,51 @@ class IfStmt : Node
 
     override void print(uint indent = 0)
     {
+        if (expr !is null)
+        {
+            writeln("IfStmt");
+            printIndent(indent, body.length == 0 && _else is null);
+            expr.print(indent + 1);
+        }
+        else
+        {
+            writeln("ElseStmt");
+        }
+
+        foreach (i, node; body)
+        {
+            bool isLast = (i == cast(size_t) body.length - 1) && _else is null;
+            printIndent(indent, isLast);
+            node.print(indent + 1);
+        }
+
+        if (_else !is null)
+        {
+            printIndent(indent, true);
+            _else.print(indent + 1);
+        }
+    }
+}
+
+class TypeOfExpr : Node
+{
+    Node value;
+
+    this(Node val, Position pos)
+    {
+        this.kind = NodeKind.TypeOfExpr;
+        value = val;
+        this.pos = pos;
+    }
+
+    override void print(uint indent = 0)
+    {
+        writeln("TypeOfExpr",);
+        if (type_sema !is null)
+            writef(" : %s", type_sema.toStr());
+        writeln();
+        printIndent(indent, true);
+        value.print(indent + 1);
     }
 }
 

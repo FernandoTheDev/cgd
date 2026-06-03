@@ -7,11 +7,13 @@ import frontend;
 import frontend.parser;
 import frontend.lexer;
 import frontend.semantic;
+import errors;
 
 class Sema1
 {
 private:
     Context context;
+    Diagnostics err;
 
     void analyze(Node node)
     {
@@ -29,14 +31,14 @@ private:
     void analyzeVarDecl(VarDecl node)
     {
         dstring name = node.name;
-        enforce(context.get(name) is null, "A variavel ja existe.");
+        d_enforce(context.get(name) is null, "A variavel ja existe.", node.pos, err);
         context.set(name, new SymbolVar(node));
     }
 
     void analyzeFnDecl(FnDecl node)
     {
         dstring name = node.fn;
-        enforce(context.get(name) is null, "A função ja existe.");
+        d_enforce(context.get(name) is null, "A função ja existe.", node.pos, err);
         context.set(name, new SymbolFn(node));
     }
 
@@ -47,9 +49,10 @@ private:
     }
 
 public:
-    this(Context context)
+    this(Context context, Diagnostics err)
     {
         this.context = context;
+        this.err = err;
     }
 
     void analyze(Program program)
