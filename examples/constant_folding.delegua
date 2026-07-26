@@ -1,4 +1,0 @@
-importar { escrevaln } de "io"
-
-var result = ((15 + 5) * 3 - 10) / ((8 - 3) + 2) + (4 * 6) - (18 / 3)
-escrevaln(result)

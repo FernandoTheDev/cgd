@@ -1,4 +1,0 @@
-importar "io"
-
-var name = leia("Nome: ")
-escrevaln("Bem vindo " + name)

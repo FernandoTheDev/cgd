@@ -1,8 +1,0 @@
-importar { escrevaln } de "io"
-
-var nome = "Fernando Cabral"
-escrevaln("Nome: ", nome.substituir("Cabral", "Dev"))
-escrevaln(nome.dividir(" "))
-escrevaln("Tamanho do nome: ", nome.tamanho)
-escrevaln("Tamanho do tamanho do nome: ", nome.tamanho.tamanho)
-

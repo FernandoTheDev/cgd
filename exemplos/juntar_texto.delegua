@@ -1,0 +1,8 @@
+função ateZero(n, s) {
+    se n < 1 
+        retorne s
+    var leonel = s + "A"
+    retorne ateZero(n-1, leonel)
+}
+
+escreva(ateZero(1000, ""))

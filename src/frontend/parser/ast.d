@@ -1,926 +1,427 @@
 module frontend.parser.ast;
 
 import std.stdio;
-import frontend.lexer.token : Loc;
-import frontend.values;
-import frontend.lexer.token;
-import middle.semantic_symbol_info;
-import frontend.parser.ftype_info;
-import frontend.parser.ast_utils;
-import std.variant : Variant, Algebraic;
-import std.typecons;
+import frontend.type_sema;
+import frontend.type_expr;
+import frontend.lexer.token : Position, PosLine, TokenKind;
+import std.conv : to;
 
-alias NullStmt = Nullable!Stmt;
-
-enum NodeType
+enum NodeKind : ubyte
 {
+    // OK
     Program,
+    
     Identifier,
-
-    VariableDeclaration,
-    UninitializedVariableDeclaration,
-    MultipleVariableDeclaration,
-    MultipleUninitializedVariableDeclaration,
-    ReturnStatement,
-    FunctionDeclaration,
-    AssignmentDeclaration,
-    ClassDeclaration,
-    ConstructorDeclaration,
-    DestructorDeclaration,
-
-    IfStatement,
-    ElseStatement,
-    ForStatement,
-    WhileStatement,
-    DoWhileStatement,
-    SwitchStatement,
-    CaseStatement,
-    DefaultStatement,
-    BreakStatement,
-    ImportStatement,
-
-    IntLiteral,
-    FloatLiteral,
-    StringLiteral,
-    NullLiteral,
-    BoolLiteral,
-    ArrayLiteral,
-
-    DereferenceExpr,
-    AddressOfExpr,
+    StringLit,
+    IntLit,
+    DoubleLit,
+    
+    BinaryExpr,
     UnaryExpr,
     CallExpr,
-    CastExpr,
-    BinaryExpr,
-    MemberCallExpr,
-    NewExpr,
-    ThisExpr,
-    IndexExpr,
-    IndexExprAssignment
+    TypeOfExpr,
+    
+    FnDecl,
+    VarDecl,
+
+    ReturnStmt,
+    IfStmt,
+
+    // TODO
+    ForStmt,
+    WhileStmt,
 }
 
-class Stmt
+abstract class Node
 {
-    NodeType kind;
-    FTypeInfo type;
-    Variant value;
-    Loc loc;
-    Stmt[] args;
+    NodeKind kind;
+    Position pos;
+    TypeExpr type_expr;
+    TypeSema type_sema;
+
+    void print(uint indent = 0);
 }
 
-class Program : Stmt
+class Program : Node
 {
-    Stmt[] body;
+    Node[] body;
 
-    this(Stmt[] body)
+    this(Node[] body)
     {
-        this.kind = NodeType.Program;
+        this.kind = NodeKind.Program;
         this.body = body;
     }
-}
 
-class BinaryExpr : Stmt
-{
-    Stmt left, right;
-    string op;
-
-    this(Stmt left, Stmt right, string op, Loc loc)
+    override void print(uint indent = 0)
     {
-        this.kind = NodeType.BinaryExpr;
-        this.left = left;
-        this.right = right;
-        this.op = op;
-        this.loc = loc;
-    }
-}
-
-class IntLiteral : Stmt
-{
-    this(long value, Loc loc)
-    {
-        this.kind = NodeType.IntLiteral;
-        this.type = createTypeInfo(TypesNative.LONG);
-        this.value = value;
-        this.loc = loc;
-    }
-}
-
-class NullLiteral : Stmt
-{
-    this(Loc loc)
-    {
-        this.kind = NodeType.NullLiteral;
-        this.type = createTypeInfo(TypesNative.NULL);
-        this.value = null;
-        this.loc = loc;
-    }
-}
-
-class BoolLiteral : Stmt
-{
-    this(bool value, Loc loc)
-    {
-        this.kind = NodeType.BoolLiteral;
-        this.type = createTypeInfo(TypesNative.BOOL);
-        this.value = value;
-        this.loc = loc;
-    }
-}
-
-class FloatLiteral : Stmt
-{
-    this(float value, Loc loc)
-    {
-        this.kind = NodeType.FloatLiteral;
-        this.type = createTypeInfo(TypesNative.FLOAT);
-        this.value = value;
-        this.loc = loc;
-    }
-}
-
-class StringLiteral : Stmt
-{
-    this(string value, Loc loc)
-    {
-        this.kind = NodeType.StringLiteral;
-        this.type = createTypeInfo(TypesNative.STRING);
-        this.value = value;
-        this.loc = loc;
-    }
-}
-
-class ArrayLiteral : Stmt
-{
-    Stmt[] elements;
-    this(Stmt[] elements, FTypeInfo type, Loc loc)
-    {
-        this.kind = NodeType.ArrayLiteral;
-        this.type = type;
-        this.elements = elements;
-        this.value = null;
-        this.loc = loc;
-    }
-}
-
-class CastExpr : Stmt
-{
-    Stmt expr;
-
-    this(FTypeInfo type, Stmt expr, Loc loc)
-    {
-        this.kind = NodeType.CastExpr;
-        this.type = type;
-        this.expr = expr;
-        this.value = null;
-        this.loc = loc;
-    }
-}
-
-class Identifier : Stmt
-{
-    this(string id, Loc loc)
-    {
-        this.kind = NodeType.Identifier;
-        this.type = createTypeInfo(TypesNative.ID);
-        this.value = id;
-        this.loc = loc;
-    }
-}
-
-class UninitializedVariableDeclaration : Stmt
-{
-    Identifier id;
-    bool mut;
-
-    this(Identifier id, FTypeInfo type, bool mut, Loc loc)
-    {
-        this.kind = NodeType.UninitializedVariableDeclaration;
-        this.id = id;
-        this.type = type;
-        this.mut = mut;
-        this.loc = loc;
-        this.value = null;
-    }
-}
-
-struct VariablePair
-{
-    Identifier id;
-    Stmt value;
-    FTypeInfo type;
-    bool mut;
-
-    this(Identifier id, Stmt value, FTypeInfo type, bool mut)
-    {
-        this.id = id;
-        this.value = value;
-        this.type = type;
-        this.mut = mut;
-    }
-}
-
-class MultipleVariableDeclaration : Stmt
-{
-    VariablePair[] declarations;
-    FTypeInfo commonType;
-
-    this(VariablePair[] declarations, FTypeInfo commonType, Loc loc)
-    {
-        this.kind = NodeType.MultipleVariableDeclaration;
-        this.declarations = declarations;
-        this.commonType = commonType;
-        this.loc = loc;
-        this.type = createTypeInfo(TypesNative.VOID);
-        this.value = null;
-    }
-
-    Identifier[] getIdentifiers()
-    {
-        Identifier[] ids;
-        foreach (decl; declarations)
+        writeln("Program");
+        foreach (i, node; body)
         {
-            ids ~= decl.id;
+            bool isLast = (i == cast(size_t)
+                body.length - 1);
+            printIndent(indent, isLast);
+            node.print(indent + 1);
         }
-        return ids;
-    }
-
-    Stmt[] getValues()
-    {
-        Stmt[] values;
-        foreach (decl; declarations)
-        {
-            values ~= decl.value;
-        }
-        return values;
-    }
-
-    FTypeInfo[] getTypes()
-    {
-        FTypeInfo[] types;
-        foreach (decl; declarations)
-        {
-            types ~= decl.type;
-        }
-        return types;
     }
 }
 
-class MultipleUninitializedVariableDeclaration : Stmt
+class VarDecl : Node
 {
-    Identifier[] ids;
-    FTypeInfo commonType;
-    bool mut;
+    dstring name;
+    Node value;
+    bool isConst;
 
-    this(Identifier[] ids, FTypeInfo commonType, bool mut, Loc loc)
+    this(dstring name, Node value, bool isConst, TypeExpr texpr, Position pos)
     {
-        this.kind = NodeType.MultipleUninitializedVariableDeclaration;
-        this.ids = ids;
-        this.commonType = commonType;
-        this.mut = mut;
-        this.loc = loc;
-        this.type = commonType;
-        this.value = null;
-    }
-}
-
-class VariableDeclaration : Stmt
-{
-    Identifier id;
-    bool mut;
-
-    this(Identifier id, Stmt value, FTypeInfo type, bool mut, Loc loc)
-    {
-        this.kind = NodeType.VariableDeclaration;
-        this.id = id;
+        this.kind = NodeKind.VarDecl;
+        this.name = name;
         this.value = value;
-        this.type = type;
-        this.mut = mut;
-        this.loc = loc;
+        this.isConst = isConst;
+        this.type_expr = texpr;
+        this.pos = pos;
     }
 
-    bool isInitialized()
+    override void print(uint indent = 0)
     {
-        return this.value.hasValue();
+        import std.conv : to;
+
+        writef("VarDecl %s '%s'", isConst ? "const" : "var", name);
+        if (type_expr !is null)
+            writef(" : %s", type_expr.toStr());
+        if (type_sema !is null)
+            writef(" :> %s", type_sema.toStr());
+        writeln();
+
+        if (value !is null)
+        {
+            printIndent(indent, true);
+            value.print(indent + 1);
+        }
     }
 }
 
-class VariableDeclarationFactory
+class IntLit : Node
 {
-    static VariableDeclaration createInitialized(Identifier id, Stmt value, FTypeInfo type, bool mut, Loc loc)
+    long value;
+
+    this(long val, Position pos)
     {
-        return new VariableDeclaration(id, value, type, mut, loc);
+        this.kind = NodeKind.IntLit;
+        value = val;
+        this.pos = pos;
+        this.type_expr = new TypeExprNamed(TypeSemaBase.Int, pos);
     }
 
-    static UninitializedVariableDeclaration createUninitialized(Identifier id, FTypeInfo type, bool mut, Loc loc)
+    override void print(uint indent = 0)
     {
-        return new UninitializedVariableDeclaration(id, type, mut, loc);
-    }
-
-    static MultipleVariableDeclaration createMultipleInitialized(
-        Identifier[] ids,
-        Stmt[] values,
-        FTypeInfo commonType,
-        bool mut,
-        Loc loc
-    )
-    {
-        if (ids.length != values.length)
-        {
-            throw new Exception(
-                "Número de identificadores deve corresponder ao número de valores");
-        }
-
-        VariablePair[] pairs;
-        foreach (i; 0 .. ids.length)
-        {
-            FTypeInfo finalType = commonType.baseType != TypesNative.NULL ? commonType
-                : values[i].type;
-            pairs ~= VariablePair(ids[i], values[i], finalType, mut);
-        }
-
-        return new MultipleVariableDeclaration(pairs, commonType, loc);
-    }
-
-    static MultipleUninitializedVariableDeclaration createMultipleUninitialized(
-        Identifier[] ids,
-        FTypeInfo commonType,
-        bool mut,
-        Loc loc
-    )
-    {
-        if (commonType.baseType == TypesNative.NULL)
-        {
-            throw new Exception(
-                "Tipo deve ser especificado para declarações múltiplas não inicializadas");
-        }
-
-        return new MultipleUninitializedVariableDeclaration(ids, commonType, mut, loc);
+        writefln("IntLit(%d)", value);
     }
 }
 
-class CallExpr : Stmt
+class DoubleLit : Node
 {
-    Identifier calle;
-    Stmt[] args;
+    double value;
 
-    this(Identifier calle, Stmt[] args, Loc loc)
+    this(double val, Position pos)
     {
-        this.kind = NodeType.CallExpr;
-        this.calle = calle;
-        this.loc = loc;
+        this.kind = NodeKind.DoubleLit;
+        value = val;
+        this.pos = pos;
+        this.type_expr = new TypeExprNamed(TypeSemaBase.Double, pos);
+    }
+
+    override void print(uint indent = 0)
+    {
+        writefln("DoubleLit(%g)", value);
+    }
+}
+
+class StringLit : Node
+{
+    dstring value;
+
+    this(dstring val, Position pos)
+    {
+        this.kind = NodeKind.StringLit;
+        value = val;
+        this.pos = pos;
+        this.type_expr = new TypeExprNamed(TypeSemaBase.String, pos);
+    }
+
+    override void print(uint indent = 0)
+    {
+        import std.conv : to;
+
+        writefln(`StringLit("%s")`, value);
+    }
+}
+
+class Identifier : Node
+{
+    dstring value;
+
+    this(dstring val, Position pos)
+    {
+        this.kind = NodeKind.Identifier;
+        value = val;
+        this.pos = pos;
+    }
+
+    override void print(uint indent = 0)
+    {
+        import std.conv : to;
+
+        writefln("Identifier('%s')", value);
+    }
+}
+
+class BinaryExpr : Node
+{
+    Node left, right;
+    TokenKind op;
+
+    this(Node l, Node r, TokenKind o, Position pos)
+    {
+        this.kind = NodeKind.BinaryExpr;
+        left = l;
+        right = r;
+        op = o;
+        this.pos = pos;
+    }
+
+    override void print(uint indent = 0)
+    {
+        writef("BinaryExpr(%s)", tokenKindStr(op));
+        if (type_sema !is null)
+            writef(" : %s", type_sema.toStr());
+        writeln();
+        printIndent(indent, false);
+        left.print(indent + 1);
+        printIndent(indent, true);
+        right.print(indent + 1);
+    }
+}
+
+class UnaryExpr : Node
+{
+    Node value;
+    TokenKind op;
+
+    this(Node val, TokenKind o, Position pos)
+    {
+        this.kind = NodeKind.UnaryExpr;
+        value = val;
+        op = o;
+        this.pos = pos;
+    }
+
+    override void print(uint indent = 0)
+    {
+        writef("UnaryExpr(%s)", tokenKindStr(op));
+        if (type_sema !is null)
+            writef(" : %s", type_sema.toStr());
+        writeln();
+        printIndent(indent, true);
+        value.print(indent + 1);
+    }
+}
+
+class CallExpr : Node
+{
+    Node fn;
+    Node[] args;
+
+    this(Node fn, Node[] args, Position pos)
+    {
+        this.kind = NodeKind.CallExpr;
+        this.fn = fn;
         this.args = args;
-        this.type = createTypeInfo(TypesNative.NULL);
+        this.pos = pos;
+    }
+
+    override void print(uint indent = 0)
+    {
+        writef("CallExpr");
+        if (type_sema !is null)
+            writef(" : %s", type_sema.toStr());
+        writeln();
+        printIndent(indent, args.length == 0);
+        fn.print(indent + 1);
+        foreach (i, arg; args)
+        {
+            bool isLast = (i == cast(size_t) args.length - 1);
+            printIndent(indent, isLast);
+            arg.print(indent + 1);
+        }
     }
 }
 
-class IfStatement : Stmt
-{
-    Stmt condition;
-    Stmt[] primary;
-    NullStmt secondary;
+class FnArg {
+    dstring name;
+    TypeExpr type_expr;
+    TypeSema type_sema;
+    Node value;
+    Position pos;
 
-    this(Stmt condition, Stmt[] primary, FTypeInfo type, Variant value, Loc loc, NullStmt secondary = null)
+    this(dstring name, TypeExpr type_expr, Node value, Position pos)
     {
-        this.kind = NodeType.IfStatement;
-        this.condition = condition;
-        this.primary = primary;
-        this.secondary = secondary;
+        this.name = name;
+        this.type_expr = type_expr;
         this.value = value;
-        this.loc = loc;
-        this.type = type;
+        this.pos = pos;
     }
 }
 
-class ElifStatement : IfStatement
+class FnDecl : Node
 {
-    this(Stmt condition, Stmt[] primary, FTypeInfo type, Variant value, Loc loc, NullStmt secondary = null)
+    dstring fn;
+    FnArg[] args;
+    Node[] body;
+
+    this(dstring fn, FnArg[] args, TypeExpr type, Node[] body, Position pos)
     {
-        super(condition, primary, type, value, loc);
-    }
-}
-
-class ElseStatement : Stmt
-{
-    Stmt[] primary;
-
-    this(Stmt[] primary, FTypeInfo type, Variant value, Loc loc)
-    {
-        this.kind = NodeType.ElseStatement;
-        this.primary = primary;
-        this.value = value;
-        this.loc = loc;
-        this.type = type;
-    }
-}
-
-class UnaryExpr : Stmt
-{
-    string op; // "-", "!", "&", "*"
-    Stmt operand;
-    bool postFix;
-
-    this(string op, Stmt operand, Loc loc, bool postFix = false)
-    {
-        this.kind = NodeType.UnaryExpr;
-        this.op = op;
-        this.postFix = postFix;
-        this.operand = operand;
-        this.value = null;
-        this.type = createTypeInfo(TypesNative.NULL);
-        this.loc = loc;
-    }
-}
-
-class DereferenceExpr : Stmt
-{
-    Stmt operand;
-
-    this(Stmt operand, Loc loc)
-    {
-        this.kind = NodeType.DereferenceExpr;
-        this.operand = operand;
-        this.value = null;
-        this.type = createTypeInfo(TypesNative.NULL);
-        this.loc = loc;
-    }
-}
-
-class AddressOfExpr : Stmt
-{
-    Stmt operand;
-
-    this(Stmt operand, Loc loc)
-    {
-        this.kind = NodeType.AddressOfExpr;
-        this.operand = operand;
-        this.value = null;
-        this.type = createTypeInfo(TypesNative.NULL);
-        this.loc = loc;
-    }
-}
-
-// FunctionDeclaration
-
-class FunctionArg
-{
-    Identifier id;
-    FTypeInfo type;
-    Nullable!Stmt def; // Default, like: function fernando(x: int = 10) {}
-
-    this(Identifier id, FTypeInfo type, Nullable!Stmt def = null)
-    {
-        this.id = id;
-        this.type = type;
-        this.def = def;
-    }
-}
-
-alias FunctionArgs = FunctionArg[];
-
-class FunctionDeclaration : Stmt
-{
-    Identifier id;
-    FunctionArgs args;
-    Stmt[] body;
-    SymbolInfo[string] context;
-
-    this(Identifier id, FunctionArgs args, Stmt[] body, FTypeInfo type, Loc loc)
-    {
-        this.id = id;
+        this.kind = NodeKind.FnDecl;
+        this.fn = fn;
         this.args = args;
-        this.kind = NodeType.FunctionDeclaration;
+        this.type_expr = type;
         this.body = body;
-        this.loc = loc;
-        this.type = type;
-        this.value = null;
+        this.pos = pos;
+    }
+
+    override void print(uint indent = 0)
+    {
+        writef("FnDecl '%s'", fn);
+        if (type_expr !is null)
+            writef(" : %s", type_expr.toStr());
+        if (type_sema !is null)
+            writef(" :> %s", type_sema.toStr());
+        writeln();
+
+        // argumentos
+        foreach (i, arg; args)
+        {
+            bool isLastArg = (i == cast(size_t) args.length - 1) && body.length == 0;
+            printIndent(indent, isLastArg);
+            writef("FnArg '%s'", arg.name);
+            if (arg.type_expr !is null)
+                writef(" : %s", arg.type_expr.toStr());
+            if (arg.type_sema !is null)
+                writef(" :> %s", arg.type_sema.toStr());
+            writeln();
+        }
+
+        // corpo
+        foreach (i, node; body)
+        {
+            bool isLast = (i == cast(size_t) body.length - 1);
+            printIndent(indent, isLast);
+            node.print(indent + 1);
+        }
     }
 }
 
-class ReturnStatement : Stmt
+class ReturnStmt : Node
 {
+    Node val;
 
-    Stmt expr;
-
-    this(Stmt expr, Loc loc)
+    this(Node val, Position pos)
     {
-        this.kind = NodeType.ReturnStatement;
-        this.expr = expr;
-        this.value = null;
-        this.loc = loc;
-        this.type = createTypeInfo(TypesNative.NULL);
+        this.kind = NodeKind.ReturnStmt;
+        this.val = val;
+        this.pos = pos;
+    }
+
+    override void print(uint indent = 0)
+    {
+        writeln("ReturnStmt");
+        if (val !is null)
+        {
+            printIndent(indent, true);
+            val.print(indent + 1);
+        }
     }
 }
 
-class ForStatement : Stmt
+class IfStmt : Node
 {
-    // varDecl, cond, expr, body
-    // for var i = 10; cond; expr {}
-    // for i = 10; cond; expr {}
-    Stmt _init;
-    Stmt cond;
-    Stmt expr;
-    Stmt[] body;
+    Node expr; // se a expressão for nula então esse node é de um else puro
+    Node[] body;
+    IfStmt _else; // pode ser 'else' e 'else if'
+    bool opt;
 
-    this(Stmt _init, Stmt cond, Stmt expr, Stmt[] body, Loc loc)
+    this(Node expr, Node[] body, IfStmt _else, Position pos)
     {
-        this.kind = NodeType.ForStatement;
-        this.value = null;
-        this._init = _init;
-        this.cond = cond;
+        this.kind = NodeKind.IfStmt;
         this.expr = expr;
         this.body = body;
-        this.loc = loc;
-        this.type = createTypeInfo(TypesNative.NULL);
+        this._else = _else;
+        this.pos = pos;
     }
-}
 
-class WhileStatement : Stmt
-{
-    // while cond body
-    Stmt cond;
-    Stmt[] body;
-
-    this(Stmt cond, Stmt[] body, Loc loc)
+    override void print(uint indent = 0)
     {
-        this.kind = NodeType.WhileStatement;
-        this.value = null;
-        this.cond = cond;
-        this.body = body;
-        this.loc = loc;
-        this.type = createTypeInfo(TypesNative.NULL);
+        if (expr !is null)
+        {
+            writeln("IfStmt");
+            printIndent(indent, body.length == 0 && _else is null);
+            expr.print(indent + 1);
+        }
+        else
+        {
+            writeln("ElseStmt");
+        }
+
+        foreach (i, node; body)
+        {
+            bool isLast = (i == cast(size_t) body.length - 1) && _else is null;
+            printIndent(indent, isLast);
+            node.print(indent + 1);
+        }
+
+        if (_else !is null)
+        {
+            printIndent(indent, true);
+            _else.print(indent + 1);
+        }
     }
 }
 
-class DoWhileStatement : Stmt
+class TypeOfExpr : Node
 {
-    // while cond body
-    Stmt cond;
-    Stmt[] body;
+    Node value;
 
-    this(Stmt cond, Stmt[] body, Loc loc)
+    this(Node val, Position pos)
     {
-        this.kind = NodeType.DoWhileStatement;
-        this.value = null;
-        this.cond = cond;
-        this.body = body;
-        this.loc = loc;
-        this.type = createTypeInfo(TypesNative.NULL);
+        this.kind = NodeKind.TypeOfExpr;
+        value = val;
+        this.pos = pos;
     }
-}
 
-class AssignmentDeclaration : Stmt
-{
-    Identifier id;
-
-    this(Identifier id, Stmt value, FTypeInfo type, Loc loc)
+    override void print(uint indent = 0)
     {
-        this.kind = NodeType.AssignmentDeclaration;
-        this.id = id;
-        this.value = value;
-        this.type = type;
-        this.loc = loc;
+        writeln("TypeOfExpr",);
+        if (type_sema !is null)
+            writef(" : %s", type_sema.toStr());
+        writeln();
+        printIndent(indent, true);
+        value.print(indent + 1);
     }
 }
 
-class MemberCallExpr : Stmt
+private void printIndent(uint indent, bool isLast)
 {
-    Stmt object; // A expressão à esquerda do ponto ("String".tamanho) -> "String"
-    Identifier member; // O membro sendo chamado
-    Stmt[] args; // Argumentos se for uma chamada de método
-    bool isMethodCall; // true se for x.method(), false se for x.property
-
-    this(Stmt object, Identifier member, Stmt[] args, bool isMethodCall, Loc loc)
-    {
-        this.kind = NodeType.MemberCallExpr;
-        this.object = object;
-        this.member = member;
-        this.args = args;
-        this.isMethodCall = isMethodCall;
-        this.loc = loc;
-        this.type = createTypeInfo(TypesNative.NULL);
-        this.value = null;
-    }
+    foreach (i; 0 .. indent)
+        write("│   ");
+    write(isLast ? "└── " : "├── ");
 }
 
-class SwitchStatement : Stmt
+private void printIndentContinue(uint indent)
 {
-    Stmt condition;
-    CaseStatement[] cases;
-    DefaultStatement defaultCase;
-
-    this(Stmt condition, CaseStatement[] cases, DefaultStatement defaultCase, Loc loc)
-    {
-        this.kind = NodeType.SwitchStatement;
-        this.condition = condition;
-        this.cases = cases;
-        this.defaultCase = defaultCase;
-        this.loc = loc;
-        this.type = createTypeInfo(TypesNative.VOID);
-        this.value = null;
-    }
+    foreach (i; 0 .. indent)
+        write("│   ");
 }
 
-class CaseStatement : Stmt
+private string tokenKindStr(TokenKind op)
 {
-    Stmt value; // Valor do caso
-    Stmt[] body; // Corpo do caso
-
-    this(Stmt value, Stmt[] body, Loc loc)
-    {
-        this.kind = NodeType.CaseStatement;
-        this.value = value;
-        this.body = body;
-        this.loc = loc;
-        this.type = createTypeInfo(TypesNative.VOID);
-    }
-}
-
-class DefaultStatement : Stmt
-{
-    Stmt[] body; // Corpo do caso padrão
-
-    this(Stmt[] body, Loc loc)
-    {
-        this.kind = NodeType.DefaultStatement;
-        this.body = body;
-        this.loc = loc;
-        this.type = createTypeInfo(TypesNative.VOID);
-        this.value = null;
-    }
-}
-
-class BreakStatement : Stmt
-{
-    this(Loc loc)
-    {
-        this.kind = NodeType.BreakStatement;
-        this.loc = loc;
-        this.type = createTypeInfo(TypesNative.VOID);
-        this.value = null;
-    }
-}
-
-enum ClassVisibility : string
-{
-    PRIVATE = "private",
-    PUBLIC = "public",
-}
-
-// a: inteiro = 10
-struct ClassProperty
-{
-    Identifier name;
-    FTypeInfo type;
-    ClassVisibility visibility;
-    Stmt defaultValue;
-}
-
-// a() {}
-class ClassMethodDeclaration : Stmt
-{
-    Identifier id;
-    FunctionArgs args;
-    Stmt[] body;
-    SymbolInfo[string] context; // compartilha com a classe
-    ClassVisibility visibility;
-
-    this(Identifier id, FunctionArgs args, Stmt[] body, FTypeInfo type, ClassVisibility visibility, Loc loc)
-    {
-        this.id = id;
-        this.args = args;
-        this.kind = NodeType.FunctionDeclaration;
-        this.body = body;
-        this.loc = loc;
-        this.type = type;
-        this.visibility = visibility;
-        this.value = null;
-    }
-}
-
-class ClassDeclaration : Stmt
-{
-    Identifier id;
-    ClassProperty[] properties;
-    ClassMethodDeclaration[] methods;
-    ConstructorDeclaration construct; // método construtor
-    DestructorDeclaration destruct; // método destrutor
-    SymbolInfo[string] context; // salva o contexto global
-
-    this(ClassProperty[] p, ClassMethodDeclaration[] m, Loc loc)
-    {
-        this.kind = NodeType.ClassDeclaration;
-        this.properties = p;
-        this.methods = m;
-        this.value = null;
-        this.type = createTypeInfo("null");
-        this.loc = loc;
-    }
-}
-
-// Adicionar novas classes AST:
-
-class ConstructorDeclaration : Stmt
-{
-    FunctionArgs args;
-    Stmt[] body;
-    SymbolInfo[string] context;
-
-    this(FunctionArgs args, Stmt[] body, Loc loc)
-    {
-        this.kind = NodeType.ConstructorDeclaration;
-        this.args = args;
-        this.body = body;
-        this.loc = loc;
-        this.type = createTypeInfo(TypesNative.VOID);
-        this.value = null;
-    }
-}
-
-class DestructorDeclaration : Stmt
-{
-    Stmt[] body;
-    SymbolInfo[string] context;
-
-    this(Stmt[] body, Loc loc)
-    {
-        this.kind = NodeType.DestructorDeclaration;
-        this.body = body;
-        this.loc = loc;
-        this.type = createTypeInfo(TypesNative.VOID);
-        this.value = null;
-    }
-}
-
-class NewExpr : Stmt
-{
-    Identifier className;
-    Stmt[] args;
-
-    this(Identifier className, Stmt[] args, Loc loc)
-    {
-        this.kind = NodeType.NewExpr;
-        this.className = className;
-        this.args = args;
-        this.loc = loc;
-        this.type = createTypeInfo(TypesNative.NULL); // Será definido durante análise semântica
-        this.value = null;
-    }
-}
-
-class ThisExpr : Stmt
-{
-    this(Loc loc)
-    {
-        this.kind = NodeType.ThisExpr;
-        this.loc = loc;
-        this.type = createTypeInfo(TypesNative.NULL); // Será definido durante análise semântica
-        this.value = null;
-    }
-}
-
-// importar "lib"
-// importar { ids, ... } de "lib"
-// importar "lib" como x
-// importar { ids, ... } de "lib" como x
-class ImportStatement : Stmt
-{
-    Identifier[] targets;
-    string from; // lib|file.delegua
-    string _alias;
-
-    this(string from, string _alias = "", Identifier[] targets = [], Loc loc = Loc.init)
-    {
-        this.kind = NodeType.ImportStatement;
-        this.value = null;
-        this.from = from;
-        this._alias = _alias;
-        this.targets = targets;
-        this.loc = loc;
-        this.type = createTypeInfo("null");
-    }
-}
-
-class IndexExpr : Stmt
-{
-    Stmt left, index;
-    this(Stmt left, Stmt index, Loc loc)
-    {
-        this.kind = NodeType.IndexExpr;
-        this.left = left;
-        this.index = index;
-        this.type = left.type; // permite encadeamento
-        this.value = null;
-        this.loc = loc;
-    }
-}
-
-class IndexExprAssignment : Stmt
-{
-    Stmt left, index, value;
-    this(Stmt left, Stmt index, Stmt value, Loc loc)
-    {
-        this.kind = NodeType.IndexExprAssignment;
-        this.left = left;
-        this.index = index;
-        this.type = left.type; // permite encadeamento
-        this.value = value;
-        this.loc = loc;
-    }
-}
-
-unittest
-{
-    writeln("Testando criação de AST nodes...");
-
-    auto loc = Loc("test.d", 1, 1, 5, ".");
-    auto intLit = new IntLiteral(42, loc);
-    assert(intLit.kind == NodeType.IntLiteral);
-    assert(intLit.value.get!long == 42);
-    assert(intLit.loc.line == 1);
-    assert(intLit.loc.file == "test.d");
-
-    writeln("✓ Teste de IntLiteral passou!");
-}
-
-unittest
-{
-    writeln("Testando criação de BinaryExpr...");
-
-    auto loc = Loc("test.d", 1, 1, 5, ".");
-    auto left = new IntLiteral(10, loc);
-    auto right = new IntLiteral(20, loc);
-    auto binExpr = new BinaryExpr(left, right, "+", loc);
-
-    assert(binExpr.kind == NodeType.BinaryExpr);
-    assert(binExpr.left == left);
-    assert(binExpr.right == right);
-    assert(binExpr.op == "+");
-    assert(binExpr.loc.line == 1);
-
-    writeln("✓ Teste de BinaryExpr passou!");
-}
-
-unittest
-{
-    writeln("Testando criação de Identifier...");
-
-    auto loc = Loc("test.d", 1, 1, 5, ".");
-    auto ident = new Identifier("variavel", loc);
-
-    assert(ident.kind == NodeType.Identifier);
-    assert(ident.value.get!string == "variavel");
-    assert(ident.loc.line == 1);
-    assert(ident.loc.start == 1);
-
-    writeln("✓ Teste de Identifier passou!");
-}
-
-unittest
-{
-    writeln("Testando criação de Program...");
-
-    auto loc = Loc("test.d", 1, 1, 5, ".");
-    auto stmt1 = new IntLiteral(1, loc);
-    auto stmt2 = new IntLiteral(2, loc);
-    Stmt[] stmts = [stmt1, stmt2];
-
-    auto program = new Program(stmts);
-
-    assert(program.kind == NodeType.Program);
-    assert(program.body.length == 2);
-    assert(program.body[0] == stmt1);
-    assert(program.body[1] == stmt2);
-
-    writeln("✓ Teste de Program passou!");
-}
-
-unittest
-{
-    writeln("Testando criação de StringLiteral...");
-
-    auto loc = Loc("test.d", 2, 1, 5, ".");
-    auto strLit = new StringLiteral("hello", loc);
-
-    assert(strLit.kind == NodeType.StringLiteral);
-    assert(strLit.value.get!string == "hello");
-    assert(strLit.loc.line == 2);
-    assert(strLit.loc.start == 1);
-
-    writeln("✓ Teste de StringLiteral passou!");
-}
-
-unittest
-{
-    writeln("Testando criação de BoolLiteral...");
-
-    auto loc = Loc("test.d", 1, 1, 5, ".");
-    auto boolLit = new BoolLiteral(true, loc);
-
-    assert(boolLit.kind == NodeType.BoolLiteral);
-    assert(boolLit.value.get!bool == true);
-
-    auto boolLit2 = new BoolLiteral(false, loc);
-    assert(boolLit2.value.get!bool == false);
-
-    writeln("✓ Teste de BoolLiteral passou!");
+    return op.to!string;
 }

@@ -1,231 +1,38 @@
 module frontend.parser.parse_type;
 
-import std.variant;
-import frontend.lexer.token : Token, TokenType;
-import frontend.values : TypesNative;
-import frontend.parser.ftype_info : createArrayType, createPointerType, createTypeInfo, FTypeInfo;
+import std.exception;
 
-/**
-* ParseType - Responsible for analyzing complex type declarations
-* Supports:
-* - Basic types (int, string, etc.)
-* - Arrays (int[], string[], etc.)
-* - Multidimensional arrays (int[][], int[][][], etc.)
-* - Pointers (*int, **int, etc.)
-* - Combinations (*int[], int*[], **int[][], etc.)
-*/
+import frontend;
+import frontend.parser;
+import frontend.lexer;
+
 class ParseType
 {
 private:
-    Token[] tokens;
-
-    bool isAtEnd()
-    {
-        return this.current >= this.tokens.length;
-    }
-
-    Token peek()
-    {
-        return this.tokens[this.current];
-    }
-
-    Token previous()
-    {
-        return this.tokens[this.current - 1];
-    }
-
-    Token advance()
-    {
-        if (!this.isAtEnd())
-            this.current++;
-        return this.previous();
-    }
-
-    bool check(TokenType type)
-    {
-        if (this.isAtEnd())
-            return false;
-        return this.peek().kind == type;
-    }
-
-    bool match(TokenType[] types)
-    {
-        foreach (type; types)
-        {
-            if (this.check(type))
-            {
-                this.advance();
-                return true;
-            }
-        }
-        return false;
-    }
-
-    ulong parsePointerPrefix()
-    {
-        ulong pointerLevel;
-
-        while (this.check(TokenType.ASTERISK) || this.check(TokenType.EXPONENTIATION))
-        {
-            if (this.peek().kind == TokenType.EXPONENTIATION)
-            {
-                pointerLevel += 2;
-            }
-            else
-            {
-                pointerLevel++;
-            }
-            this.advance(); // '*' || '**'
-        }
-        return pointerLevel;
-    }
-
-    TypesNative tokenValueToTypesNative(Token token)
-    {
-        if (token.value.type != typeid(string))
-        {
-            throw new Exception(
-                "Expected token with string value, but it came: " ~ token.value.type.toString());
-        }
-
-        string value = token.value.get!string;
-
-        switch (value)
-        {
-        case "int":
-        case "inteiro":
-        case "número":
-        case "numero":
-            return TypesNative.LONG;
-        case "float":
-        case "decimal":
-            return TypesNative.FLOAT;
-        case "string":
-        case "texto":
-            return TypesNative.STRING;
-        case "void":
-        case "vazio":
-            return TypesNative.VOID;
-        case "null":
-        case "nulo":
-            return TypesNative.NULL;
-        case "bool":
-        case "logica":
-        case "lógica":
-            return TypesNative.BOOL;
-        default:
-            return TypesNative.CLASS;
-            throw new Exception("Unknown native type: " ~ value);
-        }
-    }
-
-    TypesNative parseBaseType()
-    {
-        return this.tokenValueToTypesNative(this.advance());
-    }
-
-    ulong parseArrayDimensions()
-    {
-        ulong dimensions;
-        while (this.match([TokenType.LBRACKET, TokenType.RBRACKET]))
-        {
-            dimensions++;
-        }
-        return dimensions;
-    }
-
-protected:
-    ulong current = 0;
+    Parser p;
+    
 public:
-    this(Token[] tokens = [])
+    this(Parser p)
     {
-        this.tokens = tokens;
+        this.p = p;
     }
 
-    FTypeInfo parse()
+    TypeExpr parsePrimary()
     {
-        ulong pointerLevel = this.parsePointerPrefix();
-        TypesNative baseType = this.parseBaseType();
-        ulong dimensions = this.parseArrayDimensions();
-        FTypeInfo typeInfo;
-
-        if (dimensions > 0)
+        Token tk = p.advance();
+        switch (tk.kind)
         {
-            typeInfo = createArrayType(baseType, dimensions);
-        }
-        else
-        {
-            typeInfo = createTypeInfo(baseType);
-        }
-
-        if (pointerLevel > 0)
-        {
-            typeInfo = createPointerType(typeInfo.baseType, pointerLevel);
-        }
-
-        return typeInfo;
-    }
-}
-
-class ArrayBrackets
-{
-public:
-    bool isValid;
-    ulong dimensions;
-    ulong endIndex;
-
-    this(bool isValid, ulong dimensions, ulong endIndex)
-    {
-        this.isValid = isValid;
-        this.dimensions = dimensions;
-        this.endIndex = endIndex;
-    }
-}
-
-ArrayBrackets parseArrayBrackets(
-    ref Token[] tokens,
-    ulong startIndex
-)
-{
-    ulong current = startIndex;
-    ulong dimensions = 0;
-
-    while (current + 1 < tokens.length)
-    {
-        if (
-            tokens[current].kind == TokenType.LBRACKET &&
-            tokens[current + 1].kind == TokenType.RBRACKET
-            )
-        {
-            dimensions++;
-            current += 2;
-        }
-        else
-        {
-            break;
+            case TokenKind.Identifier:
+                return new TypeExprNamed(tk.value.s, tk.pos);
+            default:
+                enforce(false, "Tipo invalido.");
+                return null;
         }
     }
 
-    return new ArrayBrackets(dimensions > 0, dimensions, current);
-}
-
-class TypeAnnotation
-{
-public:
-    FTypeInfo typeInfo;
-    ulong endIndex;
-
-    this(FTypeInfo typeInfo, ulong endIndex)
+    TypeExpr parse()
     {
-        this.typeInfo = typeInfo;
-        this.endIndex = endIndex;
+        TypeExpr primary = parsePrimary();
+        return primary;
     }
-}
-
-TypeAnnotation parseTypeAnnotation(Token[] tokens, ulong startIndex)
-{
-    ParseType parser = new ParseType(tokens[startIndex .. $]);
-    FTypeInfo typeInfo = parser.parse();
-    auto tokensConsumed = parser.current;
-    return new TypeAnnotation(typeInfo, startIndex + tokensConsumed);
 }

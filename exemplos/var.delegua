@@ -1,0 +1,2 @@
+var nome = "Fernando"
+var calculo = 2 + 4 * 10

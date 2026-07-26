@@ -1,814 +1,313 @@
 module frontend.lexer.lexer;
 
-import std.variant;
+import std.utf : decodeFront, decode;
+import std.exception : enforce;
+import std.format;
 import std.stdio;
 import std.conv;
-import std.array;
-import std.string;
-import std.ascii : toLower;
+
 import frontend.lexer.token;
-import error;
+import errors;
 
 class Lexer
 {
 private:
-    string source;
-    string file;
-    string dir;
-    DiagnosticError error;
+    Diagnostics err;
+    Token[] tokens;
+    string source, filename;
+    uint offset, l_offset;
+    uint line = 1;
+    immutable TokenKind[dstring] keywords = [
+        "var": TokenKind.Var,
+        "variavel": TokenKind.Var,
+        "variável": TokenKind.Var,
 
-    ulong line = 1;
-    ulong offset = 0;
-    ulong lineOffset = 0;
-    ulong start = 1;
-    Token[] tokens = [];
+        "const": TokenKind.Const,
+        "fixo": TokenKind.Const,
+        "constante": TokenKind.Const,
 
-    // Estaticos e imutaveis
-    static TokenType[string] SINGLE_CHAR_TOKENS;
-    static TokenType[string] MULTI_CHAR_TOKENS;
-    
-    // VARIÁVEIS MODIFICADAS PARA PERMITIR INICIALIZAÇÃO EM shared static this()
-    static bool[char] ALPHA_CHARS;
-    static bool[char] DIGIT_CHARS;
-    static bool[char] HEX_CHARS;
-    static bool[char] OCTAL_CHARS;
-    static bool[char] BINARY_CHARS;
-    static bool[char] WHITESPACE_CHARS;
+        "funcao": TokenKind.Fn,
+        "função": TokenKind.Fn,
 
-    shared static this()
+        "se": TokenKind.If,
+        "senao": TokenKind.Else,
+        "senão": TokenKind.Else,
+
+        "enquanto": TokenKind.While,
+        "para": TokenKind.For,
+
+        "nulo": TokenKind.Null,
+        "verdadeiro": TokenKind.True,
+        "falso": TokenKind.False,
+
+        "tipo": TokenKind.Type,
+        "de": TokenKind.Of,
+
+        "retorne": TokenKind.Return,
+        "retorna": TokenKind.Return,
+    ];
+
+public:
+    this(string source, string filename, Diagnostics err)
     {
-        SINGLE_CHAR_TOKENS["+"] = TokenType.PLUS;
-        SINGLE_CHAR_TOKENS["-"] = TokenType.MINUS;
-        SINGLE_CHAR_TOKENS["*"] = TokenType.ASTERISK;
-        SINGLE_CHAR_TOKENS["/"] = TokenType.SLASH;
-        SINGLE_CHAR_TOKENS[">"] = TokenType.GREATER_THAN;
-        SINGLE_CHAR_TOKENS["<"] = TokenType.LESS_THAN;
-        SINGLE_CHAR_TOKENS[","] = TokenType.COMMA;
-        SINGLE_CHAR_TOKENS[";"] = TokenType.SEMICOLON;
-        SINGLE_CHAR_TOKENS[":"] = TokenType.COLON;
-        SINGLE_CHAR_TOKENS["("] = TokenType.LPAREN;
-        SINGLE_CHAR_TOKENS[")"] = TokenType.RPAREN;
-        SINGLE_CHAR_TOKENS["{"] = TokenType.LBRACE;
-        SINGLE_CHAR_TOKENS["}"] = TokenType.RBRACE;
-        SINGLE_CHAR_TOKENS["."] = TokenType.DOT;
-        SINGLE_CHAR_TOKENS["%"] = TokenType.MODULO;
-        SINGLE_CHAR_TOKENS["="] = TokenType.EQUALS;
-        SINGLE_CHAR_TOKENS["["] = TokenType.LBRACKET;
-        SINGLE_CHAR_TOKENS["]"] = TokenType.RBRACKET;
-        SINGLE_CHAR_TOKENS["!"] = TokenType.BANG;
-        SINGLE_CHAR_TOKENS["?"] = TokenType.QUESTION;
-        SINGLE_CHAR_TOKENS["&"] = TokenType.BIT_AND;
-        SINGLE_CHAR_TOKENS["|"] = TokenType.BIT_OR;
-        SINGLE_CHAR_TOKENS["^"] = TokenType.BIT_XOR;
-        SINGLE_CHAR_TOKENS["~"] = TokenType.BIT_NOT;
-
-        MULTI_CHAR_TOKENS["++"] = TokenType.INCREMENT;
-        MULTI_CHAR_TOKENS["--"] = TokenType.DECREMENT;
-        MULTI_CHAR_TOKENS["**"] = TokenType.EXPONENTIATION;
-        MULTI_CHAR_TOKENS["%%"] = TokenType.REMAINDER;
-        MULTI_CHAR_TOKENS["=="] = TokenType.EQUALS_EQUALS;
-        MULTI_CHAR_TOKENS[">="] = TokenType.GREATER_THAN_OR_EQUALS;
-        MULTI_CHAR_TOKENS["<="] = TokenType.LESS_THAN_OR_EQUALS;
-        MULTI_CHAR_TOKENS["&&"] = TokenType.AND;
-        MULTI_CHAR_TOKENS["||"] = TokenType.OR;
-        MULTI_CHAR_TOKENS["!="] = TokenType.NOT_EQUALS;
-        MULTI_CHAR_TOKENS[".."] = TokenType.RANGE;
-        MULTI_CHAR_TOKENS["<<"] = TokenType.LEFT_SHIFT;
-        MULTI_CHAR_TOKENS[">>"] = TokenType.RIGHT_SHIFT;
-        MULTI_CHAR_TOKENS["&="] = TokenType.BIT_AND_ASSIGN;
-        MULTI_CHAR_TOKENS["|="] = TokenType.BIT_OR_ASSIGN;
-        MULTI_CHAR_TOKENS["^="] = TokenType.BIT_XOR_ASSIGN;
-        MULTI_CHAR_TOKENS["<<="] = TokenType.LEFT_SHIFT_ASSIGN;
-        MULTI_CHAR_TOKENS[">>="] = TokenType.RIGHT_SHIFT_ASSIGN;
-
-        // INICIALIZAÇÃO DE CHARACTER SETS AQUI
-        ALPHA_CHARS = initCharSet(
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_áÁãÃâÂàÀéÉêÊíÍóÓõÕôÔúÚçÇ");
-        DIGIT_CHARS = initCharSet("0123456789");
-        HEX_CHARS = initCharSet("0123456789abcdefABCDEF");
-        OCTAL_CHARS = initCharSet("01234567");
-        BINARY_CHARS = initCharSet("01");
-        WHITESPACE_CHARS = initCharSet(" \t\r");
+        this.source = source;
+        this.filename = filename;
+        this.err = err;
     }
 
-    static bool[char] initCharSet(string chars)
+    bool isAlpha(dchar c)
     {
-        bool[char] set;
-        foreach (c; chars)
+        return (c >= 'a' && c <= 'z')
+            || (c >= 'A' && c <= 'Z')
+            || c == '_' // validação para caracteres especiais
+            || (c >= 192 && c <= 214)
+            || (c >= 216 && c <= 246)
+            || (c >= 248 && c <= 255);
+    }
+
+    bool isNumeric(dchar c)
+    {
+        return c >= '0' && c <= '9';
+    }
+
+    bool isAlphaNumeric(dchar c)
+    {
+        return isNumeric(c) || isAlpha(c);
+    }
+
+    bool isAtEnd(uint n = 0)
+    {
+        return (offset + n) >= source.length;
+    }
+
+    void checkIsAtEnd(uint n = 0)
+    {
+        enforce(!isAtEnd(n), "Source out of bounds in lexer.");
+    }
+
+    dchar future(uint n)
+    {
+        checkIsAtEnd(n);
+        return source[offset + n];
+    }
+
+    dchar advance()
+    {
+        checkIsAtEnd();
+        l_offset++;
+        return decodeFront(source);
+    }
+
+    dchar peek()
+    {
+        checkIsAtEnd();
+        size_t i;
+        return decode(source, i);
+    }
+
+    bool match(dchar ch)
+    {
+        checkIsAtEnd();
+        if (peek() == ch)
         {
-            set[c] = true;
+            advance();
+            return true;
         }
-        return set;
+        return false;
     }
 
-    Loc getLocation(ulong start, ulong end, ulong line = 0)
+    dstring lexNumer(dchar ch, uint start, out bool isDouble, out bool dotInvalid, bool d = true)
     {
-        ulong currentLine = line == 0 ? this.line : line;
-        return Loc(
-            this.file,
-            currentLine,
-            start,
-            end,
-            this.dir
-        );
-    }
-
-    void reportError(
-        string message,
-        Loc loc,
-        string suggestion = "",
-    )
-    {
-        error.addError(Diagnostic(message, loc, [
-                        error.makeSuggestion(
-                        suggestion)
-                    ]));
-        return;
-    }
-
-    void reportUnexpectedChar(char ch)
-    {
-        error.addError(
-            Diagnostic(format("Caractere inesperado '%c'", ch),
-                this.getLocation(this.start, this.start + 1),
-                [
-                    error.makeSuggestion(
-                    "Remova o caractere e verifique se o erro não persiste mais.",
-                    error.getLineText(this.line, this.file).replace(ch, ""),
-                    ),
-                ])
-        );
-    }
-
-    Token createToken(TokenType kind, Variant value, ulong skipChars = 1, ulong startAdd = 0)
-    {
-        auto valueLength = to!string(value).length;
-        ulong st = this.start + startAdd;
-        Token token = Token(kind, value, this.getLocation(st, cast(ulong) st + valueLength));
-        this.tokens ~= token;
-        this.offset += skipChars;
-        return token;
-    }
-
-    void createTokenWithLocation(TokenType kind, Variant value, ulong start, ulong length)
-    {
-        this.tokens ~= Token(
-            kind,
-            value,
-            this.getLocation(start, start + length)
-        );
-    }
-
-    void lexHexadecimal(ulong startPos)
-    {
-        this.offset += 2; // Skip "0x" or "0X"
-        const hexDigits = this.consumeHexDigits();
-
-        if (hexDigits.length == 0)
+        dstring buffer = [ch];
+        while (!isAtEnd() && (isNumeric(peek()) || peek() == '.'))
         {
-            this.reportError("Número hexadecimal inválido: dígitos ausentes após '0x'", this.getLocation(startPos, this
-                    .offset));
-            return;
+            if (!d && peek() == '.')
+            {
+                err.error(getPosition(start, line), "Sem permissão para numeros flutuantes.");
+                continue;
+            }
+            if (peek() == '.' && isDouble)
+            {
+                dotInvalid = true;
+                advance();
+                continue;
+            }
+            if (peek() == '.' && !isDouble)
+                isDouble = true;
+            buffer ~= [advance()];
         }
-
-        auto fullHex = "0x" ~ hexDigits;
-        long value = to!long(hexDigits, 16);
-
-        this.createTokenWithLocation(
-            TokenType.INT,
-            Variant(value),
-            startPos,
-            fullHex.length,
-        );
+        return buffer;
     }
 
-    void lexOctal(ulong startPos)
+    Position getPosition(uint s, uint l)
     {
-        this.offset += 2; // Skip "0o" or "0O"
-        const octalDigits = this.consumeOctalDigits();
-
-        if (octalDigits.length == 0)
-        {
-            this.reportError("Número octal inválido: dígitos ausentes após '0o'", this.getLocation(startPos, this
-                    .offset));
-            return;
-        }
-
-        auto fullOctal = "0o" ~ octalDigits;
-        long value = to!long(octalDigits, 8);
-
-        this.createTokenWithLocation(
-            TokenType.INT,
-            Variant(value),
-            startPos,
-            fullOctal.length,
-        );
+        return new Position(filename, new PosLine(s, l), new PosLine(l_offset, line));
     }
 
-    void lexBinaryWithPrefix(ulong startPos)
+    Token[] tokenizer()
     {
-        this.offset += 2; // Skip "0b" or "0B"
-        const binaryDigits = this.consumeBinaryDigits();
-
-        if (binaryDigits.length == 0)
+        while (!isAtEnd())
         {
-            this.reportError("Número binário inválido: dígitos ausentes após '0b'", this.getLocation(startPos, this
-                    .offset));
-            return;
-        }
+            dchar ch = advance();
 
-        auto fullBinary = "0b" ~ binaryDigits;
-        long value = to!long(binaryDigits, 2);
-
-        this.createTokenWithLocation(
-            TokenType.INT,
-            Variant(value),
-            startPos,
-            fullBinary.length,
-        );
-    }
-
-    bool lexString()
-    {
-        string value = ""; // Buffer
-        ulong startLine = this.line;
-        ulong startPos = this.start;
-        char openingQuote = this.source[this.offset];
-        this.offset++; // Skip opening quote
-
-        while (this.offset < this.source.length && this.source[this.offset] != openingQuote)
-        {
-            char ch = this.source[this.offset];
+            if (ch == '\r' || ch == ' ' || ch == '\t')
+                continue;
 
             if (ch == '\n')
             {
-                this.line += 1;
-                value ~= ch;
-                this.offset++;
-                this.lineOffset = this.offset;
+                line++;
+                l_offset = 0;
                 continue;
             }
 
-            // Handle escape sequences
-            if (ch == '\\')
+            if (isNumeric(ch))
             {
-                this.offset++;
-                if (this.offset >= this.source.length)
-                    break;
+                uint start = l_offset;
+                bool isDouble;
+                bool dotInvalid;
+                dstring buffer = lexNumer(ch, start, isDouble, dotInvalid);
 
-                value ~= this.getEscapedChar(this.source[this.offset]);
-                this.offset++;
-            }
-            else
-            {
-                value ~= ch;
-                this.offset++;
-            }
-        }
-
-        // Check for unclosed string
-        if (this.offset >= this.source.length || this.source[this.offset] != openingQuote)
-        {
-            ulong errorStart = startPos;
-            ulong errorEnd = this.offset - this.lineOffset;
-
-            Loc loc = this.getLocation(errorStart, errorEnd);
-            loc.line = startLine;
-
-            this.reportError(
-                "A string não foi fechada",
-                loc,
-                format("Adicione '%c' ao final da string.", openingQuote)
-            );
-            return false;
-        }
-
-        this.offset++;
-        this.createTokenWithLocation(
-            TokenType.STRING,
-            Variant(value),
-            startPos,
-            this.offset - startPos - this.lineOffset + startPos
-        );
-        return true;
-    }
-
-    char getEscapedChar(char ch)
-    {
-        switch (ch)
-        {
-        case 'n':
-            return '\n';
-        case 't':
-            return '\t';
-        case 'r':
-            return '\r';
-        case '\\':
-            return '\\';
-        case '\'':
-            return '\'';
-        case '0':
-            return '\0';
-        default:
-            return ch;
-        }
-    }
-
-    bool lexComment()
-    {
-        ulong startPos = this.offset;
-        this.offset++; // Skip the first '/'
-
-        if (this.source[this.offset] == '/')
-        {
-            this.offset++;
-            while (this.offset < this.source.length && this.source[this.offset] != '\n')
-            {
-                this.offset++;
-            }
-            return true;
-        }
-
-        if (this.source[this.offset] == '*')
-        {
-            // Multiple-line body comment
-            this.offset++;
-
-            while (this.offset + 1 < this.source.length)
-            {
-                if (this.source[this.offset] == '*' &&
-                    this.source[this.offset + 1] == '/')
+                if (dotInvalid)
                 {
-                    this.offset += 2;
-                    return true;
+                    err.error(getPosition(start, line), "Uso de '.' inválido.");
+                    continue;
                 }
 
-                if (this.source[this.offset] == '\n')
+                TokenKind kind = TokenKind.Int;
+                TokenRaw raw;
+
+                if (isDouble)
                 {
-                    this.line++;
-                    this.lineOffset = this.offset + 1;
+                    kind = TokenKind.Double;
+                    raw.d = to!double(buffer);
                 }
-                this.offset++;
+                else
+                    raw.i = to!long(buffer);
+
+                tokens ~= new Token(kind, raw, getPosition(start, line));
+                continue;
             }
-            // Error
-            this.reportError("Corpo do comentário não foi fechado.", this.getLocation(startPos, this
-                    .offset));
-            return false;
-        }
 
-        this.offset--;
-        return false;
-    }
-
-    void lexIdentifier()
-    {
-        const ulong startOffset = this.offset;
-        while (this.offset < this.source.length)
-        {
-            char c = this.source[this.offset];
-            if (!(c in this.ALPHA_CHARS) && !(
-                    c in this.DIGIT_CHARS))
+            if (isAlpha(ch))
             {
+                uint start = l_offset;
+                dstring buffer = [ch];
+
+                while (!isAtEnd() && isAlphaNumeric(peek()))
+                    buffer ~= [advance()];
+
+                TokenKind kind = TokenKind.Identifier;
+                if (immutable TokenKind* k = buffer in keywords)
+                    kind = *k;
+
+                tokens ~= new Token(kind, TokenRaw._s(buffer), getPosition(start, line));
+                continue;
+            }
+
+            if (ch == '"')
+            {
+                uint start = l_offset;
+                uint l = line;
+                dstring buffer;
+
+                // TODO: validar escapes
+                while (!isAtEnd() && peek() != '"')
+                {
+                    if (peek() == '\n')
+                    {
+                        line++;
+                        l_offset = 0;
+                    }
+                    buffer ~= [advance()];
+                }
+
+                if (isAtEnd() || !match('"'))
+                {
+                    err.error(getPosition(start, l), "String não foi fechada.");
+                    return tokens;
+                }
+
+                tokens ~= new Token(TokenKind.String, TokenRaw._s(buffer), getPosition(start, l));
+                continue;
+            }
+
+            TokenKind k = TokenKind.Eof;
+            uint start = l_offset;
+
+            switch (ch)
+            {
+            case '+':
+                k = TokenKind.Plus;
+                break;
+            case '-':
+                k = TokenKind.Minus;
+                break;
+            case '=':
+                k = TokenKind.Equals;
+                if (peek() == '=')
+                {
+                    k = TokenKind.EEquals;
+                    advance();
+                }
+                break;
+            case '/':
+                k = TokenKind.Slash;
+                break;
+            case '*':
+                k = TokenKind.Star;
+                break;
+            case '(':
+                k = TokenKind.LParen;
+                break;
+            case ')':
+                k = TokenKind.RParen;
+                break;
+            case '{':
+                k = TokenKind.LBrace;
+                break;
+            case '}':
+                k = TokenKind.RBrace;
+                break;
+            case ':':
+                k = TokenKind.Colon;
+                break;
+            case ';':
+                k = TokenKind.Semicolon;
+                break;
+            case ',':
+                k = TokenKind.Comma;
+                break;
+            case '.':
+                k = TokenKind.Dot;
+                break;
+            case '<':
+                k = TokenKind.LThan;
+                if (peek() == '=')
+                {
+                    k = TokenKind.LEquals;
+                    advance();
+                }
+                break;
+            case '>':
+                k = TokenKind.GThan;
+                if (peek() == '=')
+                {
+                    k = TokenKind.GEquals;
+                    advance();
+                }
+                break;
+            default:
                 break;
             }
-            this.offset++;
-        }
 
-        string identifier = this.source[startOffset .. this.offset];
-        TokenType tokenType = TokenType
-            .IDENTIFIER;
-        if (auto keywordType = identifier in keywords)
-        {
-            tokenType = *keywordType;
-        }
-
-        this.createTokenWithLocation(tokenType, Variant(identifier), startOffset - this.lineOffset, identifier
-                .length);
-    }
-
-    bool lexSingleCharToken()
-    {
-        string currentChar = this.source[this.offset .. this.offset + 1];
-
-        if (auto tokenType = currentChar in SINGLE_CHAR_TOKENS)
-        {
-            this.createToken(*tokenType, Variant(currentChar));
-            return true;
-        }
-        return false;
-    }
-
-    bool lexMultiCharToken()
-    {
-        if (this.offset + 1 >= this.source.length)
-            return false;
-        string twoChars = this
-            .source[this.offset .. this.offset + 2];
-
-        if (auto tokenType = twoChars in MULTI_CHAR_TOKENS)
-        {
-            this.createToken(*tokenType, Variant(twoChars), 2);
-            return true;
-        }
-        return false;
-    }
-
-    string consumeDigits()
-    {
-        ulong _start = this.offset;
-        while (this.offset < this.source.length && this
-            .source[this.offset] in this.DIGIT_CHARS)
-        {
-            this.offset++;
-        }
-        return this.source[_start .. this.offset];
-    }
-
-    string consumeHexDigits()
-    {
-        ulong _start = this.offset;
-        while (this.offset < this.source.length && this
-            .source[this.offset] in this.HEX_CHARS)
-        {
-            this.offset++;
-        }
-        return this.source[_start .. this.offset];
-    }
-
-    string consumeOctalDigits()
-    {
-        ulong _start = this.offset;
-        while (
-            this.offset < this.source.length && this
-            .source[this.offset] in this.OCTAL_CHARS)
-        {
-            this.offset++;
-        }
-        return this.source[_start .. this.offset];
-    }
-
-    string consumeBinaryDigits()
-    {
-        ulong _start = this.offset;
-        while (this.offset < this.source.length && this
-            .source[this.offset] in this
-            .BINARY_CHARS)
-        {
-            this.offset++;
-        }
-        return this
-            .source[_start .. this.offset];
-    }
-
-    void lexNumber()
-    {
-        ulong startPos = this.offset;
-
-        if (
-            this.source[this.offset] == '0' && this.offset + 1 < this
-            .source.length
-            )
-        {
-            const prefix = toLower(
-                this.source[this.offset + 1]);
-
-            // Hexadecimal (0x or 0X)
-            if (prefix == 'x')
+            if (k == TokenKind.Eof)
             {
-                this.lexHexadecimal(startPos);
-                return;
-            }
-
-            // Octal (0o or 0O)
-            if (prefix == 'o')
-            {
-                this.lexOctal(startPos);
-                return;
-            }
-
-            // Binary (0b or 0B)
-            if (prefix == 'b')
-            {
-                this.lexBinaryWithPrefix(
-                    startPos);
-                return;
-            }
-        }
-
-        string number = this.consumeDigits();
-
-        // Handle range operator (e.g., 123..456)
-        if (
-            this.offset + 2 <= this.source.length &&
-            this.source[this.offset .. this.offset + 2] == "..")
-        {
-            this.createTokenWithLocation(
-                TokenType.INT,
-                Variant(number),
-                startPos,
-                number.length,
-            );
-            this.offset += 2; // Avanca o ".."
-            this.createTokenWithLocation(TokenType.RANGE, Variant(
-                    ".."), startPos + number.length, 2);
-            return;
-        }
-
-
-        // Handle floating point numbers
-        if (this.offset < this.source.length && this
-            .source[this.offset] == '.')
-        {
-            const nextChar = this
-                .source[this.offset + 1];
-            if (
-                nextChar in this
-                .DIGIT_CHARS)
-            {
-                number ~= ".";
-                this.offset++;
-                number ~= this.consumeDigits();
-
-                this.createTokenWithLocation(
-                    TokenType.FLOAT,
-                    Variant(number),
-                    startPos,
-                    number.length,
-                );
-                return;
-            }
-        }
-
-        // Handle binary literals with suffix (e.g., 101b)
-        if (
-            this.offset < this.source.length &&
-            toLower(
-                this
-                .source[this.offset]) == 'b'
-            )
-        {
-            this.offset++;
-            long binaryValue = to!long(number, 2);
-
-            this.createTokenWithLocation(
-                TokenType.INT,
-                Variant(binaryValue),
-                startPos,
-                number.length + 1
-            );
-            return;
-        }
-
-        this.createTokenWithLocation(
-            TokenType.INT,
-            Variant(to!long(number)),
-            startPos,
-            number.length,
-        );
-    }
-
-public:
-    this(string file, string source, string dir, DiagnosticError e)
-    {
-        this.file = file;
-        this.source = source;
-        this.dir = dir;
-        this.error = e;
-    }
-
-    Token[] tokenize(
-        bool ignoreNewLine = false)
-    {
-        try
-        {
-            ulong sourceLength = cast(
-                ulong) this.source
-                .length;
-
-            while (
-                this.offset < sourceLength)
-            {
-                this.start = this.offset - this
-                    .lineOffset;
-                char c = this
-                    .source[this
-                        .offset];
-
-                if (c == '\n')
-                {
-                    if (
-                        ignoreNewLine)
-                    {
-                        this
-                            .offset++;
-                        continue;
-                    }
-                    this.line++;
-                    this
-                        .offset++;
-                    this.lineOffset = this
-                        .offset;
-                    continue;
-                }
-
-                if (
-                    c in this
-                    .WHITESPACE_CHARS)
-                {
-                    this.offset++;
-                    continue;
-                }
-
-                if (c == '/' && this.offset + 1 < sourceLength)
-                {
-                    char nextChar = this
-                        .source[this.offset + 1];
-                    if (nextChar == '/' || nextChar == '*')
-                    {
-                        if (
-                            !this.lexComment())
-                        {
-                            if (!this
-                                .lexSingleCharToken())
-                            {
-                                this.reportUnexpectedChar(
-                                    c);
-                            }
-                        }
-                        continue;
-                    }
-                }
-
-                // Handle string literals
-                if (c == '"' || c == '\'')
-                {
-                    if (
-                        !this.lexString())
-                        return null; // Error
-                    continue;
-                }
-
-                if (
-                    c in this
-                    .ALPHA_CHARS)
-                {
-                    this.lexIdentifier();
-                    continue;
-                }
-
-                if (
-                    c in this
-                    .DIGIT_CHARS)
-                {
-                    this.lexNumber();
-                    continue;
-                }
-
-                if (
-                    this.lexMultiCharToken())
-                {
-                    continue;
-                }
-
-                if (
-                    this.lexSingleCharToken())
-                {
-                    continue;
-                }
-
-                this.reportUnexpectedChar(
-                    c);
-                this.offset++; // skip
+                err.error(getPosition(start, line), format("Char desconhecido: '%c'", ch));
                 continue;
             }
 
-            this.createToken(TokenType.EOF, Variant(
-                    "\0"), 0);
-            return this.tokens;
+            tokens ~= new Token(k, TokenRaw.init, getPosition(start, line));
         }
-        catch (Exception e)
-        {
-            // ignore
-            throw e;
-        }
+        return tokens;
     }
-}
-
-unittest
-{
-    writeln("Testando Lexer básico...");
-
-    auto error = new DiagnosticError();
-    auto lexer = new Lexer("test.delegua", "", ".", error);
-
-    assert(lexer !is null);
-
-    writeln("✓ Teste de criação do Lexer passou!");
-}
-
-unittest
-{
-    writeln("Testando tokenização básica...");
-
-    auto error = new DiagnosticError();
-    auto lexer = new Lexer("test.delegua", "var x = 42;", ".", error);
-    auto tokens = lexer.tokenize();
-
-    assert(tokens.length >= 6);
-    assert(tokens[0].kind == TokenType.VAR);
-    assert(tokens[1].kind == TokenType.IDENTIFIER);
-    assert(tokens[1].value.get!string == "x");
-    assert(tokens[2].kind == TokenType.EQUALS);
-    assert(tokens[3].kind == TokenType.INT);
-    assert(tokens[3].value.get!long == 42);
-    assert(tokens[4].kind == TokenType.SEMICOLON);
-    assert(tokens[$-1].kind == TokenType.EOF);
-
-    writeln("✓ Teste de tokenização básica passou!");
-}
-
-unittest
-{
-    writeln("Testando tokenização de strings...");
-
-    auto error = new DiagnosticError();
-    auto lexer = new Lexer("test.delegua", `"hello world"`, ".", error);
-    auto tokens = lexer.tokenize();
-
-    assert(tokens.length == 2);
-    assert(tokens[0].kind == TokenType.STRING);
-    assert(tokens[0].value.get!string == "hello world");
-    assert(tokens[1].kind == TokenType.EOF);
-
-    writeln("✓ Teste de tokenização de strings passou!");
-}
-
-unittest
-{
-    writeln("Testando tokenização de números...");
-
-    auto error = new DiagnosticError();
-
-    // Teste número inteiro
-    auto lexer1 = new Lexer("test.delegua", "123", ".", error);
-    auto tokens1 = lexer1.tokenize();
-    assert(tokens1.length == 2);
-    assert(tokens1[0].kind == TokenType.INT);
-    assert(tokens1[0].value.get!long == 123);
-
-    // Teste número float - vou verificar primeiro o tipo retornado
-    auto lexer2 = new Lexer("test.delegua", "12.34", ".", error);
-    auto tokens2 = lexer2.tokenize();
-    assert(tokens2.length == 2);
-    assert(tokens2[0].kind == TokenType.FLOAT);
-    // Como pode ser string ou double, vou verificar se é um valor numérico válido
-    // usando conversão segura
-    if (tokens2[0].value.type == typeid(string)) {
-        import std.conv : to;
-        double val = tokens2[0].value.get!string.to!double;
-        assert(val == 12.34);
-    } else {
-        assert(tokens2[0].value.get!double == 12.34);
-    }
-
-    writeln("✓ Teste de tokenização de números passou!");
-}
-
-unittest
-{
-    writeln("Testando keywords em português...");
-
-    auto error = new DiagnosticError();
-    auto lexer = new Lexer("test.delegua", "se verdadeiro então", ".", error);
-    auto tokens = lexer.tokenize();
-
-    assert(tokens.length == 4);
-    assert(tokens[0].kind == TokenType.SE);
-    assert(tokens[1].kind == TokenType.TRUE);
-    assert(tokens[2].kind == TokenType.IDENTIFIER);
-    assert(tokens[3].kind == TokenType.EOF);
-
-    writeln("✓ Teste de keywords em português passou!");
-}
-
-unittest
-{
-    writeln("Testando operadores...");
-
-    auto error = new DiagnosticError();
-    auto lexer = new Lexer("test.delegua", "+ - * / == != >= <=", ".", error);
-    auto tokens = lexer.tokenize();
-
-    assert(tokens.length == 9);
-    assert(tokens[0].kind == TokenType.PLUS);
-    assert(tokens[1].kind == TokenType.MINUS);
-    assert(tokens[2].kind == TokenType.ASTERISK);
-    assert(tokens[3].kind == TokenType.SLASH);
-    assert(tokens[4].kind == TokenType.EQUALS_EQUALS);
-    assert(tokens[5].kind == TokenType.NOT_EQUALS);
-    assert(tokens[6].kind == TokenType.GREATER_THAN_OR_EQUALS);
-    assert(tokens[7].kind == TokenType.LESS_THAN_OR_EQUALS);
-    assert(tokens[8].kind == TokenType.EOF);
-
-    writeln("✓ Teste de operadores passou!");
 }

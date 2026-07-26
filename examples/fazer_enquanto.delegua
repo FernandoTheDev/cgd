@@ -1,7 +1,0 @@
-importar "io"
-
-var a: inteiro = 0
-fazer {
-    a = a + 1
-} enquanto (a < 5)
-escrevaln(a)

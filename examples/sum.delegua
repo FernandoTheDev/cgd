@@ -1,8 +1,0 @@
-importar "io"
-
-função ret1(x: inteiro): inteiro | retorna x
-função ret2(y: inteiro): inteiro | retorna y
-função sum(x: inteiro, y: inteiro): inteiro | retorna ret1(x) + ret2(y)
-
-var resultado = sum(60, 9)
-escrevaln('Resultado: ', resultado)

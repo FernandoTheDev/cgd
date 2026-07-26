@@ -1,6 +1,0 @@
-importar "io"
-
-var x = 60
-var y = 9
-var resultado = x + y
-escrevaln(resultado)

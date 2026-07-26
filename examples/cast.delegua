@@ -1,5 +1,0 @@
-importar "io"
-
-var idade: inteiro = 17
-var novaIdade: texto = idade
-escrevaln(novaIdade)
