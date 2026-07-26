@@ -9,11 +9,12 @@ import frontend.parser;
 class Parser
 {
 private:
-    Diagnostics err;
     Token[] tokens;
     uint offset;
 
 public:
+    Diagnostics err;
+    
     ParseType parseType;
     ParseExpr parseExpr;
     ParseStmt parseStmt;

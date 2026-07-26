@@ -15,11 +15,16 @@ public:
         this.p = p;
     }
 
-    Node parseIfStmt(Position pos)
+    Node parseIfStmt(Position pos, bool isElse = false)
     {
         IfStmt _else = null;
         Node[] body;
-        Node expr = p.parseExpr.parse();
+        Node expr = isElse ? null : p.parseExpr.parse();
+
+        // cobre casos de else if
+        if (p.match(TokenKind.If))
+            expr = p.parseExpr.parse();
+
         if (p.match(TokenKind.LBrace))
         {
             while (!p.check(TokenKind.RBrace))
@@ -28,6 +33,9 @@ public:
         }
         else
             body ~= p.parseIntern();
+
+        if (!p.isAtEnd() && p.check(TokenKind.Else))
+            _else = cast(IfStmt) parseIfStmt(p.advance().pos, true);
 
         return new IfStmt(expr, body, _else, pos);
     }

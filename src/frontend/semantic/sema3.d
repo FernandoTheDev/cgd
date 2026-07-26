@@ -67,8 +67,8 @@ private:
     Node analyzeTypeOfExpr(Node node)
     {
         TypeOfExpr toe = as!TypeOfExpr(node);
-        analyze(toe.value);
-        return new StringLit(toe.value.type_sema.toStr(), node.pos);
+        toe.value = analyze(toe.value);
+        return analyze(new StringLit(toe.value.type_sema.toStr(), node.pos));
     }
 
     Node analyzeIdentifier(Identifier node)
@@ -133,6 +133,7 @@ private:
     {
         context.push();
         node.type_sema = resolver.resolver(node.type_expr);
+        
         for (uint i; i < node.args.length; i++)
         {
             FnArg arg = node.args[i];
@@ -141,8 +142,10 @@ private:
             arg.type_sema = resolver.resolver(arg.type_expr);
             context.set(arg.name, new SymbolParam(arg));
         }
+
         for (uint i; i < node.body.length; i++)
             node.body[i] = analyze(node.body[i]);
+            
         context.pop();
         return node;
     }
@@ -159,6 +162,7 @@ private:
         {
             // ERR, tipos invalidos
             err.error(node.pos, format("Tipos incompativeis, '%s' com '%s'.", l.toStr(), r.toStr()));
+            node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Any);
             return node;
         }
 

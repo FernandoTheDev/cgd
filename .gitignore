@@ -18,3 +18,4 @@ performance
 bench
 out
 *.out
+cf.c

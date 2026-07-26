@@ -1,13 +1,15 @@
 module main;
 
+import std.stdio : writeln, writefln;
 import std.exception;
+import std.process;
 import std.format;
 import std.getopt;
-import std.stdio;
 import std.file;
 import std.path;
 
 import middle.opt.constant_folding;
+import core.stdc.stdlib : exit;
 import frontend.semantic;
 import frontend.parser;
 import frontend.lexer;
@@ -19,29 +21,22 @@ import cli;
 
 void verificar_erros(Diagnostics d)
 {
-    bool err;
-    if (d.hasErrors())
-        err = true;
+    if (!d.hasErrors()) return;
     d.report();
-    import core.stdc.stdlib : exit;
-
-    if (err)
-        exit(1);
+    exit(1);
 }
 
 void main(string[] args)
 {
     cgd_validar(args.length > 1, "Esperado ao menos um argumento.");
 
-    bool ajuda, versao, da, dt, opt;
+    bool ajuda, versao, opt;
     try
         getopt(args,
             "a|ajuda", &ajuda,
             "v|versao", &versao,
-            "dt|debug-tokens", &dt,
-            "da|debug-ast", &da,
-            "O|opt", &opt);
-
+            "O|opt", &opt
+        );
     catch (GetOptException e)
     {
         writefln("Flag invalida: %s\n", e.msg);
@@ -82,10 +77,6 @@ void main(string[] args)
     Token[] tokens = lexer.tokenizer();
     verificar_erros(diag);
 
-    if (dt)
-        foreach (ref Token tk; tokens)
-            tk.print();
-
     Parser parser = new Parser(tokens, diag);
     Program program = parser.parse();
     verificar_erros(diag);
@@ -108,12 +99,16 @@ void main(string[] args)
     if (opt)
     {
         new CgdConstantFolding(program, context).opt();
+        //
     }
-
-    if (da)
-        program.print();
 
     CodeGen cg = new CodeGen(program);
     string code = cg.generate();
-    writeln(code);
+    
+    string output = baseName(filename)[0..$-8]; // .delegua
+    string outc = output ~ ".c";
+    write(outc, code);
+    auto exec = executeShell(format("gcc %s -o %s -g -O0", outc, output));
+    writeln(exec.output);
+    executeShell(format("rm %s", outc));
 }

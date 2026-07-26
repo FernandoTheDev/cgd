@@ -1,5 +1,6 @@
 module errors;
 
+import core.stdc.stdlib : exit;
 import std.stdio;
 import std.format;
 import std.file;
@@ -163,6 +164,8 @@ public:
 
 void d_enforce(bool cond, string message, Position pos, Diagnostics e)
 {
-    if (!cond)
-        e.error(pos, message);
+    if (cond) return;
+    e.error(pos, message);
+    e.report();
+    exit(1);
 }

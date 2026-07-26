@@ -65,12 +65,14 @@ public:
         // cgd_main: tudo que está no toplevel que não é FnDecl
         emitRaw("void cgd_main(void)");
         emitRaw("{");
+        emitRaw("GCFRAME_PUSH();");
         indent++;
 
         foreach (node; program.body)
             if (cast(FnDecl) node is null)
                 emitStmt(node);
 
+        emitRaw("GCFRAME_POP();");
         emit("return;");
         emitRaw("}");
 
@@ -109,7 +111,13 @@ private:
     {
         emitRaw(emitProto(fn));
         emitRaw("{");
+        emitRaw("GCFRAME_PUSH();");
         indent++;
+
+        foreach (i, arg; fn.args) {
+            bool cond = isGCManaged(arg.type_sema);
+            emit(format("%s(%s%s);", cond ? "GCFRAME_ADD" : "CGDCHECKSTR", arg.name, cond ? ".s.obj" : ""));
+        }
 
         foreach (stmt; fn.body)
             emitStmt(stmt);
@@ -123,7 +131,10 @@ private:
     {
         if (ReturnStmt r = cast(ReturnStmt) node)
         {
-            emit("return " ~ emitExpr(r.val) ~ ";");
+            bool cond = r.val is null;
+            emit(format("CGD_Value __cgd_ret = %s;", !cond ? emitExpr(r.val) : ""));
+            emit("GCFRAME_POP();");
+            emit(format("return %s;", cond ? "" : "__cgd_ret"));
             return;
         }
 
@@ -131,6 +142,8 @@ private:
         {
             string val = v.value !is null ? emitExpr(v.value) : "cgd_int(0)";
             emit(cType() ~ " " ~ name(v.name) ~ " = " ~ val ~ ";");
+            if (isGCManaged(v.type_sema))
+                emit(format("GCFRAME_ADD(%s.s.obj);", name(v.name)));
             return;
         }
 
@@ -194,11 +207,6 @@ private:
         }
     }
 
-    // string emitTypeOf(TypeOfExpr node)
-    // {
-    //     return name(node.value.type_sema.toStr());
-    // }
-
     string emitExpr(Node node)
     {
         if (IntLit lit = cast(IntLit) node)
@@ -221,9 +229,6 @@ private:
 
         if (UnaryExpr u = cast(UnaryExpr) node)
             return emitUnary(u);
-        
-        // if (TypeOfExpr toe = cast(TypeOfExpr) node)
-        //     return emitTypeOf(toe);
 
         return "/* expr? */";
     }
@@ -283,14 +288,27 @@ private:
             fnName = emitExpr(node.fn);
 
         buf ~= fnName ~ "(";
-        foreach (i, arg; node.args)
+        ulong tmp;
+        foreach (i, Node arg; node.args)
         {
             if (i > 0)
                 buf ~= ", ";
-            buf ~= emitExpr(arg);
+            if (isGCManaged(arg.type_sema) && arg.kind != NodeKind.Identifier)
+            {
+                string temp = format("__cgd_tmp%d", tmp++);
+                emit(format("CGD_Value %s = %s;", temp, emitExpr(arg)));
+                buf ~= temp;
+            } else
+                buf ~= emitExpr(arg);
         }
         buf ~= ")";
 
         return buf[];
+    }
+
+    bool isGCManaged(TypeSema type) {
+        if (TypeSemaBuiltin b = cast(TypeSemaBuiltin) type)
+            return b.base == TypeSemaBase.String;
+        return false;
     }
 }

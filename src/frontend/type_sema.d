@@ -70,6 +70,9 @@ class TypeSemaBuiltin : TypeSema
         // Double domina Int
         if (base == TypeSemaBase.Double || t.base == TypeSemaBase.Double)
             return new TypeSemaBuiltin(TypeSemaBase.Double);
+
+        if (base == TypeSemaBase.String || t.base == TypeSemaBase.String)
+            return new TypeSemaBuiltin(TypeSemaBase.String);
         
         // Any domina tudo
         if (base == TypeSemaBase.Any || t.base == TypeSemaBase.Any)

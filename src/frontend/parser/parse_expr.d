@@ -52,9 +52,7 @@ public:
                 return new TypeOfExpr(val, p.getPos(tk.pos, val.pos));
             
             default:
-                // TODO: melhorar
-                tk.print();
-                enforce(false, "Expressão inválida.");
+                p.err.error(tk.pos, "Uma expressão é esperada.");
                 return null;
         }
     }
