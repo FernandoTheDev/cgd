@@ -1,8 +1,8 @@
 module frontend.parser.parse_stmt;
 
-import frontend;
-import frontend.lexer;
 import frontend.parser;
+import frontend.lexer;
+import frontend;
 
 class ParseStmt
 {
@@ -50,14 +50,14 @@ public:
         Token tk = p.advance();
         switch (tk.kind)
         {
-        case TokenKind.If:
-            return parseIfStmt(tk.pos);
+            case TokenKind.If:
+                return parseIfStmt(tk.pos);
 
-        case TokenKind.Return:
-            return parseReturnStmt(tk.pos);
+            case TokenKind.Return:
+                return parseReturnStmt(tk.pos);
 
-        default:
-            return null;
+            default:
+                return new Identifier("null", tk.pos);
         }
     }
 }

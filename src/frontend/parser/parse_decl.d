@@ -1,8 +1,8 @@
 module frontend.parser.parse_decl;
 
-import frontend;
-import frontend.lexer;
 import frontend.parser;
+import frontend.lexer;
+import frontend;
 
 class ParseDecl
 {
@@ -17,7 +17,7 @@ public:
 
     Node parseVarDecl(bool isConst)
     {
-        Token name = p.consume(TokenKind.Identifier, "Esperado um ID pro nome da variavel.");
+        Token name = p.consume(TokenKind.Identifier, "Esperado um identificador pro nome da variavel.");
         
         TypeExpr texpr = null;
         if (p.match(TokenKind.Colon))
@@ -31,7 +31,7 @@ public:
 
     Node parseFnDecl()
     {
-        Token name = p.consume(TokenKind.Identifier, "Esperado um ID pro nome da função.");
+        Token name = p.consume(TokenKind.Identifier, "Esperado um identificador pro nome da função.");
         TypeExpr retType = new TypeExprNamed("qualquer", name.pos);
 
         p.consume(TokenKind.LParen, "Esperado '(' após o nome função.");
@@ -76,7 +76,7 @@ public:
                 return parseFnDecl();
                 
             default:
-                return null;
+                return new Identifier("null", tk.pos);
         }
     }
 }

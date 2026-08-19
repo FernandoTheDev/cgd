@@ -1,0 +1,8 @@
+funcao principal() {
+    var x = 10
+    var x = 67
+
+    escreva(x)
+}
+
+principal()

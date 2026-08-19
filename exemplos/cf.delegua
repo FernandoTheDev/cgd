@@ -2,8 +2,12 @@ variavel x = 10
 fixo z = 60
 var y = x * 10 - z * (1.0 * 76) + 4460.0 + 67
 
-se (tipo de y) == "duplo" {
+escreva(tipo de 3.141592)
+
+se (tipo de y) == "real" {
     escreva("CGD")
 } senao {
     escreva("Delegua")
 }
+
+escreva("y: ", y)

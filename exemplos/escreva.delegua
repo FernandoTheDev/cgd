@@ -1,0 +1,5 @@
+var nome = "Jonas"
+nome = "Fernando"
+var outro_nome = "Leonel"
+
+escreva(nome + " e " + outro_nome)

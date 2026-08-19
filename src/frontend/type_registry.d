@@ -16,9 +16,9 @@ public:
         types["inteiro"] = new TypeSemaBuiltin(TypeSemaBase.Int);
         types["numero"] = types["inteiro"];
 
-        types["duplo"] = new TypeSemaBuiltin(TypeSemaBase.Double);
+        types["real"] = new TypeSemaBuiltin(TypeSemaBase.Double);
 
-        types["logico"] = new TypeSemaBuiltin(TypeSemaBase.Logico);
+        types["logico"] = new TypeSemaBuiltin(TypeSemaBase.Bool);
         types["booleano"] = types["logico"];
         types["binario"] = types["logico"];
 

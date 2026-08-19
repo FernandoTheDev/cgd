@@ -1,10 +1,11 @@
 module frontend.parser.ast;
 
+import std.conv : to;
 import std.stdio;
+
+import frontend.lexer.token : Position, PosLine, TokenKind;
 import frontend.type_sema;
 import frontend.type_expr;
-import frontend.lexer.token : Position, PosLine, TokenKind;
-import std.conv : to;
 
 enum NodeKind : ubyte
 {
@@ -15,6 +16,7 @@ enum NodeKind : ubyte
     StringLit,
     IntLit,
     DoubleLit,
+    BoolLit,
     
     BinaryExpr,
     UnaryExpr,
@@ -24,12 +26,13 @@ enum NodeKind : ubyte
     FnDecl,
     VarDecl,
 
+    AssignStmt,
     ReturnStmt,
     IfStmt,
 
     // TODO
-    ForStmt,
-    WhileStmt,
+    // ForStmt,
+    // WhileStmt,
 }
 
 abstract class Node
@@ -38,6 +41,12 @@ abstract class Node
     Position pos;
     TypeExpr type_expr;
     TypeSema type_sema;
+
+    this(NodeKind kind, Position pos = Position.init)
+    {
+        this.kind = kind;
+        this.pos = pos;
+    }
 
     void print(uint indent = 0);
 }
@@ -48,7 +57,7 @@ class Program : Node
 
     this(Node[] body)
     {
-        this.kind = NodeKind.Program;
+        super(NodeKind.Program);
         this.body = body;
     }
 
@@ -57,8 +66,7 @@ class Program : Node
         writeln("Program");
         foreach (i, node; body)
         {
-            bool isLast = (i == cast(size_t)
-                body.length - 1);
+            bool isLast = (i == cast(size_t) body.length - 1);
             printIndent(indent, isLast);
             node.print(indent + 1);
         }
@@ -73,23 +81,23 @@ class VarDecl : Node
 
     this(dstring name, Node value, bool isConst, TypeExpr texpr, Position pos)
     {
-        this.kind = NodeKind.VarDecl;
+        super(NodeKind.VarDecl, pos);
         this.name = name;
         this.value = value;
         this.isConst = isConst;
         this.type_expr = texpr;
-        this.pos = pos;
     }
 
     override void print(uint indent = 0)
     {
-        import std.conv : to;
-
         writef("VarDecl %s '%s'", isConst ? "const" : "var", name);
+     
         if (type_expr !is null)
             writef(" : %s", type_expr.toStr());
+     
         if (type_sema !is null)
             writef(" :> %s", type_sema.toStr());
+     
         writeln();
 
         if (value !is null)
@@ -106,9 +114,8 @@ class IntLit : Node
 
     this(long val, Position pos)
     {
-        this.kind = NodeKind.IntLit;
+        super(NodeKind.IntLit, pos);
         value = val;
-        this.pos = pos;
         this.type_expr = new TypeExprNamed(TypeSemaBase.Int, pos);
     }
 
@@ -124,9 +131,8 @@ class DoubleLit : Node
 
     this(double val, Position pos)
     {
-        this.kind = NodeKind.DoubleLit;
+        super(NodeKind.DoubleLit, pos);
         value = val;
-        this.pos = pos;
         this.type_expr = new TypeExprNamed(TypeSemaBase.Double, pos);
     }
 
@@ -142,17 +148,32 @@ class StringLit : Node
 
     this(dstring val, Position pos)
     {
-        this.kind = NodeKind.StringLit;
+        super(NodeKind.StringLit, pos);
         value = val;
-        this.pos = pos;
         this.type_expr = new TypeExprNamed(TypeSemaBase.String, pos);
     }
 
     override void print(uint indent = 0)
     {
-        import std.conv : to;
-
         writefln(`StringLit("%s")`, value);
+    }
+}
+
+class BoolLit : Node
+{
+    bool value;
+
+    this(bool val, Position pos)
+    {
+        super(NodeKind.BoolLit, pos);
+        this.kind = NodeKind.BoolLit;
+        value = val;
+        this.type_expr = new TypeExprNamed(TypeSemaBase.Bool, pos);
+    }
+
+    override void print(uint indent = 0)
+    {
+        writefln("BoolLit(%d)", value);
     }
 }
 
@@ -162,9 +183,8 @@ class Identifier : Node
 
     this(dstring val, Position pos)
     {
-        this.kind = NodeKind.Identifier;
+        super(NodeKind.Identifier, pos);
         value = val;
-        this.pos = pos;
     }
 
     override void print(uint indent = 0)
@@ -182,11 +202,10 @@ class BinaryExpr : Node
 
     this(Node l, Node r, TokenKind o, Position pos)
     {
-        this.kind = NodeKind.BinaryExpr;
+        super(NodeKind.BinaryExpr, pos);
         left = l;
         right = r;
         op = o;
-        this.pos = pos;
     }
 
     override void print(uint indent = 0)
@@ -209,10 +228,9 @@ class UnaryExpr : Node
 
     this(Node val, TokenKind o, Position pos)
     {
-        this.kind = NodeKind.UnaryExpr;
+        super(NodeKind.UnaryExpr, pos);
         value = val;
         op = o;
-        this.pos = pos;
     }
 
     override void print(uint indent = 0)
@@ -233,10 +251,9 @@ class CallExpr : Node
 
     this(Node fn, Node[] args, Position pos)
     {
-        this.kind = NodeKind.CallExpr;
+        super(NodeKind.CallExpr, pos);
         this.fn = fn;
         this.args = args;
-        this.pos = pos;
     }
 
     override void print(uint indent = 0)
@@ -280,12 +297,11 @@ class FnDecl : Node
 
     this(dstring fn, FnArg[] args, TypeExpr type, Node[] body, Position pos)
     {
-        this.kind = NodeKind.FnDecl;
+        super(NodeKind.FnDecl, pos);
         this.fn = fn;
         this.args = args;
         this.type_expr = type;
         this.body = body;
-        this.pos = pos;
     }
 
     override void print(uint indent = 0)
@@ -303,8 +319,7 @@ class FnDecl : Node
             bool isLastArg = (i == cast(size_t) args.length - 1) && body.length == 0;
             printIndent(indent, isLastArg);
             writef("FnArg '%s'", arg.name);
-            if (arg.type_expr !is null)
-                writef(" : %s", arg.type_expr.toStr());
+            if (arg.type_expr !is null) writef(" : %s", arg.type_expr.toStr());
             if (arg.type_sema !is null)
                 writef(" :> %s", arg.type_sema.toStr());
             writeln();
@@ -326,9 +341,8 @@ class ReturnStmt : Node
 
     this(Node val, Position pos)
     {
-        this.kind = NodeKind.ReturnStmt;
+        super(NodeKind.ReturnStmt, pos);
         this.val = val;
-        this.pos = pos;
     }
 
     override void print(uint indent = 0)
@@ -351,11 +365,10 @@ class IfStmt : Node
 
     this(Node expr, Node[] body, IfStmt _else, Position pos)
     {
-        this.kind = NodeKind.IfStmt;
+        super(NodeKind.IfStmt, pos);
         this.expr = expr;
         this.body = body;
         this._else = _else;
-        this.pos = pos;
     }
 
     override void print(uint indent = 0)
@@ -392,17 +405,37 @@ class TypeOfExpr : Node
 
     this(Node val, Position pos)
     {
-        this.kind = NodeKind.TypeOfExpr;
+        super(NodeKind.TypeOfExpr, pos);
         value = val;
-        this.pos = pos;
     }
 
     override void print(uint indent = 0)
     {
         writeln("TypeOfExpr",);
-        if (type_sema !is null)
-            writef(" : %s", type_sema.toStr());
+        if (type_sema !is null) writef(" : %s", type_sema.toStr());
         writeln();
+        printIndent(indent, true);
+        value.print(indent + 1);
+    }
+}
+
+class AssignStmt : Node
+{
+    Node left, value;
+    TokenKind op;
+
+    this(Node left, Node val, TokenKind op, Position pos)
+    {
+        super(NodeKind.AssignStmt, pos);
+        this.left = left;
+        this.value = val;
+    }
+
+    override void print(uint indent = 0)
+    {
+        writeln("AssignStmt(%s):", tokenKindStr(op));
+        printIndent(indent, true);
+        left.print(indent + 1);
         printIndent(indent, true);
         value.print(indent + 1);
     }

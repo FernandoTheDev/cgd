@@ -1,15 +1,28 @@
 module frontend.parser.parse_expr;
 
-import frontend;
-import frontend.lexer;
-import frontend.parser;
 import std.exception;
+import std.stdio;
+
+import frontend.parser;
+import frontend.lexer;
+import frontend;
 
 enum Precedence : ubyte {
     Low,
-    Plus,
-    Mul,
-    Call,
+    Assign, // = += -= etc
+    Ternary, // ?
+    Or, // ||
+    And, // &&
+    BitOr, // |
+    BitXor, // ^
+    BitAnd, // &
+    Eq, // == != ===
+    Cmp, // < > <= >=
+    Shift, // << >>
+    Plus, // + -
+    Mul, // * / %
+    Unary, // ! ~ - * &
+    Call, // () [] .
     High,
 }
 
@@ -40,6 +53,10 @@ public:
             
             case TokenKind.Double:
                 return new DoubleLit(tk.value.d, tk.pos);
+
+            case TokenKind.True:
+            case TokenKind.False:
+                return new BoolLit(tk.kind == TokenKind.True, tk.pos);
             
             case TokenKind.LParen:
                 Node node = parse();
@@ -53,7 +70,7 @@ public:
             
             default:
                 p.err.error(tk.pos, "Uma expressão é esperada.");
-                return null;
+                return new Identifier("null", tk.pos);
         }
     }
 
@@ -76,24 +93,32 @@ public:
         return new CallExpr(left, args, left.pos);
     }
 
+    Node parseAssignStmt(Node left, TokenKind op)
+    {
+        Node value = parse();
+        return new AssignStmt(left, value, op, p.getPos(left.pos, value.pos));
+    }
+
     Node led(Node left)
     {
         Token tk = p.advance();
-        switch (tk.kind)
+        switch (tk.kind) with (TokenKind)
         {
-            case TokenKind.Plus:
-            case TokenKind.Minus:
-            case TokenKind.Star:
-            case TokenKind.Slash:
-            case TokenKind.Modulo:
-            case TokenKind.LThan:
-            case TokenKind.GThan:
-            case TokenKind.EEquals:
-            case TokenKind.LEquals:
-            case TokenKind.GEquals:
+            case Plus:
+            case Minus:
+            case Star:
+            case Slash:
+            case Modulo:
+            case LThan:
+            case GThan:
+            case EEquals:
+            case LEquals:
+            case GEquals:
                 return parseBinaryExpr(tk.kind, left);
-            case TokenKind.LParen:
+            case LParen:
                 return parseCallExpr(left);
+            case Equals:
+                return parseAssignStmt(left, tk.kind);
             default:
                 return left;
         }
@@ -101,22 +126,26 @@ public:
 
     Precedence getPrecedence(TokenKind kind)
     {
-        switch (kind)
+        switch (kind) with (TokenKind)
         {
-            case TokenKind.Plus:
-            case TokenKind.Minus:
-            case TokenKind.LThan:
-            case TokenKind.GThan:
-            case TokenKind.EEquals:
-            case TokenKind.LEquals:
-            case TokenKind.GEquals:
+            case Equals:
+                return Precedence.Assign;
+            case Plus:
+            case Minus:
                 return Precedence.Plus;
-            case TokenKind.Star:
-            case TokenKind.Slash:
-            case TokenKind.Modulo:
+            case EEquals:
+                return Precedence.Eq;
+            case LThan:
+            case GThan:
+            case LEquals:
+            case GEquals:
+                return Precedence.Cmp;
+            case Star:
+            case Slash:
+            case Modulo:
                 return Precedence.Mul;
-            case TokenKind.Dot:
-            case TokenKind.LParen:
+            case Dot:
+            case LParen:
                 return Precedence.Call;
             default:
                 return Precedence.Low;

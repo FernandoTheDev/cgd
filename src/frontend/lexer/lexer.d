@@ -47,6 +47,37 @@ private:
         "retorna": TokenKind.Return,
     ];
 
+    immutable TokenKind[dstring] symbols = [
+        "+": TokenKind.Plus,
+        "-": TokenKind.Minus,
+        "/": TokenKind.Slash,
+        "*": TokenKind.Star,
+        
+        "=": TokenKind.Equals,
+        "==": TokenKind.EEquals,
+        
+        "(": TokenKind.LParen,
+        ")": TokenKind.RParen,
+        
+        "{": TokenKind.LBrace,
+        "}": TokenKind.RBrace,
+        
+        "[": TokenKind.LBracket,
+        "]": TokenKind.RBracket,
+        
+        ":": TokenKind.Colon,
+        ";": TokenKind.Semicolon,
+        
+        ",": TokenKind.Comma,
+        ".": TokenKind.Dot,
+        
+        "<": TokenKind.LThan,
+        "<=": TokenKind.LEquals,
+        
+        ">": TokenKind.GThan,
+        ">=": TokenKind.GEquals,
+    ];
+
 public:
     this(string source, string filename, Diagnostics err)
     {
@@ -101,7 +132,7 @@ public:
     dchar peek()
     {
         checkIsAtEnd();
-        size_t i;
+        size_t i; // não remover
         return decode(source, i);
     }
 
@@ -139,9 +170,12 @@ public:
         return buffer;
     }
 
-    Position getPosition(uint s, uint l)
+    Position getPosition(uint s, uint l) => new Position(filename, new PosLine(s, l), new PosLine(l_offset, line));
+
+    pragma(inline, true)
+    void pushToken(Token tk)
     {
-        return new Position(filename, new PosLine(s, l), new PosLine(l_offset, line));
+        tokens ~= tk;
     }
 
     Token[] tokenizer()
@@ -184,7 +218,7 @@ public:
                 else
                     raw.i = to!long(buffer);
 
-                tokens ~= new Token(kind, raw, getPosition(start, line));
+                pushToken(new Token(kind, raw, getPosition(start, line)));
                 continue;
             }
 
@@ -200,7 +234,7 @@ public:
                 if (immutable TokenKind* k = buffer in keywords)
                     kind = *k;
 
-                tokens ~= new Token(kind, TokenRaw._s(buffer), getPosition(start, line));
+                pushToken(new Token(kind, TokenRaw._s(buffer), getPosition(start, line)));
                 continue;
             }
 
@@ -227,86 +261,33 @@ public:
                     return tokens;
                 }
 
-                tokens ~= new Token(TokenKind.String, TokenRaw._s(buffer), getPosition(start, l));
+                pushToken(new Token(TokenKind.String, TokenRaw._s(buffer), getPosition(start, l)));
                 continue;
             }
 
             TokenKind k = TokenKind.Eof;
-            uint start = l_offset;
+            uint size;
 
-            switch (ch)
+            if (!isAtEnd())
+                if (immutable TokenKind* kind = [ch, peek()] in symbols)
+                {
+                    k = *kind;
+                    size++;
+                    advance();
+                    goto end;
+                }
+            
+            if (immutable TokenKind* kind = [ch] in symbols)
             {
-            case '+':
-                k = TokenKind.Plus;
-                break;
-            case '-':
-                k = TokenKind.Minus;
-                break;
-            case '=':
-                k = TokenKind.Equals;
-                if (peek() == '=')
-                {
-                    k = TokenKind.EEquals;
-                    advance();
-                }
-                break;
-            case '/':
-                k = TokenKind.Slash;
-                break;
-            case '*':
-                k = TokenKind.Star;
-                break;
-            case '(':
-                k = TokenKind.LParen;
-                break;
-            case ')':
-                k = TokenKind.RParen;
-                break;
-            case '{':
-                k = TokenKind.LBrace;
-                break;
-            case '}':
-                k = TokenKind.RBrace;
-                break;
-            case ':':
-                k = TokenKind.Colon;
-                break;
-            case ';':
-                k = TokenKind.Semicolon;
-                break;
-            case ',':
-                k = TokenKind.Comma;
-                break;
-            case '.':
-                k = TokenKind.Dot;
-                break;
-            case '<':
-                k = TokenKind.LThan;
-                if (peek() == '=')
-                {
-                    k = TokenKind.LEquals;
-                    advance();
-                }
-                break;
-            case '>':
-                k = TokenKind.GThan;
-                if (peek() == '=')
-                {
-                    k = TokenKind.GEquals;
-                    advance();
-                }
-                break;
-            default:
-                break;
+                k = *kind;
+                goto end;
             }
 
-            if (k == TokenKind.Eof)
-            {
-                err.error(getPosition(start, line), format("Char desconhecido: '%c'", ch));
-                continue;
-            }
+            err.error(getPosition(l_offset - size, line), format("Caractere desconhecido '%c'.", ch));
+            continue;
 
-            tokens ~= new Token(k, TokenRaw.init, getPosition(start, line));
+        end:
+            pushToken(new Token(k, TokenRaw.init, getPosition(l_offset - size, line)));
         }
         return tokens;
     }

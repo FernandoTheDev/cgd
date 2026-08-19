@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+cd vendor/delegua-runtime
+git pull origin dev --rebase
+./build
+cp libdelegua_rt.o ../../lib
+cd ../..
+
+if [ "$1" = "add" ]; then
+    git add vendor/delegua-runtime
+fi

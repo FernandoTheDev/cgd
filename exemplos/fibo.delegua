@@ -2,6 +2,7 @@ função soma(x, y) {
     retorne x + y
 }
 
+
 função fibonacci(n: numero): numero {
     se n <= 1 
         retorne n

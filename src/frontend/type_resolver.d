@@ -17,18 +17,23 @@ public:
 
     TypeSema resolver(TypeExpr type)
     {
+        if (type is null)
+            return new TypeSemaBuiltin(TypeSemaBase.Any);
+
         switch (type.kind)
         {
-        case TypeExprKind.Named:
-            TypeExprNamed named = cast(TypeExprNamed) type;
-            TypeSema* tsema = registry.get(named.name);
-            if (tsema is null)
-                enforce(false, "O tipo não existe.");
-            return *tsema;
-        
-        default:
-            writeln("Falha ao resolver tipo.");
-            return new TypeSemaBuiltin(TypeSemaBase.Any);
+            case TypeExprKind.Named:
+                TypeExprNamed named = cast(TypeExprNamed) type;
+                TypeSema* tsema = registry.get(named.name);
+            
+                if (tsema is null)
+                    enforce(false, "O tipo não existe.");
+            
+                return *tsema;
+
+            default:
+                writeln("Falha ao resolver tipo.");
+                return new TypeSemaBuiltin(TypeSemaBase.Any);
         }
     }
 }

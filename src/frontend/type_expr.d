@@ -2,6 +2,7 @@
 module frontend.type_expr;
 
 import std.stdio;
+
 import frontend.lexer : Position;
 
 enum TypeExprKind : ubyte

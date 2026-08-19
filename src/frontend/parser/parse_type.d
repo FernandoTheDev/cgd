@@ -2,9 +2,9 @@ module frontend.parser.parse_type;
 
 import std.exception;
 
-import frontend;
 import frontend.parser;
 import frontend.lexer;
+import frontend;
 
 class ParseType
 {
@@ -20,19 +20,16 @@ public:
     TypeExpr parsePrimary()
     {
         Token tk = p.advance();
-        switch (tk.kind)
+        switch (tk.kind) with (TokenKind)
         {
-            case TokenKind.Identifier:
+            case Identifier:
                 return new TypeExprNamed(tk.value.s, tk.pos);
+
             default:
-                enforce(false, "Tipo invalido.");
-                return null;
+                p.err.error(tk.pos, "Tipo inválido.");
+                return TypeExpr.init;
         }
     }
 
-    TypeExpr parse()
-    {
-        TypeExpr primary = parsePrimary();
-        return primary;
-    }
+    TypeExpr parse() => parsePrimary();
 }

@@ -6,14 +6,16 @@ import std.process;
 import std.format;
 import std.getopt;
 import std.file;
+import std.conv;
 import std.path;
 
 import middle.opt.constant_folding;
 import core.stdc.stdlib : exit;
 import frontend.semantic;
+import backend.c.codegen;
 import frontend.parser;
+import backend.compile;
 import frontend.lexer;
-import middle.codegen;
 import frontend;
 import errors;
 import utils;
@@ -77,9 +79,21 @@ void main(string[] args)
     Token[] tokens = lexer.tokenizer();
     verificar_erros(diag);
 
-    Parser parser = new Parser(tokens, diag);
-    Program program = parser.parse();
-    verificar_erros(diag);
+    Program program;
+
+    try {
+        Parser parser = new Parser(tokens, diag);
+        program = parser.parse();
+        verificar_erros(diag);
+    } catch (Exception e) {
+        verificar_erros(diag);
+        writeln("Ocorreu um erro interno no compilador.");
+        writefln("%s", e.msg);
+        writefln("%s", e.file);
+        writefln("%d", e.line);
+        writeln(e);
+        return;
+    }
 
     Context context = new Context;
     TypeRegistry registry = new TypeRegistry;
@@ -99,16 +113,23 @@ void main(string[] args)
     if (opt)
     {
         new CgdConstantFolding(program, context).opt();
-        //
+        program.print();
     }
 
-    CodeGen cg = new CodeGen(program);
-    string code = cg.generate();
-    
-    string output = baseName(filename)[0..$-8]; // .delegua
+    BackendC cg = new BackendC();
+    dstring code = cg.compile(program);
+    writeln(code);
+
+    string cSource = code.to!string; // UTF-32 -> UTF-8
+
+    string output = baseName(filename)[0 .. $ - 8]; // .delegua
     string outc = output ~ ".c";
-    write(outc, code);
-    auto exec = executeShell(format("gcc %s -o %s -g -O0", outc, output));
+    write(outc, cSource);
+
+    string command = format("gcc %s -o %s -g -O0 lib/libdelegua_rt.o $(pkg-config --libs bdw-gc) -rdynamic",
+        outc, output);
+    writefln("Command: %s", command);
+    auto exec = executeShell(command);
     writeln(exec.output);
-    executeShell(format("rm %s", outc));
+    // executeShell(format("rm %s", outc));
 }
