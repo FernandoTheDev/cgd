@@ -1,0 +1,3 @@
+[submodule "vendor/delegua-runtime"]
+    path = vendor/delegua-runtime
+    url = https://github.com/FernandoTheDev/delegua-runtime
