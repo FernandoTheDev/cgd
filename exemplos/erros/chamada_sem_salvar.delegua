@@ -1,0 +1,7 @@
+// gera um aviso
+
+funcao teste(): inteiro {
+    retorne 10
+}
+
+teste()

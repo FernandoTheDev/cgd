@@ -1,0 +1,7 @@
+//>puro
+funcao teste(y) {
+    var x = 10 * y
+    retorne x
+}
+
+escreva(teste(10))

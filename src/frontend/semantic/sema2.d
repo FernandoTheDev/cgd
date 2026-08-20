@@ -1,11 +1,12 @@
 // resolve os tipos
 module frontend.semantic.sema2;
 
-import utils;
 import std.exception;
-import frontend;
-import frontend.parser;
+
 import frontend.semantic;
+import frontend.parser;
+import frontend;
+import utils;
 
 class Sema2
 {
@@ -16,8 +17,8 @@ private:
     {
         switch (node.kind)
         {
-        default:
-            return;
+            default:
+                return;
         }
     }
 

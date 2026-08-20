@@ -4,6 +4,9 @@ import std.format;
 
 enum TokenKind : ubyte
 {
+    // ctfe
+    Pure,
+
     // keywords
     Var,
     Const,
@@ -30,6 +33,8 @@ enum TokenKind : ubyte
     RParen,
     LBrace,
     RBrace,
+    LBracket,
+    RBracket,
 
     Star,
     Slash,
@@ -62,25 +67,19 @@ union TokenRaw
     pragma(inline, true)
     static TokenRaw _i(long n)
     {
-        TokenRaw _;
-        _.i = n;
-        return _;
+        return TokenRaw(i: n);
     }
 
     pragma(inline, true)
     static TokenRaw _d(double n)
     {
-        TokenRaw _;
-        _.d = n;
-        return _;
+        return TokenRaw(d: n);
     }
 
     pragma(inline, true)
     static TokenRaw _s(dstring n)
     {
-        TokenRaw _;
-        _.s = n;
-        return _;
+        return TokenRaw(s: n);
     }
 }
 
@@ -110,7 +109,7 @@ class Position
 
     string toStr()
     {
-        return format("{ %s: %d:%d %d:%d }", filename, start.offset, start.line, end.offset, end.line);
+        return format("{ %s:%d:%d }", filename, start.line, start.offset);
     }
 }
 

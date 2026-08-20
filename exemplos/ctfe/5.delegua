@@ -1,0 +1,48 @@
+//>puro
+funcao dobro(x) {
+    retorne x * 2
+}
+
+//>puro
+funcao quadrado(x) {
+    retorne x * x
+}
+
+//>puro
+funcao cubo(x) {
+    retorne x * x * x
+}
+
+//>puro
+funcao soma(a, b) {
+    retorne a + b
+}
+
+//>puro
+funcao media(a, b, c) {
+    retorne (a + b + c) / 3
+}
+
+var x = 5
+var y = 3
+var z = 2
+
+escreva(quadrado(dobro(x)))
+escreva(soma(dobro(x), quadrado(y)))
+escreva(cubo(x) + cubo(y) + cubo(z))
+
+x = 10
+y = x * 2 - 1
+z = quadrado(z) + (y - x)
+
+escreva(soma(x, soma(y, z)))
+escreva(media(x, y, z))
+
+x = media(x, y, z)
+y = cubo(x) - quadrado(y) + dobro(z)
+
+escreva(soma(x, y))
+
+z = (x + y) - (x * y)
+escreva(z)
+escreva(quadrado(x - y))

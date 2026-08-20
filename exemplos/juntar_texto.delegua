@@ -1,8 +1,6 @@
 função ateZero(n, s) {
-    se n < 1 
-        retorne s
-    var leonel = s + "A"
-    retorne ateZero(n-1, leonel)
+    se n < 1 retorne s
+    retorne ateZero(n - 1, s + "A")
 }
 
 escreva(ateZero(1000, ""))

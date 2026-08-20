@@ -1,0 +1,7 @@
+//>puro
+funcao cubo(x) {
+    retorne x * x * x
+}
+
+var n = 4
+escreva(cubo(n + 1))

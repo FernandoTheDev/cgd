@@ -1,0 +1,6 @@
+//>puro
+funcao soma(x, y) {
+    retorne x + y
+}
+
+escreva(soma(soma(30, 30), 7))

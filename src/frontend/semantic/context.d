@@ -1,7 +1,8 @@
 module frontend.semantic.context;
 
-import frontend.semantic;
 import std.exception : enforce;
+
+import frontend.semantic;
 
 class Scope
 {
@@ -26,7 +27,7 @@ public:
 class Context
 {
 private:
-    Scope[] scopes;
+    public Scope[] scopes;
     size_t[] functionBoundaries;
 
 public:
@@ -35,14 +36,14 @@ public:
     void push()
     {
         scopes ~= new Scope;
-        cursor = cast(uint) scopes.length - 1;
+        cursor = cast(size_t) scopes.length - 1;
     }
 
     void pop()
     {
         enforce(scopes.length > 0, "pop em escopo vazio.");
         scopes.length--;
-        cursor = cast(uint) scopes.length - 1;
+        cursor = cast(size_t) scopes.length - 1;
     }
 
     void pushFunction()
@@ -76,10 +77,8 @@ public:
 
         foreach_reverse (i, sc; scopes[0 .. cursor + 1])
         {
-            if (i < limit)
-                break;
-            if (auto sym = sc.get(name))
-                return sym;
+            if (i < limit) break;
+            if (auto sym = sc.get(name)) return sym;
         }
         return null;
     }

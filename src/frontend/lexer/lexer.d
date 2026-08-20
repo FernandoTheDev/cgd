@@ -17,6 +17,7 @@ private:
     string source, filename;
     uint offset, l_offset;
     uint line = 1;
+    
     immutable TokenKind[dstring] keywords = [
         "var": TokenKind.Var,
         "variavel": TokenKind.Var,
@@ -45,6 +46,41 @@ private:
 
         "retorne": TokenKind.Return,
         "retorna": TokenKind.Return,
+    ];
+
+    immutable TokenKind[dstring] symbols = [
+        "+": TokenKind.Plus,
+        "-": TokenKind.Minus,
+        "/": TokenKind.Slash,
+        "*": TokenKind.Star,
+        
+        "=": TokenKind.Equals,
+        "==": TokenKind.EEquals,
+        
+        "(": TokenKind.LParen,
+        ")": TokenKind.RParen,
+        
+        "{": TokenKind.LBrace,
+        "}": TokenKind.RBrace,
+        
+        "[": TokenKind.LBracket,
+        "]": TokenKind.RBracket,
+        
+        ":": TokenKind.Colon,
+        ";": TokenKind.Semicolon,
+        
+        ",": TokenKind.Comma,
+        ".": TokenKind.Dot,
+        
+        "<": TokenKind.LThan,
+        "<=": TokenKind.LEquals,
+        
+        ">": TokenKind.GThan,
+        ">=": TokenKind.GEquals,
+    ];
+
+    immutable TokenKind[dstring] ctfeKeywords = [
+        "puro": TokenKind.Pure,
     ];
 
 public:
@@ -101,7 +137,7 @@ public:
     dchar peek()
     {
         checkIsAtEnd();
-        size_t i;
+        size_t i; // não remover
         return decode(source, i);
     }
 
@@ -139,9 +175,23 @@ public:
         return buffer;
     }
 
-    Position getPosition(uint s, uint l)
+    Position getPosition(uint s, uint l) => new Position(filename, new PosLine(s, l), new PosLine(l_offset, line));
+
+    pragma(inline, true)
+    void pushToken(Token tk)
     {
-        return new Position(filename, new PosLine(s, l), new PosLine(l_offset, line));
+        tokens ~= tk;
+    }
+
+    dstring lexId(dchar ch)
+    {
+        if (!isAlpha(ch)) return "";
+        
+        dstring buffer = [ch];
+        while (!isAtEnd() && isAlphaNumeric(peek()))
+            buffer ~= [advance()];
+        
+        return buffer;
     }
 
     Token[] tokenizer()
@@ -184,23 +234,20 @@ public:
                 else
                     raw.i = to!long(buffer);
 
-                tokens ~= new Token(kind, raw, getPosition(start, line));
+                pushToken(new Token(kind, raw, getPosition(start, line)));
                 continue;
             }
 
             if (isAlpha(ch))
             {
                 uint start = l_offset;
-                dstring buffer = [ch];
-
-                while (!isAtEnd() && isAlphaNumeric(peek()))
-                    buffer ~= [advance()];
+                dstring buffer = lexId(ch);
 
                 TokenKind kind = TokenKind.Identifier;
                 if (immutable TokenKind* k = buffer in keywords)
                     kind = *k;
 
-                tokens ~= new Token(kind, TokenRaw._s(buffer), getPosition(start, line));
+                pushToken(new Token(kind, TokenRaw._s(buffer), getPosition(start, line)));
                 continue;
             }
 
@@ -227,86 +274,68 @@ public:
                     return tokens;
                 }
 
-                tokens ~= new Token(TokenKind.String, TokenRaw._s(buffer), getPosition(start, l));
+                pushToken(new Token(TokenKind.String, TokenRaw._s(buffer), getPosition(start, l)));
                 continue;
             }
 
             TokenKind k = TokenKind.Eof;
-            uint start = l_offset;
+            uint size;
 
-            switch (ch)
+            if (!isAtEnd(1))
             {
-            case '+':
-                k = TokenKind.Plus;
-                break;
-            case '-':
-                k = TokenKind.Minus;
-                break;
-            case '=':
-                k = TokenKind.Equals;
-                if (peek() == '=')
+                dstring tk = [ch, peek(), future(1)];
+                
+                if (tk == "//>")
                 {
-                    k = TokenKind.EEquals;
-                    advance();
+                    advance(); // pula o /
+                    advance(); // pula o >
+
+                    uint start = l_offset + 1;
+                    dstring buffer = lexId(advance());
+                    Position pos = getPosition(start, line);
+
+                    if (immutable TokenKind* kind = buffer in ctfeKeywords)
+                    {
+                        pushToken(new Token(*(cast(TokenKind*)kind), TokenRaw.init, pos));
+                        continue;
+                    }
+
+                    err.error(pos, 
+                        format("Não foi possível detectar o qualificador '%s'.", buffer));
+                    continue;
                 }
-                break;
-            case '/':
-                k = TokenKind.Slash;
-                break;
-            case '*':
-                k = TokenKind.Star;
-                break;
-            case '(':
-                k = TokenKind.LParen;
-                break;
-            case ')':
-                k = TokenKind.RParen;
-                break;
-            case '{':
-                k = TokenKind.LBrace;
-                break;
-            case '}':
-                k = TokenKind.RBrace;
-                break;
-            case ':':
-                k = TokenKind.Colon;
-                break;
-            case ';':
-                k = TokenKind.Semicolon;
-                break;
-            case ',':
-                k = TokenKind.Comma;
-                break;
-            case '.':
-                k = TokenKind.Dot;
-                break;
-            case '<':
-                k = TokenKind.LThan;
-                if (peek() == '=')
-                {
-                    k = TokenKind.LEquals;
-                    advance();
-                }
-                break;
-            case '>':
-                k = TokenKind.GThan;
-                if (peek() == '=')
-                {
-                    k = TokenKind.GEquals;
-                    advance();
-                }
-                break;
-            default:
-                break;
             }
 
-            if (k == TokenKind.Eof)
+            if (!isAtEnd())
             {
-                err.error(getPosition(start, line), format("Char desconhecido: '%c'", ch));
-                continue;
+                dstring tk = [ch, peek()];
+
+                if (tk == "//")
+                {
+                    while (!isAtEnd() && peek() != '\n') advance();
+                    continue;
+                }
+
+                if (immutable TokenKind* kind = tk in symbols)
+                {
+                    k = *kind;
+                    size++;
+                    advance();
+                    goto end;
+                }
+            }
+            
+            if (immutable TokenKind* kind = [ch] in symbols)
+            {
+                k = *kind;
+                goto end;
             }
 
-            tokens ~= new Token(k, TokenRaw.init, getPosition(start, line));
+            err.error(getPosition(l_offset - size, line), format("Caractere desconhecido '%c'.", ch));
+            continue;
+
+        end:
+            pushToken(new Token(k, TokenRaw.init, getPosition(l_offset - size, line)));
         }
         return tokens;
     }

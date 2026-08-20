@@ -4,8 +4,8 @@ module frontend.type_sema;
 enum TypeSemaBase : dstring
 {
     Int = "numero",
-    Double = "duplo",
-    Logico = "logico",
+    Double = "real",
+    Bool = "logico",
     String = "texto",
     Void = "vazio",
     Any = "qualquer",

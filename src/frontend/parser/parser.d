@@ -1,10 +1,11 @@
 module frontend.parser.parser;
 
-import std.stdio;
 import std.exception;
-import frontend;
-import frontend.lexer;
+import std.stdio;
+
 import frontend.parser;
+import frontend.lexer;
+import frontend;
 
 class Parser
 {
@@ -13,6 +14,7 @@ private:
     uint offset;
 
 public:
+    ubyte flags;
     Diagnostics err;
     
     ParseType parseType;
@@ -30,15 +32,9 @@ public:
         this.parseDecl = new ParseDecl(this);
     }
 
-    Position getPos(Position l, Position r)
-    {
-        return new Position(l.filename, l.start, r.end);
-    }
+    Position getPos(Position l, Position r) => new Position(l.filename, l.start, r.end);
 
-    bool isAtEnd(uint n = 0)
-    {
-        return (offset + n) >= tokens.length;
-    }
+    bool isAtEnd(uint n = 0) => (offset + n) >= tokens.length;
 
     void checkIsAtEnd(uint n = 0)
     {
@@ -59,7 +55,7 @@ public:
 
     bool match(TokenKind kind)
     {
-        if (peek().kind == kind)
+        if (check(kind))
         {
             advance();
             return true;
@@ -83,12 +79,12 @@ public:
 
     bool isStmt()
     {
-        switch (peek().kind)
+        switch (peek().kind) with (TokenKind)
         {
-            case TokenKind.For:
-            case TokenKind.If:
-            case TokenKind.While:
-            case TokenKind.Return:
+            case For:
+            case If:
+            case While:
+            case Return:
                 return true;
             default:
                 return false;
@@ -97,29 +93,100 @@ public:
 
     bool isDecl()
     {
-        switch (peek().kind)
+        switch (peek().kind) with (TokenKind)
         {
-            case TokenKind.Var:
-            case TokenKind.Const:
-            case TokenKind.Fn:
+            case Var:
+            case Const:
+            case Fn:
                 return true;
             default:
                 return false;
         }
     }
 
+    pragma(inline, true)
+    bool needSemiColon(NodeKind kind)
+    {
+        switch (kind) with (NodeKind) 
+        {
+            case ReturnStmt:
+            case CallExpr:
+            case VarDecl:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    pragma(inline, true)
+    void checkSemiColon(NodeKind kind)
+    {
+        if (!isAtEnd())
+            if (needSemiColon(kind))
+                bool _ = match(TokenKind.Semicolon);
+    }
+
     Node parseIntern()
     {
-        if (isDecl()) return parseDecl.parse();
-        if (isStmt()) return parseStmt.parse();
-        return parseExpr.parse();
+        Node node;
+        
+        if (isDecl())
+            node = parseDecl.parse();
+        else if (isStmt())
+            node = parseStmt.parse();
+        else
+            node = parseExpr.parse();
+        
+        checkSemiColon(node.kind);
+        return node;
+    }
+
+    Node[] parseBody(bool simpleStatemet = false)
+    {
+        Node[] body;
+
+        if (simpleStatemet && !check(TokenKind.LBrace))
+            body ~= parseIntern();
+        else
+        {
+            consume(TokenKind.LBrace, "Esperado '{'");
+            
+            while (!check(TokenKind.RBrace))
+            {
+                Node node = parseIntern();
+                if (node.kind == NodeKind.NaN) continue; // ignora
+                body ~= node;
+            }
+
+            consume(TokenKind.RBrace, "Esperado '}'");
+        }
+
+        return body;
+    }
+
+    ubyte getAndResetFlags()
+    {
+        ubyte tmp = flags;
+        flags = 0;
+        return tmp;
+    }
+
+    pragma(inline, true)
+    void resetFlags()
+    {
+        flags = 0;
     }
 
     Program parse()
     {
         Node[] body;
         while (!isAtEnd())
-            body ~= parseIntern();
+        {
+            Node node = parseIntern();
+            if (node.kind == NodeKind.NaN) continue; // ignora
+            body ~= node;
+            resetFlags();
+        }
         return new Program(body);
     }
 }

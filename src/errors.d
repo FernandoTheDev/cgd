@@ -161,11 +161,3 @@ public:
         _list.length = 0;
     }
 }
-
-void d_enforce(bool cond, string message, Position pos, Diagnostics e)
-{
-    if (cond) return;
-    e.error(pos, message);
-    e.report();
-    exit(1);
-}

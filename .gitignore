@@ -18,4 +18,7 @@ performance
 bench
 out
 *.out
-cf.c
+*.bak
+/*.c
+a.d
+*.txt

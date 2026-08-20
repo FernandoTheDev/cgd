@@ -1,3 +1,3 @@
 module env;
 
-const string VERSION = "1.0.0";
+const string VERSION = "0.2.0";
