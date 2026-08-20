@@ -7,6 +7,7 @@ import std.stdio;
 
 import frontend.semantic;
 import frontend.parser;
+import ctfe.ctfe_flags;
 import frontend.lexer;
 import frontend;
 import errors;
@@ -22,7 +23,7 @@ private:
 
     Node analyze(Node node)
     {
-        if (node.type_sema !is null) return node;
+        if (node.type_sema !is null || node.kind == NodeKind.NaN) return node;
 
         switch (node.kind)
         {
@@ -85,6 +86,14 @@ private:
         }
 
         SymbolVar* symv = cast(SymbolVar*) sym;
+
+        if (symv.isConstant)
+        {
+            err.error(var.pos, format("A variavel '%s' não pode ser reatribuída pois é uma constante.", name));
+            alreadyDeclaredHere(name, symv.node.pos, err);
+            return node;
+        }
+
         node.value = analyze(node.value);
 
         if (!checkTypes(node.pos, symv.node.type_sema, node.value.type_sema))
@@ -103,11 +112,20 @@ private:
     Node analyzeIdentifier(Identifier node)
     {
         Symbol* sym = context.get(node.value);
+        
+        if (sym is null)
+        {
+            err.warning(node.pos, "Simbolo não encontrado.");
+            return node;
+        }
+
         if (sym.isFn())
         {
             err.error(node.pos, "Não é possível usar o nome de uma função como identificador solto.");
             alreadyDeclaredHere(node.value, (cast(SymbolFn*) sym).node.pos, err);
         }
+
+        sym.uses++;
         node.type_sema = (cast(SymbolVar*) sym).node.type_sema;
         return node;
     }
@@ -148,10 +166,21 @@ private:
         if (sym is null)
             err.error(node.pos, format("A função '%s' não existe.", name));
 
-        node.type_sema = (cast(SymbolFn*) sym).node.type_sema;
+        sym.uses++;
+        SymbolFn* symf = cast(SymbolFn*) sym;
+        node.type_sema = symf.node.type_sema;
 
         for (uint i; i < node.args.length; i++)
+        {
             node.args[i] = analyze(node.args[i]);
+            
+            if (symf.node.args.length < 1) 
+                continue;
+            
+            FnArg arg = symf.node.args[i];
+            if (!checkTypes(node.args[i].pos, arg.type_sema, node.args[i].type_sema))
+                alreadyDeclaredHere(arg.name, arg.pos, err);
+        }
 
         return node;
     }
@@ -166,6 +195,9 @@ private:
     {
         context.push();
         node.type_sema = resolver.resolver(node.type_expr);
+
+        // if (node.ctfe_flags & CTFEFlags.Pure)
+        //     writefln("Função pura detectada: %s", node.fn);
         
         for (uint i; i < node.args.length; i++)
         {
@@ -220,7 +252,6 @@ private:
     Node analyzeVarDecl(VarDecl node)
     {
         node.value = analyze(node.value);
-        updateType(node, resolver);
 
         dstring name = node.name;
         if (Symbol* sym = context.get(name))
@@ -230,9 +261,15 @@ private:
         }
 
         TypeSema valueType = node.value.type_sema;
+        // writeln(name, ": ", valueType.toStr());
+        // writeln(node.type_sema, "\n");
         
-        if (node.type_sema !is null)
-            checkTypes(node.pos, node.type_sema, valueType);
+        if (node.type_expr !is null)
+        {
+            updateType(node, resolver); // atualiza o tipo semantico para fazer o checkTypes
+            if (checkTypes(node.pos, node.type_sema, valueType))
+                node.type_sema = valueType; // é compativel? pode ter havido cast implicito, atualiza
+        }
         else
             node.type_sema = valueType; // inferencia
 

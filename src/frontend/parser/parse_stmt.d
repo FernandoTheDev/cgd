@@ -18,21 +18,13 @@ public:
     Node parseIfStmt(Position pos, bool isElse = false)
     {
         IfStmt _else = null;
-        Node[] body;
         Node expr = isElse ? null : p.parseExpr.parse();
 
         // cobre casos de else if
         if (p.match(TokenKind.If))
             expr = p.parseExpr.parse();
 
-        if (p.match(TokenKind.LBrace))
-        {
-            while (!p.check(TokenKind.RBrace))
-                body ~= p.parseIntern();
-            p.consume(TokenKind.RBrace, "Esperado '}' após o 'se'.");
-        }
-        else
-            body ~= p.parseIntern();
+        Node[] body = p.parseBody(true);
 
         if (!p.isAtEnd() && p.check(TokenKind.Else))
             _else = cast(IfStmt) parseIfStmt(p.advance().pos, true);

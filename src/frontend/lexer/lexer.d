@@ -17,6 +17,7 @@ private:
     string source, filename;
     uint offset, l_offset;
     uint line = 1;
+    
     immutable TokenKind[dstring] keywords = [
         "var": TokenKind.Var,
         "variavel": TokenKind.Var,
@@ -76,6 +77,10 @@ private:
         
         ">": TokenKind.GThan,
         ">=": TokenKind.GEquals,
+    ];
+
+    immutable TokenKind[dstring] ctfeKeywords = [
+        "puro": TokenKind.Pure,
     ];
 
 public:
@@ -178,6 +183,17 @@ public:
         tokens ~= tk;
     }
 
+    dstring lexId(dchar ch)
+    {
+        if (!isAlpha(ch)) return "";
+        
+        dstring buffer = [ch];
+        while (!isAtEnd() && isAlphaNumeric(peek()))
+            buffer ~= [advance()];
+        
+        return buffer;
+    }
+
     Token[] tokenizer()
     {
         while (!isAtEnd())
@@ -225,10 +241,7 @@ public:
             if (isAlpha(ch))
             {
                 uint start = l_offset;
-                dstring buffer = [ch];
-
-                while (!isAtEnd() && isAlphaNumeric(peek()))
-                    buffer ~= [advance()];
+                dstring buffer = lexId(ch);
 
                 TokenKind kind = TokenKind.Identifier;
                 if (immutable TokenKind* k = buffer in keywords)
@@ -268,14 +281,49 @@ public:
             TokenKind k = TokenKind.Eof;
             uint size;
 
+            if (!isAtEnd(1))
+            {
+                dstring tk = [ch, peek(), future(1)];
+                
+                if (tk == "//>")
+                {
+                    advance(); // pula o /
+                    advance(); // pula o >
+
+                    uint start = l_offset + 1;
+                    dstring buffer = lexId(advance());
+                    Position pos = getPosition(start, line);
+
+                    if (immutable TokenKind* kind = buffer in ctfeKeywords)
+                    {
+                        pushToken(new Token(*(cast(TokenKind*)kind), TokenRaw.init, pos));
+                        continue;
+                    }
+
+                    err.error(pos, 
+                        format("Não foi possível detectar o qualificador '%s'.", buffer));
+                    continue;
+                }
+            }
+
             if (!isAtEnd())
-                if (immutable TokenKind* kind = [ch, peek()] in symbols)
+            {
+                dstring tk = [ch, peek()];
+
+                if (tk == "//")
+                {
+                    while (!isAtEnd() && peek() != '\n') advance();
+                    continue;
+                }
+
+                if (immutable TokenKind* kind = tk in symbols)
                 {
                     k = *kind;
                     size++;
                     advance();
                     goto end;
                 }
+            }
             
             if (immutable TokenKind* kind = [ch] in symbols)
             {

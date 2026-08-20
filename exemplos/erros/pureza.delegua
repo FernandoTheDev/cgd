@@ -1,0 +1,6 @@
+//>puro
+funcao teste(mensagem: texto) {
+    escreva(mensagem)
+}
+
+teste("Oi")

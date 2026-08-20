@@ -6,11 +6,13 @@ import std.stdio;
 import frontend.lexer.token : Position, PosLine, TokenKind;
 import frontend.type_sema;
 import frontend.type_expr;
+import ctfe.ctfe_flags;
 
 enum NodeKind : ubyte
 {
     // OK
     Program,
+    NaN, // Not a Node
     
     Identifier,
     StringLit,
@@ -294,14 +296,16 @@ class FnDecl : Node
     dstring fn;
     FnArg[] args;
     Node[] body;
+    ubyte ctfe_flags;
 
-    this(dstring fn, FnArg[] args, TypeExpr type, Node[] body, Position pos)
+    this(dstring fn, FnArg[] args, TypeExpr type, Node[] body, ubyte ctfe_flags, Position pos)
     {
         super(NodeKind.FnDecl, pos);
         this.fn = fn;
         this.args = args;
         this.type_expr = type;
         this.body = body;
+        this.ctfe_flags = ctfe_flags;
     }
 
     override void print(uint indent = 0)
@@ -438,6 +442,19 @@ class AssignStmt : Node
         left.print(indent + 1);
         printIndent(indent, true);
         value.print(indent + 1);
+    }
+}
+
+class NaN : Node
+{
+    this(Position pos)
+    {
+        super(NodeKind.NaN, pos);
+    }
+
+    override void print(uint indent = 0)
+    {
+        writeln("NaN");
     }
 }
 

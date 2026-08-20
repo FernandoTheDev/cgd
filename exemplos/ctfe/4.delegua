@@ -1,0 +1,21 @@
+//>puro
+funcao dobro(x) {
+    retorne x * 2
+}
+
+//>puro
+funcao quadrado(x) {
+    retorne x * x
+}
+
+//>puro
+funcao soma(a, b) {
+    retorne a + b
+}
+
+var x = 5
+var y = 3
+
+escreva(quadrado(dobro(x)))
+escreva(soma(dobro(x), quadrado(y)))
+escreva(soma(x, y))

@@ -1,0 +1,5 @@
+funcao teste(n: inteiro): inteiro {
+    retorne n
+}
+
+escreva(teste("teste"))

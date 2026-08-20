@@ -1,5 +1,7 @@
 module frontend.parser.parse_decl;
 
+import std.stdio;
+
 import frontend.parser;
 import frontend.lexer;
 import frontend;
@@ -40,27 +42,32 @@ public:
         {
             Token argName = p.consume(TokenKind.Identifier, "Esperado um nome pro argumento.");
             TypeExpr type = new TypeExprNamed("qualquer", argName.pos);
+            
             if (p.match(TokenKind.Colon))
                 type = p.parseType.parse();
+
             Node val = null;
+            
             if (p.match(TokenKind.Equals))
                 val = p.parseExpr.parse();
+            
             if (!p.check(TokenKind.RParen))
                 p.consume(TokenKind.Comma, "Esperado ',' após o argumento.");
+            
             args ~= new FnArg(argName.value.s, type, val, argName.pos);
+            // writeln(args[$ - 1]);
         }
+
         p.consume(TokenKind.RParen, "Esperado ')' após os argumentos.");
 
         if (p.match(TokenKind.Colon))
             retType = p.parseType.parse();
 
-        p.consume(TokenKind.LBrace, "Esperado '{' pro corpo da função.");
-        Node[] body;
-        while (!p.check(TokenKind.RBrace))
-            body ~= p.parseIntern();
-        p.consume(TokenKind.RBrace, "Esperado '}' após o corpo da função.");
+        // p.consume(TokenKind.LBrace, "Esperado '{' pro corpo da função.");
+        Node[] body = p.parseBody();
+        // p.consume(TokenKind.RBrace, "Esperado '}' após o corpo da função.");
 
-        return new FnDecl(name.value.s, args, retType, body, name.pos);
+        return new FnDecl(name.value.s, args, retType, body, p.getAndResetFlags(), name.pos);
     }
 
     Node parse()

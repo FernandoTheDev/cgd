@@ -21,3 +21,4 @@ out
 *.bak
 /*.c
 a.d
+*.txt

@@ -12,6 +12,7 @@ enum SymbolKind : ubyte
 abstract class Symbol
 {
     SymbolKind kind;
+    long uses;
     bool isVar() => kind == SymbolKind.Var;
     bool isFn() => kind == SymbolKind.Fn;
     bool isParam() => kind == SymbolKind.Param;

@@ -4,6 +4,9 @@ import std.format;
 
 enum TokenKind : ubyte
 {
+    // ctfe
+    Pure,
+
     // keywords
     Var,
     Const,

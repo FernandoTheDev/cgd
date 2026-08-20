@@ -1,5 +1,6 @@
 module utils;
 
+import core.stdc.stdlib : exit;
 import std.exception;
 import std.format;
 import std.stdio;
@@ -57,4 +58,11 @@ Position getPosFromSymbol(Symbol* sym)
         case Fn:
             return (cast(SymbolFn*)sym).node.pos;
     }
+}
+
+void verificar_erros(Diagnostics d)
+{
+    d.report();
+    if (!d.hasErrors()) return;
+    exit(1);
 }

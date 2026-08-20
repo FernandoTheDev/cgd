@@ -27,7 +27,7 @@ public:
 class Context
 {
 private:
-    Scope[] scopes;
+    public Scope[] scopes;
     size_t[] functionBoundaries;
 
 public:

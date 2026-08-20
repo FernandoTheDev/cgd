@@ -1,16 +1,20 @@
-module middle.opt.constant_folding;
+module opt.constant_folding;
 
+import std.algorithm;
 import std.stdio;
+import std.array;
 
 import frontend.semantic.context;
 import frontend.semantic.symbol;
 import frontend.lexer.token;
 import frontend.parser.ast;
 import utils;
+import ctfe;
 
-class CgdConstantFolding
+final class CgdConstantFolding
 {
 private:
+    CTFEContext ctfe;
     Program program;
     Context context;
 
@@ -24,7 +28,9 @@ private:
             case NodeKind.Identifier:
                 Identifier id = as!Identifier(n);
                 Symbol* sym = context.get(id.value);
-                writeln(sym);
+
+                // writeln(id.value);
+                // writeln(sym);
 
                 if (sym is null) 
                     goto end;
@@ -33,6 +39,7 @@ private:
                 if (symv is null) 
                     goto end;
 
+                sym.uses--;
                 return getConstant(symv.node.value);
 
             // constantes
@@ -44,6 +51,9 @@ private:
 
             case NodeKind.BinaryExpr:
                 return foldBinary(as!BinaryExpr(n));
+
+            case NodeKind.CallExpr:
+                return opt(n);
 
             default:
                 break;
@@ -114,9 +124,13 @@ private:
                 return null;
         }
 
-        if (op == "+")
-            if (l.kind == NodeKind.StringLit && r.kind == NodeKind.StringLit)
-                return new StringLit((cast(StringLit)l).value ~ (cast(StringLit)r).value, l.pos);
+        if (l.kind == NodeKind.StringLit && r.kind == NodeKind.StringLit)
+        {
+            dstring s1 = (cast(StringLit) l).value;
+            dstring s2 = (cast(StringLit) r).value;
+            if (op == "+")  return new StringLit(s1 ~ s2, l.pos);
+            if (op == "==") return new BoolLit(s1 == s2, l.pos);
+        }
 
         if (l.kind == NodeKind.IntLit)
             return fold!IntLit(op);
@@ -139,12 +153,8 @@ private:
                 return node;
 
             case NodeKind.FnDecl:
-                context.enter();
-
                 foreach (ref Node child; (as!FnDecl(node)).body)
                     child = opt(child);
-                
-                context.leave();
                 return node;
 
             case NodeKind.VarDecl:
@@ -170,6 +180,9 @@ private:
 
             case NodeKind.CallExpr:
                 CallExpr call = as!CallExpr(node);
+
+                dstring name = (cast(Identifier) call.fn).value;
+                bool allArgsIsFromComptime = true;
                 
                 foreach (ref Node child; call.args)
                 {
@@ -177,7 +190,29 @@ private:
                     if (fold !is null)
                         child = fold;
                     else
+                    {
                         child = opt(child);
+                        allArgsIsFromComptime = false;
+                    }
+                }
+
+                // writeln(name, " ", allArgsIsFromComptime);
+                // writeln(allArgsIsFromComptime);
+                // writeln(ctfe.functions);
+
+                if (allArgsIsFromComptime && name in ctfe.functions)
+                {
+                    // writeln("CTFE\n");
+                    CGDValue[] params = call.args.map!(arg => CTFECompile.nodeToCgdValue(arg)).array;
+                    ctfe.functions[name].context.params = params;
+                    
+                    vmHandle(&ctfe.functions[name]);
+                    node = CTFECompile.cgdValueToNode(ctfe.functions[name].context.ret[0]);
+
+                    ctfe.functions[name].pc = 0;
+
+                    Symbol* sym = context.get(name);
+                    sym.uses--;
                 }
                 
                 return node;
@@ -185,8 +220,12 @@ private:
             case NodeKind.IfStmt:
                 IfStmt ifs = as!IfStmt(node);
                 
-                ifs.expr = getConstant(ifs.expr);
-                ifs.opt = true;
+                Node constant = getConstant(ifs.expr);
+                if (constant)
+                {
+                    ifs.opt = true;
+                    ifs.expr = constant;
+                }
                 
                 foreach (ref Node child; ifs.body)
                     child = opt(child);
@@ -223,15 +262,15 @@ private:
     }
 
 public:
-    this(Program program, Context context)
+    this(Program program, Context context, CTFEContext ctfe)
     {
         this.program = program;
         this.context = context;
+        this.ctfe = ctfe;
     }
 
     void opt()
     {
-        context.cursor = 0;
         opt(program);
     }
 }

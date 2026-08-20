@@ -3,6 +3,7 @@ module frontend.semantic.sema1;
 
 import std.exception;
 import std.format;
+import std.stdio;
 
 import frontend.semantic;
 import frontend.parser;
@@ -36,13 +37,14 @@ private:
             err.error(node.pos, format("%s '%s' já existe.", ternary(sym.isFn(), "A função", "O simbolo"), name));
             alreadyDeclaredHere(name, getPosFromSymbol(sym), err);
         }
+        // writeln(node.args);
         context.set(name, new SymbolFn(node));
     }
 
     void addStdFunctions()
     {
         context.set("escreva", new SymbolFn(
-            new FnDecl("escreva", [], new TypeExprNamed("vazio", Position.init), [], Position.init), true));
+            new FnDecl("escreva", [], new TypeExprNamed("vazio", Position.init), [], 0, Position.init), true));
     }
 
 public:

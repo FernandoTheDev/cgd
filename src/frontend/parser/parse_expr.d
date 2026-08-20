@@ -6,6 +6,7 @@ import std.stdio;
 import frontend.parser;
 import frontend.lexer;
 import frontend;
+import ctfe;
 
 enum Precedence : ubyte {
     Low,
@@ -67,6 +68,10 @@ public:
                 p.consume(TokenKind.Of, "Esperado 'de' após o 'tipo'.");
                 Node val = parse();
                 return new TypeOfExpr(val, p.getPos(tk.pos, val.pos));
+
+            case TokenKind.Pure:
+                p.flags |= CTFEFlags.Pure;
+                return new NaN(tk.pos);
             
             default:
                 p.err.error(tk.pos, "Uma expressão é esperada.");

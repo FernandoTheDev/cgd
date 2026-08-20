@@ -14,6 +14,7 @@ private:
     uint offset;
 
 public:
+    ubyte flags;
     Diagnostics err;
     
     ParseType parseType;
@@ -129,19 +130,63 @@ public:
     {
         Node node;
         
-        if (isDecl())       node = parseDecl.parse();
-        else if (isStmt())  node = parseStmt.parse();
-        else                node = parseExpr.parse();
+        if (isDecl())
+            node = parseDecl.parse();
+        else if (isStmt())
+            node = parseStmt.parse();
+        else
+            node = parseExpr.parse();
         
         checkSemiColon(node.kind);
         return node;
+    }
+
+    Node[] parseBody(bool simpleStatemet = false)
+    {
+        Node[] body;
+
+        if (simpleStatemet && !check(TokenKind.LBrace))
+            body ~= parseIntern();
+        else
+        {
+            consume(TokenKind.LBrace, "Esperado '{'");
+            
+            while (!check(TokenKind.RBrace))
+            {
+                Node node = parseIntern();
+                if (node.kind == NodeKind.NaN) continue; // ignora
+                body ~= node;
+            }
+
+            consume(TokenKind.RBrace, "Esperado '}'");
+        }
+
+        return body;
+    }
+
+    ubyte getAndResetFlags()
+    {
+        ubyte tmp = flags;
+        flags = 0;
+        return tmp;
+    }
+
+    pragma(inline, true)
+    void resetFlags()
+    {
+        flags = 0;
     }
 
     Program parse()
     {
         Node[] body;
         while (!isAtEnd())
-            body ~= parseIntern();
+        {
+            Node node = parseIntern();
+            if (node.kind == NodeKind.NaN) continue; // ignora
+            body ~= node;
+            resetFlags();
+        }
         return new Program(body);
     }
 }

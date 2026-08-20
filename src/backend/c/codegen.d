@@ -66,7 +66,9 @@ private:
 
     void compileDecl(Node node)
     {
-        switch (node.kind) {
+        if (node is null || node.kind == NodeKind.NaN) return;
+        switch (node.kind) 
+        {
             case NodeKind.FnDecl:
                 return compileFnDecl(cast(FnDecl) node);
 
@@ -78,7 +80,10 @@ private:
 
     dstring compileStmt(Node node)
     {
-        switch (node.kind) {
+        if (node is null) return "/* Nó nulo recebido no codegen */";
+        if (node.kind == NodeKind.NaN) return "/* NaN */";
+        switch (node.kind) 
+        {
             case NodeKind.VarDecl:
                 VarDecl var = cast(VarDecl) node;
                 return formatD("%s %s = %s;", VALUE, var.name, compileExpr(var.value));
@@ -91,19 +96,7 @@ private:
                 return compileExpr(node) ~ ";";
 
             case NodeKind.IfStmt:
-                IfStmt ifstmt = cast(IfStmt) node;
-                dstring[] cd;
-                
-                if (!ifstmt.opt)
-                    cd = [formatD("if (delegua_is_truthy(%s)) {", compileExpr(ifstmt.expr))];
-                
-                foreach (Node n; ifstmt.body)
-                    cd ~= compileStmt(n);
-                
-                if (!ifstmt.opt)
-                    cd ~= "}";
-                
-                return cd.join("\n");
+                return compileIfStmt(to!IfStmt(node));
 
             case NodeKind.AssignStmt:
                 AssignStmt assign = cast(AssignStmt) node;
@@ -117,6 +110,7 @@ private:
     dstring compileExpr(Node node)
     {
         if (node is null) return "/* Nó nulo recebido no codegen */";
+        if (node.kind == NodeKind.NaN) return "/* NaN */";
 
         switch (node.kind) 
         {
@@ -179,6 +173,38 @@ private:
             emit(compileStmt(n), 4);
         
         emit("}");
+    }
+
+    dstring compileIfStmt(IfStmt ifstmt, bool fromIf = false)
+    {
+        dstring[] cd;
+
+        if (ifstmt.expr is null) // else puro
+        {
+            cd ~= fromIf ? "else {" : "else {";
+    
+            foreach (Node n; ifstmt.body)
+                cd ~= compileStmt(n);
+    
+            cd ~= "}";
+            return cd.join("\n");
+        }
+
+        cd ~= formatD("%s (delegua_is_truthy(%s)) {",
+            fromIf ? "else if" : "if", compileExpr(ifstmt.expr));
+
+        foreach (Node n; ifstmt.body)
+            cd ~= compileStmt(n);
+
+        if (ifstmt._else is null)
+            cd ~= "}";
+        else
+        {
+            cd[$-1] ~= " } ";
+            cd ~= compileIfStmt(ifstmt._else, true);
+        }
+
+        return cd.join("\n");
     }
 
     pragma(inline, true)
