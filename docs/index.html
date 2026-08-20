@@ -3,9 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CGD</title>
+    <title>CGD — Compilador Delégua</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
-    
+    <header class="navbar">
+        <div class="logo-container">
+            <img src="assets/logo.png" alt="Logo CGD" class="logo">
+            <span class="brand">cgd<span class="brand-dim">.exe</span></span>
+        </div>
+        <nav>
+            <a href="https://github.com/fernandothedev/cgd" class="link-source">código-fonte</a>
+            <a href="https://www.patreon.com/fernandothedev" target="_blank" class="btn-nav-support">Apoie-me</a>
+        </nav>
+    </header>
+
+    <main class="hero">
+        <div class="hero-text">
+            <span class="eyebrow">// compilador para delégua</span>
+            <h1>Compila rápido.<br>Falha alto.<br>Roda sério.</h1>
+            <p class="description">
+                O CGD passou por reescritas e reformulações arquiteturais completas.
+                O objetivo nunca mudou: um compilador robusto, previsível e rápido —
+                sem esconder o que acontece por baixo do capô.
+            </p>
+            <div class="cta-group">
+                <a href="https://github.com/fernandothedev/cgd" class="btn-primary">Ver código-fonte</a>
+                <a href="https://www.patreon.com/fernandothedev" target="_blank" class="btn-secondary">
+                    Apoie no Patreon
+                </a>
+            </div>
+        </div>
+
+        <div class="terminal" role="img" aria-label="Terminal mostrando a saída de compilação do CGD">
+            <div class="terminal-bar">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+                <span class="terminal-title">bash — cgd</span>
+            </div>
+            <div class="terminal-body">
+                <p class="line"><span class="prompt">$</span> cgd ola.delegua</p>
+                <!-- <p class="line out ok">[ok] <span class="dim">lexer</span> <span class="pad">·</span> 1284 tokens em 3ms</p>
+                <p class="line out ok">[ok] <span class="dim">parser</span> <span class="pad">·</span> AST validada</p>
+                <p class="line out ok">[ok] <span class="dim">análise semântica</span> <span class="pad">·</span> 0 erros</p>
+                <p class="line out ok">[ok] <span class="dim">codegen x64</span> <span class="pad">·</span> ABI System V</p>
+                <p class="line out warn">[--] <span class="dim">otimizações</span> <span class="pad">·</span> O2</p> -->
+                <p class="line"><span class="prompt">$</span> ./ola</p>
+                <p class="line out success">Olá Mundo!</p>
+                <p class="line"><span class="prompt">$</span> <span class="cursor">▌</span></p>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>Desenvolvido com dedicação por Fernando.</p>
+    </footer>
 </body>
 </html>
