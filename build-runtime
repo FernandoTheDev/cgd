@@ -2,7 +2,13 @@
 set -e
 
 cd vendor/delegua-runtime
-git pull origin dev --rebase
+
+# Proteção 1: Só tenta o pull se for um repositório git legítimo
+if [ -d ".git" ]; then
+    # Proteção 2: O '|| true' impede que o 'set -e' mate o script se estiver offline ou der conflito
+    git pull origin dev --rebase > /dev/null 2>&1 || true
+fi
+
 ./build
 cp libdelegua_rt.o ../../lib
 cd ../..
