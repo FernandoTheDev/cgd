@@ -133,6 +133,8 @@ if [ ! -f "$BIN_NAME" ]; then
 fi
 
 # --- 6. Instalação ---
+mkdir -p ./lib # Proteção: garante que "lib" seja um diretório
+
 info "Construindo o runtime da linguagem..."
 ./build-runtime
 
