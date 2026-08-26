@@ -81,8 +81,10 @@ private:
                     if ((cast(BoolLit) ifstmt.expr).value)
                         return new BlockStmt(ifstmt.body, ifstmt.pos);
                     else
+                    {
                         if (ifstmt._else is null) return null;
                         return cast(Node) ifstmt._else;
+                    }
                 }
                 
                 return node;
