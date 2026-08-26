@@ -1,0 +1,17 @@
+//$
+//! 23416728348467685
+//>puro
+função fibonacci(n: inteiro): inteiro {
+    var a = 0
+    var b = 1
+    var i = 0
+    enquanto i < n {
+        var temp = a + b
+        a = b
+        b = temp
+        i = i + 1
+    }
+    retorne a
+}
+
+escreva(fibonacci(80))

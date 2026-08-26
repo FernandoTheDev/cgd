@@ -1,3 +1,5 @@
+//$
+//! 67
 //>puro
 funcao soma(x, y) {
     retorne x + y

@@ -1,0 +1,47 @@
+//$
+//! Maior sequencia de Collatz ate 1000: 178
+//>puro
+funcao modulo_dois(n) {
+    retorne !(n & 1)
+}
+
+//>puro
+funcao passo_collatz(n) {
+    se modulo_dois(n) {
+        retorne n / 2
+    }
+    retorne (3 * n) + 1
+}
+
+//>puro
+funcao calcular_passos_collatz(n) {
+    var passos = 0
+    var atual = n
+    
+    enquanto atual > 1 {
+        atual = passo_collatz(atual)
+        passos = passos + 1
+    }
+    
+    retorne passos
+}
+
+//>puro
+funcao estresse_ctfe(limite) {
+    var maior_sequencia = 0
+    var i = 1
+    
+    enquanto i <= limite {
+        var passos_atuais = calcular_passos_collatz(i)
+        
+        se passos_atuais > maior_sequencia {
+            maior_sequencia = passos_atuais
+        }
+        
+        i = i + 1
+    }
+    
+    retorne maior_sequencia
+}
+
+escreva("Maior sequencia de Collatz ate 1000: ", estresse_ctfe(1000))

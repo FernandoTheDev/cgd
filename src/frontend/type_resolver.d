@@ -31,6 +31,10 @@ public:
             
                 return *tsema;
 
+            case TypeExprKind.Array:
+                TypeExprArray arr = cast(TypeExprArray) type;
+                return new TypeSemaArray(resolver(arr.base));
+
             default:
                 writeln("Falha ao resolver tipo.");
                 return new TypeSemaBuiltin(TypeSemaBase.Any);

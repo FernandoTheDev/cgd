@@ -14,11 +14,10 @@ cgd-test-*
 *.o
 *.obj
 *.lst
-performance
-bench
-out
 *.out
 *.bak
 /*.c
-a.d
+/tp
 *.txt
+/rm
+/lib

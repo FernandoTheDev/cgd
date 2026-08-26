@@ -1,0 +1,10 @@
+//$
+//! verdadeiro
+//>puro
+funcao menorQue(n, m) {
+    se n <= m
+        retorne verdadeiro
+    retorne falso
+}
+
+escreva(menorQue(10, 20))

@@ -19,11 +19,14 @@ enum NodeKind : ubyte
     IntLit,
     DoubleLit,
     BoolLit,
+    ArrayLit,
     
     BinaryExpr,
     UnaryExpr,
     CallExpr,
     TypeOfExpr,
+    IndexExpr,
+    MemberExpr,
     
     FnDecl,
     VarDecl,
@@ -31,10 +34,11 @@ enum NodeKind : ubyte
     AssignStmt,
     ReturnStmt,
     IfStmt,
+    BlockStmt,
+    WhileStmt,
 
     // TODO
     // ForStmt,
-    // WhileStmt,
 }
 
 abstract class Node
@@ -227,17 +231,19 @@ class UnaryExpr : Node
 {
     Node value;
     TokenKind op;
+    bool post;
 
-    this(Node val, TokenKind o, Position pos)
+    this(Node val, TokenKind o, bool post, Position pos)
     {
         super(NodeKind.UnaryExpr, pos);
-        value = val;
-        op = o;
+        this.value = val;
+        this.op = o;
+        this.post = post;
     }
 
     override void print(uint indent = 0)
     {
-        writef("UnaryExpr(%s)", tokenKindStr(op));
+        writef("UnaryExpr(%s) : post -> %d", tokenKindStr(op), post);
         if (type_sema !is null)
             writef(" : %s", type_sema.toStr());
         writeln();
@@ -289,6 +295,12 @@ class FnArg {
         this.value = value;
         this.pos = pos;
     }
+
+    this(TypeSema type, Position pos)
+    {
+        this.type_sema = type;
+        this.pos = pos;
+    }
 }
 
 class FnDecl : Node
@@ -304,6 +316,17 @@ class FnDecl : Node
         this.fn = fn;
         this.args = args;
         this.type_expr = type;
+        this.body = body;
+        this.ctfe_flags = ctfe_flags;
+    }
+
+
+    this(dstring fn, FnArg[] args, TypeSema type, Node[] body, ubyte ctfe_flags, Position pos)
+    {
+        super(NodeKind.FnDecl, pos);
+        this.fn = fn;
+        this.args = args;
+        this.type_sema = type;
         this.body = body;
         this.ctfe_flags = ctfe_flags;
     }
@@ -458,7 +481,110 @@ class NaN : Node
     }
 }
 
-private void printIndent(uint indent, bool isLast)
+class BlockStmt : Node
+{
+    Node[] body;
+
+    this(Node[] body, Position pos)
+    {
+        super(NodeKind.BlockStmt, pos);
+        this.body = body;
+    }
+
+    override void print(uint indent = 0)
+    {
+        foreach (i, node; body)
+        {
+            bool isLast = (i == cast(size_t) body.length - 1);
+            printIndent(indent, isLast);
+            node.print(indent + 1);
+        }
+    }
+}
+
+class ArrayLit : Node
+{
+    Node[] elements;
+
+    this(Node[] elements, Position pos)
+    {
+        super(NodeKind.ArrayLit, pos);
+        this.elements = elements;
+        this.type_expr = new TypeExprArray(new TypeExprNamed(TypeSemaBase.Any, pos), pos);
+    }
+
+    override void print(uint indent = 0)
+    {
+        writefln("ArrayLit");
+    }
+}
+
+class IndexExpr : Node
+{
+    Node value, idx;
+
+    this(Node value, Node idx, Position pos)
+    {
+        super(NodeKind.IndexExpr, pos);
+        this.value = value;
+        this.idx = idx;
+        this.type_expr = new TypeExprNamed(TypeSemaBase.Any, pos);
+    }
+
+    override void print(uint indent = 0)
+    {
+        writefln("IndexExpr");
+    }
+}
+
+class WhileStmt : Node
+{
+    Node expr;
+    Node[] body;
+
+    this(Node expr, Node[] body, Position pos)
+    {
+        super(NodeKind.WhileStmt, pos);
+        this.body = body;
+        this.expr = expr;
+    }
+
+    override void print(uint indent = 0)
+    {
+        writefln("WhileStmt");
+        printIndent(indent);
+        expr.print(indent);
+        foreach (i, node; body)
+        {
+            bool isLast = (i == cast(size_t) body.length - 1);
+            printIndent(indent, isLast);
+            node.print(indent + 1);
+        }
+    }
+}
+
+class MemberExpr : Node
+{
+    Node left, right;
+
+    this(Node left, Node right, Position pos)
+    {
+        super(NodeKind.MemberExpr, pos);
+        this.left = left;
+        this.right = right;
+    }
+
+    override void print(uint indent = 0)
+    {
+        writefln("MemberExpr");
+        printIndent(indent);
+        left.print(indent);
+        printIndent(indent);
+        right.print(indent);
+    }
+}
+
+private void printIndent(uint indent, bool isLast = false)
 {
     foreach (i; 0 .. indent)
         write("│   ");

@@ -1,3 +1,5 @@
+//# 1
+
 funcao principal() {
     var x = 10
     var x = 67

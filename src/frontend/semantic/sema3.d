@@ -1,12 +1,16 @@
 // resolve todos os nodes
 module frontend.semantic.sema3;
 
+import std.algorithm;
 import std.exception;
 import std.format;
+import std.array;
 import std.stdio;
 
+import backend.c.codegen;
 import frontend.semantic;
 import frontend.parser;
+import backend.c.utils;
 import ctfe.ctfe_flags;
 import frontend.lexer;
 import frontend;
@@ -21,7 +25,7 @@ private:
     TypeResolver resolver;
     Diagnostics err;
 
-    Node analyze(Node node)
+    Node analyze(Node node, bool comptimeValue = false)
     {
         if (node.type_sema !is null || node.kind == NodeKind.NaN) return node;
 
@@ -46,7 +50,7 @@ private:
                 return analyzeReturnStmt(as!ReturnStmt(node));
 
             case NodeKind.Identifier:
-                return analyzeIdentifier(as!Identifier(node));
+                return analyzeIdentifier(as!Identifier(node), comptimeValue);
 
             case NodeKind.TypeOfExpr:
                 return analyzeTypeOfExpr(node);
@@ -61,14 +65,148 @@ private:
                 node.type_sema = resolver.resolver(node.type_expr);
                 return node;
 
+            case NodeKind.ArrayLit:
+                return analyzeArrayLit(as!ArrayLit(node));
+
+            case NodeKind.IndexExpr:
+                return analyzeIndexExpr(as!IndexExpr(node));
+
+            case NodeKind.WhileStmt:
+                return analyzeWhileStmt(as!WhileStmt(node));
+
+            case NodeKind.UnaryExpr:
+                return analyzeUnaryExpr(as!UnaryExpr(node));
+
+            case NodeKind.MemberExpr:
+                return analyzeMemberExpr(as!MemberExpr(node));
+
             default:
                 err.error(node.pos, "Node desconhecido.");
                 return node;
         }
     }
 
+    Node analyzeMemberExpr(MemberExpr node)
+    {
+        node.left = analyze(node.left);
+
+        if (node.right.kind != NodeKind.CallExpr)
+        {
+            err.error(node.right.pos, "Não é possível realizar esta ação.");
+            return node;
+        }
+
+        CallExpr call = as!CallExpr(node.right);
+        dstring fname = as!Identifier(call.fn).value;
+
+        BuiltinTypeFn[dstring]* inner = node.left.type_sema.kind in builtinTypeFn;
+        BuiltinTypeFn* builtin = inner !is null ? (fname in *inner) : null;
+        
+        if (builtin is null)
+        {
+            err.error(call.pos, format("Propriedade '%s' não encontrada.", fname));
+            return node;
+        }
+
+        dstring sym = node.left.type_sema.toStr() ~ "__" ~ fname;
+        // writeln(sym);
+        // writeln(*builtin);
+
+        FnArg[] args = builtin.args.map!(t => new FnArg(t, call.pos)).array;
+        call.fn = new Identifier(sym, call.fn.pos);
+
+        context.set(sym, new SymbolFn(new FnDecl(sym, args, builtin.ret, (Node[]).init, cast(ubyte) 0, call.pos)));
+        node.right = analyze(node.right);
+
+        context.remove(sym);
+        call.fn = new Identifier(fname, call.fn.pos);
+
+        return node;
+    }
+
+    Node analyzeUnaryExpr(UnaryExpr node)
+    {
+        analyze(node.value);
+        node.type_sema = node.value.type_sema;
+
+        bool[TokenKind] opsNums = [
+            TokenKind.PPlus: false,
+            TokenKind.MMinus: false,
+        ];
+        
+        if (node.op in opsNums && !node.value.type_sema.isNumeric())
+            err.error(node.pos, "Não é possível usar operadores unários em valores não numéricos.");
+
+        return node;
+    }
+
+    Node analyzeWhileStmt(WhileStmt node)
+    {
+        analyze(node.expr);
+        
+        foreach (Node child; node.body)
+            analyze(child);
+        
+        return node;
+    }
+
+    Node analyzeArrayLit(ArrayLit node)
+    {
+        foreach (Node element; node.elements)
+            analyze(element);
+
+        node.type_sema = resolver.resolver(node.type_expr);
+        return node;   
+    }
+
+    Node analyzeIndexExpr(IndexExpr node)
+    {
+        node.value = analyze(node.value);
+        node.idx = analyze(node.idx);
+
+        Node value = node.value;
+        Node idx = node.idx;
+
+        // permitindo apenas em vetores e textos por enquanto
+        dstring type = value.type_sema.toStr();
+        if (!value.type_sema.isArray() && type != TypeSemaBase.String && type != TypeSemaBase.Any)
+        {
+            err.error(node.pos, 
+                format("Não é possível acessar o campo do tipo '%s'. Apenas vetores e textos são permitidos", type));
+            return node;
+        }
+
+        dstring type2 = idx.type_sema.toStr();
+        if (type2 != TypeSemaBase.Int)
+        {
+            err.error(node.pos, 
+                format("O indíce deve ser do tipo '%s', foi recebido '%s'.", TypeSemaBase.Int, type2));
+            return node;
+        }
+
+        if (TypeSemaArray typeArr = cast(TypeSemaArray) value.type_sema)
+            node.type_sema = typeArr.base;
+        else
+            node.type_sema = value.type_sema;
+
+        return node;
+    }
+
+    Node analyzeAssignStmtIdx(AssignStmt node)
+    {
+        // val[idx] = 42
+        node.left = analyze(node.left); // val[idx]
+        node.value = analyze(node.value); // 42
+        checkTypes(node.pos, node.left.type_sema, node.value.type_sema);
+        
+        return node;
+    }
+
     Node analyzeAssignStmt(AssignStmt node)
     {
+        if (node.left.kind == NodeKind.IndexExpr)
+            return analyzeAssignStmtIdx(node);
+
         if (node.left.kind != NodeKind.Identifier)
         {
             err.error(node.pos, "Atribuição inválida: o lado esquerdo da operação deve ser uma variável.");
@@ -105,11 +243,11 @@ private:
     Node analyzeTypeOfExpr(Node node)
     {
         TypeOfExpr toe = as!TypeOfExpr(node);
-        toe.value = analyze(toe.value);
+        toe.value = analyze(toe.value, true);
         return analyze(new StringLit(toe.value.type_sema.toStr(), node.pos));
     }
 
-    Node analyzeIdentifier(Identifier node)
+    Node analyzeIdentifier(Identifier node, bool comptimeValue)
     {
         Symbol* sym = context.get(node.value);
         
@@ -125,7 +263,9 @@ private:
             alreadyDeclaredHere(node.value, (cast(SymbolFn*) sym).node.pos, err);
         }
 
-        sym.uses++;
+        if (!comptimeValue)
+            sym.uses++;
+            
         node.type_sema = (cast(SymbolVar*) sym).node.type_sema;
         return node;
     }
@@ -164,7 +304,14 @@ private:
         Symbol* sym = context.get(name);
         
         if (sym is null)
-            err.error(node.pos, format("A função '%s' não existe.", name));
+        {
+            dstring suggest = context.suggest(name);
+            err.error(node.pos, format("A função '%s' não existe%s",
+                name,
+                suggest == "" ? "." : format(", você quer dizer '%s'?", suggest)
+            ));
+            return node;
+        }
 
         sym.uses++;
         SymbolFn* symf = cast(SymbolFn*) sym;
@@ -280,6 +427,11 @@ private:
     pragma(inline, true)
     bool checkTypes(Position pos, TypeSema t1, TypeSema t2)
     {
+        if (t1 is null || t2 is null)
+        {
+            err.error(pos, "Alguma das expressões está com o tipo inválido.");
+            return false;
+        }
         bool comp = t1.isComp(t2);
         if (!comp)
             err.error(pos, format("Incompatibilidade de tipo: era esperado '%s' mas foi recebido '%s'.",

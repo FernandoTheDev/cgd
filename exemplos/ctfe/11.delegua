@@ -1,0 +1,8 @@
+//$
+//! Resultado: 67
+//>puro
+funcao soma(a, b, c) {
+    retorne a + b + c
+}
+
+escreva("Resultado: ", soma(soma(10, 0.99, 18.01), verdadeiro, 37.0))

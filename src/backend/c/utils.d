@@ -38,3 +38,12 @@ dstring compileEscreva(BackendC ctx, Node node)
     CallExpr call = cast(CallExpr) node;
     return formatD("delegua_escreva(%d, %s)", call.args.length, ctx.nodesToStr(call.args));
 }
+
+dstring compileVetorAdicionar(BackendC ctx, Node node)
+{
+    MemberExpr member = cast(MemberExpr) node;
+    dstring vetor = ctx.compileExpr(member.left);
+    CallExpr call = cast(CallExpr) member.right;
+    dstring[] args = call.args.map!(arg => ctx.compileExpr(arg)).array;
+    return formatD("delegua_vetor_adicionar(&%s, %s);", vetor, args.join(", "));
+}

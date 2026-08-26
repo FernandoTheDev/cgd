@@ -1,8 +1,13 @@
+//$
+//! 55
+
+//>puro
 função soma(x, y) {
     retorne x + y
 }
 
 
+//>puro
 função fibonacci(n: numero): numero {
     se n <= 1 
         retorne n

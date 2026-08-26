@@ -1,0 +1,9 @@
+//! [Fernando, [Dev], Dev]\nFernando Dev
+var arr = ["Fernando", ["Jonas"]]
+
+arr[1][0] = "Dev"
+arr.adicionar("Dev")
+
+escreva(arr)
+escreva(arr[0] + " " + arr[1][0])
+

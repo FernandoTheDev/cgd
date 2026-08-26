@@ -1,0 +1,9 @@
+//$
+//! FernandoDev
+
+//>puro
+funcao concatenar(s1, s2) {
+    retorne s1 + s2
+}
+
+escreva(concatenar("Fernando", "Dev"))

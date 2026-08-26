@@ -50,12 +50,16 @@ private:
 
     immutable TokenKind[dstring] symbols = [
         "+": TokenKind.Plus,
+        "++": TokenKind.PPlus,
         "-": TokenKind.Minus,
+        "--": TokenKind.MMinus,
         "/": TokenKind.Slash,
         "*": TokenKind.Star,
+        "%": TokenKind.Modulo,
         
         "=": TokenKind.Equals,
         "==": TokenKind.EEquals,
+        "!=": TokenKind.NEquals,
         
         "(": TokenKind.LParen,
         ")": TokenKind.RParen,
@@ -68,6 +72,7 @@ private:
         
         ":": TokenKind.Colon,
         ";": TokenKind.Semicolon,
+        "!": TokenKind.Bang,
         
         ",": TokenKind.Comma,
         ".": TokenKind.Dot,
@@ -77,6 +82,13 @@ private:
         
         ">": TokenKind.GThan,
         ">=": TokenKind.GEquals,
+
+        "&": TokenKind.BITAnd,
+        "|": TokenKind.BITOr,
+        "~": TokenKind.BITNot,
+        "^": TokenKind.BITXor,
+        "<<": TokenKind.BITSL,
+        ">>": TokenKind.BITSR,
     ];
 
     immutable TokenKind[dstring] ctfeKeywords = [

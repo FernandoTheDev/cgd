@@ -1,3 +1,5 @@
+//$
+//! 100
 //>puro
 funcao teste(y) {
     var x = 10 * y

@@ -1,0 +1,16 @@
+//! O valor não está desligado.
+
+const LIGADO = 1
+const DESLIGADO = 0
+
+var valor = 0
+valor = valor | LIGADO
+valor = valor & ~LIGADO
+
+se valor & LIGADO {
+    escreva("O valor está ligado.")
+}
+
+se !(valor & DESLIGADO) {
+    escreva("O valor não está desligado.")
+}

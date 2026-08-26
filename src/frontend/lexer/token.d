@@ -40,7 +40,18 @@ enum TokenKind : ubyte
     Slash,
     Modulo,
     Plus,
+    PPlus,
     Minus,
+    MMinus,
+    Bang,
+
+    BITAnd,
+    BITOr,
+    BITXor,
+    BITNot,
+    BITSR,
+    BITSL,
+
     LThan,
     GThan,
     LEquals,
@@ -48,6 +59,7 @@ enum TokenKind : ubyte
 
     Equals,
     EEquals,
+    NEquals,
 
     Colon,
     Semicolon,

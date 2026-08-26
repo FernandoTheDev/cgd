@@ -202,14 +202,8 @@ private:
 
                 if (allArgsIsFromComptime && name in ctfe.functions)
                 {
-                    // writeln("CTFE\n");
                     CGDValue[] params = call.args.map!(arg => CTFECompile.nodeToCgdValue(arg)).array;
-                    ctfe.functions[name].context.params = params;
-                    
-                    vmHandle(&ctfe.functions[name]);
-                    node = CTFECompile.cgdValueToNode(ctfe.functions[name].context.ret[0]);
-
-                    ctfe.functions[name].pc = 0;
+                    node = ctfe.call(name, params);
 
                     Symbol* sym = context.get(name);
                     sym.uses--;
@@ -254,6 +248,21 @@ private:
                     }
                 }
                 
+                return node;
+
+            case NodeKind.WhileStmt:
+                /* TODO:
+                ** LOOPS PRECISAM DE ANALISE PROFUNDA PRA EVITAR EFEITO COLATERAL
+                ** NÃO DÁ PRA RESOLVER AQUI ASSSIM
+                **/
+
+                // WhileStmt wstmt = as!WhileStmt(node);
+                // Node constant = getConstant(wstmt.expr);
+                // if (constant)
+                //     wstmt.expr = constant;
+                // foreach (ref Node child; wstmt.body)
+                //     child = opt(child);
+
                 return node;
 
             default:

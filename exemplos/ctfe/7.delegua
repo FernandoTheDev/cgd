@@ -1,0 +1,13 @@
+//$
+//! 4
+//>puro
+funcao multiplicacao(x, y) {
+    retorne x * y
+}
+
+//>puro
+funcao quadrado(x) {
+    retorne multiplicacao(x, x)
+}
+
+escreva(quadrado(2))

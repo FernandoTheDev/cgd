@@ -11,17 +11,10 @@ import cli;
 void main(string[] args)
 {
     cgd_validar(args.length > 1, "Esperado ao menos um argumento.");
-
     CGDArguments arguments;
 
     try
-        getopt(args,
-            "a|ajuda", &arguments.showHelp,
-            "v|versao", &arguments.showVersion,
-            "o|otimizar", &arguments.opt,
-            "depurar", &arguments.showDebug,
-            "s|saida", &arguments.output,
-        );
+        cli_parse(args, arguments);
     catch (GetOptException e)
     {
         writefln("Flag invalida: %s\n", e.msg[20..$]);
