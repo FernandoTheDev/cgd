@@ -134,7 +134,7 @@ private:
             TokenKind.MMinus: false,
         ];
         
-        if (node.op in opsNums && !node.value.type_sema.isNumeric())
+        if (node.op in opsNums && (!node.value.type_sema.isNumeric() && !node.value.type_sema.isAny()))
             err.error(node.pos, "Não é possível usar operadores unários em valores não numéricos.");
 
         return node;

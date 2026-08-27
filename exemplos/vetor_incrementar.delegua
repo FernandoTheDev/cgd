@@ -1,0 +1,6 @@
+//! 66\n67\n67
+var x = [66]
+escreva(x[0]++)
+escreva(x[0])
+var z = x[0]--
+escreva(z)

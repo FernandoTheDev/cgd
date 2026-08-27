@@ -135,6 +135,7 @@ private:
             case NodeKind.IntLit:
             case NodeKind.DoubleLit:
             case NodeKind.BoolLit:
+            case NodeKind.BlockStmt:
                 return node;
 
             case NodeKind.BinaryExpr:
@@ -194,9 +195,9 @@ private:
         ass.value = loweringExpr(ass.value);
         stmts ~= ass;
 
-        Identifier result = un.post
-            ? new Identifier(tmpName, un.pos)        // i++ -> valor antigo (temp)
-            : cast(Identifier) un.value;             // ++i -> valor novo (o próprio i)
+        Node result = un.post
+            ? new Identifier(tmpName, un.pos) // i++ -> valor antigo (temp)
+            : un.value;                       // ++i -> valor novo (o próprio i)
 
         stmts ~= result;
 

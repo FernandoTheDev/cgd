@@ -1,0 +1,7 @@
+//! 67
+var x = [[66]]
+
+var i = 0
+var j = 0
+
+escreva(++x[i][j])
