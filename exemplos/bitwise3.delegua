@@ -1,0 +1,29 @@
+//! resultado: 42
+funcao full_adder(a, b, c) {
+    var cin = c[0]
+    var axb = a ^ b
+    var sum = axb ^ cin
+    var c1 = a & b 
+    var c2 = cin & axb 
+    c[0] = c1 | c2
+    retorne sum
+}
+
+funcao add_bits(A, B) {
+    var resultado = 0
+    var carry = [0]
+
+    var i = 0
+    enquanto (i < 32) {
+        var a_bits = (A >> i) & 1
+        var b_bits = (B >> i) & 1
+        var sum_bit = full_adder(a_bits, b_bits, carry)
+        resultado = resultado | (sum_bit << i++)
+    }
+
+    retorne resultado
+}
+
+var a = 27
+var b = 15
+escreva("resultado: ", add_bits(a, b))

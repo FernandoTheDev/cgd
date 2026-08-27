@@ -10,6 +10,7 @@ if [ -d ".git" ]; then
 fi
 
 ./build
+mkdir -p ../../lib # Proteção 3: garante que "lib" seja um diretório
 cp libdelegua_rt.o ../../lib
 cd ../..
 

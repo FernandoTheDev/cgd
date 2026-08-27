@@ -37,6 +37,13 @@ public:
         return new ReturnStmt(p.parseExpr.parse(), pos);
     }
 
+    Node parseWhileStmt(Position pos)
+    {
+        Node expr = p.parseExpr.parse();
+        Node[] body = p.parseBody(true);
+        return new WhileStmt(expr, body, p.getPos(pos, expr.pos));
+    }
+
     Node parse()
     {
         Token tk = p.advance();
@@ -47,6 +54,9 @@ public:
 
             case TokenKind.Return:
                 return parseReturnStmt(tk.pos);
+
+            case TokenKind.While:
+                return parseWhileStmt(tk.pos);
 
             default:
                 return new Identifier("null", tk.pos);

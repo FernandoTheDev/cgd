@@ -1,0 +1,187 @@
+//$
+//# 0
+
+//>puro
+funcao eh_par(n) {
+    retorne !(n & 1)
+}
+
+//>puro
+funcao colapso_collatz(n) {
+    se eh_par(n) {
+        retorne n / 2
+    }
+    retorne (n * 3) + 1
+}
+
+//>puro
+funcao passos_collatz(n) {
+    var passos = 0
+    var atual = n
+    enquanto atual > 1 {
+        atual = colapso_collatz(atual)
+        passos = passos + 1
+    }
+    retorne passos
+}
+
+//>puro
+funcao fibonacci_iterativo(n) {
+    var a = 0
+    var b = 1
+    var i = 0
+    enquanto i < n {
+        var temp = a + b
+        a = b
+        b = temp
+        i = i + 1
+    }
+    retorne a
+}
+
+//>puro
+funcao fatorial(n) {
+    var resultado = 1
+    var i = 2
+    enquanto i <= n {
+        resultado = resultado * i
+        i = i + 1
+    }
+    retorne resultado
+}
+
+//>puro
+funcao potencia(base, expoente) {
+    var resultado = 1
+    var i = 0
+    enquanto i < expoente {
+        resultado = resultado * base
+        i = i + 1
+    }
+    retorne resultado
+}
+
+//>puro
+funcao mdc(a, b) {
+    var x = a
+    var y = b
+    enquanto !(y == 0) {
+        var temp = y
+        y = x % y
+        x = temp
+    }
+    retorne x
+}
+
+//>puro
+funcao eh_primo(n) {
+    se n < 2 {
+        retorne falso
+    }
+    var i = 2
+    var primo = verdadeiro
+    enquanto i * i <= n {
+        se n % i == 0 {
+            primo = falso
+        }
+        i = i + 1
+    }
+    retorne primo
+}
+
+//>puro
+funcao contar_primos_ate(limite) {
+    var contagem = 0
+    var i = 2
+    enquanto i <= limite {
+        se eh_primo(i) {
+            contagem = contagem + 1
+        }
+        i = i + 1
+    }
+    retorne contagem
+}
+
+//>puro
+funcao soma_digitos(n) {
+    var soma = 0
+    var atual = n
+    enquanto atual > 0 {
+        soma = soma + (atual % 10)
+        atual = atual / 10
+    }
+    retorne soma
+}
+
+//>puro
+funcao eh_palindromo_numerico(n) {
+    var original = n
+    var invertido = 0
+    var atual = n
+    enquanto atual > 0 {
+        invertido = (invertido * 10) + (atual % 10)
+        atual = atual / 10
+    }
+    retorne original == invertido
+}
+
+//>puro
+funcao media_ponderada(a, b, peso) {
+    retorne (a * peso) + (b * (1.0 - peso))
+}
+
+//>puro
+funcao distancia_aproximada(dx, dy) {
+    var soma_quadrados = (dx * dx) + (dy * dy)
+    var estimativa = soma_quadrados / 2.0
+    var i = 0
+    enquanto i < 5 {
+        estimativa = (estimativa + (soma_quadrados / estimativa)) / 2.0
+        i = i + 1
+    }
+    retorne estimativa
+}
+
+//>puro
+funcao combinar_metricas(n1, n2, n3) {
+    var passos_a = passos_collatz(n1)
+    var passos_b = passos_collatz(n2)
+    var fib = fibonacci_iterativo(n3)
+    var fat = fatorial(6)
+    var pot = potencia(2, 10)
+    var divisor = mdc(passos_a * 4, passos_b * 6)
+    var primos = contar_primos_ate(50)
+    var dig = soma_digitos(123456789)
+    var palindromo = eh_palindromo_numerico(12321)
+    var media = media_ponderada(passos_a, passos_b, 0.65)
+    var dist = distancia_aproximada(3, 4)
+
+    var acumulado = fib + fat + pot + divisor + primos + dig
+    var ajustado = acumulado - (media * 2.0) + dist
+
+    retorne ajustado
+}
+
+// variaveis mortas em cascata: cada uma so alimenta a proxima,
+// nenhuma delas jamais e usada no resultado final.
+var lixo_1 = fatorial(4)
+var lixo_2 = lixo_1 * potencia(2, 3)
+var lixo_3 = lixo_2 + fibonacci_iterativo(10)
+var lixo_4 = mdc(lixo_3, 17)
+var lixo_5 = contar_primos_ate(lixo_4)
+
+// outra cadeia morta, independente da primeira
+var descartavel_a = passos_collatz(31)
+var descartavel_b = descartavel_a * descartavel_a
+var descartavel_c = soma_digitos(descartavel_b)
+
+var resultado_principal = combinar_metricas(27, 97, 15)
+var resultado_secundario = combinar_metricas(6, 11, 8)
+
+var total = resultado_principal + resultado_secundario
+
+escreva("Resultado principal: ", resultado_principal)
+escreva("Resultado secundario: ", resultado_secundario)
+escreva("Total: ", total)
+escreva("Primo 97? ", eh_primo(97))
+escreva("Palindromo 909? ", eh_palindromo_numerico(909))

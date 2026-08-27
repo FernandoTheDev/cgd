@@ -1,0 +1,4 @@
+//! 0\n2
+var i = 0
+escreva(i++) // 0
+escreva(++i) // 2

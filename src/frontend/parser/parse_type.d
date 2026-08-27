@@ -31,5 +31,14 @@ public:
         }
     }
 
-    TypeExpr parse() => parsePrimary();
+    TypeExpr parse()
+    {
+        TypeExpr type = parsePrimary();
+        if (p.match(TokenKind.LBracket))
+        {
+            type = new TypeExprArray(type, type.pos);
+            p.consume(TokenKind.RBracket, "Esperado ']' após o tipo.");
+        }
+        return type;
+    }
 }

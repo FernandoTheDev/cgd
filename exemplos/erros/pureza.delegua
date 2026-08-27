@@ -1,3 +1,5 @@
+//$
+//# 1
 //>puro
 funcao teste(mensagem: texto) {
     escreva(mensagem)

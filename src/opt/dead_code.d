@@ -20,9 +20,22 @@ private:
     Node[] remove(Node[] body)
     {
         Node[] newBody;
+        bool ret;
         foreach (Node child; body)
-            if (remove(child) !is null)
-                newBody ~= child;
+        {
+            Node res = remove(child);
+            
+            if (res is null) 
+                continue;
+            
+            if (ret) 
+                continue;
+            
+            if (res.kind == NodeKind.ReturnStmt)
+                ret = true;
+            
+            newBody ~= res;
+        }
         return newBody;
     }
 
@@ -46,11 +59,35 @@ private:
                 Symbol* sym = context.get((cast(VarDecl) node).name);
                 if (sym is null) return node;
                 long uses = sym.uses;
+                // writefln("var: %s = %d", (cast(SymbolVar*)sym).node.name, uses);
                 return uses > 0 ? node : null;
 
             case NodeKind.AssignStmt:
                 AssignStmt assign = cast(AssignStmt) node;
                 return context.get((cast(Identifier)assign.left).value).uses > 0 ? node : null;
+
+            case NodeKind.IfStmt:
+                IfStmt ifstmt = cast(IfStmt) node;
+                ifstmt.body = remove(ifstmt.body);
+                
+                if (ifstmt.expr is null)
+                    return new BlockStmt(ifstmt.body, ifstmt.pos);
+
+                if (ifstmt._else !is null)
+                    ifstmt._else = cast(IfStmt) remove(cast(Node) ifstmt._else);
+
+                if (ifstmt.expr.kind == NodeKind.BoolLit)
+                {
+                    if ((cast(BoolLit) ifstmt.expr).value)
+                        return new BlockStmt(ifstmt.body, ifstmt.pos);
+                    else
+                    {
+                        if (ifstmt._else is null) return null;
+                        return cast(Node) ifstmt._else;
+                    }
+                }
+                
+                return node;
 
             default:
                 return node;

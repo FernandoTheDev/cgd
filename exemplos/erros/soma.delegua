@@ -1,4 +1,4 @@
-//> em_linha
+//# 1
 funcao soma(x: inteiro, y: inteiro) {
     retorna x + y
 }

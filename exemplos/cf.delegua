@@ -1,3 +1,5 @@
+//$
+//! real\nCGD\ny: 67
 variavel x = 10
 fixo z = 60
 var y = x * 10 - z * (1.0 * 76) + 4460.0 + 67

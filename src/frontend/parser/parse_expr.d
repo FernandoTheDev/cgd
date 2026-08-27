@@ -8,7 +8,8 @@ import frontend.lexer;
 import frontend;
 import ctfe;
 
-enum Precedence : ubyte {
+enum Precedence : ubyte 
+{
     Low,
     Assign, // = += -= etc
     Ternary, // ?
@@ -72,6 +73,26 @@ public:
             case TokenKind.Pure:
                 p.flags |= CTFEFlags.Pure;
                 return new NaN(tk.pos);
+
+            case TokenKind.LBracket:
+                Node[] values;
+                while (!p.isAtEnd() && !p.check(TokenKind.RBracket))
+                {
+                    values ~= parse();
+                    if (!p.check(TokenKind.RBracket))
+                        p.consume(TokenKind.Comma, "Esperado ',' após o elemento.");
+                }
+                Position end = p.consume(TokenKind.RBracket, "Esperado ']' após o vetor.").pos;
+                return new ArrayLit(values, p.getPos(tk.pos, end));
+
+            case TokenKind.Plus:
+            case TokenKind.PPlus:
+            case TokenKind.Minus:
+            case TokenKind.MMinus:
+            case TokenKind.BITNot:
+            case TokenKind.Bang:
+                Node expr = parse(Precedence.Unary);
+                return new UnaryExpr(expr, tk.kind, false, p.getPos(tk.pos, expr.pos));
             
             default:
                 p.err.error(tk.pos, "Uma expressão é esperada.");
@@ -94,14 +115,27 @@ public:
             if (!p.check(TokenKind.RParen))
                 p.consume(TokenKind.Comma, "Esperado ',' após o valor.");
         }
-        p.consume(TokenKind.RParen, "Esperado ')' após a chamada da função.");
-        return new CallExpr(left, args, left.pos);
+        Position end = p.consume(TokenKind.RParen, "Esperado ')' após a chamada da função.").pos;
+        return new CallExpr(left, args, p.getPos(left.pos, end));
     }
 
     Node parseAssignStmt(Node left, TokenKind op)
     {
         Node value = parse();
         return new AssignStmt(left, value, op, p.getPos(left.pos, value.pos));
+    }
+
+    Node parseIndexExpr(Node value)
+    {
+        Node index = parse(Precedence.Call);
+        Position end = p.consume(TokenKind.RBracket, "Esperado ']' após o indice.").pos;
+        return new IndexExpr(value, index, p.getPos(value.pos, end));
+    }
+
+    Node parseMemberExpr(Node left)
+    {
+        Node right = parse();
+        return new MemberExpr(left, right, p.getPos(left.pos, right.pos));
     }
 
     Node led(Node left)
@@ -119,11 +153,23 @@ public:
             case EEquals:
             case LEquals:
             case GEquals:
+            case BITAnd:
+            case BITOr:
+            case BITXor:
+            case BITSL:
+            case BITSR:
                 return parseBinaryExpr(tk.kind, left);
             case LParen:
                 return parseCallExpr(left);
             case Equals:
                 return parseAssignStmt(left, tk.kind);
+            case LBracket:
+                return parseIndexExpr(left);
+            case Dot:
+                return parseMemberExpr(left);
+            case PPlus:
+            case MMinus:
+                return new UnaryExpr(left, tk.kind, true, p.getPos(left.pos, tk.pos));
             default:
                 return left;
         }
@@ -149,8 +195,23 @@ public:
             case Slash:
             case Modulo:
                 return Precedence.Mul;
+            case BITAnd:
+                return Precedence.BitAnd;
+            case BITOr:
+                return Precedence.BitOr;
+            case BITXor:
+                return Precedence.BitXor;
+            case BITSL:
+            case BITSR:
+                return Precedence.Shift;
+            case BITNot:
+            case Bang:
+                return Precedence.Unary;
             case Dot:
             case LParen:
+            case LBracket:
+            case PPlus:
+            case MMinus:
                 return Precedence.Call;
             default:
                 return Precedence.Low;

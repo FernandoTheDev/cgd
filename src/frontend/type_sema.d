@@ -26,9 +26,14 @@ abstract class TypeSema
     bool isArray() => kind == TypeSemaKind.Array;
     bool isTuple() => kind == TypeSemaKind.Tuple;
     bool isClass() => kind == TypeSemaKind.Class;
+
     bool isNumeric();
+    bool isBool();
+    bool isAny() => false;
+    
     bool isComp(TypeSema type);
     TypeSema promote(TypeSema other );
+
     dstring toStr();
 }
 
@@ -42,8 +47,13 @@ class TypeSemaBuiltin : TypeSema
         this.base = base;
     }
 
+    override bool isAny() => base == TypeSemaBase.Any;
+
     override bool isComp(TypeSema other)
     {
+        if (isAny() || other.isAny())
+            return true;
+
         TypeSemaBuiltin t = cast(TypeSemaBuiltin) other;
         if (t is null) return false;
 
@@ -56,7 +66,11 @@ class TypeSemaBuiltin : TypeSema
             return true;
 
         // promoção numérica: Int <-> Double
+        // Int <-> Bool
         if (isNumeric() && t.isNumeric())
+            return true;
+
+        if ((isNumeric() && t.isBool()) || (isBool() && t.isNumeric()))
             return true;
 
         return false;
@@ -88,6 +102,11 @@ class TypeSemaBuiltin : TypeSema
             || base == TypeSemaBase.Double;
     }
 
+    override bool isBool()
+    {
+        return base == TypeSemaBase.Bool;
+    }
+
     override dstring toStr()
     {
         return base;
@@ -104,8 +123,12 @@ class TypeSemaArray : TypeSema
         this.base = base;
     }
 
+    override bool isAny() => base.isAny();
+
     override bool isComp(TypeSema type)
     {
+        if (isAny() || type.isAny())
+            return true;
         if (TypeSemaArray arr = cast(TypeSemaArray) type)
             return base.isComp(arr.base);
         return false;
@@ -119,6 +142,11 @@ class TypeSemaArray : TypeSema
     }
 
     override bool isNumeric()
+    {
+        return false;
+    }
+
+    override bool isBool()
     {
         return false;
     }

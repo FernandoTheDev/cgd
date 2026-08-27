@@ -1,0 +1,10 @@
+//$
+//! 55
+//>puro
+função fibonacci(n) {
+    se n <= 1
+        retorne n
+    retorne fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+escreva(fibonacci(10))

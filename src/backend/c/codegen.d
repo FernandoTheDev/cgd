@@ -8,17 +8,36 @@ import std.conv;
 
 import frontend.lexer.token;
 import frontend.type_sema;
+import backend.c.lvalue;
 import frontend.parser;
 import backend.c.utils;
 
 enum VALUE = "delegua_value";
 enum ENTRY = "delegua_main";
 
+struct BuiltinTypeFn
+{
+    BuiltinFn ptr;
+    TypeSema[] args;
+    TypeSema ret;
+}
+
+BuiltinTypeFn[dstring][TypeSemaKind] builtinTypeFn = [
+    TypeSemaKind.Array: [
+        "adicionar": BuiltinTypeFn(&compileVetorAdicionar, [
+            new TypeSemaBuiltin(TypeSemaBase.Any)
+        ], new TypeSemaArray(new TypeSemaBuiltin(TypeSemaBase.Any)))
+    ]
+];
+
 class BackendC
 {
 private:
+    size_t tmp;
+
     dstring[] includes = [
         `#include "vendor/delegua-runtime/src/delegua_rt.h"`
+        // `#include "/home/fernandodev/.cgd/delegua_rt.h"`
     ];
 
     dstring[] prototypes = [
@@ -29,15 +48,21 @@ private:
         "\n\n/* código */"
     ];
 
-    const string[TokenKind] opToFn = [
-        TokenKind.Plus:    "delegua_op_add",
-        TokenKind.Minus:   "delegua_op_sub",
-        TokenKind.Star:    "delegua_op_mul",
-        TokenKind.Slash:   "delegua_op_div",
-        TokenKind.EEquals: "delegua_op_eq",
-        TokenKind.LEquals: "delegua_op_le",
-        TokenKind.LThan:   "delegua_op_lt",
-    ];
+    dstring[][] pendingStack;
+
+    pragma(inline, true)
+    void pushFrame()
+    {
+        pendingStack ~= (dstring[]).init;
+    }
+
+    pragma(inline, true)
+    dstring[] popFrame()
+    {
+        dstring[] top = pendingStack[$ - 1];
+        pendingStack.length -= 1;
+        return top;
+    }
 
     const BuiltinFn[dstring] builtinFn = [
         "escreva": &compileEscreva
@@ -47,7 +72,7 @@ private:
     dstring genIndent(uint indent = 0)
     {
         dstring buffer;
-        while (indent --> 0) 
+        while (indent --> 0)
             buffer ~= " ";
         return buffer;
     }
@@ -56,6 +81,19 @@ private:
     void emit(dstring line, uint indent = 0)
     {
         code ~= genIndent(indent) ~ line;
+    }
+
+    // emitLocal(): vai para o frame local do topo da pilha, se
+    // houver um aberto; caso contrário cai no buffer global (isso
+    // preserva o comportamento antigo fora de qualquer frame, ex.
+    // no nível de compile()/compileFnDecl(), que já emitem direto).
+    pragma(inline, true)
+    void emitLocal(dstring line, uint indent = 0)
+    {
+        if (pendingStack.length > 0)
+            pendingStack[$ - 1] ~= genIndent(indent) ~ line;
+        else
+            emit(line, indent);
     }
 
     pragma(inline, true)
@@ -67,7 +105,7 @@ private:
     void compileDecl(Node node)
     {
         if (node is null || node.kind == NodeKind.NaN) return;
-        switch (node.kind) 
+        switch (node.kind)
         {
             case NodeKind.FnDecl:
                 return compileFnDecl(cast(FnDecl) node);
@@ -78,11 +116,11 @@ private:
         }
     }
 
-    dstring compileStmt(Node node)
+    public dstring compileStmt(Node node)
     {
         if (node is null) return "/* Nó nulo recebido no codegen */";
         if (node.kind == NodeKind.NaN) return "/* NaN */";
-        switch (node.kind) 
+        switch (node.kind)
         {
             case NodeKind.VarDecl:
                 VarDecl var = cast(VarDecl) node;
@@ -100,19 +138,73 @@ private:
 
             case NodeKind.AssignStmt:
                 AssignStmt assign = cast(AssignStmt) node;
-                return formatD("%s = %s;", compileExpr(assign.left), compileExpr(assign.value));
+                dstring value = compileExpr(assign.value);
+                LValue lv = resolveLValue(assign.left);
+                return formatD("%s;", lv.write(value));
+
+            case NodeKind.BlockStmt:
+                BlockStmt block = cast(BlockStmt) node;
+                dstring[] body;
+
+                foreach (Node child; block.body)
+                    body ~= compileStmtOrdered(child);
+
+                return body.join("\n");
+
+            case NodeKind.WhileStmt:
+                WhileStmt wstmt = cast(WhileStmt) node;
+                emit(formatD("while (delegua_is_truthy(%s)) {", compileExpr(wstmt.expr)));
+
+                dstring[] body;
+
+                foreach (Node child; wstmt.body)
+                    body ~= compileStmtOrdered(child);
+
+                body ~= "}";
+
+                return body.join("\n");
+
+            case NodeKind.MemberExpr:
+                MemberExpr member = cast(MemberExpr) node;
+                CallExpr call = cast(CallExpr) member.right;
+                dstring fname = (cast(Identifier) call.fn).value;
+
+                BuiltinTypeFn[dstring]* inner = member.left.type_sema.kind in builtinTypeFn;
+                BuiltinTypeFn* builtin = inner !is null ? (fname in *inner) : null;
+
+                return builtin.ptr(this, node);
 
             default:
                 return "/* statement desconhecido. */";
         }
     }
 
-    dstring compileExpr(Node node)
+    // -------------------------------------------------------------
+    // compileStmtOrdered: abre um frame local, roda compileStmt(),
+    // e devolve TODOS os efeitos colaterais gerados durante essa
+    // chamada seguidos da linha final do statement, na ordem
+    // correta. É isso que garante que side effects de UM statement
+    // nunca vazem para antes de statements anteriores do mesmo
+    // bloco (o bug do `i++` saindo antes de `a_bits`/`b_bits`).
+    // -------------------------------------------------------------
+    dstring compileStmtOrdered(Node node)
+    {
+        pushFrame();
+        dstring result = compileStmt(node);
+        dstring[] sideEffects = popFrame();
+
+        if (sideEffects.length == 0)
+            return result;
+
+        return (sideEffects ~ result).join("\n");
+    }
+
+    public dstring compileExpr(Node node)
     {
         if (node is null) return "/* Nó nulo recebido no codegen */";
         if (node.kind == NodeKind.NaN) return "/* NaN */";
 
-        switch (node.kind) 
+        switch (node.kind)
         {
             case NodeKind.Identifier:
                 return (cast(Identifier) node).value;
@@ -138,22 +230,75 @@ private:
 
                 return formatD("%s(%s)", callee, nodesToStr(call.args));
 
-            case NodeKind.BinaryExpr:
-                BinaryExpr bexpr = cast(BinaryExpr) node;
-                
-                dstring left = compileExpr(bexpr.left);
-                dstring right = compileExpr(bexpr.right);
+            case NodeKind.ArrayLit:
+                ArrayLit arr = cast(ArrayLit) node;
 
-                if (const(string)* fn = bexpr.op in opToFn)
-                    return formatD("%s(%s, %s)", *fn, left, right);
-                
-                return formatD("%s %s %s", left, getOp(bexpr.op), right);
+                dstring temp = formatD("t%d", tmp++);
+                // cria uma variavel temporaria
+                emitLocal(formatD("%s %s = create_vetor();", VALUE, temp));
+
+                foreach (Node element; arr.elements)
+                    emitLocal(formatD("delegua_vetor_adicionar(&%s, %s);", temp, compileExpr(element)));
+
+                return temp;
+
+            case NodeKind.IndexExpr:
+                return compileIndexExpr(cast(IndexExpr) node);
+
+            case NodeKind.BlockStmt:
+                BlockStmt block = cast(BlockStmt) node;
+                dstring[] body;
+
+                foreach (Node child; block.body)
+                    body ~= compileStmtOrdered(child);
+
+                for (size_t i; i + 1 < body.length; i++)
+                    emitLocal(body[i]);
+
+                return compileExpr(block.body[$ - 1]);
+
             default:
+                node.print();
                 return "/* expressão desconhecida. */";
         }
     }
 
-    void compileFnDecl(FnDecl node) 
+    LValue resolveLValue(Node node)
+    {
+        switch (node.kind)
+        {
+            case NodeKind.Identifier:
+                return LValue(LValueKind.Var, (cast(Identifier) node).value);
+
+            case NodeKind.IndexExpr:
+                IndexExpr idx = cast(IndexExpr) node;
+                return LValue(
+                    LValueKind.Index,
+                    null,
+                    compileExpr(idx.value), // container
+                    compileExpr(idx.idx)    // index
+                );
+
+            default:
+                node.print();
+                assert(0, "nó não é um lvalue válido");
+        }
+    }
+
+    dstring compileIndexExpr(IndexExpr idxexpr)
+    {
+        // o vetor é passado por referencia
+        dstring value = compileExpr(idxexpr.value); // vetor
+        dstring idx = compileExpr(idxexpr.idx); // indice
+
+        // cria uma variavel temporaria
+        dstring var = formatD("tmp%d", tmp++);
+        emitLocal(formatD("%s %s = delegua_vetor_obter(&%s, %s);", VALUE, var, value, idx));
+
+        return var;
+    }
+
+    void compileFnDecl(FnDecl node)
     {
         dstring args;
         size_t len = node.args.length;
@@ -170,8 +315,8 @@ private:
         emit(formatD("%s {", proto));
 
         foreach (Node n; node.body)
-            emit(compileStmt(n), 4);
-        
+            emit(compileStmtOrdered(n), 4);
+
         emit("}");
     }
 
@@ -182,10 +327,10 @@ private:
         if (ifstmt.expr is null) // else puro
         {
             cd ~= fromIf ? "else {" : "else {";
-    
+
             foreach (Node n; ifstmt.body)
-                cd ~= compileStmt(n);
-    
+                cd ~= compileStmtOrdered(n);
+
             cd ~= "}";
             return cd.join("\n");
         }
@@ -194,13 +339,13 @@ private:
             fromIf ? "else if" : "if", compileExpr(ifstmt.expr));
 
         foreach (Node n; ifstmt.body)
-            cd ~= compileStmt(n);
+            cd ~= compileStmtOrdered(n);
 
         if (ifstmt._else is null)
             cd ~= "}";
         else
         {
-            cd[$-1] ~= " } ";
+            cd[$ - 1] ~= " } ";
             cd ~= compileIfStmt(ifstmt._else, true);
         }
 
@@ -221,10 +366,10 @@ public:
                 compileDecl(node);
 
         emit(formatD("void %s(void) {", ENTRY));
-        
+
         foreach (Node node; prog.body)
             if (!isDecl(node.kind))
-                emit(compileStmt(node), 4);
+                emit(compileStmtOrdered(node), 4);
 
         emit("}");
 
