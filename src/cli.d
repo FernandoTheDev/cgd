@@ -6,10 +6,10 @@ import std.getopt;
 import std.stdio;
 import env;
 
-
 enum Flag[] FLAGS = [
     Flag("a", "ajuda",        "showHelp",    "Exibe esta mensagem de ajuda"),
     Flag("v", "versao",       "showVersion", "Exibe a versão atual do compilador"),
+    Flag("d", "depurar",      "showDebug",   "Ativa o modo de depuração do compialdor"),
     Flag("o", "otimizar",     "opt",         "Ativa a otimização do compilador"),
     Flag("t", "tempo",        "showPerf",    "Exibe o tempo de execução de cada passe"),
     Flag("s", "saida",        "output",      "Define o caminho do arquivo de saída"),

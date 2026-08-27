@@ -48,14 +48,6 @@ private:
         "\n\n/* código */"
     ];
 
-    // -------------------------------------------------------------
-    // Pilha de buffers locais para efeitos colaterais (temp vars,
-    // incrementos, materializações de vetor, etc). Cada statement
-    // de nível "linha" empurra um frame novo, roda sua compilação,
-    // e resgata as linhas que a compilação gerou de forma LOCAL —
-    // preservando a ordem relativa dentro do próprio statement, em
-    // vez de vazar para o buffer global fora de ordem.
-    // -------------------------------------------------------------
     dstring[][] pendingStack;
 
     pragma(inline, true)
@@ -72,31 +64,6 @@ private:
         return top;
     }
 
-    const string[TokenKind] opToFn = [
-        TokenKind.Plus:    "delegua_op_add",
-        TokenKind.Minus:   "delegua_op_sub",
-        TokenKind.Star:    "delegua_op_mul",
-        TokenKind.Slash:   "delegua_op_div",
-        TokenKind.Modulo:  "delegua_op_mod",
-
-        TokenKind.EEquals: "delegua_op_eq",
-
-        TokenKind.LEquals: "delegua_op_le",
-        TokenKind.LThan:   "delegua_op_lt",
-
-        TokenKind.GEquals: "delegua_op_ge",
-        TokenKind.GThan:   "delegua_op_gt",
-
-        TokenKind.BITOr:   "delegua_op_bor",
-        TokenKind.BITAnd:  "delegua_op_bnd",
-        TokenKind.BITNot:  "delegua_op_bnt",
-        TokenKind.BITXor:  "delegua_op_bxr",
-        TokenKind.BITSL:   "delegua_op_shl",
-        TokenKind.BITSR:   "delegua_op_shr",
-
-        TokenKind.Bang:    "delegua_op_not",
-    ];
-
     const BuiltinFn[dstring] builtinFn = [
         "escreva": &compileEscreva
     ];
@@ -110,9 +77,6 @@ private:
         return buffer;
     }
 
-    // emit(): vai para o buffer GLOBAL. Use apenas para linhas de
-    // estrutura de verdade (assinaturas de função, "while (...) {",
-    // "}", etc) — nunca para efeitos colaterais de sub-expressões.
     pragma(inline, true)
     void emit(dstring line, uint indent = 0)
     {
@@ -152,13 +116,6 @@ private:
         }
     }
 
-    // -------------------------------------------------------------
-    // compileStmt: versão "crua". Pode disparar emitLocal() para o
-    // frame que estiver aberto no momento em que for chamada — por
-    // isso, quem quiser um bloco de linhas AUTOCONTIDO e em ordem
-    // (ex. o corpo de um while/if/bloco) deve chamar
-    // compileStmtOrdered() em vez desta diretamente.
-    // -------------------------------------------------------------
     public dstring compileStmt(Node node)
     {
         if (node is null) return "/* Nó nulo recebido no codegen */";
@@ -181,7 +138,7 @@ private:
 
             case NodeKind.AssignStmt:
                 AssignStmt assign = cast(AssignStmt) node;
-                dstring value = compileExpr(assign.value, true);
+                dstring value = compileExpr(assign.value);
                 LValue lv = resolveLValue(assign.left);
                 return formatD("%s;", lv.write(value));
 
@@ -217,11 +174,6 @@ private:
 
                 return builtin.ptr(this, node);
 
-            case NodeKind.UnaryExpr:
-                UnaryExpr un = cast(UnaryExpr) node;
-                AssignStmt ass = new AssignStmt(un.value, un, TokenKind.Equals, node.pos);
-                return compileStmt(ass);
-
             default:
                 return "/* statement desconhecido. */";
         }
@@ -247,7 +199,7 @@ private:
         return (sideEffects ~ result).join("\n");
     }
 
-    public dstring compileExpr(Node node, bool isStmt = false)
+    public dstring compileExpr(Node node)
     {
         if (node is null) return "/* Nó nulo recebido no codegen */";
         if (node.kind == NodeKind.NaN) return "/* NaN */";
@@ -278,17 +230,6 @@ private:
 
                 return formatD("%s(%s)", callee, nodesToStr(call.args));
 
-            case NodeKind.BinaryExpr:
-                BinaryExpr bexpr = cast(BinaryExpr) node;
-
-                dstring left = compileExpr(bexpr.left);
-                dstring right = compileExpr(bexpr.right);
-
-                if (const(string)* fn = bexpr.op in opToFn)
-                    return formatD("%s(%s, %s)", *fn, left, right);
-
-                return formatD("%s %s %s", left, getOp(bexpr.op), right);
-
             case NodeKind.ArrayLit:
                 ArrayLit arr = cast(ArrayLit) node;
 
@@ -304,10 +245,20 @@ private:
             case NodeKind.IndexExpr:
                 return compileIndexExpr(cast(IndexExpr) node);
 
-            case NodeKind.UnaryExpr:
-                return compileUnaryExpr(cast(UnaryExpr) node, isStmt);
+            case NodeKind.BlockStmt:
+                BlockStmt block = cast(BlockStmt) node;
+                dstring[] body;
+
+                foreach (Node child; block.body)
+                    body ~= compileStmtOrdered(child);
+
+                for (size_t i; i + 1 < body.length; i++)
+                    emitLocal(body[i]);
+
+                return compileExpr(block.body[$ - 1]);
 
             default:
+                node.print();
                 return "/* expressão desconhecida. */";
         }
     }
@@ -334,68 +285,11 @@ private:
         }
     }
 
-    dstring compileUnaryExpr(UnaryExpr unary, bool isStmt = false)
-    {
-        TokenKind[TokenKind] ops = [
-            TokenKind.PPlus: TokenKind.Plus,
-            TokenKind.MMinus: TokenKind.Minus,
-            TokenKind.BITNot: TokenKind.BITNot,
-            TokenKind.Bang: TokenKind.Bang,
-            TokenKind.Minus:  TokenKind.Minus,
-        ];
-
-        TokenKind[TokenKind] un = [
-            TokenKind.BITNot: TokenKind.BITNot,
-            TokenKind.Bang:   TokenKind.Bang,
-        ];
-
-        TokenKind[TokenKind] notMath = [
-            TokenKind.Bang: TokenKind.Bang,
-        ];
-
-        const(string)* fn = ops[unary.op] in opToFn;
-        dstring sum = "create_num(1)"; // valor pra soma/subtração de 1
-
-        // monta a chamada, exemplo:
-        // delegua_op_add(t0, create_num(1))
-        dstring cur = formatD("t%d", tmp++);
-        emitLocal(formatD("%s %s = {0};", VALUE, cur));
-
-        dstring call = unary.op in un
-            ? 
-                unary.op in notMath
-                    ? formatD("%s(%s)", *fn, compileExpr(unary.value))
-                    : formatD("%s(%s)", *fn, cur)
-            : formatD("%s(%s, %s)", *fn, cur, sum);
-
-        if (unary.op in notMath)
-            return call;
-
-        LValue lv = resolveLValue(unary.value);
-        emitLocal(formatD("%s = %s;", cur, lv.read()));
-
-        // valor "antigo", devolvido no caso pós-fixado (i++)
-        dstring old = cur;
-        if (unary.post)
-        {
-            old = formatD("t%d", tmp++);
-            emitLocal(formatD("%s %s = %s;", VALUE, old, cur));
-        }
-
-        if (!isStmt)
-            emitLocal(lv.write(call) ~ ";");
-
-        return unary.post ? old : formatD("(%s)", call);
-    }
-
-    dstring compileIndexExpr(IndexExpr idxexpr, bool isAssign = false, dstring left = "")
+    dstring compileIndexExpr(IndexExpr idxexpr)
     {
         // o vetor é passado por referencia
         dstring value = compileExpr(idxexpr.value); // vetor
         dstring idx = compileExpr(idxexpr.idx); // indice
-
-        if (isAssign)
-            return formatD("delegua_vetor_setar(&%s, %s, %s)", value, idx, left);
 
         // cria uma variavel temporaria
         dstring var = formatD("tmp%d", tmp++);

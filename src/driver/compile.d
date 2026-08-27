@@ -1,6 +1,6 @@
 module driver.compile;
 
-import std.stdio : writeln, writefln;
+import std.stdio : writeln, writefln, wrt = write;
 import core.stdc.stdlib : exit;
 import std.datetime.stopwatch;
 import std.exception;
@@ -14,6 +14,7 @@ import std.conv;
 import std.path;
 
 import opt.constant_folding;
+import middle.lowering;
 import opt.dead_code;
 import driver.args;
 import driver.time;
@@ -44,32 +45,30 @@ void compile(CGDArguments args, string filename)
 
     Timer timer = Timer(args.showPerf);
 
-    timer.start("Lendo arquivo.");
+    timer.start("Lendo arquivo");
     string source = readText(filename);
     timer.show();
     
     Diagnostics diag = new Diagnostics;
-    Lexer lexer = new Lexer(source, filename, diag);
-
-    timer.start("Fazendo a geração de tokens.");
-    Token[] tokens = lexer.tokenizer();
-    timer.show();
-    
-    verificar_erros(diag);
-
     Program program;
 
     try {
+        Lexer lexer = new Lexer(source, filename, diag);
+        timer.start("Fazendo a geração de tokens");
+        Token[] tokens = lexer.tokenizer();
+        timer.show();
+
+        verificar_erros(diag);
+
         Parser parser = new Parser(tokens, diag);
-        
-        timer.start("Fazendo a geração da AST.");
+        timer.start("Fazendo a geração da AST");
         program = parser.parse();
         timer.show();
         
         verificar_erros(diag);
     } catch (Exception e) {
         verificar_erros(diag);
-        writeln("Ocorreu um erro interno no compilador.");
+        writeln("Ocorreu um erro interno no compilador");
         writeln(e);
         return;
     }
@@ -79,31 +78,31 @@ void compile(CGDArguments args, string filename)
     TypeResolver resolver = new TypeResolver(registry);
 
     Sema1 sema1 = new Sema1(context, diag);
-    timer.start("Semantica 1.");
+    timer.start("Semantica 1");
     sema1.analyze(program);
     timer.show();
     verificar_erros(diag);
 
     Sema2 sema2 = new Sema2(registry);
-    timer.start("Semantica 2.");
+    timer.start("Semantica 2");
     sema2.analyze(program);
     timer.show();
 
     Sema3 sema3 = new Sema3(context, registry, resolver, diag);
-    timer.start("Semantica 3.");
+    timer.start("Semantica 3");
     sema3.analyze(program);
     timer.show();
     verificar_erros(diag);
 
     CTFEContext ctfeContext = new CTFEContext;
-    timer.start("Anlise de pureza nas funções.");
+    timer.start("Anlise de pureza nas funções");
     new PurityAnalysis(context, diag, ctfeContext).analysis(program);
     timer.show();
     verificar_erros(diag);
 
     if (args.opt)
     {
-        timer.start("Otimização.");
+        timer.start("Otimização");
         enum MAX = 20;
         for (size_t iter; iter++ < MAX;)
         {
@@ -113,11 +112,20 @@ void compile(CGDArguments args, string filename)
         timer.show();
     }
 
+    // reescreve partes do programa
+    // o backend deve se manter burro
+    // operações como BinaryExpr virarão CallExpr diretamente
+    // além desse caso muitos outros serão reescritos
+    timer.start("Realizando o lowering da AST");
+    new CgdLowering(diag).lowering(program);
+    timer.show();
+    verificar_erros(diag);
+
     if (args.showDebug)
         program.print();
 
     BackendC cg = new BackendC();
-    timer.start("Gerando código C.");
+    timer.start("Gerando código C");
     dstring code = cg.compile(program);
     timer.show();
 
@@ -129,7 +137,7 @@ void compile(CGDArguments args, string filename)
     string output = args.output == "" ? baseName(filename)[0 .. $ - 8] : args.output;
     string outc = output ~ ".c";
     
-    timer.start("Escrevendo o arquivo '.c'.");
+    timer.start("Escrevendo o arquivo '.c'");
     write(outc, cSource);
     timer.show();
 
@@ -140,7 +148,7 @@ void compile(CGDArguments args, string filename)
         cc = cCompilers[0];
     else if (cc == "")
     {
-        writefln("Não foi possível encontrar um compilador C. Tentativas: tcc, gcc e clang.");
+        writefln("Não foi possível encontrar um compilador C. Tentativas: tcc, gcc e clang");
         return;
     }
 
@@ -154,10 +162,10 @@ void compile(CGDArguments args, string filename)
     if (args.showDebug)
         writefln("Command: %s", command);
 
-    timer.start("Compilando.");
+    timer.start("Compilando");
     auto exec = executeShell(command);
     timer.show();
 
-    if (exec.status != 0)
-        writeln(exec.output);
+    // if (exec.status != 0)
+    wrt(exec.output);
 }

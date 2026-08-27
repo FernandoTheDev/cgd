@@ -493,6 +493,7 @@ class BlockStmt : Node
 
     override void print(uint indent = 0)
     {
+        writefln("BlockStmt");
         foreach (i, node; body)
         {
             bool isLast = (i == cast(size_t) body.length - 1);
