@@ -13,7 +13,7 @@ de equivalência com todos os ambientes, dialetos e extensões do interpretador.
 | Controle          | Se/senão, ternário, escolha/caso, enquanto, fazer/enquanto, para, para cada, sustar e continua                                                      |
 | Coleções          | Literais, índices negativos, espalhamento, compreensão, fatiamento com passo e laços como expressões de vetores                                     |
 | Funções           | Nomeadas/anônimas sem captura, funções como valores, callbacks, recursão, padrões dependentes de parâmetros anteriores e parâmetros variáveis       |
-| Classes           | Campos tipados, construtores, herança, super, isto, métodos ligados, público/privado/protegido e acessores automáticos/customizados                 |
+| Classes           | Campos tipados, construtores, herança, super, isto, métodos ligados/estáticos, público/privado/protegido e acessores automáticos/customizados       |
 | Exceções          | Tente, pegue com/sem tipo, finalmente, falhar, Excecao e subclasses; limpeza em retornos e controles de laço                                        |
 | Módulos           | Importação de fontes `.delegua` por caminho literal, cache, ciclos diagnosticados, inicialização única e exportações protegidas                     |
 | Texto             | Interpolação, escapes, tamanho/indexação por pontos de código, divisão, substituição, busca, caixa Unicode e aparar                                 |
@@ -65,3 +65,17 @@ O frontend antecipa falhas locais comprovadas de operadores, índices e contrato
 antes da emissão C; em regiões com pegue emite avisos para preservar tratamento.
 Dados dinâmicos continuam validados pelo runtime. A localização usa metadados
 estáticos em pontos falíveis, sem chamadas adicionais a cada linha.
+
+## Bibliotecas e editor próprios
+
+Os namespaces `cgd:json`, `cgd:rede` e `cgd:colecoes` oferecem bibliotecas Delégua
+tipadas. JSON tem métodos estáticos e instâncias; rede usa libcurl gerenciada
+sem ponteiros/callbacks arbitrários. A API C completa de libcurl não é exposta.
+Métodos estáticos são herdados, mas campos estáticos não estão implementados.
+Iterações, compreensões e desestruturações aceitam anotações de tipo explícitas.
+
+O formatador próprio usa quatro espaços, via CLI ou LSP. O servidor stdio local
+oferece completion por tipo/escopo/namespace, hover, referências, definição,
+rename, signature help, símbolos e semantic tokens. Não compila por edição; não
+há DAP ou indexação irrestrita do disco. Consulte [Ferramentas](ferramentas.md)
+para APIs, instalação, limites e comandos de teste.

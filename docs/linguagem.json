@@ -187,5 +187,25 @@
     "description": "Linux x86_64 é a plataforma validada com DMD e LDC2, Clang e GCC. A CLI permite configurar target, sysroot, compilador e runtime separadamente para preparar builds cruzados.",
     "examples": [],
     "notes": "Windows/macOS e executáveis cruzados ainda não foram validados. Instaladores são shell/Linux. Não há bigint, dialetos extras, threads da linguagem, debugger ou bibliotecas Node. Consulte o guia de desenvolvimento para configurar a toolchain."
+  },
+  {
+    "id": "bibliotecas-cgd",
+    "title": "JSON, rede e coleções do CGD",
+    "status": "parcial",
+    "description": "Importe cgd:json, cgd:rede ou cgd:colecoes como namespaces. JSON possui métodos estáticos analisar/serializar e instâncias com obter, definir e texto. Rede usa sessões gerenciadas libcurl; Colecoes oferece unicos e intervalo.",
+    "examples": [
+      "bibliotecas/json_classe.delegua",
+      "bibliotecas/rede.delegua",
+      "bibliotecas/colecoes.delegua"
+    ],
+    "notes": "JSON em Delégua puro, limite de profundidade e preservação de números além da representação nativa. Rede exige libcurl >=7.86; opções com ponteiros/callbacks arbitrários são recusadas. WebSocket depende da libcurl instalada, não validado neste ambiente."
+  },
+  {
+    "id": "metodos-estaticos",
+    "title": "Métodos estáticos e ferramentas do editor",
+    "status": "parcial",
+    "description": "estatico declara método sem isto, herdado e acessível pela classe ou instância. O LSP local oferece completion por tipo, signature help e formatador com quatro espaços. Ctrl+Shift+I formata no VS Code; --formatar formata pela CLI.",
+    "examples": ["estaticos.delegua"],
+    "notes": "Campos estáticos e depurador/DAP não estão implementados. O editor analisa sem compilar/linkar por edição. Literais longos não são divididos pelo formatador."
   }
 ]

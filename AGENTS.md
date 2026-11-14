@@ -97,3 +97,26 @@ ou stashes do vendor. Versione configurações e ofereça um comando de verifica
 - O usuário confirmou o remote FernandoTheDev/delegua-runtime e pediu commits no
   vendor. Use o Git próprio do submódulo, publique-o primeiro e atualize a referência
   no CGD. Não inicialize outro repositório nem converta o vendor em cópia de arquivos.
+
+## Continuidade obrigatória de novas tarefas
+
+Mantenha `docs/CONTINUIDADE.md` atualizado com a solicitação ativa, decisões,
+implementação concluída, testes realmente executados, pendências e próximos
+comandos. O usuário pediu esse registro também para solicitações futuras, para
+poder retomar após expiração do limite. A tarefa atual inclui libcurl por API
+controlada, bibliotecas de rede/JSON em Delégua e extensão VS Code com LSP local
+persistente e tokens semânticos. O depurador foi adiado; não confundir execução
+com depuração. Não compilar/linkar por edição do documento.
+
+## Estilo explícito e ferramentas (nova solicitação)
+
+- Não introduzir `auto` em D; declarar tipos concretos. Bibliotecas Delégua devem
+  anotar variáveis, argumentos e retornos, usando `qualquer` quando dinâmico.
+- O formatador Delégua próprio está em frontend/formatter.d; quatro espaços são
+  contrato. Preservar strings, comentários e contratos dos exemplos. A CLI tem
+  --formatar/--verificar-formatacao e o LSP documentFormatting.
+- Não oferecer métodos globais como fallback de completion após ponto. Módulos
+  importados são namespaces; respeitar escopo, receptor, herança e visibilidade.
+- Métodos estáticos possuem isStatic; não recebem isto. Campos estáticos continuam
+  sem suporte. Bibliotecas JSON/rede/coleções e extensão estão em evolução; ler
+  docs/CONTINUIDADE.md antes de retomar e registrar testes efetivamente executados.

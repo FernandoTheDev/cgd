@@ -109,3 +109,23 @@ toolchain estão em [Desenvolvimento](desenvolvimento.md). O guia web
 Os pontos de erro do C usam descritores estáticos e escritas de ponteiro, sem
 chamadas de localização por linha. O catálogo central também alimenta a referência
 web e a opção `--explicar`. Veja os limites em Desenvolvimento.
+
+## Análise persistente e formatação
+
+`frontend/analysis.d` devolve AST, contexto, tokens e diagnósticos sem chamar o
+driver de compilação nem executar CTFE. O LSP (`src/lsp/`) mantém documentos e
+versões em memória, overlays de importações e dependências; consulta índices da
+revisão analisada para hover, referências e completion. Uma edição invalida o
+documento e os dependentes abertos. O protocolo usa stdio e posições UTF-16.
+
+`frontend/formatter.d` preserva os lexemas de strings/comentários e organiza
+espaçamento, blocos e listas com quatro espaços. Sua idempotência e preservação
+dos contratos são verificadas sobre cópias de todo o catálogo. Não se deve usar
+Prettier de JavaScript sobre fontes Delégua. Os metadados em `lsp/builtins.d`
+precisam acompanhar a lista de métodos permitidos por tipo no runtime; campos
+privados e membros sombreados não podem aparecer como membros públicos herdados.
+
+As primitivas `cgdCurl*` usam assinaturas explícitas em `frontend/natives.d`;
+arrays paralelos possuem contratos estáticos de comprimento/aridade. O runtime
+possui handles opacos gerenciados, buffers com limites e callbacks internos.
+Bibliotecas Delégua recebem esses valores sem acesso aos endereços C.

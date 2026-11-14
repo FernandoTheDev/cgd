@@ -195,3 +195,13 @@ git commit -m "build: atualizar referencia do runtime"
 Remote original: https://github.com/FernandoTheDev/delegua-runtime. Atualizações
 explícitas usam `git -C vendor/delegua-runtime pull --ff-only origin dev`; preserve
 alterações locais antes disso. Stashes existentes não são descartados.
+
+## Estilo de tipos e formatador Delégua
+
+Declare tipos concretos em D e não introduza `auto`, foreach inferido ou argumentos
+de lambdas sem tipo. Nas bibliotecas e exemplos Delégua, mantenha argumentos,
+retornos e vínculos explícitos; use `qualquer` para o domínio dinâmico. Fixtures
+que exercitam inferência ou erros deliberados conservam sua finalidade de teste.
+`python3 scripts/verificar_tipos.py` verifica a política nos fontes/testes D e nas
+bibliotecas Delégua. `scripts/formatar.py` usa o próprio CGD para `.delegua`; faça
+build do CGD antes. Ctrl+Shift+I no editor aciona o mesmo formatador via LSP.

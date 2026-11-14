@@ -67,7 +67,7 @@
             </select>
           </div>
         </div>
-        <p id="guide-count" role="status">17 capítulos</p>
+        <p id="guide-count" role="status">19 capítulos</p>
         <nav class="section-nav" aria-label="Capítulos da linguagem">
           <a href="#valores">Valores, tipos e variáveis</a
           ><a href="#operadores">Operadores e ordem de avaliação</a
@@ -83,7 +83,9 @@
           ><a href="#otimizacoes">Otimização e avaliação em compilação</a
           ><a href="#diagnosticos">Diagnósticos e ferramentas</a
           ><a href="#exclusoes">Exclusões de segurança</a
-          ><a href="#plataformas">Plataformas e limites da implementação</a>
+          ><a href="#plataformas">Plataformas e limites da implementação</a
+          ><a href="#bibliotecas-cgd">JSON, rede e coleções do CGD</a
+          ><a href="#metodos-estaticos">Métodos estáticos e ferramentas do editor</a>
         </nav>
       </section>
       <div id="guide-empty" hidden>
@@ -111,8 +113,8 @@
             >
           </p>
           <pre><code>// Declaração, valores primitivos e tipo de em execução.
-var vazio
-const ativo = verdadeiro
+var vazio: qualquer
+const ativo: logico = verdadeiro
 var idade: inteiro = 20
 var medida: real = 2.5
 escreva(vazio, ativo)
@@ -126,12 +128,12 @@ escreva(tipo de idade, &quot; &quot;, tipo de medida, &quot; &quot;, tipo de &qu
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var a, b = 1, 2
-a, b = b, a  // Os valores da direita são avaliados antes das escritas.
-var contador = 2
+          <pre><code>var a: numero, b: numero = 1, 2
+a, b = b, a // Os valores da direita são avaliados antes das escritas.
+var contador: numero = 2
 contador += 5
 escreva(a, b, contador)
-var destino = 0
+var destino: numero = 0
 escreva(destino = 5)</code></pre>
         </details>
         <details>
@@ -142,13 +144,20 @@ escreva(destino = 5)</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var x = 1
-se verdadeiro { var x = 2; escreva(x) }
-escreva(x)
-funcao criar() {
-    retorna auxiliar
-    funcao auxiliar(x) { retorna x * 2 }
+          <pre><code>var x: numero = 1
+se verdadeiro {
+    var x: numero = 2;
+    escreva(x)
 }
+
+escreva(x)
+funcao criar(): qualquer {
+    retorna auxiliar
+    funcao auxiliar(x: qualquer): qualquer {
+        retorna x * 2
+    }
+}
+
 escreva(criar()(4))</code></pre>
         </details>
 
@@ -179,7 +188,7 @@ escreva(criar()(4))</code></pre>
           </p>
           <pre><code>// Potência, divisão inteira, bits, comparação e curto-circuito.
 escreva(2 ** 5, 100 \ 3, 5 &amp; 3, 1 &lt;&lt; 0)
-escreva(3 != 4, falso e (1 / 0), nulo ?: 10)</code></pre>
+escreva(3 != 4, falso e(1 / 0), nulo ?: 10)</code></pre>
         </details>
         <details>
           <summary>linguagem/35_bits_e_atribuicoes.delegua</summary>
@@ -189,15 +198,15 @@ escreva(3 != 4, falso e (1 / 0), nulo ?: 10)</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var n = 8
+          <pre><code>var n: numero = 8
 escreva(n | 1, n &gt;&gt; 3)
 escreva(3 ^ 2, ~1, 5 &amp; 3)
-var a = 9
+var a: numero = 9
 a -= 1
 a *= 2
 a /= 4
 a %= 3
-escreva(++a + 1)</code></pre>
+escreva(++ a + 1)</code></pre>
         </details>
 
         <p class="callout">
@@ -225,8 +234,8 @@ escreva(++a + 1)</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var idade = 20
-escreva(idade &gt;= 18 ? &quot;adulto&quot; : &quot;menor&quot;)
+          <pre><code>var idade: numero = 20
+escreva(idade &gt;= 18 ? &quot;adulto&quot;: &quot;menor&quot;)
 escolha 2 {
     caso 1: escreva(&quot;um&quot;)
     caso 2:
@@ -242,14 +251,28 @@ escolha 2 {
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>para (var i = 0; i &lt; 4; i++) {
-    se i == 1 { continua }
-    se i == 3 { sustar }
+          <pre><code>para (var i: numero = 0; i &lt; 4; i++) {
+    se i == 1 {
+        continua
+    }
+
+    se i == 3 {
+        sustar
+    }
+
     escreva(i)
 }
-fazer { escreva(&quot;feito&quot;) } enquanto falso
-var soma = 0
-para cada item em [1, 2, 3] { soma += item }
+
+fazer {
+    escreva(&quot;feito&quot;)
+}
+
+enquanto falso
+var soma: numero = 0
+para cada item: inteiro em [1, 2, 3] {
+    soma += item
+}
+
 escreva(soma)</code></pre>
         </details>
         <details>
@@ -260,10 +283,21 @@ escreva(soma)</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var i = 0
-var primeiro = fazer { i++; retorna i } enquanto i &lt; 2
-var segundo = para cada valor em [1, 2] { retorna valor * 2 }
-var terceiro = enquanto i &gt; 0 { retorna i-- }
+          <pre><code>var i: numero = 0
+var primeiro: qualquer[] = fazer {
+    i++;
+    retorna i
+}
+
+enquanto i &lt; 2
+var segundo: qualquer[] = para cada valor: inteiro em [1, 2] {
+    retorna valor * 2
+}
+
+var terceiro: qualquer[] = enquanto i &gt; 0 {
+    retorna i--
+}
+
 escreva(primeiro)
 escreva(segundo)
 escreva(terceiro)</code></pre>
@@ -292,9 +326,16 @@ escreva(terceiro)</code></pre>
             >
           </p>
           <pre><code>// Retornos dentro de uma expressão de laço acumulam os valores.
-var quadrados = para (var i = 0; i &lt; 4; i++) { retorna i * i }
-var i = 0
-var pares = enquanto i &lt; 3 { i++; retorna i * 2 }
+var quadrados: qualquer[] = para (var i: numero = 0; i &lt; 4; i++) {
+    retorna i * i
+}
+
+var i: numero = 0
+var pares: qualquer[] = enquanto i &lt; 3 {
+    i++;
+    retorna i * 2
+}
+
 escreva(quadrados)
 escreva(pares)</code></pre>
         </details>
@@ -325,7 +366,11 @@ escreva(pares)</code></pre>
           <pre><code>funcao soma(a: inteiro, b: inteiro = a + 2): inteiro {
     retorna a + b
 }
-funcao reunir(primeiro, ...resto) { retorna [primeiro, ...resto] }
+
+funcao reunir(primeiro: qualquer, ... resto: qualquer): qualquer {
+    retorna [primeiro, ... resto]
+}
+
 escreva(soma(3))
 escreva(reunir(1, ...[2, 3]))</code></pre>
         </details>
@@ -337,15 +382,23 @@ escreva(reunir(1, ...[2, 3]))</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>funcao dobro(x) { retorna x * 2 }
-var operacao = dobro
-funcao criar() {
-    // Esta função não captura nenhuma variável de criar().
-    retorna funcao(x) { retorna x + 4 }
+          <pre><code>funcao dobro(x: qualquer): qualquer {
+    retorna x * 2
 }
+
+var operacao: funcao = dobro
+funcao criar(): qualquer {
+    // Esta função não captura nenhuma variável de criar().
+    retorna funcao(x: qualquer): qualquer {
+        retorna x + 4
+    }
+}
+
 escreva(operacao(3))
 escreva(criar()(5))
-escreva(mapear([1, 2, 3], funcao(x) { retorna x * 3 }))</code></pre>
+escreva(mapear([1, 2, 3], funcao(x: qualquer): qualquer {
+    retorna x * 3
+}))</code></pre>
         </details>
 
         <p class="callout">
@@ -373,10 +426,10 @@ escreva(mapear([1, 2, 3], funcao(x) { retorna x * 3 }))</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var valores = [3, 1, 2]
+          <pre><code>var valores: qualquer[] = [3, 1, 2]
 valores.ordenar()
 escreva(valores, valores.somar())
-var removidos = valores.encaixar(1, 1, 7, 8)
+var removidos: qualquer = valores.encaixar(1, 1, 7, 8)
 escreva(removidos, valores)</code></pre>
         </details>
         <details>
@@ -387,9 +440,9 @@ escreva(removidos, valores)</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var valores = [1, 2, 3, 4, 5]
-escreva([x * 3 para cada x em valores se x % 2 == 0])
-escreva(valores[::-1], valores[::2])</code></pre>
+          <pre><code>var valores: qualquer[] = [1, 2, 3, 4, 5]
+escreva([x * 3 para cada x: inteiro em valores se x % 2 == 0])
+escreva(valores[: : - 1], valores[: : 2])</code></pre>
         </details>
         <details>
           <summary>linguagem/22_contratos_aliases.delegua</summary>
@@ -401,8 +454,13 @@ escreva(valores[::-1], valores[::2])</code></pre>
           </p>
           <pre><code>var numeros: inteiro[] = [1]
 var alias: qualquer = numeros
-tente { alias.adicionar(&quot;texto&quot;) }
-pegue { escreva(&quot;bloqueado&quot;) }
+tente {
+    alias.adicionar(&quot;texto&quot;)
+}
+pegue {
+    escreva(&quot;bloqueado&quot;)
+}
+
 escreva(numeros)</code></pre>
         </details>
         <details>
@@ -413,14 +471,20 @@ escreva(numeros)</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var v = [1, 2]
+          <pre><code>var v: qualquer[] = [1, 2]
 v.empilhar(3)
-escreva(v.concatenar([4]).ordenar(funcao(a, b) { retorna b - a }))
+escreva(v.concatenar([4]).ordenar(funcao(a: qualquer, b: qualquer): qualquer {
+    retorna b - a
+}))
 v.adicionar(4)
 escreva(v.removerPrimeiro(), v.removerUltimo())
 escreva(v.removerUltimo())
 escreva(v.removerPrimeiro())
-escreva([1, 2, 3].filtrarPor(funcao(x) { retorna x &lt; 3 }).mapear(funcao(x) { retorna x * 3 }))</code></pre>
+escreva([1, 2, 3].filtrarPor(funcao(x: qualquer): qualquer {
+    retorna x &lt; 3
+}).mapear(funcao(x: qualquer): qualquer {
+    retorna x * 3
+}))</code></pre>
         </details>
 
         <p class="callout">
@@ -450,11 +514,17 @@ escreva([1, 2, 3].filtrarPor(funcao(x) { retorna x &lt; 3 }).mapear(funcao(x) { 
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var original = {a: 1}
-var dados = {...original, b: 2}
-const {a, b} = dados
+          <pre><code>var original: dicionario = { a: 1 }
+
+var dados: dicionario = { ... original, b: 2 }
+
+const { a: qualquer, b: qualquer } = dados
 escreva(a, b)
-para cada {chave, valor} em {x: 7} { escreva(chave, valor) }
+
+para cada { chave: texto, valor: inteiro } em { x: 7 } {
+    escreva(chave, valor)
+}
+
 escreva(&quot;a&quot; em dados)</code></pre>
         </details>
         <details>
@@ -466,7 +536,7 @@ escreva(&quot;a&quot; em dados)</code></pre>
             >
           </p>
           <pre><code>// Tuplas possuem acesso por índice e por propriedades ordinais.
-var tuplaLiteral = [(1, &quot;texto&quot;)]
+var tuplaLiteral: tupla = [(1, &quot;texto&quot;)]
 var tipada: (numero, texto) = tupla([2, &quot;outro&quot;])
 escreva(tuplaLiteral[0], tuplaLiteral.segundo)
 escreva(tipada)</code></pre>
@@ -479,13 +549,14 @@ escreva(tipada)</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var original = {dados: [1]}
-var copia = clonar(original)
+          <pre><code>var original: dicionario = { dados: [1] }
+
+var copia: qualquer = clonar(original)
 copia.dados.adicionar(2)
 escreva(original.dados, copia.dados)
-var ciclo = []
+var ciclo: qualquer[] = []
 ciclo.adicionar(ciclo)
-var clonado = clonar(ciclo)
+var clonado: qualquer = clonar(ciclo)
 escreva(clonado[0] == clonado)</code></pre>
         </details>
         <details>
@@ -496,7 +567,8 @@ escreva(clonado[0] == clonado)</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var d = {b: 2, a: 1}
+          <pre><code>var d: dicionario = { b: 2, a: 1 }
+
 escreva(d.chaves().ordenar().juntar(&quot;-&quot;), d.valores().ordenar())
 escreva(d.contém(&quot;a&quot;), d.remover(&quot;a&quot;), d.tamanho())</code></pre>
         </details>
@@ -527,9 +599,9 @@ escreva(d.contém(&quot;a&quot;), d.remover(&quot;a&quot;), d.tamanho())</code><
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>escreva(tamanho(&quot;ação&quot;), &quot;ação&quot;[1], &quot;ação&quot;[1:3])
+          <pre><code>escreva(tamanho(&quot;ação&quot;), &quot;ação&quot;[1], &quot;ação&quot;[1: 3])
 escreva(&quot;  Olá árvore  &quot;.aparar().maiusculo())
-var n = 2
+var n: numero = 2
 escreva(&quot;valor ${n + 1}&quot;)</code></pre>
         </details>
         <details>
@@ -575,10 +647,16 @@ escreva(&quot;ABC&quot;.tudoMaiusculo(), &quot;abc&quot;.tudoMinusculo())</code>
           </p>
           <pre><code>classe Ponto {
     x: numero
-    construtor(x: numero) { isto.x = x }
-    dobro() { retorna isto.x * 2 }
+    construtor(x: numero) {
+        isto.x = x
+    }
+
+    dobro(): qualquer {
+        retorna isto.x * 2
+    }
 }
-var ponto = Ponto(3)
+
+var ponto: Ponto = Ponto(3)
 escreva(ponto.x, ponto.dobro())
 ponto.x = 4
 escreva(ponto.dobro())</code></pre>
@@ -592,17 +670,35 @@ escreva(ponto.dobro())</code></pre>
             >
           </p>
           <pre><code>classe Base {
-    protegido { x: numero }
-    construtor(x) { isto.x = x }
-    valor() { retorna isto.x }
+    protegido {
+        x: numero
+    }
+
+    construtor(x: qualquer) {
+        isto.x = x
+    }
+
+    valor(): qualquer {
+        retorna isto.x
+    }
 }
+
 classe Filha herda Base {
-    construtor(x) { super(x + 1) }
-    valor() { retorna super.valor() * 2 }
-    dado() { retorna isto.x }
+    construtor(x: qualquer) {
+        super(x + 1)
+    }
+
+    valor(): qualquer {
+        retorna super.valor() * 2
+    }
+
+    dado(): qualquer {
+        retorna isto.x
+    }
 }
-var filha = Filha(3)
-var metodo = filha.valor  // Receptor explícito, gerenciado pelo GC.
+
+var filha: Filha = Filha(3)
+var metodo: funcao = filha.valor // Receptor explícito, gerenciado pelo GC.
 escreva(metodo(), filha.dado())
 escreva(filha.eInstanciaDe(Base))</code></pre>
         </details>
@@ -615,14 +711,25 @@ escreva(filha.eInstanciaDe(Base))</code></pre>
             >
           </p>
           <pre><code>classe Conta {
-    privado { _saldo: numero }
-    saldo: numero {
-        obter() { retorna isto._saldo }
-        definir(valor) { isto._saldo = valor * 2 }
+    privado {
+        _saldo: numero
     }
-    construtor() { isto._saldo = 0 }
+
+    saldo: numero {
+        obter() {
+            retorna isto._saldo
+        }
+        definir(valor: qualquer) {
+            isto._saldo = valor * 2
+        }
+    }
+
+    construtor() {
+        isto._saldo = 0
+    }
 }
-var conta = Conta()
+
+var conta: Conta = Conta()
 conta.saldo = 3
 escreva(conta.saldo)</code></pre>
         </details>
@@ -636,10 +743,16 @@ escreva(conta.saldo)</code></pre>
           </p>
           <pre><code>classe Pessoa {
     nome: texto
-    construtor(nome) { isto.nome = nome }
-    paraTexto() { retorna &quot;Pessoa: ${isto.nome}&quot; }
+    construtor(nome: qualquer) {
+        isto.nome = nome
+    }
+
+    paraTexto(): qualquer {
+        retorna &quot;Pessoa: ${isto.nome}&quot;
+    }
 }
-var p = Pessoa(&quot;Ada&quot;)
+
+var p: Pessoa = Pessoa(&quot;Ada&quot;)
 escreva(p.tipo())
 escreva(p.respondeA(&quot;paraTexto&quot;), p.eInstanciaDe(Objeto))
 escreva(p)</code></pre>
@@ -678,7 +791,12 @@ escreva(p)</code></pre>
 } finalmente {
     escreva(&quot;limpeza&quot;)
 }
-tente { escreva(1 / 0) } pegue (erro) { escreva(erro) }</code></pre>
+
+tente {
+    escreva(1 / 0)
+} pegue (erro) {
+    escreva(erro)
+}</code></pre>
         </details>
         <details>
           <summary>linguagem/18_finalmente_retorno.delegua</summary>
@@ -688,12 +806,21 @@ tente { escreva(1 / 0) } pegue (erro) { escreva(erro) }</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>funcao obter() {
-    tente { retorna 3 } finalmente { escreva(&quot;fim&quot;) }
+          <pre><code>funcao obter(): qualquer {
+    tente {
+        retorna 3
+    } finalmente {
+        escreva(&quot;fim&quot;)
+    }
 }
+
 escreva(obter())
-para (var i = 0; i &lt; 2; i++) {
-    tente { continua } finalmente { escreva(&quot;loop&quot;) }
+para (var i: numero = 0; i &lt; 2; i++) {
+    tente {
+        continua
+    } finalmente {
+        escreva(&quot;loop&quot;)
+    }
 }</code></pre>
         </details>
         <details>
@@ -704,10 +831,18 @@ para (var i = 0; i &lt; 2; i++) {
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>classe MeuErro herda Excecao {}
-tente { falhar MeuErro(&quot;meu erro&quot;) }
-pegue (erro: MeuErro) { escreva(erro) }
-pegue { escreva(&quot;outro erro&quot;) }</code></pre>
+          <pre><code>classe MeuErro herda Excecao {
+}
+
+tente {
+    falhar MeuErro(&quot;meu erro&quot;)
+}
+pegue (erro: MeuErro) {
+    escreva(erro)
+}
+pegue {
+    escreva(&quot;outro erro&quot;)
+}</code></pre>
         </details>
 
         <p class="callout">
@@ -737,8 +872,8 @@ pegue { escreva(&quot;outro erro&quot;) }</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var calculos = importar(&quot;lib/calculos.delegua&quot;)
-var outraReferencia = importar(&quot;./lib/calculos.delegua&quot;)
+          <pre><code>var calculos: qualquer = importar(&quot;lib/calculos.delegua&quot;)
+var outraReferencia: qualquer = importar(&quot;./lib/calculos.delegua&quot;)
 escreva(calculos.soma(3), outraReferencia.versao, calculos.Valor(4).dado)</code></pre>
         </details>
         <details>
@@ -750,8 +885,8 @@ escreva(calculos.soma(3), outraReferencia.versao, calculos.Valor(4).dado)</code>
             >
           </p>
           <pre><code>// As duas importações compartilham o módulo, sem repetir inicialização.
-var primeiro = importar(&quot;biblioteca.delegua&quot;)
-var segundo = importar(&quot;biblioteca.delegua&quot;)
+var primeiro: qualquer = importar(&quot;biblioteca.delegua&quot;)
+var segundo: qualquer = importar(&quot;biblioteca.delegua&quot;)
 escreva(primeiro.dobro(2 + 2))</code></pre>
         </details>
 
@@ -782,9 +917,14 @@ escreva(primeiro.dobro(2 + 2))</code></pre>
             >
           </p>
           <pre><code>escreva(inteiro(&quot;12&quot;), real(&quot;.5&quot;), 1234.5689.formatar())
-funcao par(x) { retorna x % 2 == 0 }
+funcao par(x: qualquer): qualquer {
+    retorna x % 2 == 0
+}
+
 escreva(filtrar([1, 2, 3, 4], par), todosEmCondicao([2, 4], par))
-paraCada([1, 2], funcao(x) { escreva(x * 2) })</code></pre>
+paraCada([1, 2], funcao(x: qualquer): qualquer {
+    escreva(x * 2)
+})</code></pre>
         </details>
         <details>
           <summary>linguagem/27_entrada.delegua</summary>
@@ -794,7 +934,7 @@ paraCada([1, 2], funcao(x) { escreva(x * 2) })</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var nome = leia(&quot;Nome: &quot;)
+          <pre><code>var nome: texto = leia(&quot;Nome: &quot;)
 escreva(&quot;Olá, ${nome}&quot;)</code></pre>
         </details>
         <details>
@@ -805,8 +945,8 @@ escreva(&quot;Olá, ${nome}&quot;)</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>escreva((-3).absoluto(), (2.3).arredondarParaCima(), 2.5.formatar(2))
-escreva(1234.5689.formatar({minimoCasasDecimais: 2, maximoCasasDecimais: 3}))</code></pre>
+          <pre><code>escreva((- 3).absoluto(), (2.3).arredondarParaCima(), 2.5.formatar(2))
+escreva(1234.5689.formatar({ minimoCasasDecimais: 2, maximoCasasDecimais: 3 }))</code></pre>
         </details>
         <details>
           <summary>linguagem/33_aleatoriedade.delegua</summary>
@@ -817,12 +957,13 @@ escreva(1234.5689.formatar({minimoCasasDecimais: 2, maximoCasasDecimais: 3}))</c
             >
           </p>
           <pre><code>// A saída é determinística: verificamos os intervalos, não um valor sorteado.
-para (var i = 0; i &lt; 100; i++) {
-    var real = aleatorio()
-    var inteiro = aleatorioEntre(-3, 4)
+para (var i: numero = 0; i &lt; 100; i++) {
+    var real: real = aleatorio()
+    var inteiro: numero = aleatorioEntre(- 3, 4)
     assercao real &gt;= 0 e real &lt; 1
-    assercao inteiro &gt;= -3 e inteiro &lt; 4
+    assercao inteiro &gt;= - 3 e inteiro &lt; 4
 }
+
 escreva(&quot;intervalos validados&quot;)</code></pre>
         </details>
 
@@ -853,13 +994,25 @@ escreva(&quot;intervalos validados&quot;)</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>@minimo(valor=0)
-classe Medida { lado: numero }
+          <pre><code>@ minimo(valor = 0)
+classe Medida {
+    lado: numero
+}
+
 escreva(decoradores(Medida).classe[0].nome)
-funcao alternativa() { retorna 9 }
-funcao de decorador trocar(original) { retorna alternativa }
-@trocar
-funcao obter() { retorna 1 }
+funcao alternativa(): qualquer {
+    retorna 9
+}
+
+funcao de decorador trocar(original: qualquer): qualquer {
+    retorna alternativa
+}
+
+@ trocar
+funcao obter(): qualquer {
+    retorna 1
+}
+
 escreva(obter())</code></pre>
         </details>
         <details>
@@ -872,8 +1025,12 @@ escreva(obter())</code></pre>
           </p>
           <pre><code>assercao 2 + 2 == 4
 escreva(&quot;validado&quot;)
-tente { asserção(falso, &quot;mensagem personalizada&quot;) }
-pegue (erro) { escreva(erro) }</code></pre>
+tente {
+    asserção(falso, &quot;mensagem personalizada&quot;)
+}
+pegue (erro) {
+    escreva(erro)
+}</code></pre>
         </details>
 
         <p class="callout">
@@ -905,9 +1062,13 @@ pegue (erro) { escreva(erro) }</code></pre>
           <pre><code>// A VM é usada na compilação, não na execução do binário final.
 //&gt;puro
 funcao fibonacci(n: inteiro): inteiro {
-    se n &lt; 2 { retorna n }
+    se n &lt; 2 {
+        retorna n
+    }
+
     retorna fibonacci(n - 1) + fibonacci(n - 2)
 }
+
 escreva(fibonacci(10))</code></pre>
         </details>
         <details>
@@ -919,11 +1080,12 @@ escreva(fibonacci(10))</code></pre>
             >
           </p>
           <pre><code>// A propagação usa a declaração resolvida, preservando o sombreamento.
-const valor = 2
+const valor: numero = 2
 se verdadeiro {
-    const valor = 9
+    const valor: numero = 9
     escreva(valor + 1)
 }
+
 escreva(valor + 1)</code></pre>
         </details>
         <details>
@@ -935,10 +1097,11 @@ escreva(valor + 1)</code></pre>
             >
           </p>
           <pre><code>// Mesmo com -o, multiplicar por zero não elimina a avaliação da função.
-funcao calcular() {
+funcao calcular(): qualquer {
     escreva(&quot;efeito&quot;)
     retorna 7
 }
+
 escreva(calcular() * 0)</code></pre>
         </details>
         <details>
@@ -950,14 +1113,15 @@ escreva(calcular() * 0)</code></pre>
             >
           </p>
           <pre><code>// --verificar avisa sobre a cauda inalcançável; finalmente permanece em -o.
-funcao resultado() {
+funcao resultado(): qualquer {
     tente {
-        retorna (2 + 3) * 4
+        retorna(2 + 3) * 4
         escreva(&quot;inalcançável&quot;)
     } finalmente {
         escreva(&quot;limpeza&quot;)
     }
 }
+
 escreva(resultado())</code></pre>
         </details>
         <details>
@@ -968,8 +1132,11 @@ escreva(resultado())</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>funcao proibida() { falhar &quot;Não deveria executar&quot; }
-escreva(verdadeiro ? 7 : proibida(), falso e proibida(), verdadeiro ou proibida(), nulo ?: 8)</code></pre>
+          <pre><code>funcao proibida(): qualquer {
+    falhar &quot;Não deveria executar&quot;
+}
+
+escreva(verdadeiro ? 7: proibida(), falso e proibida(), verdadeiro ou proibida(), nulo ?: 8)</code></pre>
         </details>
         <details>
           <summary>compilador/07_metodos_e_padroes.delegua</summary>
@@ -981,9 +1148,15 @@ escreva(verdadeiro ? 7 : proibida(), falso e proibida(), verdadeiro ou proibida(
           </p>
           <pre><code>// Os passes também visitam métodos, valores padrão e funções anônimas.
 classe Medida {
-    dobro(valor = 1 + 1) { retorna valor * 2 }
+    dobro(valor: qualquer = 1 + 1): qualquer {
+        retorna valor * 2
+    }
 }
-var calcular = funcao(valor = 3 + 4) { retorna valor }
+
+var calcular: funcao = funcao(valor: qualquer = 3 + 4): qualquer {
+    retorna valor
+}
+
 escreva(Medida().dobro(), calcular())</code></pre>
         </details>
         <details>
@@ -996,17 +1169,29 @@ escreva(Medida().dobro(), calcular())</code></pre>
           </p>
           <pre><code>// A VM preserva senão, slots locais, parâmetros mutáveis e ordem de argumentos.
 //&gt;puro
-funcao escolher(condicao) {
-    se condicao { retorna 1 } senao { retorna 2 }
+funcao escolher(condicao: qualquer): qualquer {
+    se condicao {
+        retorna 1
+    } senao {
+        retorna 2
+    }
 }
+
 //&gt;puro
-funcao combinar(a, b) { retorna a * 10 + b }
+funcao combinar(a: qualquer, b: qualquer): qualquer {
+    retorna a * 10 + b
+}
+
 //&gt;puro
-funcao calcular() {
-    var valor = 1
-    se verdadeiro { var valor = 99 }
+funcao calcular(): qualquer {
+    var valor: numero = 1
+    se verdadeiro {
+        var valor: numero = 99
+    }
+
     retorna combinar(valor++, valor++)
 }
+
 escreva(escolher(falso), calcular())</code></pre>
         </details>
         <details>
@@ -1019,7 +1204,10 @@ escreva(escolher(falso), calcular())</code></pre>
           </p>
           <pre><code>// Uma falha da CTFE preserva a chamada para permitir tratamento em execução.
 //&gt;puro
-funcao dividir(valor) { retorna 1 / valor }
+funcao dividir(valor: qualquer): qualquer {
+    retorna 1 / valor
+}
+
 tente {
     dividir(0)
 } pegue (erro) {
@@ -1036,7 +1224,10 @@ tente {
           </p>
           <pre><code>// A otimização não pode remover a validação de inteiro, nem em funções puras.
 //&gt;puro
-funcao incrementar(valor: inteiro) { retorna valor + 1 }
+funcao incrementar(valor: inteiro) {
+    retorna valor + 1
+}
+
 escreva(incrementar(2.5))</code></pre>
         </details>
 
@@ -1070,8 +1261,8 @@ escreva(incrementar(2.5))</code></pre>
             >
           </p>
           <pre><code>// Dois erros independentes: o parser recupera e reporta os dois.
-var primeiro = ;
-var segundo = ;</code></pre>
+var primeiro: qualquer =;
+var segundo: qualquer =;</code></pre>
         </details>
         <details>
           <summary>compilador/06_sugestao.delegua</summary>
@@ -1081,7 +1272,7 @@ var segundo = ;</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var mensagem = &quot;Olá&quot;
+          <pre><code>var mensagem: texto = &quot;Olá&quot;
 escreva(mensage)</code></pre>
         </details>
         <details>
@@ -1092,7 +1283,7 @@ escreva(mensage)</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>const zero = 3 - 3
+          <pre><code>const zero: inteiro = 3 - 3
 escreva(10 / zero)</code></pre>
         </details>
         <details>
@@ -1347,7 +1538,11 @@ tente {
             >
           </p>
           <pre><code>funcao criar(x) {
-    retorna funcao() { retorna x } // Captura implícita proibida.
+    retorna funcao() {
+        retorna x
+    }
+
+    // Captura implícita proibida.
 }</code></pre>
         </details>
         <details>
@@ -1358,8 +1553,10 @@ tente {
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var externo = 1
-funcao obter() { retorna externo }</code></pre>
+          <pre><code>var externo: inteiro = 1
+funcao obter() {
+    retorna externo
+}</code></pre>
         </details>
         <details>
           <summary>seguranca/03_ffi.delegua</summary>
@@ -1370,7 +1567,8 @@ funcao obter() { retorna externo }</code></pre>
             >
           </p>
           <pre><code>// Código nativo arbitrário não faz parte do perfil compilado.
-classe estrangeira Biblioteca {}</code></pre>
+classe estrangeira Biblioteca {
+}</code></pre>
         </details>
         <details>
           <summary>seguranca/04_importacao_dinamica.delegua</summary>
@@ -1380,8 +1578,8 @@ classe estrangeira Biblioteca {}</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>var caminho = &quot;modulo.delegua&quot;
-var modulo = importar(caminho)</code></pre>
+          <pre><code>var caminho: texto = &quot;modulo.delegua&quot;
+var modulo: qualquer = importar(caminho)</code></pre>
         </details>
 
         <p class="callout">
@@ -1407,6 +1605,108 @@ var modulo = importar(caminho)</code></pre>
           Windows/macOS e executáveis cruzados ainda não foram validados. Instaladores são
           shell/Linux. Não há bigint, dialetos extras, threads da linguagem, debugger ou bibliotecas
           Node. Consulte o guia de desenvolvimento para configurar a toolchain.
+        </p>
+      </section>
+      <section
+        class="doc-section guide-chapter"
+        id="bibliotecas-cgd"
+        data-status="parcial"
+        aria-labelledby="title-bibliotecas-cgd"
+      >
+        <span class="status-badge status-parcial">Com limites</span>
+        <h2 id="title-bibliotecas-cgd">JSON, rede e coleções do CGD</h2>
+        <p>
+          Importe cgd:json, cgd:rede ou cgd:colecoes como namespaces. JSON possui métodos estáticos
+          analisar/serializar e instâncias com obter, definir e texto. Rede usa sessões gerenciadas
+          libcurl; Colecoes oferece unicos e intervalo.
+        </p>
+        <details>
+          <summary>bibliotecas/json_classe.delegua</summary>
+          <p>
+            <a
+              href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/json_classe.delegua"
+              >Abrir fonte e contrato de teste</a
+            >
+          </p>
+          <pre><code>var biblioteca: qualquer = importar(&quot;../../bibliotecas/json.delegua&quot;)
+var dados: qualquer = biblioteca.JSON.analisar(&#x27;{&quot;nome&quot;:&quot;CGD&quot;,&quot;versao&quot;:1}&#x27;)
+escreva(biblioteca.JSON.serializar(dados))
+var documento: qualquer = biblioteca.JSON(dados)
+escreva(documento.obter(&quot;nome&quot;))
+escreva(documento.definir(&quot;versao&quot;, 2).texto())</code></pre>
+        </details>
+        <details>
+          <summary>bibliotecas/rede.delegua</summary>
+          <p>
+            <a
+              href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/rede.delegua"
+              >Abrir fonte e contrato de teste</a
+            >
+          </p>
+          <pre><code>// Não faz requisições externas: introspecção e codificação são locais.
+var rede: qualquer = importar(&quot;../../bibliotecas/rede.delegua&quot;)
+escreva(rede.escapar(&quot;a b/c&quot;))
+escreva(rede.decodificar(&quot;a%20b%2Fc&quot;))
+escreva(tamanho(rede.opcoes()) &gt; 100)</code></pre>
+        </details>
+        <details>
+          <summary>bibliotecas/colecoes.delegua</summary>
+          <p>
+            <a
+              href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/colecoes.delegua"
+              >Abrir fonte e contrato de teste</a
+            >
+          </p>
+          <pre><code>var biblioteca = importar(&quot;../../bibliotecas/colecoes.delegua&quot;)
+escreva(biblioteca.Colecoes.unicos([1, 2, 1, 3, 2]))
+escreva(biblioteca.Colecoes.intervalo(5, 0, - 2))</code></pre>
+        </details>
+
+        <p class="callout">
+          JSON em Delégua puro, limite de profundidade e preservação de números além da
+          representação nativa. Rede exige libcurl &gt;=7.86; opções com ponteiros/callbacks
+          arbitrários são recusadas. WebSocket depende da libcurl instalada, não validado neste
+          ambiente.
+        </p>
+      </section>
+      <section
+        class="doc-section guide-chapter"
+        id="metodos-estaticos"
+        data-status="parcial"
+        aria-labelledby="title-metodos-estaticos"
+      >
+        <span class="status-badge status-parcial">Com limites</span>
+        <h2 id="title-metodos-estaticos">Métodos estáticos e ferramentas do editor</h2>
+        <p>
+          estatico declara método sem isto, herdado e acessível pela classe ou instância. O LSP
+          local oferece completion por tipo, signature help e formatador com quatro espaços.
+          Ctrl+Shift+I formata no VS Code; --formatar formata pela CLI.
+        </p>
+        <details>
+          <summary>estaticos.delegua</summary>
+          <p>
+            <a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/estaticos.delegua"
+              >Abrir fonte e contrato de teste</a
+            >
+          </p>
+          <pre><code>classe Calculadora {
+    estatico dobro(valor: inteiro): inteiro {
+        retorna valor * 2
+    }
+}
+
+classe Avancada herda Calculadora {
+}
+
+escreva(Calculadora.dobro(3))
+escreva(Avancada.dobro(4))
+var calculadora: Calculadora = Calculadora()
+escreva(calculadora.dobro(5))</code></pre>
+        </details>
+
+        <p class="callout">
+          Campos estáticos e depurador/DAP não estão implementados. O editor analisa sem
+          compilar/linkar por edição. Literais longos não são divididos pelo formatador.
         </p>
       </section>
       <section class="doc-section" id="catalogo">
