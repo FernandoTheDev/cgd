@@ -35,7 +35,7 @@ abstract class TypeSema
     bool isAny() => false;
 
     bool isComp(TypeSema type);
-    TypeSema promote(TypeSema other );
+    TypeSema promote(TypeSema other);
 
     dstring toStr();
 }
@@ -58,7 +58,8 @@ class TypeSemaBuiltin : TypeSema
             return true;
 
         TypeSemaBuiltin t = cast(TypeSemaBuiltin) other;
-        if (t is null) return false;
+        if (t is null)
+            return false;
 
         // Any é compatível com tudo
         if (base == TypeSemaBase.Any || t.base == TypeSemaBase.Any)
@@ -82,7 +83,8 @@ class TypeSemaBuiltin : TypeSema
     override TypeSema promote(TypeSema other)
     {
         TypeSemaBuiltin t = cast(TypeSemaBuiltin) other;
-        if (t is null) return this; // tipos incompatíveis, sem promoção
+        if (t is null)
+            return this; // tipos incompatíveis, sem promoção
 
         // Double domina Int
         if (base == TypeSemaBase.Double || t.base == TypeSemaBase.Double)
@@ -101,8 +103,7 @@ class TypeSemaBuiltin : TypeSema
 
     override bool isNumeric()
     {
-        return base == TypeSemaBase.Int
-            || base == TypeSemaBase.Double;
+        return base == TypeSemaBase.Int || base == TypeSemaBase.Double;
     }
 
     override bool isBool()
@@ -140,7 +141,8 @@ class TypeSemaArray : TypeSema
     override TypeSema promote(TypeSema other)
     {
         TypeSemaArray arr = cast(TypeSemaArray) other;
-        if (arr is null) return this;
+        if (arr is null)
+            return this;
         return new TypeSemaArray(base.promote(arr.base));
     }
 
@@ -163,17 +165,42 @@ class TypeSemaArray : TypeSema
 class TypeSemaClass : TypeSema
 {
     import frontend.parser.ast : ClassDecl;
+
     ClassDecl declaration;
-    this(ClassDecl declaration){kind=TypeSemaKind.Class;this.declaration=declaration;}
-    override bool isNumeric(){return false;}
-    override bool isBool(){return false;}
-    override bool isComp(TypeSema other)
+    this(ClassDecl declaration)
     {
-        if(other.isAny())return true;
-        if(auto c=cast(TypeSemaClass)other)
-            for(auto node=c.declaration;node !is null;node=node.superClass)if(node is declaration)return true;
+        kind = TypeSemaKind.Class;
+        this.declaration = declaration;
+    }
+
+    override bool isNumeric()
+    {
         return false;
     }
-    override TypeSema promote(TypeSema other){return this;}
-    override dstring toStr(){return declaration.name;}
+
+    override bool isBool()
+    {
+        return false;
+    }
+
+    override bool isComp(TypeSema other)
+    {
+        if (other.isAny())
+            return true;
+        if (auto c = cast(TypeSemaClass) other)
+            for (auto node = c.declaration; node !is null; node = node.superClass)
+                if (node is declaration)
+                    return true;
+        return false;
+    }
+
+    override TypeSema promote(TypeSema other)
+    {
+        return this;
+    }
+
+    override dstring toStr()
+    {
+        return declaration.name;
+    }
 }

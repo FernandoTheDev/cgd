@@ -1,3 +1,5 @@
 module tests.main;
 
-void main() {}
+void main()
+{
+}

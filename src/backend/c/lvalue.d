@@ -4,9 +4,9 @@ import backend.c.utils;
 
 enum LValueKind
 {
-    Var,      // variável simples: t = valor
+    Var, // variável simples: t = valor
     Member,
-    Index,    // vetor[idx] = valor
+    Index, // vetor[idx] = valor
 }
 
 struct LValue
@@ -28,7 +28,8 @@ struct LValue
             case LValueKind.Var:
                 return name;
 
-            case LValueKind.Member: return formatD("delegua_propriedade_em(%s, %s, %s)",container,index,caller);
+            case LValueKind.Member:
+                return formatD("delegua_propriedade_em(%s, %s, %s)", container, index, caller);
             case LValueKind.Index:
                 return formatD("delegua_obter(%s, %s)", container, index);
         }
@@ -41,7 +42,9 @@ struct LValue
             case LValueKind.Var:
                 return formatD("%s = %s", name, value);
 
-            case LValueKind.Member: return formatD("delegua_definir_em(%s, %s, %s, %s)",container,index,value,caller);
+            case LValueKind.Member:
+                return formatD("delegua_definir_em(%s, %s, %s, %s)", container,
+                        index, value, caller);
             case LValueKind.Index:
                 return formatD("delegua_setar(%s, %s, %s)", container, index, value);
         }

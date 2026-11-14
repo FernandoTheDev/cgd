@@ -35,8 +35,8 @@ public:
     Node parseReturnStmt(Position pos)
     {
         Node value;
-        if (!p.isAtEnd() && !p.check(TokenKind.RBrace) && !p.check(TokenKind.Semicolon)
-            && p.peek().pos.start.line == pos.end.line)
+        if (!p.isAtEnd() && !p.check(TokenKind.RBrace) && !p.check(TokenKind.Semicolon) && p.peek()
+                .pos.start.line == pos.end.line)
             value = p.parseExpr.parse();
         return new ReturnStmt(value, pos);
     }
@@ -58,8 +58,7 @@ public:
             {
                 do
                 {
-                    names ~= p.consume(TokenKind.Identifier, "Esperado nome após para cada.")
-                        .value.s;
+                    names ~= p.consume(TokenKind.Identifier, "Esperado nome após para cada.").value.s;
                 }
                 while (p.match(TokenKind.Comma));
                 p.consume(TokenKind.RBrace, "Esperado '}' após nomes.");
@@ -112,8 +111,8 @@ public:
                     p.consume(TokenKind.Colon, "Esperado ':' após caso.");
                 }
             while (p.check(TokenKind.Case));
-            while (!p.isAtEnd() && !p.check(TokenKind.Case) && !p.check(TokenKind.Default) && !p.check(
-                    TokenKind.RBrace))
+            while (!p.isAtEnd() && !p.check(TokenKind.Case) && !p.check(TokenKind.Default)
+                    && !p.check(TokenKind.RBrace))
                 c.body ~= p.parseIntern();
             if (fallback)
                 node.fallback = c.body;
@@ -155,38 +154,38 @@ public:
         Token tk = p.advance();
         switch (tk.kind)
         {
-        case TokenKind.Switch:
-            return parseSwitch(tk.pos);
-        case TokenKind.Assert:
-            auto id = new Identifier("assercao", tk.pos);
-            if (p.match(TokenKind.LParen))
-                return p.parseExpr.parseCallExpr(id);
-            return new CallExpr(id, [p.parseExpr.parse()], tk.pos);
-        case TokenKind.Try:
-            return parseTry(tk.pos);
-        case TokenKind.Fail:
-            return new ThrowStmt(p.parseExpr.parse(), tk.pos);
-        case TokenKind.For:
-            return parseFor(tk.pos);
-        case TokenKind.Break:
-            return new LoopControl(true, tk.pos);
-        case TokenKind.Continue:
-            return new LoopControl(false, tk.pos);
-        case TokenKind.Do:
-            auto body = p.parseBody();
-            p.consume(TokenKind.While, "Esperado 'enquanto' após fazer.");
-            return new DoStmt(p.parseExpr.parse(), body, tk.pos);
-        case TokenKind.If:
-            return parseIfStmt(tk.pos);
+            case TokenKind.Switch:
+                return parseSwitch(tk.pos);
+            case TokenKind.Assert:
+                auto id = new Identifier("assercao", tk.pos);
+                if (p.match(TokenKind.LParen))
+                    return p.parseExpr.parseCallExpr(id);
+                return new CallExpr(id, [p.parseExpr.parse()], tk.pos);
+            case TokenKind.Try:
+                return parseTry(tk.pos);
+            case TokenKind.Fail:
+                return new ThrowStmt(p.parseExpr.parse(), tk.pos);
+            case TokenKind.For:
+                return parseFor(tk.pos);
+            case TokenKind.Break:
+                return new LoopControl(true, tk.pos);
+            case TokenKind.Continue:
+                return new LoopControl(false, tk.pos);
+            case TokenKind.Do:
+                auto body = p.parseBody();
+                p.consume(TokenKind.While, "Esperado 'enquanto' após fazer.");
+                return new DoStmt(p.parseExpr.parse(), body, tk.pos);
+            case TokenKind.If:
+                return parseIfStmt(tk.pos);
 
-        case TokenKind.Return:
-            return parseReturnStmt(tk.pos);
+            case TokenKind.Return:
+                return parseReturnStmt(tk.pos);
 
-        case TokenKind.While:
-            return parseWhileStmt(tk.pos);
+            case TokenKind.While:
+                return parseWhileStmt(tk.pos);
 
-        default:
-            return new Identifier("null", tk.pos);
+            default:
+                return new Identifier("null", tk.pos);
         }
     }
 }

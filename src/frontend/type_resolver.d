@@ -15,7 +15,8 @@ private:
 public:
     this(TypeRegistry registry, Diagnostics diagnostics = null)
     {
-        this.registry = registry; this.diagnostics = diagnostics;
+        this.registry = registry;
+        this.diagnostics = diagnostics;
     }
 
     TypeSema resolver(TypeExpr type)
@@ -31,14 +32,17 @@ public:
 
                 if (tsema is null)
                 {
-                    if (diagnostics !is null) diagnostics.error(named.pos, format("O tipo '%s' não existe.", named.name));
+                    if (diagnostics !is null)
+                        diagnostics.error(named.pos, format("O tipo '%s' não existe.", named.name));
                     return new TypeSemaBuiltin(TypeSemaBase.Any);
                 }
 
-                if(auto c=cast(TypeSemaClass)*tsema)named.classLinkName=c.declaration.signature.linkName;
+                if (auto c = cast(TypeSemaClass)*tsema)
+                    named.classLinkName = c.declaration.signature.linkName;
                 return *tsema;
 
-            case TypeExprKind.Tuple: return new TypeSemaBuiltin(TypeSemaBase.Tuple);
+            case TypeExprKind.Tuple:
+                return new TypeSemaBuiltin(TypeSemaBase.Tuple);
             case TypeExprKind.Array:
                 TypeExprArray arr = cast(TypeExprArray) type;
                 return new TypeSemaArray(resolver(arr.base));

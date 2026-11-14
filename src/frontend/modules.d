@@ -5,7 +5,9 @@ import std.path;
 import std.conv;
 import std.string;
 import std.algorithm : canFind;
-import core.sys.posix.stdlib : realpath;
+import std.array : join;
+
+version (Posix) import core.sys.posix.stdlib : realpath;
 import core.stdc.stdlib : free;
 
 class ModuleLoader
@@ -14,6 +16,8 @@ class ModuleLoader
     ModuleUnit[string] cache;
     bool[string] active;
     size_t depth;
+    size_t totalBytes;
+    string[] importStack;
     this(Diagnostics diagnostics)
     {
         this.diagnostics = diagnostics;
@@ -21,20 +25,39 @@ class ModuleLoader
 
     string canonical(string path)
     {
-        auto resolved = realpath(path.toStringz, null);
-        if (resolved is null)
-            throw new Exception("Módulo não encontrado: " ~ path);
-        scope (exit)
-            free(resolved);
-        return resolved.fromStringz.idup;
+        version (Posix)
+        {
+            auto resolved = realpath(path.toStringz, null);
+            if (resolved is null)
+                throw new Exception("Módulo não encontrado: " ~ path);
+            scope (exit)
+                free(resolved);
+            return resolved.fromStringz.idup;
+        }
+        else
+        {
+            auto normalized = absolutePath(path).asNormalizedPath.to!string;
+            if (!exists(normalized) || !isFile(normalized))
+                throw new Exception("Módulo não encontrado: " ~ path);
+            // A resolução de junctions/symlinks Windows ainda requer validação nativa.
+            version (Windows)
+                return normalized.toLower;
+            else
+                return normalized;
+        }
     }
 
     void load(Program program, string filename)
     {
         auto path = canonical(filename);
         active[path] = true;
+        importStack ~= path;
+        scope (exit)
+        {
+            active.remove(path);
+            importStack.length--;
+        }
         visit(program, path);
-        active.remove(path);
     }
 
     void visit(Node node, string filename)
@@ -66,7 +89,8 @@ class ModuleLoader
                 auto target = canonical(buildPath(dirName(filename), path));
                 if (target in active)
                 {
-                    diagnostics.error(node.pos, "Ciclo de importação detectado: " ~ target);
+                    diagnostics.error(node.pos,
+                            "Ciclo de importação detectado: " ~ importStack.join(" -> ") ~ " -> " ~ target, "E2001");
                     return;
                 }
                 if (auto cached = target in cache)
@@ -79,15 +103,28 @@ class ModuleLoader
                     diagnostics.error(node.pos, "Limite de profundidade de módulos excedido.");
                     return;
                 }
+                auto bytes = getSize(target);
+                if (bytes > 4 * 1024 * 1024 || totalBytes + bytes > 64 * 1024 * 1024 || cache.length >= 1024)
+                {
+                    diagnostics.error(node.pos, "Limite de recursos de carregamento de módulos excedido.", "E2002");
+                    return;
+                }
+                totalBytes += cast(size_t) bytes;
+                importStack ~= target;
                 active[target] = true;
                 depth++;
                 scope (exit)
                 {
                     active.remove(target);
                     depth--;
+                    importStack.length--;
                 }
-                auto tokens = new Lexer(readText(target), target, diagnostics).tokenizer();
+                auto tokens = new Lexer(cast(string) std.file.read(target), target, diagnostics).tokenizer();
+                if (diagnostics.hasErrors())
+                    return;
                 auto program = new Parser(tokens, diagnostics).parse();
+                if (diagnostics.hasErrors())
+                    return;
                 auto unit = new ModuleUnit(target, program, node.pos);
                 cache[target] = unit;
                 imported.target = unit;
@@ -95,7 +132,7 @@ class ModuleLoader
             }
             catch (Exception e)
             {
-                diagnostics.error(node.pos, e.msg);
+                diagnostics.error(node.pos, e.msg ~ "\nImportado por: " ~ importStack.join(" -> "), "E2003");
             }
             return;
         }

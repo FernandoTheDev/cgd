@@ -19,7 +19,8 @@ enum CGDTypeKind : ubyte
 struct CGDValue
 {
     CGDTypeKind type;
-    union {
+    union
+    {
         long i;
         dstring s;
         double d;
@@ -37,6 +38,7 @@ enum VMOpCode : ubyte
     LoadParam,
     Load,
     Store,
+    Validate,
 
     Push,
 
@@ -77,7 +79,8 @@ struct VMInstruction
 {
     VMOpCode opCode;
     size_t param; // para LoadParam
-    union {
+    union
+    {
         CGDValue value; // para constantes de comptime
         dstring str;
     }
@@ -103,10 +106,9 @@ struct VM
 
     CGDValue[] stack;
     size_t pc;
-    bool executing, halted;
+    bool executing, halted, returned;
 
-    pragma(inline, true)
-    CGDValue pop()
+    pragma(inline, true) CGDValue pop()
     {
         enforce(stack.length > 0, "Stack underflow.");
         CGDValue value = stack[stack.length - 1UL];
@@ -114,8 +116,7 @@ struct VM
         return value;
     }
 
-    pragma(inline, true)
-    void push(CGDValue value) nothrow
+    pragma(inline, true) void push(CGDValue value) nothrow
     {
         stack ~= value;
     }
@@ -125,71 +126,39 @@ alias VMHandleFn = void function(VMInstruction*, VM*);
 
 enum OpCodes = EnumMembers!VMOpCode;
 const VMHandleFn[OpCodes.length] handlers = [
-    &vmLoadParam,
-    &vmLoad,
-    &vmStore,
-
-    &vmPush,
-
-    &vmJmp,
-    &vmJz,
-    &vmJnz,
-
-    &vmAdd,
-    &vmSub,
-    &vmMul,
-    &vmDiv,
-    &vmIDiv,
-    &vmLe,
-    &vmLt,
-    &vmMod,
-    &vmGt,
-    &vmGe,
-    &vmEq,
-    &vmNeq,
-
-    &vmBAnd,
-    &vmBOr,
-    &vmBXor,
-    &vmShl,
-    &vmShr,
-
-    &vmNeg,
-    &vmNot,
-    &vmBNot,
-
-    &vmCall,
-    &vmRet,
-
-    &vmHalt,
+    &vmLoadParam, &vmLoad, &vmStore, &vmValidate, &vmPush, &vmJmp, &vmJz, &vmJnz, &vmAdd,
+    &vmSub, &vmMul, &vmDiv, &vmIDiv, &vmLe, &vmLt, &vmMod, &vmGt, &vmGe, &vmEq, &vmNeq,
+    &vmBAnd, &vmBOr, &vmBXor, &vmShl, &vmShr, &vmNeg, &vmNot, &vmBNot, &vmCall, &vmRet, &vmHalt,
 ];
 
 // validação
 static foreach (size_t i, VMOpCode op; OpCodes)
-    static assert(handlers[i] !is null, "Handler ausente para o opcode: " ~ op.stringof);
+    static assert(handlers[i]!is null, "Handler ausente para o opcode: " ~ op.stringof);
+
+void vmValidate(VMInstruction* instr, VM* vm)
+{
+    enforce(vm.stack.length > 0, "CTFE: validação sem valor.");
+    validateCTFEValue(vm.stack[$ - 1], instr.str);
+}
 
 void vmLoadParam(VMInstruction* instr, VM* vm)
 {
     vm.push(vm.context.params[instr.param]);
-    vmHandle(vm);
 }
 
 void vmLoad(VMInstruction* instr, VM* vm)
 {
     vm.push(vm.context.vars[instr.param]);
-    vmHandle(vm);
 }
 
 void vmStore(VMInstruction* instr, VM* vm)
 {
     vm.context.vars[instr.param] = vm.pop();
-    vmHandle(vm);
 }
 
 void vmPush(VMInstruction* instr, VM* vm)
 {
     vm.push(instr.value);
-    vmHandle(vm);
 }
 
 void vmCall(VMInstruction* instr, VM* vm)
@@ -199,20 +168,20 @@ void vmCall(VMInstruction* instr, VM* vm)
     dstring name = instr.str;
 
     CGDValue[] args;
-    foreach (i; 0..numArgs)
+    foreach (i; 0 .. numArgs)
         args ~= vm.pop();
 
     size_t pc = vm.pc;
     vm.push(vm.ctfe.callValue(name, args));
     vm.pc = pc;
 
-    vmHandle(vm);
 }
 
 void vmRet(VMInstruction* instr, VM* vm)
 {
-    if (vm.stack.length > 0)
-        vm.context.ret[0] = vm.pop();
+    enforce(vm.stack.length > 0, "CTFE: retorno sem valor representável.");
+    vm.context.ret[0] = vm.pop();
+    vm.returned = true;
     vm.halted = true;
     // vmHandle(vm);
 }
@@ -220,7 +189,6 @@ void vmRet(VMInstruction* instr, VM* vm)
 void vmJmp(VMInstruction* instr, VM* vm)
 {
     vm.pc = instr.param;
-    vmHandle(vm);
 }
 
 void vmJz(VMInstruction* instr, VM* vm)
@@ -228,7 +196,6 @@ void vmJz(VMInstruction* instr, VM* vm)
     CGDValue cond = vm.pop();
     if (!isTruthy(cond))
         vm.pc = instr.param;
-    vmHandle(vm);
 }
 
 void vmJnz(VMInstruction* instr, VM* vm)
@@ -236,31 +203,37 @@ void vmJnz(VMInstruction* instr, VM* vm)
     CGDValue cond = vm.pop();
     if (isTruthy(cond))
         vm.pc = instr.param;
-    vmHandle(vm);
 }
 
-pragma(inline, true)
-private long coerceToInteiro(CGDValue v)
+pragma(inline, true) private long coerceToInteiro(CGDValue v)
 {
     final switch (v.type)
     {
-        case CGDTypeKind.Inteiro: return v.i;
-        case CGDTypeKind.Real:    return cast(long) v.d;
-        case CGDTypeKind.Logico:  return v.b1 ? 1 : 0;
+        case CGDTypeKind.Inteiro:
+            return v.i;
+        case CGDTypeKind.Real:
+            import std.math : isFinite;
+
+            enforce(isFinite(v.d) && v.d >= cast(double) long.min && v.d < 9223372036854775808.0,
+                    "Conversão bit a bit fora do intervalo em CTFE.");
+            return cast(long) v.d;
+        case CGDTypeKind.Logico:
+            return v.b1 ? 1 : 0;
         case CGDTypeKind.Texto:
             throw new Exception("operador bitwise nao suporta Texto");
     }
 }
 
-pragma(inline, true)
-private bool isTruthy(CGDValue v)
+pragma(inline, true) private bool isTruthy(CGDValue v)
 {
     final switch (v.type)
     {
-        case CGDTypeKind.Logico:  return v.b1;
+        case CGDTypeKind.Logico:
+            return v.b1;
         case CGDTypeKind.Inteiro:
         case CGDTypeKind.Real:
-        case CGDTypeKind.Texto: return true;
+        case CGDTypeKind.Texto:
+            return true;
     }
 }
 
@@ -291,7 +264,6 @@ void vmAdd(VMInstruction* instr, VM* vm)
             throw new Exception("operador + nao suportado entre Logico e Logico");
     }
 
-    vmHandle(vm);
 }
 
 void vmSub(VMInstruction* instr, VM* vm)
@@ -320,7 +292,6 @@ void vmSub(VMInstruction* instr, VM* vm)
             throw new Exception("operador - nao suportado para Logico");
     }
 
-    vmHandle(vm);
 }
 
 void vmMul(VMInstruction* instr, VM* vm)
@@ -349,7 +320,6 @@ void vmMul(VMInstruction* instr, VM* vm)
             throw new Exception("operador * nao suportado para Logico");
     }
 
-    vmHandle(vm);
 }
 
 void vmDiv(VMInstruction* instr, VM* vm)
@@ -363,8 +333,8 @@ void vmDiv(VMInstruction* instr, VM* vm)
         case CGDTypeKind.Inteiro:
             enforce(right.i != 0, "Divisão por zero em tempo de compilação.");
             enforce(left.i != long.min || right.i != -1, "Overflow na divisão em tempo de compilação.");
-            vm.push(left.i % right.i == 0 ? CGDValue.inteiro(left.i / right.i)
-                : CGDValue.real_(cast(double)left.i / right.i));
+            vm.push(left.i % right.i == 0 ? CGDValue.inteiro(left.i / right.i) : CGDValue.real_(
+                    cast(double) left.i / right.i));
             break;
 
         case CGDTypeKind.Real:
@@ -379,7 +349,6 @@ void vmDiv(VMInstruction* instr, VM* vm)
             throw new Exception("operador / nao suportado para Logico");
     }
 
-    vmHandle(vm);
 }
 
 void vmIDiv(VMInstruction* instr, VM* vm)
@@ -388,18 +357,19 @@ void vmIDiv(VMInstruction* instr, VM* vm)
     promote(left, right);
     if (left.type == CGDTypeKind.Inteiro)
     {
-        enforce(right.i != 0 && (left.i != long.min || right.i != -1), "Divisão inteira inválida em tempo de compilação.");
+        enforce(right.i != 0 && (left.i != long.min || right.i != -1),
+                "Divisão inteira inválida em tempo de compilação.");
         vm.push(CGDValue.inteiro(left.i / right.i));
     }
     else if (left.type == CGDTypeKind.Real)
     {
         auto result = left.d / right.d;
-        enforce(right.d != 0 && result >= cast(double)long.min && result < 9223372036854775808.0,
-            "Divisão inteira fora do intervalo em tempo de compilação.");
-        vm.push(CGDValue.inteiro(cast(long)result));
+        enforce(right.d != 0 && result >= cast(double) long.min && result < 9223372036854775808.0,
+                "Divisão inteira fora do intervalo em tempo de compilação.");
+        vm.push(CGDValue.inteiro(cast(long) result));
     }
-    else throw new Exception("Divisão inteira exige números.");
-    vmHandle(vm);
+    else
+        throw new Exception("Divisão inteira exige números.");
 }
 
 void vmMod(VMInstruction* instr, VM* vm)
@@ -416,8 +386,7 @@ void vmMod(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Real:
-            vm.push(CGDValue.real_(left.d % right.d));
-            break;
+            throw new Exception("Módulo real não é suportado pelo runtime.");
 
         case CGDTypeKind.Texto:
             throw new Exception("operador % nao suportado para Texto");
@@ -426,7 +395,6 @@ void vmMod(VMInstruction* instr, VM* vm)
             throw new Exception("operador % nao suportado para Logico");
     }
 
-    vmHandle(vm);
 }
 
 void vmLt(VMInstruction* instr, VM* vm)
@@ -452,7 +420,6 @@ void vmLt(VMInstruction* instr, VM* vm)
             throw new Exception("operador < nao suportado para Logico");
     }
 
-    vmHandle(vm);
 }
 
 void vmLe(VMInstruction* instr, VM* vm)
@@ -478,7 +445,6 @@ void vmLe(VMInstruction* instr, VM* vm)
             throw new Exception("operador <= nao suportado para Logico");
     }
 
-    vmHandle(vm);
 }
 
 void vmGt(VMInstruction* instr, VM* vm)
@@ -504,7 +470,6 @@ void vmGt(VMInstruction* instr, VM* vm)
             throw new Exception("operador > nao suportado para Logico");
     }
 
-    vmHandle(vm);
 }
 
 void vmGe(VMInstruction* instr, VM* vm)
@@ -530,13 +495,19 @@ void vmGe(VMInstruction* instr, VM* vm)
             throw new Exception("operador >= nao suportado para Logico");
     }
 
-    vmHandle(vm);
 }
 
 void vmEq(VMInstruction* instr, VM* vm)
 {
     CGDValue right = vm.pop();
     CGDValue left = vm.pop();
+    bool numericLeft = left.type == CGDTypeKind.Inteiro || left.type == CGDTypeKind.Real;
+    bool numericRight = right.type == CGDTypeKind.Inteiro || right.type == CGDTypeKind.Real;
+    if (left.type != right.type && !(numericLeft && numericRight))
+    {
+        vm.push(CGDValue.logico(false));
+        return;
+    }
     promote(left, right);
 
     final switch (left.type)
@@ -558,13 +529,19 @@ void vmEq(VMInstruction* instr, VM* vm)
             break;
     }
 
-    vmHandle(vm);
 }
 
 void vmNeq(VMInstruction* instr, VM* vm)
 {
     CGDValue right = vm.pop();
     CGDValue left = vm.pop();
+    bool numericLeft = left.type == CGDTypeKind.Inteiro || left.type == CGDTypeKind.Real;
+    bool numericRight = right.type == CGDTypeKind.Inteiro || right.type == CGDTypeKind.Real;
+    if (left.type != right.type && !(numericLeft && numericRight))
+    {
+        vm.push(CGDValue.logico(true));
+        return;
+    }
     promote(left, right);
 
     final switch (left.type)
@@ -586,7 +563,6 @@ void vmNeq(VMInstruction* instr, VM* vm)
             break;
     }
 
-    vmHandle(vm);
 }
 
 void vmBAnd(VMInstruction* instr, VM* vm)
@@ -598,7 +574,6 @@ void vmBAnd(VMInstruction* instr, VM* vm)
     long r = coerceToInteiro(right);
 
     vm.push(CGDValue.inteiro(l & r));
-    vmHandle(vm);
 }
 
 void vmBOr(VMInstruction* instr, VM* vm)
@@ -610,7 +585,6 @@ void vmBOr(VMInstruction* instr, VM* vm)
     long r = coerceToInteiro(right);
 
     vm.push(CGDValue.inteiro(l | r));
-    vmHandle(vm);
 }
 
 void vmBXor(VMInstruction* instr, VM* vm)
@@ -622,20 +596,20 @@ void vmBXor(VMInstruction* instr, VM* vm)
     long r = coerceToInteiro(right);
 
     vm.push(CGDValue.inteiro(l ^ r));
-    vmHandle(vm);
 }
 
 void vmShl(VMInstruction* instr, VM* vm)
 {
     CGDValue right = vm.pop();
     CGDValue left = vm.pop();
+    enforce(left.type == CGDTypeKind.Inteiro && right.type == CGDTypeKind.Inteiro,
+            "Deslocamento esquerdo exige inteiros, como no runtime.");
 
     long l = coerceToInteiro(left);
     long r = coerceToInteiro(right);
     enforce(r >= 0 && r < 64, "Deslocamento deve estar entre 0 e 63.");
 
     vm.push(CGDValue.inteiro(l << r));
-    vmHandle(vm);
 }
 
 void vmShr(VMInstruction* instr, VM* vm)
@@ -648,7 +622,6 @@ void vmShr(VMInstruction* instr, VM* vm)
     enforce(r >= 0 && r < 64, "Deslocamento deve estar entre 0 e 63.");
 
     vm.push(CGDValue.inteiro(l >> r));
-    vmHandle(vm);
 }
 
 void vmNeg(VMInstruction* instr, VM* vm)
@@ -673,7 +646,6 @@ void vmNeg(VMInstruction* instr, VM* vm)
             throw new Exception("operador unario - nao suportado para Logico");
     }
 
-    vmHandle(vm);
 }
 
 void vmNot(VMInstruction* instr, VM* vm)
@@ -693,16 +665,15 @@ void vmNot(VMInstruction* instr, VM* vm)
             break;
     }
 
-    vmHandle(vm);
 }
 
 void vmBNot(VMInstruction* instr, VM* vm)
 {
     CGDValue v = vm.pop();
+    enforce(v.type == CGDTypeKind.Inteiro, "Negação bit a bit exige inteiro, como no runtime.");
     long l = coerceToInteiro(v);
 
     vm.push(CGDValue.inteiro(~l));
-    vmHandle(vm);
 }
 
 void vmHalt(VMInstruction* instr, VM* vm)
@@ -710,12 +681,13 @@ void vmHalt(VMInstruction* instr, VM* vm)
     vm.halted = true;
 }
 
-pragma(inline, true)
-void vmHandle(VM* vm)
+pragma(inline, true) void vmHandle(VM* vm)
 {
-    if (vm.executing) return;
+    if (vm.executing)
+        return;
     vm.executing = true;
-    scope(exit) vm.executing = false;
+    scope (exit)
+        vm.executing = false;
     while (!vm.halted)
     {
         vm.ctfe.consumeInstruction();
@@ -725,19 +697,11 @@ void vmHandle(VM* vm)
     }
 }
 
-pragma(inline, true)
-void promote(ref CGDValue left, ref CGDValue right)
+pragma(inline, true) void promote(ref CGDValue left, ref CGDValue right)
 {
-    // Nunca promove pra Texto implicitamente em operação binária mista —
-    // isso é decisão de mais alto nível (concatenação/interpolação), não
-    // coerção aritmética/lógica. Se um dos dois já é Texto, os dois viram Texto,
-    // mas de forma simétrica e explícita.
-    if (left.type == CGDTypeKind.Texto || right.type == CGDTypeKind.Texto)
-    {
-        if (left.type != CGDTypeKind.Texto)  left = toTexto(left);
-        if (right.type != CGDTypeKind.Texto) right = toTexto(right);
-        return;
-    }
+    // A formatação de valores mistos usa o runtime; não aproxime sua representação.
+    if ((left.type == CGDTypeKind.Texto || right.type == CGDTypeKind.Texto) && left.type != right.type)
+        throw new Exception("Conversão textual mista preservada para execução nativa.");
 
     final switch (left.type)
     {
@@ -799,15 +763,3 @@ void promote(ref CGDValue left, ref CGDValue right)
             return;
     }
 }
-
-private CGDValue toTexto(ref CGDValue v)
-{
-    final switch (v.type)
-    {
-        case CGDTypeKind.Inteiro: return CGDValue.texto(formatD("%d", v.i));
-        case CGDTypeKind.Real:    return CGDValue.texto(formatD("%f", v.d));
-        case CGDTypeKind.Logico:  return CGDValue.texto(v.b1 ? "verdadeiro" : "falso");
-        case CGDTypeKind.Texto:   return v;
-    }
-}
-

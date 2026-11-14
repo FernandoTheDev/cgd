@@ -18,8 +18,9 @@ private:
         switch (node.kind)
         {
             case NodeKind.ClassDecl:
-                auto c=cast(ClassDecl)node;
-                registry.set(c.name,new TypeSemaClass(c)); return;
+                auto c = cast(ClassDecl) node;
+                registry.set(c.name, new TypeSemaClass(c));
+                return;
             default:
                 return;
         }

@@ -26,7 +26,12 @@ private:
         if (!(fn.ctfe_flags & CTFEFlags.Pure))
             return false;
 
-        foreach(d;fn.decorators)if(d.envelope !is null){err.error(fn.pos,"Função com envelope de decorador não aceita avaliação //>puro.");return false;}
+        foreach (d; fn.decorators)
+            if (d.envelope !is null)
+            {
+                err.error(fn.pos, "Função com envelope de decorador não aceita avaliação //>puro.");
+                return false;
+            }
         bool status = nodeAnalysisBlockStmt(fn.body);
         dstring name = fn.fn;
         // writefln("A função é pura: %d -> '%s'", status, name);
@@ -39,8 +44,8 @@ private:
         }
 
         if (!status)
-            err.error(fn.pos,
-                format("A função '%s' foi marcada como pura mas após uma análise a pureza não foi detectada.", name));
+            err.error(fn.pos, format(
+                    "A função '%s' foi marcada como pura mas após uma análise a pureza não foi detectada.", name));
 
         return status;
     }
@@ -51,18 +56,38 @@ private:
         {
             case NodeKind.TupleLit:
             case NodeKind.SequenceStmt:
-            case NodeKind.ConditionalExpr:case NodeKind.SpreadExpr:case NodeKind.SliceExpr:case NodeKind.Comprehension:case NodeKind.SwitchStmt:case NodeKind.LoopExpr:
+            case NodeKind.ConditionalExpr:
+            case NodeKind.SpreadExpr:
+            case NodeKind.SliceExpr:
+            case NodeKind.Comprehension:
+            case NodeKind.SwitchStmt:
+            case NodeKind.LoopExpr:
             case NodeKind.TypeOfExpr:
-            case NodeKind.ModuleUnit: case NodeKind.ImportExpr:
-            case NodeKind.TryStmt: case NodeKind.ThrowStmt:
-            case NodeKind.ClassDecl: case NodeKind.SuperExpr:
+            case NodeKind.ModuleUnit:
+            case NodeKind.ImportExpr:
+            case NodeKind.TryStmt:
+            case NodeKind.ThrowStmt:
+            case NodeKind.ClassDecl:
+            case NodeKind.SuperExpr:
             case NodeKind.FunctionExpr:
-            case NodeKind.MapLit: case NodeKind.EachStmt:
+            case NodeKind.MapLit:
+            case NodeKind.EachStmt:
             case NodeKind.NullLit:
-            case NodeKind.ForStmt: case NodeKind.DoStmt: case NodeKind.BreakStmt: case NodeKind.ContinueStmt:
-                err.error(node.pos, "Esse recurso ainda não é suportado na avaliação em tempo de compilação.");
+            case NodeKind.ForStmt:
+            case NodeKind.DoStmt:
+            case NodeKind.BreakStmt:
+            case NodeKind.ContinueStmt:
+                err.error(node.pos,
+                        "Esse recurso ainda não é suportado na avaliação em tempo de compilação.");
                 return false;
             case NodeKind.Identifier:
+                if ((cast(Identifier) node).functionRef !is null)
+                {
+                    err.error(node.pos,
+                            "Valor de função ainda não é representável na avaliação em tempo de compilação.");
+                    return false;
+                }
+                return true;
 
             case NodeKind.NaN:
             case NodeKind.StringLit:
@@ -75,9 +100,13 @@ private:
             case NodeKind.BinaryExpr:
                 BinaryExpr binary = cast(BinaryExpr) node;
                 import frontend.lexer : TokenKind;
-                if (binary.op == TokenKind.And || binary.op == TokenKind.Or || binary.op == TokenKind.Coalesce
-                    || binary.op == TokenKind.Pow || binary.op == TokenKind.In)
-                { err.error(node.pos, "Operador ainda não suportado na avaliação em tempo de compilação."); return false; }
+
+                if (binary.op == TokenKind.And || binary.op == TokenKind.Or
+                        || binary.op == TokenKind.Coalesce || binary.op == TokenKind.Pow || binary.op == TokenKind.In)
+                {
+                    err.error(node.pos, "Operador ainda não suportado na avaliação em tempo de compilação.");
+                    return false;
+                }
                 return (nodeAnalysis(binary.left) == true) && (nodeAnalysis(binary.right) == true);
 
             case NodeKind.UnaryExpr:
@@ -85,7 +114,9 @@ private:
                 return nodeAnalysis(un.value);
 
             case NodeKind.FnDecl:
-                return nodeAnalysisBlockStmt((cast(FnDecl) node).body);
+                err.error(node.pos,
+                        "Função local ainda não é suportada na avaliação em tempo de compilação.");
+                return false;
 
             case NodeKind.VarDecl:
                 VarDecl var = cast(VarDecl) node;
@@ -100,7 +131,11 @@ private:
 
             case NodeKind.ReturnStmt:
                 auto value = (cast(ReturnStmt) node).val;
-                if (value is null) { err.error(node.pos, "Retorno sem valor ainda não é suportado em funções puras."); return false; }
+                if (value is null)
+                {
+                    err.error(node.pos, "Retorno sem valor ainda não é suportado em funções puras.");
+                    return false;
+                }
                 return nodeAnalysis(value);
 
             case NodeKind.CallExpr:
@@ -124,14 +159,16 @@ private:
     bool nodeAnalysisWhileStmt(WhileStmt node)
     {
         bool expr = node.expr is null || nodeAnalysis(node.expr);
-        if (!expr) return false;
+        if (!expr)
+            return false;
         return nodeAnalysisBlockStmt(node.body);
     }
 
     bool nodeAnalysisIfStmt(IfStmt node)
     {
         bool expr = node.expr is null || nodeAnalysis(node.expr);
-        if (!expr) return false;
+        if (!expr)
+            return false;
 
         if (!nodeAnalysisBlockStmt(node.body))
             return false;
@@ -145,24 +182,36 @@ private:
     {
         bool ret = true;
         foreach (Node child; body)
-            if (!nodeAnalysis(child) && ret) ret = false;
+            if (!nodeAnalysis(child) && ret)
+                ret = false;
         return ret;
     }
 
     bool nodeAnalysisCallExpr(CallExpr node)
     {
-        dstring name = (cast(Identifier) node.fn).value;
-        Symbol* sym = context.get(name);
-
-        if (sym is null || !sym.isFn())
+        auto identifier = cast(Identifier) node.fn;
+        if (identifier is null || identifier.functionRef is null)
         {
-            err.error(node.pos, format("A função '%s' não foi encontrada.", name));
+            err.error(node.pos,
+                    "Chamada indireta/método ainda não é suportada na avaliação em tempo de compilação.");
             return false;
         }
-
-        SymbolFn* symf = cast(SymbolFn*) sym;
+        auto name = identifier.value;
+        auto sym = context.get(name);
+        if (sym is null || !sym.isFn() || (cast(SymbolFn*) sym).node !is identifier.functionRef)
+        {
+            err.error(node.pos, "Identidade da função não disponível na avaliação em tempo de compilação.");
+            return false;
+        }
+        auto symf = cast(SymbolFn*) sym;
         if (symf.node.ctfe_flags & CTFEFlags.Pure)
-            return true;
+        {
+            bool valid = true;
+            foreach (arg; node.args)
+                if (!nodeAnalysis(arg))
+                    valid = false;
+            return valid;
+        }
 
         err.error(node.pos, format("A função '%s' não é marcada pura.", name));
 

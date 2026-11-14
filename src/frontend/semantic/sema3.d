@@ -37,12 +37,18 @@ private:
     {
         if (context.requiresCapture(node.value))
         {
-            err.warning(node.pos, format("Captura externa de '%s' detectada: exigiria upvalues, recurso desabilitado por segurança.", node
-                    .value));
+            err.warning(node.pos,
+                    format("Captura externa de '%s' detectada: exigiria upvalues, recurso desabilitado por segurança.",
+                        node.value));
             err.error(node.pos, "A captura foi bloqueada; passe o valor como parâmetro explícito.");
         }
         else
-            err.error(node.pos, format("O símbolo '%s' não foi declarado.", node.value));
+        {
+            err.error(node.pos, format("O símbolo '%s' não foi declarado.", node.value), "E3001");
+            auto suggestion = context.suggest(node.value);
+            if (suggestion.length)
+                err.hint(node.pos, format("Você quis dizer '%s'?", suggestion), "H3001");
+        }
         node.type_sema = anyType();
     }
 
@@ -52,22 +58,22 @@ private:
             return true;
         switch (node.kind)
         {
-        case NodeKind.StringLit:
-        case NodeKind.IntLit:
-        case NodeKind.DoubleLit:
-        case NodeKind.BoolLit:
-        case NodeKind.NullLit:
-            return true;
-        case NodeKind.ArrayLit:
-        case NodeKind.MapLit:
-        case NodeKind.UnaryExpr:
-        case NodeKind.BinaryExpr:
-            foreach (child; childNodes(node))
-                if (!metadataConstant(child))
-                    return false;
-            return true;
-        default:
-            return false;
+            case NodeKind.StringLit:
+            case NodeKind.IntLit:
+            case NodeKind.DoubleLit:
+            case NodeKind.BoolLit:
+            case NodeKind.NullLit:
+                return true;
+            case NodeKind.ArrayLit:
+            case NodeKind.MapLit:
+            case NodeKind.UnaryExpr:
+            case NodeKind.BinaryExpr:
+                foreach (child; childNodes(node))
+                    if (!metadataConstant(child))
+                        return false;
+                return true;
+            default:
+                return false;
         }
     }
 
@@ -78,14 +84,16 @@ private:
             foreach (ref value; d.values)
             {
                 if (!metadataConstant(value))
-                    err.error(pos, "Argumentos de metadados devem ser expressões constantes sem execução de funções.");
+                    err.error(pos,
+                            "Argumentos de metadados devem ser expressões constantes sem execução de funções.");
                 value = analyze(value);
             }
             auto sym = context.get(d.name);
             if (sym !is null && sym.isFn() && (cast(SymbolFn*) sym).node.decoratorEnvelope)
             {
                 if (!envelopes)
-                    err.error(pos, "Envelope de decorador exige uma função livre; metadados são permitidos neste membro.");
+                    err.error(pos,
+                            "Envelope de decorador exige uma função livre; metadados são permitidos neste membro.");
                 else
                     d.envelope = (cast(SymbolFn*) sym).node;
             }
@@ -120,234 +128,235 @@ private:
 
         switch (node.kind)
         {
-        case NodeKind.SequenceStmt:
-            auto sequence = cast(SequenceStmt) node;
-            foreach (ref child; sequence.body)
-                child = analyze(child);
-            return node;
-        case NodeKind.ConditionalExpr:
-            auto c = cast(ConditionalExpr) node;
-            c.condition = analyze(c.condition);
-            c.yes = analyze(c.yes);
-            c.no = analyze(c.no);
-            node.type_sema = anyType();
-            return node;
-        case NodeKind.SpreadExpr:
-            auto s = cast(SpreadExpr) node;
-            s.value = analyze(s.value);
-            node.type_sema = anyType();
-            return node;
-        case NodeKind.SliceExpr:
-            auto s = cast(SliceExpr) node;
-            s.value = analyze(s.value);
-            s.start = analyze(s.start);
-            s.end = analyze(s.end);
-            s.step = analyze(s.step);
-            node.type_sema = s.value.type_sema;
-            return node;
-        case NodeKind.Comprehension:
-            auto c = cast(Comprehension) node;
-            c.iterable = analyze(c.iterable);
-            context.push();
-            auto v = new VarDecl(c.name, null, false, null, c.pos);
-            v.type_sema = anyType();
-            context.set(c.name, new SymbolVar(v));
-            c.value = analyze(c.value);
-            c.condition = analyze(c.condition);
-            context.pop();
-            node.type_sema = new TypeSemaArray(anyType());
-            return node;
-        case NodeKind.LoopExpr:
-            auto l = cast(LoopExpr) node;
-            collectionDepth++;
-            l.loop = analyze(l.loop);
-            collectionDepth--;
-            node.type_sema = new TypeSemaArray(anyType());
-            return node;
-        case NodeKind.SwitchStmt:
-            auto s = cast(SwitchStmt) node;
-            s.value = analyze(s.value);
-            switchDepth++;
-            foreach (ref c; s.cases)
-            {
-                foreach (ref v; c.values)
-                    v = analyze(v);
-                analyzeBody(c.body);
-            }
-            analyzeBody(s.fallback);
-            switchDepth--;
-            return node;
-        case NodeKind.ImportExpr:
-            auto imported = cast(ImportExpr) node;
-            if (imported.target !is null && !imported.target.analyzed)
-            {
-                auto unit = imported.target;
-                unit.analyzed = true;
-                auto ctx = new Context;
-                auto types = new TypeRegistry;
-                new Sema1(ctx, err).analyze(unit.program);
-                new Sema2(types).analyze(unit.program);
-                new Sema3(ctx, types, new TypeResolver(types, err), err).analyze(unit.program);
-            }
-            node.type_sema = anyType();
-            return node;
-        case NodeKind.ThrowStmt:
-            auto t = cast(ThrowStmt) node;
-            t.value = analyze(t.value);
-            return node;
-        case NodeKind.TryStmt:
-            auto t = cast(TryStmt) node;
-            analyzeBody(t.body);
-            foreach (ref c; t.catches)
-            {
-                context.push();
-                if (c.type !is null)
-                    resolver.resolver(c.type);
-                if (c.name.length)
-                {
-                    auto v = new VarDecl(c.name, null, true, c.type, c.pos);
-                    v.type_sema = anyType();
-                    context.set(c.name, new SymbolVar(v, true));
-                }
-                foreach (ref child; c.body)
+            case NodeKind.SequenceStmt:
+                auto sequence = cast(SequenceStmt) node;
+                foreach (ref child; sequence.body)
                     child = analyze(child);
-                context.pop();
-            }
-            analyzeBody(t.finalBody);
-            return node;
-        case NodeKind.ClassDecl:
-            return analyzeClass(cast(ClassDecl) node);
-        case NodeKind.SuperExpr:
-            auto s = cast(SuperExpr) node;
-            if (methodOwner is null || methodOwner.superClass is null)
-                err.error(node.pos, "Uso de super fora de uma subclasse.");
-            s.owner = methodOwner;
-            node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Function);
-            return node;
-        case NodeKind.FunctionExpr:
-            auto f = cast(FunctionExpr) node;
-            analyzeFnDecl(f.declaration, false);
-            node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Function);
-            return node;
-        case NodeKind.EachStmt:
-            auto loop = cast(EachStmt) node;
-            loop.iterable = analyze(loop.iterable);
-            context.push();
-            auto variable = new VarDecl(loop.name, null, false, null, loop.pos);
-            variable.type_sema = anyType();
-            context.set(loop.name, new SymbolVar(variable));
-            foreach (name; loop.destructured)
-            {
-                auto v = new VarDecl(name, null, false, null, loop.pos);
+                return node;
+            case NodeKind.ConditionalExpr:
+                auto c = cast(ConditionalExpr) node;
+                c.condition = analyze(c.condition);
+                c.yes = analyze(c.yes);
+                c.no = analyze(c.no);
+                node.type_sema = anyType();
+                return node;
+            case NodeKind.SpreadExpr:
+                auto s = cast(SpreadExpr) node;
+                s.value = analyze(s.value);
+                node.type_sema = anyType();
+                return node;
+            case NodeKind.SliceExpr:
+                auto s = cast(SliceExpr) node;
+                s.value = analyze(s.value);
+                s.start = analyze(s.start);
+                s.end = analyze(s.end);
+                s.step = analyze(s.step);
+                node.type_sema = s.value.type_sema;
+                return node;
+            case NodeKind.Comprehension:
+                auto c = cast(Comprehension) node;
+                c.iterable = analyze(c.iterable);
+                context.push();
+                auto v = new VarDecl(c.name, null, false, null, c.pos);
                 v.type_sema = anyType();
-                if (!context.set(name, new SymbolVar(v)))
-                    err.error(loop.pos, "Nome duplicado na iteração.");
-            }
-            loopDepth++;
-            analyzeBody(loop.body);
-            loopDepth--;
-            context.pop();
-            return node;
-        case NodeKind.MapLit:
-            auto map = cast(MapLit) node;
-            foreach (ref key; map.keys)
-                key = analyze(key);
-            foreach (ref value; map.values)
-                value = analyze(value);
-            node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Map);
-            return node;
-        case NodeKind.NullLit:
-            node.type_sema = anyType();
-            return node;
-        case NodeKind.BlockStmt:
-            auto block = as!BlockStmt(node);
-            analyzeBody(block.body);
-            return node;
-        case NodeKind.BreakStmt:
-        case NodeKind.ContinueStmt:
-            if (!loopDepth && (node.kind == NodeKind.ContinueStmt || !switchDepth))
-                err.error(node.pos, "Controle de laço fora de um laço de repetição/escolha.");
-            return node;
-        case NodeKind.ForStmt:
-            auto loop = as!ForStmt(node);
-            context.push();
-            loop.init = analyze(loop.init);
-            loop.condition = analyze(loop.condition);
-            loop.step = analyze(loop.step);
-            loopDepth++;
-            analyzeBody(loop.body);
-            loopDepth--;
-            context.pop();
-            return node;
-        case NodeKind.DoStmt:
-            auto loop = as!DoStmt(node);
-            loopDepth++;
-            analyzeBody(loop.body);
-            loopDepth--;
-            loop.condition = analyze(loop.condition);
-            return node;
-        case NodeKind.VarDecl:
-            return analyzeVarDecl(as!VarDecl(node));
+                context.set(c.name, new SymbolVar(v));
+                c.value = analyze(c.value);
+                c.condition = analyze(c.condition);
+                context.pop();
+                node.type_sema = new TypeSemaArray(anyType());
+                return node;
+            case NodeKind.LoopExpr:
+                auto l = cast(LoopExpr) node;
+                collectionDepth++;
+                l.loop = analyze(l.loop);
+                collectionDepth--;
+                node.type_sema = new TypeSemaArray(anyType());
+                return node;
+            case NodeKind.SwitchStmt:
+                auto s = cast(SwitchStmt) node;
+                s.value = analyze(s.value);
+                switchDepth++;
+                foreach (ref c; s.cases)
+                {
+                    foreach (ref v; c.values)
+                        v = analyze(v);
+                    analyzeBody(c.body);
+                }
+                analyzeBody(s.fallback);
+                switchDepth--;
+                return node;
+            case NodeKind.ImportExpr:
+                auto imported = cast(ImportExpr) node;
+                if (imported.target !is null && !imported.target.analyzed)
+                {
+                    auto unit = imported.target;
+                    unit.analyzed = true;
+                    auto ctx = new Context;
+                    auto types = new TypeRegistry;
+                    new Sema1(ctx, err).analyze(unit.program);
+                    new Sema2(types).analyze(unit.program);
+                    new Sema3(ctx, types, new TypeResolver(types, err), err).analyze(unit.program);
+                }
+                node.type_sema = anyType();
+                return node;
+            case NodeKind.ThrowStmt:
+                auto t = cast(ThrowStmt) node;
+                t.value = analyze(t.value);
+                return node;
+            case NodeKind.TryStmt:
+                auto t = cast(TryStmt) node;
+                analyzeBody(t.body);
+                foreach (ref c; t.catches)
+                {
+                    context.push();
+                    if (c.type !is null)
+                        resolver.resolver(c.type);
+                    if (c.name.length)
+                    {
+                        auto v = new VarDecl(c.name, null, true, c.type, c.pos);
+                        v.type_sema = anyType();
+                        context.set(c.name, new SymbolVar(v, true));
+                    }
+                    foreach (ref child; c.body)
+                        child = analyze(child);
+                    context.pop();
+                }
+                analyzeBody(t.finalBody);
+                return node;
+            case NodeKind.ClassDecl:
+                return analyzeClass(cast(ClassDecl) node);
+            case NodeKind.SuperExpr:
+                auto s = cast(SuperExpr) node;
+                if (methodOwner is null || methodOwner.superClass is null)
+                    err.error(node.pos, "Uso de super fora de uma subclasse.");
+                s.owner = methodOwner;
+                node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Function);
+                return node;
+            case NodeKind.FunctionExpr:
+                auto f = cast(FunctionExpr) node;
+                analyzeFnDecl(f.declaration, false);
+                node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Function);
+                return node;
+            case NodeKind.EachStmt:
+                auto loop = cast(EachStmt) node;
+                loop.iterable = analyze(loop.iterable);
+                context.push();
+                auto variable = new VarDecl(loop.name, null, false, null, loop.pos);
+                variable.type_sema = anyType();
+                context.set(loop.name, new SymbolVar(variable));
+                foreach (name; loop.destructured)
+                {
+                    auto v = new VarDecl(name, null, false, null, loop.pos);
+                    v.type_sema = anyType();
+                    if (!context.set(name, new SymbolVar(v)))
+                        err.error(loop.pos, "Nome duplicado na iteração.");
+                }
+                loopDepth++;
+                analyzeBody(loop.body);
+                loopDepth--;
+                context.pop();
+                return node;
+            case NodeKind.MapLit:
+                auto map = cast(MapLit) node;
+                foreach (ref key; map.keys)
+                    key = analyze(key);
+                foreach (ref value; map.values)
+                    value = analyze(value);
+                node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Map);
+                return node;
+            case NodeKind.NullLit:
+                node.type_sema = anyType();
+                return node;
+            case NodeKind.BlockStmt:
+                auto block = as!BlockStmt(node);
+                analyzeBody(block.body);
+                return node;
+            case NodeKind.BreakStmt:
+            case NodeKind.ContinueStmt:
+                if (!loopDepth
+                        && (node.kind == NodeKind.ContinueStmt || !switchDepth))
+                    err.error(node.pos, "Controle de laço fora de um laço de repetição/escolha.");
+                return node;
+            case NodeKind.ForStmt:
+                auto loop = as!ForStmt(node);
+                context.push();
+                loop.init = analyze(loop.init);
+                loop.condition = analyze(loop.condition);
+                loop.step = analyze(loop.step);
+                loopDepth++;
+                analyzeBody(loop.body);
+                loopDepth--;
+                context.pop();
+                return node;
+            case NodeKind.DoStmt:
+                auto loop = as!DoStmt(node);
+                loopDepth++;
+                analyzeBody(loop.body);
+                loopDepth--;
+                loop.condition = analyze(loop.condition);
+                return node;
+            case NodeKind.VarDecl:
+                return analyzeVarDecl(as!VarDecl(node));
 
-        case NodeKind.BinaryExpr:
-            return analyzeBinaryExpr(as!BinaryExpr(node));
+            case NodeKind.BinaryExpr:
+                return analyzeBinaryExpr(as!BinaryExpr(node));
 
-        case NodeKind.FnDecl:
-            return analyzeFnDecl(as!FnDecl(node));
+            case NodeKind.FnDecl:
+                return analyzeFnDecl(as!FnDecl(node));
 
-        case NodeKind.IfStmt:
-            return analyzeIfStmt(as!IfStmt(node));
+            case NodeKind.IfStmt:
+                return analyzeIfStmt(as!IfStmt(node));
 
-        case NodeKind.CallExpr:
-            return analyzeCallExpr(as!CallExpr(node));
+            case NodeKind.CallExpr:
+                return analyzeCallExpr(as!CallExpr(node));
 
-        case NodeKind.ReturnStmt:
-            return analyzeReturnStmt(as!ReturnStmt(node));
+            case NodeKind.ReturnStmt:
+                return analyzeReturnStmt(as!ReturnStmt(node));
 
-        case NodeKind.Identifier:
-            return analyzeIdentifier(as!Identifier(node), comptimeValue);
+            case NodeKind.Identifier:
+                return analyzeIdentifier(as!Identifier(node), comptimeValue);
 
-        case NodeKind.TypeOfExpr:
-            return analyzeTypeOfExpr(node);
+            case NodeKind.TypeOfExpr:
+                return analyzeTypeOfExpr(node);
 
-        case NodeKind.AssignStmt:
-            auto assign = analyzeAssignStmt(as!AssignStmt(node));
-            assign.type_sema = anyType();
-            return assign;
+            case NodeKind.AssignStmt:
+                auto assign = analyzeAssignStmt(as!AssignStmt(node));
+                assign.type_sema = anyType();
+                return assign;
 
-        case NodeKind.StringLit:
-        case NodeKind.IntLit:
-        case NodeKind.DoubleLit:
-        case NodeKind.BoolLit:
-            node.type_sema = resolver.resolver(node.type_expr);
-            return node;
+            case NodeKind.StringLit:
+            case NodeKind.IntLit:
+            case NodeKind.DoubleLit:
+            case NodeKind.BoolLit:
+                node.type_sema = resolver.resolver(node.type_expr);
+                return node;
 
-        case NodeKind.TupleLit:
-            auto tuple = cast(TupleLit) node;
-            foreach (ref value; tuple.elements)
-                value = analyze(value);
-            if (tuple.elements.length < 2 || tuple.elements.length > 10)
-                err.error(node.pos, "Tupla exige de 2 a 10 elementos.");
-            node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Tuple);
-            return node;
-        case NodeKind.ArrayLit:
-            return analyzeArrayLit(as!ArrayLit(node));
+            case NodeKind.TupleLit:
+                auto tuple = cast(TupleLit) node;
+                foreach (ref value; tuple.elements)
+                    value = analyze(value);
+                if (tuple.elements.length < 2 || tuple.elements.length > 10)
+                    err.error(node.pos, "Tupla exige de 2 a 10 elementos.");
+                node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Tuple);
+                return node;
+            case NodeKind.ArrayLit:
+                return analyzeArrayLit(as!ArrayLit(node));
 
-        case NodeKind.IndexExpr:
-            return analyzeIndexExpr(as!IndexExpr(node));
+            case NodeKind.IndexExpr:
+                return analyzeIndexExpr(as!IndexExpr(node));
 
-        case NodeKind.WhileStmt:
-            return analyzeWhileStmt(as!WhileStmt(node));
+            case NodeKind.WhileStmt:
+                return analyzeWhileStmt(as!WhileStmt(node));
 
-        case NodeKind.UnaryExpr:
-            return analyzeUnaryExpr(as!UnaryExpr(node));
+            case NodeKind.UnaryExpr:
+                return analyzeUnaryExpr(as!UnaryExpr(node));
 
-        case NodeKind.MemberExpr:
-            return analyzeMemberExpr(as!MemberExpr(node));
+            case NodeKind.MemberExpr:
+                return analyzeMemberExpr(as!MemberExpr(node));
 
-        default:
-            err.error(node.pos, "Node desconhecido.");
-            return node;
+            default:
+                err.error(node.pos, "Node desconhecido.");
+                return node;
         }
     }
 
@@ -406,8 +415,8 @@ private:
                 constructor = method;
             analyzeFnDecl(method, false);
         }
-        node.signature.args = constructor !is null ? constructor.args
-            : node.superClass !is null ? node.superClass.signature.args : [];
+        node.signature.args = constructor !is null ? constructor.args : node.superClass !is null
+            ? node.superClass.signature.args : [];
         classesActive.remove(node);
         classesAnalyzed[node] = true;
         return node;
@@ -444,10 +453,7 @@ private:
                         err.error(node.pos, "Não é possível incrementar uma constante.");
         }
 
-        bool[TokenKind] opsNums = [
-            TokenKind.PPlus: false,
-            TokenKind.MMinus: false,
-        ];
+        bool[TokenKind] opsNums = [TokenKind.PPlus: false, TokenKind.MMinus: false,];
 
         if (node.op in opsNums && (!node.value.type_sema.isNumeric() && !node.value.type_sema.isAny()))
             err.error(node.pos, "Não é possível usar operadores unários em valores não numéricos.");
@@ -491,19 +497,20 @@ private:
         }
         dstring type = value.type_sema.toStr();
         if (!value.type_sema.isArray() && type != TypeSemaBase.String && type != TypeSemaBase.Any
-            && type != TypeSemaBase.Map && type != TypeSemaBase.Tuple)
+                && type != TypeSemaBase.Map && type != TypeSemaBase.Tuple)
         {
             err.error(node.pos,
-                format("Não é possível acessar o campo do tipo '%s'. Apenas vetores e textos são permitidos", type));
+                    format("Não é possível acessar o campo do tipo '%s'. Apenas vetores e textos são permitidos",
+                        type));
             return node;
         }
 
         dstring type2 = idx.type_sema.toStr();
-        if (type != TypeSemaBase.Map && type != TypeSemaBase.Any && type2 != TypeSemaBase.Int && type2 != TypeSemaBase
-            .Any)
+        if (type != TypeSemaBase.Map && type != TypeSemaBase.Any && type2 != TypeSemaBase.Int
+                && type2 != TypeSemaBase.Any)
         {
-            err.error(node.pos,
-                format("O indíce deve ser do tipo '%s', foi recebido '%s'.", TypeSemaBase.Int, type2));
+            err.error(node.pos, format("O indíce deve ser do tipo '%s', foi recebido '%s'.",
+                    TypeSemaBase.Int, type2));
             return node;
         }
 
@@ -607,8 +614,10 @@ private:
         if (!comptimeValue)
             sym.uses++;
 
-        node.type_sema = sym.isParam() ? (cast(SymbolParam*) sym).node.type_sema
-            : (cast(SymbolVar*) sym).node.type_sema;
+        if (sym.isVar())
+            node.variableRef = (cast(SymbolVar*) sym).node;
+        node.type_sema = sym.isParam() ? (cast(SymbolParam*) sym).node.type_sema : (cast(SymbolVar*) sym)
+            .node.type_sema;
         return node;
     }
 
@@ -647,7 +656,7 @@ private:
                 analyzeClass(fn.classFactory);
             node.builtinCall = (cast(SymbolFn*) sym).isRuntime;
             node.type_sema = fn.classFactory is null ? resolver.resolver(
-                fn.type_expr) : new TypeSemaClass(fn.classFactory);
+                    fn.type_expr) : new TypeSemaClass(fn.classFactory);
             bool spread = node.args.any!(a => a.kind == NodeKind.SpreadExpr);
             bool rest = fn.args.length && fn.args[$ - 1].rest;
             if (id.value != "escreva" && !spread)
@@ -657,8 +666,8 @@ private:
                     if (arg.value is null && !arg.rest)
                         minimum++;
                 if (node.args.length < minimum || (!rest && node.args.length > fn.args.length))
-                    err.error(node.pos, format("A função '%s' espera entre %s e %s argumentos; recebeu %s.", id
-                            .value, minimum, fn.args.length, node.args.length));
+                    err.error(node.pos, format("A função '%s' espera entre %s e %s argumentos; recebeu %s.",
+                            id.value, minimum, fn.args.length, node.args.length));
             }
             foreach (i, ref arg; node.args)
             {
@@ -673,7 +682,7 @@ private:
             arg = analyze(arg);
         node.type_sema = anyType();
         if (node.fn.type_sema !is null && !node.fn.type_sema.isAny()
-            && node.fn.type_sema.toStr() != TypeSemaBase.Function)
+                && node.fn.type_sema.toStr() != TypeSemaBase.Function)
             err.error(node.pos, "O valor chamado não é uma função.");
         return node;
     }
@@ -767,7 +776,7 @@ private:
         TypeSema r = node.right.type_sema;
 
         if (node.op == TokenKind.And || node.op == TokenKind.Or || node.op == TokenKind.In
-            || node.op == TokenKind.EEquals || node.op == TokenKind.NEquals)
+                || node.op == TokenKind.EEquals || node.op == TokenKind.NEquals)
         {
             node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Bool);
             return node;
@@ -789,15 +798,15 @@ private:
 
         switch (node.op)
         {
-        case TokenKind.EEquals:
-        case TokenKind.LEquals:
-        case TokenKind.GEquals:
-        case TokenKind.LThan:
-        case TokenKind.GThan:
-            type = new TypeSemaBuiltin(TypeSemaBase.Bool);
-            break;
-        default:
-            break;
+            case TokenKind.EEquals:
+            case TokenKind.LEquals:
+            case TokenKind.GEquals:
+            case TokenKind.LThan:
+            case TokenKind.GThan:
+                type = new TypeSemaBuiltin(TypeSemaBase.Bool);
+                break;
+            default:
+                break;
         }
 
         node.type_sema = type;
@@ -831,8 +840,7 @@ private:
         return node;
     }
 
-    pragma(inline, true)
-    bool checkTypes(Position pos, TypeSema t1, TypeSema t2)
+    pragma(inline, true) bool checkTypes(Position pos, TypeSema t1, TypeSema t2)
     {
         if (t1 is null || t2 is null)
         {

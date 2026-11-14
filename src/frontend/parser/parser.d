@@ -7,6 +7,14 @@ import frontend.parser;
 import frontend.lexer;
 import frontend;
 
+class ParseException : Exception
+{
+    this()
+    {
+        super("Erro sintático recuperável.");
+    }
+}
+
 class Parser
 {
 private:
@@ -15,8 +23,31 @@ private:
 
 public:
     ubyte flags;
+    size_t nesting;
+
+    void enterSyntax()
+    {
+        if (nesting >= 256)
+        {
+            err.error(isAtEnd() ? null : peek().pos, "Limite de aninhamento sintático excedido.", "E1003");
+            throw new ParseException;
+        }
+        nesting++;
+    }
+
+    void leaveSyntax()
+    {
+        nesting--;
+    }
+
     size_t sequenceId;
-    dstring hiddenName() { import std.conv : to; return "#seq_"d ~ (sequenceId++).to!dstring; }
+    dstring hiddenName()
+    {
+        import std.conv : to;
+
+        return "#seq_"d ~ (sequenceId++).to!dstring;
+    }
+
     Diagnostics err;
 
     ParseType parseType;
@@ -43,8 +74,8 @@ public:
         if (isAtEnd(n))
         {
             auto pos = tokens.length ? tokens[$ - 1].pos : null;
-            err.error(pos, "Fim inesperado do arquivo; verifique delimitadores e expressões incompletas.");
-            throw new Exception("Fim inesperado do arquivo.");
+            err.error(pos, "Fim inesperado do arquivo; verifique delimitadores e expressões incompletas.", "E1001");
+            throw new ParseException;
         }
     }
 
@@ -70,8 +101,10 @@ public:
         return false;
     }
 
-    bool checkNext(TokenKind kind,uint distance=1)
-    { return !isAtEnd(distance) && tokens[offset+distance].kind==kind; }
+    bool checkNext(TokenKind kind, uint distance = 1)
+    {
+        return !isAtEnd(distance) && tokens[offset + distance].kind == kind;
+    }
 
     bool check(TokenKind kind)
     {
@@ -81,26 +114,29 @@ public:
     Token consume(TokenKind kind, string message)
     {
         Token tk = advance();
-        if (tk.kind == kind) return tk;
-        err.error(tk.pos, message);
-        return tk;
+        if (tk.kind == kind)
+            return tk;
+        err.error(tk.pos, message, "E1001");
+        throw new ParseException;
     }
 
     Token consumeName(string message)
     {
-        auto token=advance();
-        if((token.kind==TokenKind.Identifier || token.kind<=TokenKind.Of) && token.value.s.length)
-            return new Token(TokenKind.Identifier,token.value,token.pos);
-        err.error(token.pos,message);
-        return new Token(TokenKind.Identifier,TokenRaw._s("#invalid"),token.pos);
+        auto token = advance();
+        if ((token.kind == TokenKind.Identifier || token.kind <= TokenKind.Of) && token.value.s.length)
+            return new Token(TokenKind.Identifier, token.value, token.pos);
+        err.error(token.pos, message, "E1001");
+        throw new ParseException;
     }
 
     bool isStmt()
     {
         switch (peek().kind) with (TokenKind)
         {
-            case Switch: case Assert:
-            case Try: case Fail:
+            case Switch:
+            case Assert:
+            case Try:
+            case Fail:
             case For:
             case Do:
             case Break:
@@ -128,8 +164,7 @@ public:
         }
     }
 
-    pragma(inline, true)
-    bool needSemiColon(NodeKind kind)
+    pragma(inline, true) bool needSemiColon(NodeKind kind)
     {
         switch (kind) with (NodeKind)
         {
@@ -142,8 +177,7 @@ public:
         }
     }
 
-    pragma(inline, true)
-    void checkSemiColon(NodeKind kind)
+    pragma(inline, true) void checkSemiColon(NodeKind kind)
     {
         if (!isAtEnd())
             if (needSemiColon(kind))
@@ -153,19 +187,23 @@ public:
     Decorator[] parseDecorators()
     {
         Decorator[] result;
-        while(match(TokenKind.At))
+        while (match(TokenKind.At))
         {
-            auto name=consumeName("Esperado nome do decorador.");Decorator d;d.name=name.value.s;
-            if(match(TokenKind.LParen))
+            auto name = consumeName("Esperado nome do decorador.");
+            Decorator d;
+            d.name = name.value.s;
+            if (match(TokenKind.LParen))
             {
-                while(!isAtEnd()&&!check(TokenKind.RParen))
+                while (!isAtEnd() && !check(TokenKind.RParen))
                 {
-                    auto key=consumeName("Esperado nome do argumento do decorador.");
-                    consume(TokenKind.Equals,"Esperado '=' após argumento do decorador.");
-                    d.keys ~= key.value.s;d.values ~= parseExpr.parse();
-                    if(!check(TokenKind.RParen))consume(TokenKind.Comma,"Esperado ',' após argumento.");
+                    auto key = consumeName("Esperado nome do argumento do decorador.");
+                    consume(TokenKind.Equals, "Esperado '=' após argumento do decorador.");
+                    d.keys ~= key.value.s;
+                    d.values ~= parseExpr.parse();
+                    if (!check(TokenKind.RParen))
+                        consume(TokenKind.Comma, "Esperado ',' após argumento.");
                 }
-                consume(TokenKind.RParen,"Esperado ')' após decorador.");
+                consume(TokenKind.RParen, "Esperado ')' após decorador.");
             }
             result ~= d;
         }
@@ -174,13 +212,20 @@ public:
 
     Node parseIntern()
     {
+        enterSyntax();
+        scope (exit)
+            leaveSyntax();
         Node node;
 
-        if (match(TokenKind.Semicolon)) return new NaN(tokens[offset - 1].pos);
+        if (match(TokenKind.Semicolon))
+            return new NaN(tokens[offset - 1].pos);
 
-        if(check(TokenKind.At))
+        if (check(TokenKind.At))
         {
-            auto decorators=parseDecorators();node=parseIntern();node.decorators=decorators;return node;
+            auto decorators = parseDecorators();
+            node = parseIntern();
+            node.decorators = decorators;
+            return node;
         }
         if (isDecl())
             node = parseDecl.parse();
@@ -205,15 +250,22 @@ public:
 
             while (!isAtEnd() && !check(TokenKind.RBrace))
             {
-                Node node = parseIntern();
-                if (node.kind == NodeKind.NaN) continue; // ignora
-                body ~= node;
+                auto before = offset;
+                try
+                {
+                    Node node = parseIntern();
+                    if (node.kind != NodeKind.NaN)
+                        body ~= node;
+                }
+                catch (ParseException)
+                    synchronize(before, true);
             }
 
             consume(TokenKind.RBrace, "Esperado '}'");
         }
 
-        return body;
+        return
+        body;
     }
 
     ubyte getAndResetFlags()
@@ -223,10 +275,26 @@ public:
         return tmp;
     }
 
-    pragma(inline, true)
-    void resetFlags()
+    pragma(inline, true) void resetFlags()
     {
         flags = 0;
+    }
+
+    private void synchronize(uint before, bool inBody)
+    {
+        resetFlags();
+        if (offset == before && !isAtEnd())
+            advance();
+        while (!isAtEnd())
+        {
+            if (inBody && check(TokenKind.RBrace))
+                return;
+            if (match(TokenKind.Semicolon))
+                return;
+            if (isDecl() || isStmt() || check(TokenKind.At))
+                return;
+            advance();
+        }
     }
 
     Program parse()
@@ -234,9 +302,16 @@ public:
         Node[] body;
         while (!isAtEnd())
         {
-            Node node = parseIntern();
-            if (node.kind == NodeKind.NaN) continue; // ignora
-            body ~= node;
+            auto before = offset;
+            try
+            {
+                Node node = parseIntern();
+                if (node.kind == NodeKind.NaN)
+                    continue;
+                body ~= node;
+            }
+            catch (ParseException)
+                synchronize(before, false);
             resetFlags();
         }
         return new Program(body);

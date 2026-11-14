@@ -13,7 +13,10 @@ import std.file;
 import std.conv;
 import std.path;
 
-import opt.constant_folding;
+import opt.pass_manager;
+import driver.toolchain;
+import frontend.flow;
+import frontend.validation;
 import middle.lowering;
 import opt.dead_code;
 import driver.args;
@@ -25,22 +28,8 @@ import errors;
 import utils;
 import ctfe;
 
-
-pragma(inline, true)
-bool which(string c)
-{
-    if (c.canFind('/')) return exists(c) && isFile(c);
-    foreach (dir; environment.get("PATH").split(":"))
-        if (exists(buildPath(dir, c)) && isFile(buildPath(dir, c))) return true;
-    return false;
-}
-
 void compile(CGDArguments args, string filename)
 {
-    // .delegua => 8
-    if (filename.length < 9)
-        cgd_erro(format("Arquivo inválido: %s", filename));
-
     if (extension(filename) != ".delegua")
         cgd_erro(format("Extensao de arquivo inválida: %s", filename));
 
@@ -53,13 +42,16 @@ void compile(CGDArguments args, string filename)
     Timer timer = Timer(args.showPerf);
 
     timer.start("Lendo arquivo");
-    string source = readText(filename);
+    if (getSize(filename) > 4 * 1024 * 1024)
+        cgd_erro("Fonte excede o limite de 4 MiB por arquivo.");
+    string source = cast(string) std.file.read(filename);
     timer.show();
 
     Diagnostics diag = new Diagnostics;
     Program program;
 
-    try {
+    try
+    {
         Lexer lexer = new Lexer(source, filename, diag);
         timer.start("Fazendo a geração de tokens");
         Token[] tokens = lexer.tokenizer();
@@ -73,12 +65,16 @@ void compile(CGDArguments args, string filename)
         timer.show();
 
         verificar_erros(diag);
-    } catch (Exception e) {
+    }
+    catch (Exception e)
+    {
         verificar_erros(diag);
         cgd_erro("Falha no frontend: " ~ e.msg);
     }
 
-    new ModuleLoader(diag).load(program,filename);
+    new ModuleLoader(diag).load(program, filename);
+    verificar_erros(diag);
+    validateStructure(program, diag);
     verificar_erros(diag);
     Context context = new Context;
     TypeRegistry registry = new TypeRegistry;
@@ -107,15 +103,20 @@ void compile(CGDArguments args, string filename)
     timer.show();
     verificar_erros(diag);
 
+    timer.start("Análise de fluxo");
+    new FlowAnalysis(diag).analyze(program);
+    timer.show();
+    verificar_erros(diag);
+
+    if (args.checkOnly)
+        return;
     if (args.opt)
     {
-        timer.start("Otimização");
-        enum MAX = 20;
-        for (size_t iter; iter++ < MAX;)
-        {
-            new CgdConstantFolding(program, context, ctfeContext).opt();
-            new CgdDeadCode(program, context).remove();
-        }
+        timer.start("Otimização até ponto fixo");
+        auto stats = optimize(program, context, ctfeContext);
+        if (args.showDebug)
+            writefln("Otimização: %d iteração(ões), %d dobras, %d eliminações",
+                    stats.iterations, stats.folded, stats.removed);
         timer.show();
     }
 
@@ -148,29 +149,16 @@ void compile(CGDArguments args, string filename)
     write(outc, cSource);
     timer.show();
 
-    string cc = environment.get("CC");
-    string[] cCompilers = ["clang", "gcc", "tcc"].filter!(c => which(c)).array;
-
-    if (cc == "" && cCompilers.length > 0)
-        cc = cCompilers[0];
-    else if (cc == "")
-    {
-        cgd_erro("Não foi possível encontrar um compilador C. Tentativas: tcc, gcc e clang");
-    }
-
-    string runtimeRoot = dirName(thisExePath());
-    string runtimeObject = buildPath(runtimeRoot, "lib", "libdelegua_rt.o");
-    if (!exists(runtimeObject)) cgd_erro("Runtime ausente. Execute ./build-runtime antes de compilar.");
-    auto pkg = execute(["pkg-config", "--cflags", "--libs", "bdw-gc"]);
-    if (pkg.status) cgd_erro("Não foi possível localizar bdw-gc: " ~ pkg.output);
-    string[] command = [cc, "-std=c99", "-Werror=implicit-function-declaration", "-Werror=return-type", "-Werror=incompatible-pointer-types",
-        "-I", runtimeRoot, outc, "-o", output, args.opt ? "-O2" : "-O0", runtimeObject];
-    command ~= pkg.output.split();
-    command ~= ["-rdynamic", "-ldl", "-lm"];
-    if (args.showDebug) writeln(command);
+    if (args.emitC)
+        return;
+    auto toolchain = CToolchain.discover(args);
+    auto command = toolchain.command(absolutePath(outc), absolutePath(output), args.opt, toolchain.gcFlags());
+    if (args.showDebug)
+        writeln(command);
     timer.start("Compilando");
-    auto exec = execute(command);
+    auto result = execute(command);
     timer.show();
-    if (exec.status) cgd_erro("O compilador C falhou:\n" ~ exec.output);
-    wrt(exec.output);
+    if (result.status)
+        cgd_erro("O compilador C falhou:\n" ~ result.output);
+    wrt(result.output);
 }

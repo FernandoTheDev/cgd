@@ -18,116 +18,49 @@ private:
     uint offset, l_offset;
     uint line = 1;
 
-    immutable TokenKind[dstring] keywords = [
-        "var": TokenKind.Var,
-        "variavel": TokenKind.Var,
-        "variável": TokenKind.Var,
+    static immutable TokenKind[dstring] keywords = [
+        "var": TokenKind.Var, "variavel": TokenKind.Var, "variável": TokenKind.Var,
 
-        "const": TokenKind.Const,
-        "fixo": TokenKind.Const,
-        "constante": TokenKind.Const,
+        "const": TokenKind.Const, "fixo": TokenKind.Const, "constante": TokenKind.Const,
 
-        "funcao": TokenKind.Fn,
-        "função": TokenKind.Fn,
+        "funcao": TokenKind.Fn, "função": TokenKind.Fn, "se": TokenKind.If,
+        "senao": TokenKind.Else, "senão": TokenKind.Else, "enquanto": TokenKind.While,
+        "para": TokenKind.For, "escolha": TokenKind.Switch, "caso": TokenKind.Case,
+        "padrao": TokenKind.Default, "padrão": TokenKind.Default, "assercao": TokenKind.Assert,
+        "asserção": TokenKind.Assert, "importar": TokenKind.Import, "tente": TokenKind.Try,
+        "pegue": TokenKind.Catch, "finalmente": TokenKind.Finally, "falhar": TokenKind.Fail,
+        "classe": TokenKind.Class, "herda": TokenKind.Extends, "isto": TokenKind.This,
+        "super": TokenKind.Super, "publico": TokenKind.Public, "público": TokenKind.Public,
+        "privado": TokenKind.Private, "protegido": TokenKind.Protected, "cada": TokenKind.Each,
+        "fazer": TokenKind.Do, "sustar": TokenKind.Break, "continua": TokenKind.Continue,
+        "e": TokenKind.And, "ou": TokenKind.Or, "em": TokenKind.In, "contem": TokenKind.In,
+        "contém": TokenKind.In, "nao": TokenKind.Bang, "não": TokenKind.Bang,
 
-        "se": TokenKind.If,
-        "senao": TokenKind.Else,
-        "senão": TokenKind.Else,
+        "nulo": TokenKind.Null, "verdadeiro": TokenKind.True, "falso": TokenKind.False,
 
-        "enquanto": TokenKind.While,
-        "para": TokenKind.For,
-        "escolha": TokenKind.Switch, "caso": TokenKind.Case,
-        "padrao": TokenKind.Default, "padrão": TokenKind.Default,
-        "assercao": TokenKind.Assert, "asserção": TokenKind.Assert,
-        "importar": TokenKind.Import,
-        "tente": TokenKind.Try, "pegue": TokenKind.Catch,
-        "finalmente": TokenKind.Finally, "falhar": TokenKind.Fail,
-        "classe": TokenKind.Class,
-        "herda": TokenKind.Extends,
-        "isto": TokenKind.This,
-        "super": TokenKind.Super,
-        "publico": TokenKind.Public, "público": TokenKind.Public,
-        "privado": TokenKind.Private, "protegido": TokenKind.Protected,
-        "cada": TokenKind.Each,
-        "fazer": TokenKind.Do,
-        "sustar": TokenKind.Break,
-        "continua": TokenKind.Continue,
-        "e": TokenKind.And,
-        "ou": TokenKind.Or,
-        "em": TokenKind.In,
-        "contem": TokenKind.In,
-        "contém": TokenKind.In,
-        "nao": TokenKind.Bang,
-        "não": TokenKind.Bang,
-
-        "nulo": TokenKind.Null,
-        "verdadeiro": TokenKind.True,
-        "falso": TokenKind.False,
-
-        "tipo": TokenKind.Type,
-        "de": TokenKind.Of,
-
-        "retorne": TokenKind.Return,
+        "tipo": TokenKind.Type, "de": TokenKind.Of, "retorne": TokenKind.Return,
         "retorna": TokenKind.Return,
     ];
 
-    immutable TokenKind[dstring] symbols = [
-        "@": TokenKind.At,
-        "?": TokenKind.Question,
-        "**": TokenKind.Pow,
-        "\\": TokenKind.IntDiv,
-        "?:": TokenKind.Coalesce,
-        "<-": TokenKind.Equals,
-        "+=": TokenKind.PlusAssign,
-        "-=": TokenKind.MinusAssign,
-        "*=": TokenKind.MulAssign,
-        "/=": TokenKind.DivAssign,
-        "%=": TokenKind.ModAssign,
-        "+": TokenKind.Plus,
-        "++": TokenKind.PPlus,
-        "-": TokenKind.Minus,
-        "--": TokenKind.MMinus,
-        "/": TokenKind.Slash,
-        "*": TokenKind.Star,
-        "%": TokenKind.Modulo,
+    static immutable TokenKind[dstring] symbols = [
+        "@": TokenKind.At, "?": TokenKind.Question, "**": TokenKind.Pow, "\\": TokenKind.IntDiv,
+        "?:": TokenKind.Coalesce, "<-": TokenKind.Equals, "+=": TokenKind.PlusAssign,
+        "-=": TokenKind.MinusAssign, "*=": TokenKind.MulAssign, "/=": TokenKind.DivAssign,
+        "%=": TokenKind.ModAssign, "+": TokenKind.Plus, "++": TokenKind.PPlus,
+        "-": TokenKind.Minus, "--": TokenKind.MMinus, "/": TokenKind.Slash, "*": TokenKind.Star,
+        "%": TokenKind.Modulo, "=": TokenKind.Equals, "==": TokenKind.EEquals,
+        "!=": TokenKind.NEquals, "(": TokenKind.LParen, ")": TokenKind.RParen,
 
-        "=": TokenKind.Equals,
-        "==": TokenKind.EEquals,
-        "!=": TokenKind.NEquals,
+        "{": TokenKind.LBrace, "}": TokenKind.RBrace, "[": TokenKind.LBracket,
+        "]": TokenKind.RBracket, ":": TokenKind.Colon, ";": TokenKind.Semicolon,
+        "!": TokenKind.Bang, ",": TokenKind.Comma, ".": TokenKind.Dot, "<": TokenKind.LThan,
+        "<=": TokenKind.LEquals, ">": TokenKind.GThan, ">=": TokenKind.GEquals,
 
-        "(": TokenKind.LParen,
-        ")": TokenKind.RParen,
-
-        "{": TokenKind.LBrace,
-        "}": TokenKind.RBrace,
-
-        "[": TokenKind.LBracket,
-        "]": TokenKind.RBracket,
-
-        ":": TokenKind.Colon,
-        ";": TokenKind.Semicolon,
-        "!": TokenKind.Bang,
-
-        ",": TokenKind.Comma,
-        ".": TokenKind.Dot,
-
-        "<": TokenKind.LThan,
-        "<=": TokenKind.LEquals,
-
-        ">": TokenKind.GThan,
-        ">=": TokenKind.GEquals,
-
-        "&": TokenKind.BITAnd,
-        "|": TokenKind.BITOr,
-        "~": TokenKind.BITNot,
-        "^": TokenKind.BITXor,
-        "<<": TokenKind.BITSL,
-        ">>": TokenKind.BITSR,
+        "&": TokenKind.BITAnd, "|": TokenKind.BITOr, "~": TokenKind.BITNot, "^": TokenKind.BITXor,
+        "<<": TokenKind.BITSL, ">>": TokenKind.BITSR,
     ];
 
-    immutable TokenKind[dstring] ctfeKeywords = [
-        "puro": TokenKind.Pure,
-    ];
+    static immutable TokenKind[dstring] ctfeKeywords = ["puro": TokenKind.Pure,];
 
 public:
     this(string source, string filename, Diagnostics err)
@@ -135,16 +68,14 @@ public:
         this.source = source;
         this.filename = filename;
         this.err = err;
+        err.registerSource(filename, source);
     }
 
     bool isAlpha(dchar c)
     {
-        return (c >= 'a' && c <= 'z')
-            || (c >= 'A' && c <= 'Z')
-            || c == '_' // validação para caracteres especiais
-            || (c >= 192 && c <= 214)
-            || (c >= 216 && c <= 246)
-            || (c >= 248 && c <= 255);
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' // validação para caracteres especiais
+         || (c >= 192 && c <= 214)
+            || (c >= 216 && c <= 246) || (c >= 248 && c <= 255);
     }
 
     bool isNumeric(dchar c)
@@ -224,10 +155,9 @@ public:
         return buffer;
     }
 
-    Position getPosition(uint s, uint l) => new Position(filename, new PosLine(s, l), new PosLine(l_offset, line));
+    Position getPosition(uint s, uint l) => new Position(filename, new PosLine(s, l), new PosLine(l_offset + 1, line));
 
-    pragma(inline, true)
-    void pushToken(Token tk)
+    pragma(inline, true) void pushToken(Token tk)
     {
         tokens ~= tk;
     }
@@ -246,6 +176,17 @@ public:
 
     Token[] tokenizer()
     {
+        // Valida antes de decodificar; bytes inválidos nunca viram exceção interna.
+        import std.utf : validate, UTFException;
+
+        try
+            validate(source);
+        catch (UTFException)
+        {
+            err.error(new Position(filename, new PosLine(1, 1), new PosLine(1, 1)),
+                    "Arquivo fonte não contém UTF-8 válido.", "E1002");
+            return [];
+        }
         while (!isAtEnd())
         {
             dchar ch = advance();
@@ -366,28 +307,28 @@ public:
                         c = advance();
                         switch (c)
                         {
-                        case 'n':
-                            c = '\n';
-                            break;
-                        case 'r':
-                            c = '\r';
-                            break;
-                        case 't':
-                            c = '\t';
-                            break;
-                        case '0':
-                            c = '\0';
-                            break;
-                        case '$':
-                            escapedInterpolation ~= buffer.length;
-                            break;
-                        case '\\':
-                        case '\'':
-                        case '"':
-                            break;
-                        default:
-                            err.error(getPosition(start, l), "Escape inválido.");
-                            break;
+                            case 'n':
+                                c = '\n';
+                                break;
+                            case 'r':
+                                c = '\r';
+                                break;
+                            case 't':
+                                c = '\t';
+                                break;
+                            case '0':
+                                c = '\0';
+                                break;
+                            case '$':
+                                escapedInterpolation ~= buffer.length;
+                                break;
+                            case '\\':
+                            case '\'':
+                            case '"':
+                                break;
+                            default:
+                                err.error(getPosition(start, l), "Escape inválido.");
+                                break;
                         }
                     }
                     buffer ~= c;
@@ -425,17 +366,21 @@ public:
                     advance(); // pula o >
 
                     uint start = l_offset + 1;
+                    if (isAtEnd())
+                    {
+                        err.error(getPosition(start, line), "Esperado qualificador após //>.", "E1001");
+                        continue;
+                    }
                     dstring buffer = lexId(advance());
                     Position pos = getPosition(start, line);
 
                     if (immutable TokenKind* kind = buffer in ctfeKeywords)
                     {
-                        pushToken(new Token(*(cast(TokenKind*) kind), TokenRaw.init, pos));
+                        pushToken(new Token(*kind, TokenRaw.init, pos));
                         continue;
                     }
 
-                    err.error(pos,
-                        format("Não foi possível detectar o qualificador '%s'.", buffer));
+                    err.error(pos, format("Não foi possível detectar o qualificador '%s'.", buffer));
                     continue;
                 }
             }

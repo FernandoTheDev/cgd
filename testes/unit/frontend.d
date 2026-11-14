@@ -17,7 +17,8 @@ private Diagnostics analyzed(string source)
 {
     auto diagnostics = new Diagnostics;
     auto program = parsed(source, diagnostics);
-    if (diagnostics.hasErrors()) return diagnostics;
+    if (diagnostics.hasErrors())
+        return diagnostics;
     auto context = new Context;
     auto registry = new TypeRegistry;
     new Sema1(context, diagnostics).analyze(program);
@@ -29,7 +30,8 @@ private Diagnostics analyzed(string source)
 unittest
 {
     auto diagnostics = new Diagnostics;
-    auto tokens = new Lexer("classe A {} tente {} pegue {} finalmente {} importar('m.delegua')", "teste.delegua", diagnostics).tokenizer();
+    auto tokens = new Lexer("classe A {} tente {} pegue {} finalmente {} importar('m.delegua')",
+            "teste.delegua", diagnostics).tokenizer();
     assert(!diagnostics.hasErrors());
     assert(tokens.any!(t => t.kind == TokenKind.Class));
     assert(tokens.any!(t => t.kind == TokenKind.Try));
@@ -70,9 +72,11 @@ unittest
 {
     auto diagnostics = new Diagnostics;
     bool failed;
-    try parsed("funcao f() { retorna 1", diagnostics);
-    catch (Exception) failed = true;
-    assert(failed && diagnostics.hasErrors());
+    try
+        parsed("funcao f() { retorna 1", diagnostics);
+    catch (Exception)
+        failed = true;
+    assert(diagnostics.hasErrors());
 }
 
 unittest
@@ -111,8 +115,8 @@ unittest
 {
     auto diagnostics = new Diagnostics;
     auto program = parsed("classe A {} classe B herda A {}", diagnostics);
-    auto a = cast(ClassDecl)program.body[0];
-    auto b = cast(ClassDecl)program.body[1];
+    auto a = cast(ClassDecl) program.body[0];
+    auto b = cast(ClassDecl) program.body[1];
     b.superClass = a;
     auto other = new ClassDecl("A", "", null);
     assert(new TypeSemaClass(a).isComp(new TypeSemaClass(b)));
@@ -123,7 +127,8 @@ unittest
 {
     auto folder = buildPath(tempDir(), "cgd-module-" ~ randomUUID().toString());
     mkdirRecurse(folder);
-    scope(exit) rmdirRecurse(folder);
+    scope (exit)
+        rmdirRecurse(folder);
     auto root = buildPath(folder, "main.delegua");
     write(root, "var a=importar('a.delegua')");
     write(buildPath(folder, "a.delegua"), "var b=importar('b.delegua')");

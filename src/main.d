@@ -7,11 +7,15 @@ import driver.compile;
 import driver.args;
 import utils;
 import cli;
+import errors;
 
 void main(string[] args)
 {
     cgd_validar(args.length > 1, "Esperado ao menos um argumento.");
     CGDArguments arguments;
+    foreach (i, arg; args)
+        if (arg == "--diagnosticos=json" || (arg == "--diagnosticos" && i + 1 < args.length && args[i + 1] == "json"))
+            diagnosticFormat = DiagnosticFormat.json;
 
     try
         cli_parse(args, arguments);
@@ -19,6 +23,15 @@ void main(string[] args)
     {
         cgd_erro("Flag inválida: " ~ e.msg);
     }
+
+    if (arguments.diagnostics == "json")
+        diagnosticFormat = DiagnosticFormat.json;
+    else if (arguments.diagnostics != "texto")
+        cgd_erro("Formato de diagnóstico inválido; use texto ou json.");
+    if (arguments.checkOnly && arguments.emitC)
+        cgd_erro("Escolha --verificar ou --emitir-c.");
+    if (arguments.showDebug && diagnosticFormat == DiagnosticFormat.json)
+        cgd_erro("--depurar não pode ser combinado com diagnósticos JSON.");
 
     if (arguments.showHelp)
     {
@@ -32,6 +45,7 @@ void main(string[] args)
         return;
     }
 
+    cgd_validar(args.length == 2, "Informe exatamente um arquivo .delegua. Use --ajuda para consultar as opções.");
     try
         compile(arguments, args[1]);
     catch (Exception e)

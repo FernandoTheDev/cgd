@@ -1,44 +1,42 @@
 module errors;
 
-import core.stdc.stdlib : exit;
-import std.stdio;
-import std.format;
-import std.file;
-import std.string;
-import std.array;
-import std.range;
-import std.algorithm;
-import frontend.lexer;
+import frontend.lexer.token : Position;
+import std.algorithm : any, count, min, max;
+import std.array : array, split;
+import std.file : readText;
+import std.format : format;
+import std.json : JSONValue;
+import std.range : repeat;
+import std.stdio : stderr;
+import std.string : splitLines;
+import std.conv : to;
 
-private string[][string] _fileCache;
-
-private string[] linesOf(string path)
+/// JSON Lines em stderr permite consumir avisos de passes distintos sem texto misto.
+enum DiagnosticFormat
 {
-    if (auto cached = path in _fileCache)
-        return *cached;
-
-    string[] lines = readText(path).splitLines().array;
-    _fileCache[path] = lines;
-    return lines;
+    text,
+    json
 }
+
+DiagnosticFormat diagnosticFormat;
 
 enum Severity : ubyte
 {
     Hint,
     Warning,
-    Error,
+    Error
 }
 
-private string label(Severity s)
+string label(Severity severity)
 {
-    final switch (s)
+    final switch (severity)
     {
-    case Severity.Hint:
-        return "hint";
-    case Severity.Warning:
-        return "warning";
-    case Severity.Error:
-        return "error";
+        case Severity.Hint:
+            return "hint";
+        case Severity.Warning:
+            return "warning";
+        case Severity.Error:
+            return "error";
     }
 }
 
@@ -47,120 +45,179 @@ struct Diagnostic
     Severity severity;
     Position position;
     string message;
+    string code;
 }
 
-private void renderDiagnostic(ref Diagnostic d)
+string diagnosticJSON(const Diagnostic d)
 {
-    stderr.writefln("%s: %s", label(d.severity), d.message);
-    if (d.position is null) return;
-    stderr.writefln(" --> %s", d.position.toStr());
-
-    string[] lines;
-
-    try
-        lines = linesOf(d.position.filename);
-    catch (Exception)
+    JSONValue result = JSONValue([
+        "severity": JSONValue(label(d.severity)),
+        "code": JSONValue(d.code),
+        "message": JSONValue(d.message)
+    ]);
+    if (d.position !is null)
     {
-        stderr.writeln();
-        return;
+        result["file"] = d.position.filename;
+        result["range"] = JSONValue([
+            "start": JSONValue([
+                "line": JSONValue(d.position.start.line),
+                "column": JSONValue(d.position.start.offset)
+            ]),
+            "end": JSONValue([
+                "line": JSONValue(d.position.end.line),
+                "column": JSONValue(d.position.end.offset)
+            ])
+        ]);
     }
+    return result.toString();
+}
 
-    uint lineStart = d.position.start.line;
-    uint lineEnd = d.position.end.line;
-    uint colStart = d.position.start.offset;
-    uint colEnd = d.position.end.offset;
-
-    lineStart = min(lineStart, cast(uint) lines.length);
-    lineEnd = min(lineEnd, cast(uint) lines.length);
-
-    uint gutterWidth = cast(uint) format("%d", lineEnd).length;
-    string gutter = ' '.repeat(gutterWidth + 1).array;
-
-    stderr.writefln("%s|", gutter);
-
-    foreach (uint n; lineStart .. lineEnd + 1)
+/// Colunas do lexer são pontos de código, começando em 1. A tabulação usa 4 espaços.
+string diagnosticText(const Diagnostic d, string source = "")
+{
+    string result = format("%s[%s]: %s\n", label(d.severity), d.code, d.message);
+    if (d.position is null)
+        return result;
+    result ~= format(" --> %s\n", d.position.toStr());
+    auto lines = source.splitLines();
+    if (!lines.length)
+        return result;
+    auto first = max(1u, d.position.start.line);
+    auto last = min(cast(uint) lines.length, max(first, d.position.end.line));
+    last = min(last, first + 4); // Limita snippets de erros que abrangem arquivos inteiros.
+    foreach (lineNo; first .. last + 1)
     {
-        if (n == 0 || n > lines.length)
+        dstring line;
+        try
+            line = lines[lineNo - 1].to!dstring;
+        catch (Exception)
+        {
+            result ~= "     | [trecho indisponível: UTF-8 inválido]\n";
             continue;
-
-        string line = lines[n - 1];
-        stderr.writefln("%*d | %s", gutterWidth, n, line);
-
-        uint spanStart = (n == lineStart) ? colStart : 1;
-        uint spanEnd = (n == lineEnd) ? colEnd : cast(uint) line.length;
-
-        spanStart = max(spanStart, 1);
-        spanEnd = max(spanEnd, spanStart);
-
-        string spaces = ' '.repeat(gutterWidth + 3 + spanStart - 1).array;
-        string caret = "^";
-        string tilde = cast(string)(
-            spanEnd > spanStart ? '~'.repeat(spanEnd - spanStart).array : "");
-
-        stderr.writefln("%s%s%s", spaces, caret, tilde);
+        }
+        auto start = lineNo == first ? min(line.length, max(1u, d.position.start.offset) - 1) : 0;
+        auto end = lineNo == d.position.end.line ? min(line.length, max(1u, d.position.end.offset) - 1) : line.length;
+        size_t visualStart, visualEnd;
+        string display;
+        foreach (i, ch; line)
+        {
+            auto width = ch == '\t' ? 4 - visualEnd % 4 : 1;
+            if (i < start)
+                visualStart += width;
+            visualEnd += width;
+            display ~= ch == '\t' ? ' '.repeat(width).array : [ch].to!string;
+        }
+        size_t markerWidth;
+        foreach (ch; line[start .. max(start, end)])
+            markerWidth += ch == '\t' ? 4 - (visualStart + markerWidth) % 4 : 1;
+        result ~= format("%4d | %s\n     | %s^%s\n", lineNo, display, ' '.repeat(visualStart)
+                .array, '~'.repeat(markerWidth ? markerWidth - 1 : 0).array);
     }
+    if (d.position.end.line > last)
+        result ~= "     | …\n";
+    return result;
+}
 
-    stderr.writefln("%s|", gutter);
-    stderr.writeln();
+void reportFatal(string message, string code = "E9001")
+{
+    auto d = Diagnostic(Severity.Error, null, message, code);
+    stderr.write(diagnosticFormat == DiagnosticFormat.json ? diagnosticJSON(d) ~ "\n" : diagnosticText(d));
 }
 
 class Diagnostics
 {
-private:
-    Diagnostic[] _list;
+    private Diagnostic[] list;
+    private string[string] sources;
+    private size_t emitted;
+    private size_t errors;
+    enum maxErrors = 100;
 
-public:
-    void add(Severity sev, Position pos, string message)
+    void registerSource(string filename, string source)
     {
-        _list ~= Diagnostic(sev, pos, message);
+        if (filename !in sources)
+            sources[filename] = source;
     }
 
-    void error(Position pos, string message)
+    void add(Severity severity, Position pos, string message, string code = "")
     {
-        add(Severity.Error, pos, message);
+        if (errors > maxErrors)
+            return;
+        if (!code.length)
+            code = severity == Severity.Error ? "E0001" : severity == Severity.Warning ? "W0001" : "H0001";
+        foreach (d; list)
+            if (d.severity == severity && d.code == code && d.message == message && ((d.position is null
+                    && pos is null) || (d.position !is null && pos !is null
+                    && d.position.filename == pos.filename
+                    && d.position.start.line == pos.start.line && d.position.start.offset == pos.start.offset)))
+                return;
+        if (severity == Severity.Error && errors++ == maxErrors)
+            list ~= Diagnostic(Severity.Error, pos,
+                    "Limite de diagnósticos atingido; corrija os erros anteriores.", "E0002");
+        else
+            list ~= Diagnostic(severity, pos, message, code);
     }
 
-    void warning(Position pos, string message)
+    void error(Position pos, string message, string code = "")
     {
-        add(Severity.Warning, pos, message);
+        add(Severity.Error, pos, message, code);
     }
 
-    void hint(Position pos, string message)
+    void warning(Position pos, string message, string code = "")
     {
-        add(Severity.Hint, pos, message);
+        add(Severity.Warning, pos, message, code);
+    }
+
+    void hint(Position pos, string message, string code = "")
+    {
+        add(Severity.Hint, pos, message, code);
     }
 
     bool hasErrors() const
     {
-        return _list.any!(d => d.severity == Severity.Error);
+        return list.any!(d => d.severity == Severity.Error);
     }
 
     bool hasWarnings() const
     {
-        return _list.any!(d => d.severity == Severity.Warning);
+        return list.any!(d => d.severity == Severity.Warning);
     }
 
     bool report()
     {
-        foreach (ref d; _list)
-            renderDiagnostic(d);
-
-        uint errors = cast(uint) _list.count!(d => d.severity == Severity.Error);
-        uint warnings = cast(uint) _list.count!(d => d.severity == Severity.Warning);
-
-        if (errors > 0 || warnings > 0)
+        foreach (d; list[emitted .. $])
         {
-            stderr.writefln("resultado: %d erro(s), %d aviso(s)", errors, warnings);
-            stderr.writeln();
+            if (diagnosticFormat == DiagnosticFormat.json)
+                stderr.writeln(diagnosticJSON(d));
+            else
+            {
+                string source;
+                if (d.position !is null)
+                {
+                    if (auto cached = d.position.filename in sources)
+                        source = *cached;
+                    else
+                        try
+                            source = readText(d.position.filename);
+                        catch (Exception)
+                        {
+                        }
+                }
+                stderr.write(diagnosticText(d, source));
+            }
         }
-
-        return errors > 0;
+        emitted = list.length;
+        return hasErrors();
     }
 
-    const(Diagnostic)[] entries() const { return _list; }
+    const(Diagnostic)[] entries() const
+    {
+        return list;
+    }
 
     void clear()
     {
-        _list.length = 0;
+        list.length = 0;
+        emitted = 0;
+        errors = 0;
     }
 }

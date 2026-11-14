@@ -3,7 +3,7 @@ module driver.time;
 import core.time;
 import std.stdio;
 
-struct Timer 
+struct Timer
 {
     bool showTime;
     string label;
@@ -15,9 +15,10 @@ struct Timer
         time = MonoTime.currTime;
     }
 
-    void show() 
+    void show()
     {
-        if (!showTime) return;
+        if (!showTime)
+            return;
         auto us = (MonoTime.currTime - time).total!"usecs";
         writeln("[", label, "] ", us, " us");
     }

@@ -17,13 +17,39 @@ enum TokenKind : ubyte
     While,
     For,
     At,
-    Question, Spread, Switch, Case, Default, Assert,
+    Question,
+    Spread,
+    Switch,
+    Case,
+    Default,
+    Assert,
     Import,
-    Try, Catch, Finally, Fail,
-    Class, Extends, This, Super, Public, Private, Protected,
+    Try,
+    Catch,
+    Finally,
+    Fail,
+    Class,
+    Extends,
+    This,
+    Super,
+    Public,
+    Private,
+    Protected,
     Each,
-    Do, Break, Continue, And, Or, Coalesce, In, Pow, IntDiv,
-    PlusAssign, MinusAssign, MulAssign, DivAssign, ModAssign,
+    Do,
+    Break,
+    Continue,
+    And,
+    Or,
+    Coalesce,
+    In,
+    Pow,
+    IntDiv,
+    PlusAssign,
+    MinusAssign,
+    MulAssign,
+    DivAssign,
+    ModAssign,
     Type,
     Of,
 
@@ -84,20 +110,17 @@ union TokenRaw
     double d;
     dstring s;
 
-    pragma(inline, true)
-    static TokenRaw _i(long n)
+    pragma(inline, true) static TokenRaw _i(long n)
     {
         return TokenRaw(i: n);
     }
 
-    pragma(inline, true)
-    static TokenRaw _d(double n)
+    pragma(inline, true) static TokenRaw _d(double n)
     {
         return TokenRaw(d: n);
     }
 
-    pragma(inline, true)
-    static TokenRaw _s(dstring n)
+    pragma(inline, true) static TokenRaw _s(dstring n)
     {
         return TokenRaw(s: n);
     }
@@ -120,14 +143,14 @@ class Position
     string filename;
     PosLine start, end;
 
-    this (string f, PosLine s, PosLine e)
+    this(string f, PosLine s, PosLine e)
     {
         filename = f;
         start = s;
         end = e;
     }
 
-    string toStr()
+    string toStr() const
     {
         return format("{ %s:%d:%d }", filename, start.line, start.offset);
     }
@@ -140,17 +163,17 @@ class Token
     TokenRaw value;
     Position pos;
 
-    this (TokenKind k, TokenRaw r, Position p)
+    this(TokenKind k, TokenRaw r, Position p)
     {
         kind = k;
         value = r;
         pos = p;
     }
 
-    pragma(inline, true)
-    void print()
+    pragma(inline, true) void print()
     {
         import std.stdio : writeln;
+
         writeln("[TOKEN]\n    kind = ", kind, "\n    value = ", value, "\n    pos = ", pos.toStr());
     }
 }
