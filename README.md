@@ -2,42 +2,27 @@
 
 # CGD — Compilador Geral Delégua
 
-O CGD compila programas Delégua para C99 e, em seguida, gera executáveis nativos
-com Clang, GCC ou TCC. O frontend é escrito em D. O runtime em C fornece valores
-gerenciados, coleções, classes, chamadas de função e exceções.
+Frontend em **D**, saída **C99**, executáveis nativos e runtime gerenciado em C.
+O CGD implementa um perfil compilado de
+[Delégua, da Design Líquido](https://github.com/DesignLiquido/delegua), mantendo
+sua referência à [wiki oficial](https://github.com/DesignLiquido/delegua/wiki).
+Este repositório é uma implementação própria, com limites documentados; não é o
+interpretador original nem oferece todos os seus ambientes e extensões.
 
-A branch `dev` contém o perfil compilado em desenvolvimento. Capturas de ambientes
-por upvalues, FFI e carregamento dinâmico de código não fazem parte desse perfil.
-As diferenças e limitações estão na [matriz de compatibilidade](docs/compatibilidade.md).
+**[Website](https://fernandothedev.github.io/cgd/)** ·
+**[Guia da linguagem e compatibilidade](https://fernandothedev.github.io/cgd/linguagem.html)** ·
+[Exemplos executáveis](exemplos/README.md) ·
+[Desenvolvimento e passes](docs/desenvolvimento.md) ·
+[Contexto para agentes](AGENTS.md)
 
-[Website](https://fernandothedev.github.io/cgd/) ·
-[Exemplos](exemplos/README.md) ·
-[Arquitetura](docs/arquitetura.md) ·
-[Segurança](docs/seguranca.md) ·
-[Referência oficial de Delégua](https://github.com/DesignLiquido/delegua/wiki)
+## Instalar as dependências
 
-## Começar do zero
-
-O ambiente validado é **Linux x86_64**. Para compilar o CGD, instale:
-
-| Dependência | Uso |
-| --- | --- |
-| Git | Checkout do compilador e do submódulo do runtime |
-| DMD **ou** LDC2 | Compilação do frontend em D |
-| DUB | Build e testes unitários em D |
-| Clang ou GCC | Build do runtime C99 e dos programas Delégua |
-| `pkg-config` e Boehm GC com headers (`bdw-gc`) | Descoberta e vínculo do coletor de lixo |
-| Python 3 | Suítes de integração, exemplos e matriz de validação |
-
-TCC também pode gerar programas, mas o build do runtime usa Clang por padrão.
-`CC=gcc ./build-runtime` seleciona GCC. Python não é necessário para executar
-os binários gerados. Eles continuam dependendo das bibliotecas nativas vinculadas,
-incluindo Boehm GC; não são binários estáticos portáveis entre sistemas.
-
-Exemplos de dependências de desenvolvimento por distribuição:
+Ambiente validado: **Linux x86_64**. São necessários DMD ou LDC2, DUB, Clang ou
+GCC, pkg-config e Boehm GC com headers. Python 3 é usado nos testes e ferramentas;
+não é necessário para executar o programa gerado.
 
 ```sh
-# Debian / Ubuntu — LDC2 e DUB pelo gerenciador de pacotes
+# Debian / Ubuntu
 sudo apt-get update
 sudo apt-get install git build-essential clang pkg-config libgc-dev ldc dub python3
 
@@ -48,192 +33,98 @@ sudo dnf install git gcc clang pkgconf-pkg-config gc-devel ldc dub python3
 sudo pacman -S --needed git gcc clang pkgconf gc ldc dub python
 ```
 
-Para DMD, consulte os [downloads oficiais de D](https://dlang.org/download.html).
-LDC também disponibiliza instruções e binários em seu
-[repositório oficial](https://github.com/ldc-developers/ldc).
-O coletor usado é o [Boehm-Demers-Weiser GC](https://github.com/bdwgc/bdwgc).
-Os nomes dos pacotes podem variar por distribuição.
+Alternativas: [DMD](https://dlang.org/download.html),
+[LDC](https://github.com/ldc-developers/ldc),
+[Boehm GC](https://github.com/bdwgc/bdwgc). Os nomes dos pacotes podem variar.
+Os binários gerados dependem das bibliotecas nativas vinculadas; não são binários
+estáticos automaticamente portáveis entre sistemas.
+
+## Build do zero
 
 ```sh
 git clone --branch dev --recurse-submodules https://github.com/FernandoTheDev/cgd.git
 cd cgd
 
-# Se o checkout já existia e ainda não tem o vendor:
+# Em checkouts existentes:
 git submodule update --init --recursive
 
 ./build-runtime
 dub build --compiler=ldc2 --build=release
-
-# Alternativa com DMD:
-dub build --compiler=dmd --build=release
+# Alternativa: dub build --compiler=dmd --build=release
 ```
 
-`build-runtime` compila o estado local do vendor e copia o objeto para `lib/`.
-Ele não faz pulls silenciosos. Para atualizar o vendor explicitamente, preserve
-suas alterações locais e execute `git -C vendor/delegua-runtime pull --ff-only origin dev`.
-
-## Compilar um programa
-
-Crie `ola.delegua`:
-
-```js
-classe Pessoa {
-    nome: texto
-    construtor(nome) { isto.nome = nome }
-    apresentar() { retorna "Olá, ${isto.nome}!" }
-}
-escreva(Pessoa("Delégua").apresentar())
-```
-
-```sh
-./cgd ola.delegua
-./ola
-# Olá, Delégua!
-
-# Ativar as otimizações do CGD e escolher o destino:
-mkdir -p out
-./cgd ola.delegua -o -s out/ola
-./out/ola
-```
-
-Crie o diretório de saída antes de usar `-s`. O compilador grava também o C
-intermediário ao lado do executável, por exemplo `out/ola.c`.
-A extensão de entrada deve ser `.delegua`.
-
-| Opção | Efeito |
-| --- | --- |
-| `-a`, `--ajuda` | Exibe a ajuda |
-| `-v`, `--versao` | Exibe a versão |
-| `-s CAMINHO`, `--saida CAMINHO` | Define o executável de saída |
-| `-o`, `--otimizar` | Ativa otimizações e usa `-O2` no compilador C |
-| `-d`, `--depurar` | Mostra a AST, o C gerado e o comando de compilação |
-| `-t`, `--tempo` | Mostra os tempos dos passes |
-
-`-o` é uma opção booleana de otimização; o nome do executável é definido com
-`-s`. Para selecionar o compilador C: `CC=gcc ./cgd ola.delegua`.
-`CC` deve conter o caminho/nome de um executável, sem opções concatenadas.
+`CC=gcc ./build-runtime` seleciona GCC para o runtime. O script usa o commit local
+do vendor e não faz pull automaticamente. O vendor já possui Git próprio como submódulo; pode ser editado e commitado
+daqui com `git -C vendor/delegua-runtime`. Veja o [fluxo de trabalho](docs/desenvolvimento.md#editar-o-runtime-a-partir-deste-checkout).
+O runtime é desenvolvido em
+[FernandoTheDev/delegua-runtime](https://github.com/FernandoTheDev/delegua-runtime).
 
 ## Instalar no usuário
 
 ```sh
 ./instalar --compiler ldc2 --release
-# Ou: ./instalar --compiler dmd --release
-
 export PATH="$HOME/.local/bin:$PATH"
-cgd ola.delegua -s ola
+cgd --versao
 ```
 
-O instalador não instala pacotes do sistema. Ele mantém uma cópia autocontida
-do compilador, headers e objeto do runtime em `~/.local/share/cgd` e cria um
-link em `~/.local/bin/cgd`. O layout corresponde aos caminhos procurados pelo
-compilador, inclusive quando ele é chamado fora do checkout.
+A instalação copia executável, headers e runtime para `~/.local/share/cgd` e cria
+um link em `~/.local/bin/cgd`, sem sudo. Use `--prefix DIRETORIO` e
+`--bin-dir DIRETORIO` para outros destinos; `--no-build` reutiliza um build existente.
+Para remover a instalação padrão: apague o link `~/.local/bin/cgd` e o diretório
+`~/.local/share/cgd`. Não há instalação automática de pacotes do sistema.
+
+## Primeiro programa
 
 ```sh
-# Prefixos alternativos; útil para testes e ambientes isolados:
-./instalar --prefix /caminho/cgd --bin-dir /caminho/bin --compiler dmd
+mkdir -p out
+./cgd exemplos/linguagem/14_classes.delegua -o -s out/classes
+./out/classes
 
-# Reutilizar os artefatos já compilados e testados:
-./instalar --no-build --prefix /caminho/cgd --bin-dir /caminho/bin
+# Análise sem toolchain C e diagnósticos consumíveis por ferramentas:
+./cgd exemplos/linguagem/14_classes.delegua --verificar --diagnosticos=json
+
+# C intermediário, sem link:
+./cgd exemplos/linguagem/14_classes.delegua --emitir-c -o -s out/classes
+./cgd --explicar E3101
+./cgd --ajuda
 ```
 
-Variáveis equivalentes: `CGD_PREFIX`, `CGD_BIN_DIR` e `DC`. O instalador também
-aceita `--debug`, `--release` e `--help`. Não exige `sudo` para o prefixo padrão.
+**`-o` ativa otimizações; `-s` define o destino.** Crie o diretório de saída antes.
+O `.c` fica ao lado do executável. `CC=gcc` ou `--cc gcc` seleciona o backend C.
+Opções de alvo, sysroot e runtime estão no [guia de desenvolvimento](docs/desenvolvimento.md).
+A configuração de cross compilation está separada do hospedeiro; Windows e
+executáveis cruzados ainda não foram validados.
 
-## Recursos e exemplos
-
-O catálogo em [exemplos/README.md](exemplos/README.md) cobre tipos, operadores,
-atribuições múltiplas, escopos, condicionais, laços, compreensão de listas,
-funções como valores, parâmetros variáveis, coleções, Unicode, classes,
-herança, privacidade, acessores, exceções, módulos, decoradores e asserções.
-Há também exemplos de padrões rejeitados e de erros verificados em execução.
+## Trabalhar no projeto
 
 ```sh
-./cgd exemplos/linguagem/08_funcoes_valores.delegua -s out/funcoes
-./out/funcoes
-
-./cgd exemplos/modulos/01_importacao.delegua -s out/modulos
-./out/modulos
-```
-
-Importações de fontes usam caminhos literais relativos ao arquivo que importa:
-`const calculos = importar("lib/calculos.delegua")`. Módulos são compilados no
-mesmo executável, inicializados uma vez e expõem seus nomes públicos.
-
-## Como o compilador funciona
-
-```text
-Fonte .delegua → tokens → AST → resolução de módulos e análise semântica
-             → CTFE/otimizações opcionais → lowering → C99
-             → compilador C + runtime + Boehm GC → executável nativo
-```
-
-A VM de CTFE funciona durante a compilação de funções marcadas `//>puro`.
-Ela não é um interpretador embutido no programa final. O backend atual gera C;
-o CGD não possui, nesta versão, um backend próprio de LLVM/assembly.
-Veja os detalhes e o mapa dos diretórios em [Arquitetura](docs/arquitetura.md).
-
-## Testar
-
-```sh
-# Testes unitários nativos de D:
-dub test --compiler=dmd
-dub test --compiler=ldc2
-
-# Integração, incluindo execução com e sem otimização:
+dub test --compiler=dmd --config=unittest
+dub test --compiler=ldc2 --config=unittest
+python3 testes/driver.py
 python3 testes/integracao.py
-
-# Todos os arquivos de exemplos, incluindo entrada e erros esperados:
 python3 testes/exemplos.py
-
-# Runner histórico em D, também com suporte aos exemplos de entrada:
-rdmd testes/unitario.d
-
-# Website: validação estática, sem instalar dependências de navegador:
+python3 scripts/validar.py         # matriz DMD/LDC2 × debug/release × Clang/GCC
+python3 scripts/sanitizadores.py   # ASan/UBSan; restaura o runtime normal
+python3 scripts/formatar.py --check
+python3 scripts/gerar_referencia.py --check
 python3 testes/site.py --static-only
-# QA visual opcional: Chrome/Chromium e websocket-client (requirements-site.txt).
-python3 testes/site.py
-
-# Runtime C:
-(cd vendor/delegua-runtime && ./tests/run.sh)
-
-# Instalação em diretórios temporários, sem alterar seu prefixo:
-python3 scripts/validar_instalacao.py
-
-# Runtime e todos os programas com ASan/UBSan (restaura o runtime normal):
-python3 scripts/sanitizadores.py
-
-# Matriz completa DMD/LDC2 × debug/release × Clang/GCC:
-python3 scripts/validar.py
 ```
 
-A matriz exige os dois compiladores D e os dois compiladores C. O relatório é
-gravado em `out/validacao.json`; dependências ausentes são falhas explícitas.
-Para um subconjunto: `python3 scripts/validar.py --compilers dmd --builds debug --c-compilers clang`.
-Os contratos de cada exemplo estão nos comentários `//!`, `//#` e `//?`.
+Detalhes de formatadores, contratos de otimização, diagnósticos e novos passes:
+[Desenvolvimento](docs/desenvolvimento.md). O mapa do código e a ABI estão em
+[Arquitetura](docs/arquitetura.md); evidências e limitações dos testes estão em
+[Validação](docs/validacao.md). Relatórios e artefatos são gravados em `out/`.
+O QA de navegador usa Chrome/Chromium e `requirements-site.txt`.
 
-## Segurança e diferenças de linguagem
+A branch de integração é `dev`. Atualize o runtime explicitamente, preservando
+alterações locais. Quando houver mudanças no submódulo, publique seu commit
+antes de atualizar a referência no CGD. Evite versionar executáveis e C gerado.
+Mantenha testes com e sem otimização e acrescente regressões para cada mudança
+observável. Rode `git diff --check` nos dois repositórios.
 
-Funções sem captura e métodos com receptor explícito são suportados. Ao detectar
-uma referência externa que exigiria upvalues, o compilador emite aviso e bloqueia
-a compilação. Passe os valores necessários por parâmetros.
-
-O runtime valida aridade, tipos, identidade nominal das classes, privacidade,
-índices, imutabilidade das tuplas, contratos de vetores por aliases e overflow
-inteiro. Erros de execução incluem localização e podem ser tratados com
-`tente ... pegue`. Esses mecanismos não equivalem a uma prova formal de
-segurança de toda a implementação.
-
-FFI, ponteiros arbitrários, NPM, importação dinâmica e código avaliado em tempo
-de execução não são expostos pela linguagem compilada. Limites numéricos,
-restrições da CTFE e diferenças restantes estão em
+Capturas/upvalues, FFI arbitrária e carregamento dinâmico são exclusões deliberadas.
+Outros limites de implementação são descritos separadamente em
 [Compatibilidade](docs/compatibilidade.md) e [Segurança](docs/seguranca.md).
 
-## Contribuir
-
-Mudanças do compilador e do runtime devem ser testadas juntas. O runtime é um
-submódulo: publique primeiro seu commit no repositório `delegua-runtime`, depois
-atualize a referência no CGD. Evite registrar executáveis, objetos e arquivos
-C gerados. Antes de enviar: rode a matriz e `git diff --check` nos dois repositórios.
-
-O projeto usa a licença [Apache-2.0](LICENSE).
-Se quiser apoiar o desenvolvimento, visite o [Patreon de Fernando](https://www.patreon.com/fernandothedev).
+Licença [Apache-2.0](LICENSE). Autoria e referências ao projeto Delégua devem ser
+preservadas. [Apoie o desenvolvimento](https://www.patreon.com/fernandothedev).

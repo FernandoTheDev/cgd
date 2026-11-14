@@ -1,7 +1,8 @@
 'use strict';
 
 const dependencyCommands = {
-  debian: 'sudo apt-get update\nsudo apt-get install git build-essential clang pkg-config libgc-dev ldc dub python3',
+  debian:
+    'sudo apt-get update\nsudo apt-get install git build-essential clang pkg-config libgc-dev ldc dub python3',
   fedora: 'sudo dnf install git gcc clang pkgconf-pkg-config gc-devel ldc dub python3',
   arch: 'sudo pacman -S --needed git gcc clang pkgconf gc ldc dub python',
 };
@@ -10,9 +11,13 @@ distro.addEventListener('change', () => {
   document.querySelector('#deps-code').textContent = dependencyCommands[distro.value];
 });
 
-const normalize = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const normalize = (text) =>
+  text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 const rows = [...document.querySelectorAll('.feature-row')];
-document.querySelector('#feature-search').addEventListener('input', event => {
+document.querySelector('#feature-search').addEventListener('input', (event) => {
   const query = normalize(event.target.value.trim());
   let visible = 0;
   for (const row of rows) {
@@ -29,14 +34,17 @@ for (const button of document.querySelectorAll('[data-copy]')) {
       await navigator.clipboard.writeText(text);
       button.textContent = 'Copiado';
       document.querySelector('#copy-status').textContent = 'Código copiado.';
-      setTimeout(() => { button.textContent = 'Copiar'; }, 1800);
+      setTimeout(() => {
+        button.textContent = 'Copiar';
+      }, 1800);
     } catch {
       const range = document.createRange();
       range.selectNodeContents(document.getElementById(button.dataset.copy));
       const selection = window.getSelection();
       selection.removeAllRanges();
       selection.addRange(range);
-      document.querySelector('#copy-status').textContent = 'Selecionei o código. Use o comando de copiar do seu navegador.';
+      document.querySelector('#copy-status').textContent =
+        'Selecionei o código. Use o comando de copiar do seu navegador.';
     }
   });
 }

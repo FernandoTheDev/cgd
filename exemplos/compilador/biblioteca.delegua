@@ -1,0 +1,3 @@
+//! módulo inicializado
+escreva("módulo inicializado")
+funcao dobro(valor) { retorna valor * 2 }

@@ -6,42 +6,46 @@ usam C99. DMD e LDC2 compilam o mesmo frontend.
 
 ## Passes
 
-1. **Lexer** — reconhece palavras-chave, operadores, literais, escapes e posições.
-2. **Parser** — produz nós de declarações, expressões, tipos, classes e controle de fluxo.
-3. **Módulos** — resolve caminhos literais de `.delegua`, canonicaliza caminhos,
-   reutiliza módulos e diagnostica ciclos antes da geração de código.
-4. **Semântica** — registra símbolos, resolve tipos e herança, valida chamadas,
-   retornos, constantes e escopos; bloqueia capturas de ambientes externos.
-5. **CTFE e otimização** — com `-o`, propaga constantes adequadas e tenta executar
-   funções `//>puro` em uma VM de compilação limitada. Limites de instruções ou
-   recursão preservam a chamada para execução nativa.
-6. **Lowering** — converte operações em chamadas explícitas do runtime e prepara
-   a representação usada pelo backend.
-7. **Backend C** — emite callbacks, descritores de tipos, valores de classes,
-   inicializadores de módulos e o corpo de `delegua_main`.
-8. **Driver** — grava o `.c` e chama Clang/GCC/TCC por vetor de argumentos,
-   vinculando `libdelegua_rt.o`, Boehm GC e bibliotecas nativas necessárias.
+1. **Lexer** — valida UTF-8 e reconhece palavras-chave, operadores, literais, escapes e posições. Tabelas imutáveis são compartilhadas entre lexers.
+2. **Parser** — produz a AST e recupera erros independentes por sincronização. Limita o aninhamento para evitar esgotar a pilha.
+3. **Módulos** — resolve caminhos literais, canonicaliza, reutiliza unidades, impõe orçamento de loading e mostra cadeias de importação em ciclos.
+4. **Validação estrutural** — percorre a AST iterativamente antes dos passes recursivos, limitando profundidade e quantidade de nós.
+5. **Semântica** — registra símbolos, resolve tipos e herança, valida chamadas, retornos, constantes e escopos; bloqueia capturas. Identificadores mantêm a identidade da declaração resolvida.
+6. **Segurança estática** — antecipa falhas locais provadas de operadores, contratos e índices antes do backend, preservando tratamento de exceções com avisos.
+7. **Pureza e fluxo** — valida funções `//>puro` e emite avisos de código inalcançável/possível retorno implícito, independentemente de otimização.
+8. **Otimização opcional** — passa até ponto fixo, contabilizando mudanças. Dobra literais, propaga constantes por identidade, simplifica ramos e preserva efeitos/exceções. A CTFE tem orçamento e fallback nativo.
+9. **Lowering** — converte operações em chamadas explícitas do runtime.
+10. **Backend C** — emite callbacks, descritores, classes, inicializadores de módulos e `delegua_main`. Nomes/textos C usam codificação direta em buffers reservados.
+11. **Toolchain** — separa descoberta e argv do pipeline, configura alvo/sysroot/runtime e executa o compilador C sem shell.
+
+`--verificar` encerra após a análise; `--emitir-c` encerra após a emissão. Nenhum
+desses modos exige linker ou runtime instalado. A configuração de cross
+compilation não equivale a suporte validado a Windows/macOS.
 
 ## Mapa do repositório
 
-| Caminho | Responsabilidade |
-| --- | --- |
-| `src/frontend/lexer/` | Tokens e posições |
-| `src/frontend/parser/` | AST, expressões, declarações e tipos |
-| `src/frontend/semantic/` | Símbolos, escopos e análise semântica |
-| `src/frontend/modules.d` | Grafo de importação de fontes |
-| `src/ctfe/` | Análise de pureza, bytecode e VM de compilação |
-| `src/opt/` | Otimizações da AST |
-| `src/middle/` | Lowering |
-| `src/backend/c/` | Emissão C99 e destinos de atribuição |
-| `src/driver/` | CLI, arquivos, tempos e chamada ao compilador C |
-| `src/errors.d` | Diagnósticos com severidade e posição |
-| `vendor/delegua-runtime/` | Runtime C e seus próprios testes |
-| `testes/unit/` | Testes unitários de D |
-| `testes/integracao.py` | Semântica observável, erros e segurança |
-| `testes/exemplos.py` | Validação de todo o catálogo de exemplos |
-| `scripts/validar.py` | Matriz de compiladores e modos de build |
-| `docs/` | Documentação e website estático |
+| Caminho                     | Responsabilidade                                |
+| --------------------------- | ----------------------------------------------- |
+| `src/frontend/lexer/`       | Tokens e posições                               |
+| `src/frontend/parser/`      | AST, expressões, declarações e tipos            |
+| `src/frontend/semantic/`    | Símbolos, escopos e análise semântica           |
+| `src/frontend/modules.d`    | Grafo de importação de fontes                   |
+| `src/ctfe/`                 | Análise de pureza, bytecode e VM de compilação  |
+| `src/frontend/validation.d` | Limites estruturais antes da semântica          |
+| `src/frontend/flow.d`       | Avisos de fluxo conservadores                   |
+| `src/middle/rewrite.d`      | Reescrita de slots com cache por execução       |
+| `src/driver/toolchain.d`    | Descoberta, argv e configuração de alvo         |
+| `src/opt/`                  | Otimizações da AST                              |
+| `src/middle/`               | Lowering                                        |
+| `src/backend/c/`            | Emissão C99 e destinos de atribuição            |
+| `src/driver/`               | CLI, arquivos, tempos e chamada ao compilador C |
+| `src/errors.d`              | Diagnósticos com severidade e posição           |
+| `vendor/delegua-runtime/`   | Runtime C e seus próprios testes                |
+| `testes/unit/`              | Testes unitários de D                           |
+| `testes/integracao.py`      | Semântica observável, erros e segurança         |
+| `testes/exemplos.py`        | Validação de todo o catálogo de exemplos        |
+| `scripts/validar.py`        | Matriz de compiladores e modos de build         |
+| `docs/`                     | Documentação e website estático                 |
 
 ## ABI dos valores e chamadas
 
@@ -97,3 +101,11 @@ livres são aplicados na inicialização das funções do programa. Envelopes qu
 exigem capturar o parâmetro recebido em uma função interna são bloqueados pela
 mesma regra de upvalues. A extensão `decoradores(valor)` consulta cópias dos
 metadados de funções, classes e propriedades.
+
+Os contratos detalhados de passes, códigos de diagnóstico e configuração da
+toolchain estão em [Desenvolvimento](desenvolvimento.md). O guia web
+[Delégua no CGD](linguagem.html) descreve a linguagem pelo ponto de vista do usuário.
+
+Os pontos de erro do C usam descritores estáticos e escritas de ponteiro, sem
+chamadas de localização por linha. O catálogo central também alimenta a referência
+web e a opção `--explicar`. Veja os limites em Desenvolvimento.

@@ -1,0 +1,8 @@
+//! tratado
+// Uma operação deliberadamente inválida dentro de pegue recebe aviso W3101.
+// A exceção continua tratável, e a localização não exige chamada por linha.
+tente {
+    escreva(1 / 0)
+} pegue (erro) {
+    escreva("tratado")
+}

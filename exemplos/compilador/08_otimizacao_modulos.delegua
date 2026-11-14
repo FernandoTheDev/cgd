@@ -1,0 +1,5 @@
+//! módulo inicializado\n8
+// As duas importações compartilham o módulo, sem repetir inicialização.
+var primeiro = importar("biblioteca.delegua")
+var segundo = importar("biblioteca.delegua")
+escreva(primeiro.dobro(2 + 2))

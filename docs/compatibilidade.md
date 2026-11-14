@@ -5,23 +5,23 @@ Referência: [wiki oficial](https://github.com/DesignLiquido/delegua/wiki), revi
 com runtime gerenciado. A tabela descreve o código desta branch, não uma promessa
 de equivalência com todos os ambientes, dialetos e extensões do interpretador.
 
-| Área | Recursos disponíveis |
-| --- | --- |
-| Valores | Nulo, lógicos, inteiros de 64 bits, reais de 64 bits, textos UTF-8, vetores, tuplas, dicionários, funções e objetos |
-| Variáveis | Inferência, anotações, constantes, inicialização nula, atribuição múltipla e desestruturação de propriedades |
-| Operadores | Aritmética, potência, divisão inteira, bits, comparações, curto-circuito, coalescência, pertencimento e atribuições compostas |
-| Controle | Se/senão, ternário, escolha/caso, enquanto, fazer/enquanto, para, para cada, sustar e continua |
-| Coleções | Literais, índices negativos, espalhamento, compreensão, fatiamento com passo e laços como expressões de vetores |
-| Funções | Nomeadas/anônimas sem captura, funções como valores, callbacks, recursão, padrões dependentes de parâmetros anteriores e parâmetros variáveis |
-| Classes | Campos tipados, construtores, herança, super, isto, métodos ligados, público/privado/protegido e acessores automáticos/customizados |
-| Exceções | Tente, pegue com/sem tipo, finalmente, falhar, Excecao e subclasses; limpeza em retornos e controles de laço |
-| Módulos | Importação de fontes `.delegua` por caminho literal, cache, ciclos diagnosticados, inicialização única e exportações protegidas |
-| Texto | Interpolação, escapes, tamanho/indexação por pontos de código, divisão, substituição, busca, caixa Unicode e aparar |
-| Biblioteca global | Escreva, leia, conversões, tamanho, tupla, aleatório, aleatório entre, clonar, filtrar, mapear, ordenar, paraCada e todosEmCondicao |
-| Métodos | Métodos de texto/número/vetor/dicionário descritos na wiki e propriedades ordinais das tuplas |
-| Metadados | Decoradores de dados em funções/classes/campos/métodos e envelopes de funções livres sem captura |
-| Asserções | Asserção/assercao como declaração e função, com mensagem opcional e exceção tratável |
-| Compilação | C99, Clang/GCC/TCC, diagnósticos com posição, CTFE limitada e otimizações opcionais |
+| Área              | Recursos disponíveis                                                                                                                                |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Valores           | Nulo, lógicos, inteiros de 64 bits, reais de 64 bits, textos UTF-8, vetores, tuplas, dicionários, funções e objetos                                 |
+| Variáveis         | Inferência, anotações, constantes, inicialização nula, atribuição múltipla e desestruturação de propriedades                                        |
+| Operadores        | Aritmética, potência, divisão inteira, bits, comparações, curto-circuito, coalescência, pertencimento e atribuições compostas                       |
+| Controle          | Se/senão, ternário, escolha/caso, enquanto, fazer/enquanto, para, para cada, sustar e continua                                                      |
+| Coleções          | Literais, índices negativos, espalhamento, compreensão, fatiamento com passo e laços como expressões de vetores                                     |
+| Funções           | Nomeadas/anônimas sem captura, funções como valores, callbacks, recursão, padrões dependentes de parâmetros anteriores e parâmetros variáveis       |
+| Classes           | Campos tipados, construtores, herança, super, isto, métodos ligados, público/privado/protegido e acessores automáticos/customizados                 |
+| Exceções          | Tente, pegue com/sem tipo, finalmente, falhar, Excecao e subclasses; limpeza em retornos e controles de laço                                        |
+| Módulos           | Importação de fontes `.delegua` por caminho literal, cache, ciclos diagnosticados, inicialização única e exportações protegidas                     |
+| Texto             | Interpolação, escapes, tamanho/indexação por pontos de código, divisão, substituição, busca, caixa Unicode e aparar                                 |
+| Biblioteca global | Escreva, leia, conversões, tamanho, tupla, aleatório, aleatório entre, clonar, filtrar, mapear, ordenar, paraCada e todosEmCondicao                 |
+| Métodos           | Métodos de texto/número/vetor/dicionário listados na referência local e propriedades ordinais das tuplas                                            |
+| Metadados         | Decoradores de dados em funções/classes/campos/métodos e envelopes de funções livres sem captura                                                    |
+| Asserções         | Asserção/assercao como declaração e função, com mensagem opcional e exceção tratável                                                                |
+| Compilação        | C99, Clang/GCC/TCC, diagnósticos com códigos/JSON, análise sem geração de executável, emissão C isolada, CTFE limitada e otimizações até ponto fixo |
 
 Veja os [exemplos executáveis](../exemplos/README.md) e o
 [contrato de segurança](seguranca.md).
@@ -48,3 +48,20 @@ são automaticamente bibliotecas do CGD.
 
 Esses limites são separados das exclusões de segurança: não se deve classificar
 um recurso ausente como inseguro apenas por ainda não estar implementado.
+
+## Ferramentas e limites de compilação
+
+`--verificar` faz análise sem toolchain C. `--emitir-c` gera somente o C99.
+`--diagnosticos=json` produz diagnósticos estruturados em stderr. O parser
+recupera erros independentes e o frontend avisa sobre código inalcançável.
+Os limites de tamanho/aninhamento e os códigos são descritos em
+[Desenvolvimento](desenvolvimento.md). Opções de alvo, sysroot e runtime preparam
+compilações cruzadas, mas executáveis Windows/macOS ainda não foram validados.
+
+A [referência web](linguagem.html) reúne a sintaxe e exemplos testados de cada área,
+com filtros por suporte, limitação e exclusão deliberada.
+
+O frontend antecipa falhas locais comprovadas de operadores, índices e contratos
+antes da emissão C; em regiões com pegue emite avisos para preservar tratamento.
+Dados dinâmicos continuam validados pelo runtime. A localização usa metadados
+estáticos em pontos falíveis, sem chamadas adicionais a cada linha.

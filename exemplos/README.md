@@ -13,35 +13,35 @@ mkdir -p out
 
 ## Percurso pela linguagem
 
-| Exemplo | Recurso |
-| --- | --- |
-| [01_tipos.delegua](linguagem/01_tipos.delegua) | Tipos e valores |
-| [02_operadores.delegua](linguagem/02_operadores.delegua) | Operadores |
-| [03_atribuicoes.delegua](linguagem/03_atribuicoes.delegua) | Atribuições múltiplas |
-| [04_condicionais.delegua](linguagem/04_condicionais.delegua) | Condicionais e escolha |
-| [05_lacos.delegua](linguagem/05_lacos.delegua) | Laços e controle |
-| [06_lacos_resultado.delegua](linguagem/06_lacos_resultado.delegua) | Laços como expressões |
-| [07_funcoes.delegua](linguagem/07_funcoes.delegua) | Parâmetros padrão e variáveis |
-| [08_funcoes_valores.delegua](linguagem/08_funcoes_valores.delegua) | Funções como valores e callbacks |
-| [09_vetores.delegua](linguagem/09_vetores.delegua) | Métodos de vetores |
-| [10_compreensao_fatias.delegua](linguagem/10_compreensao_fatias.delegua) | Compreensão e fatias |
-| [11_dicionarios.delegua](linguagem/11_dicionarios.delegua) | Dicionários e desestruturação |
-| [12_tuplas.delegua](linguagem/12_tuplas.delegua) | Tuplas e contratos |
-| [13_texto_unicode.delegua](linguagem/13_texto_unicode.delegua) | Texto e Unicode |
-| [14_classes.delegua](linguagem/14_classes.delegua) | Classes |
-| [15_heranca.delegua](linguagem/15_heranca.delegua) | Herança e métodos ligados |
-| [16_privacidade_acessores.delegua](linguagem/16_privacidade_acessores.delegua) | Privacidade e acessores |
-| [17_excecoes.delegua](linguagem/17_excecoes.delegua) | Exceções |
-| [18_finalmente_retorno.delegua](linguagem/18_finalmente_retorno.delegua) | Finalmente em retornos e laços |
-| [19_excecoes_tipadas.delegua](linguagem/19_excecoes_tipadas.delegua) | Exceções tipadas |
-| [20_clonagem.delegua](linguagem/20_clonagem.delegua) | Clonagem e ciclos |
-| [21_biblioteca.delegua](linguagem/21_biblioteca.delegua) | Biblioteca nativa |
-| [22_contratos_aliases.delegua](linguagem/22_contratos_aliases.delegua) | Contratos através de aliases |
-| [23_decoradores.delegua](linguagem/23_decoradores.delegua) | Decoradores |
-| [24_assercoes.delegua](linguagem/24_assercoes.delegua) | Asserções |
-| [25_escopos.delegua](linguagem/25_escopos.delegua) | Escopos e funções internas sem captura |
-| [26_ctfe.delegua](linguagem/26_ctfe.delegua) | Avaliação em compilação |
-| [27_entrada.delegua](linguagem/27_entrada.delegua) | Entrada padrão |
+| Exemplo                                                                        | Recurso                                |
+| ------------------------------------------------------------------------------ | -------------------------------------- |
+| [01_tipos.delegua](linguagem/01_tipos.delegua)                                 | Tipos e valores                        |
+| [02_operadores.delegua](linguagem/02_operadores.delegua)                       | Operadores                             |
+| [03_atribuicoes.delegua](linguagem/03_atribuicoes.delegua)                     | Atribuições múltiplas                  |
+| [04_condicionais.delegua](linguagem/04_condicionais.delegua)                   | Condicionais e escolha                 |
+| [05_lacos.delegua](linguagem/05_lacos.delegua)                                 | Laços e controle                       |
+| [06_lacos_resultado.delegua](linguagem/06_lacos_resultado.delegua)             | Laços como expressões                  |
+| [07_funcoes.delegua](linguagem/07_funcoes.delegua)                             | Parâmetros padrão e variáveis          |
+| [08_funcoes_valores.delegua](linguagem/08_funcoes_valores.delegua)             | Funções como valores e callbacks       |
+| [09_vetores.delegua](linguagem/09_vetores.delegua)                             | Métodos de vetores                     |
+| [10_compreensao_fatias.delegua](linguagem/10_compreensao_fatias.delegua)       | Compreensão e fatias                   |
+| [11_dicionarios.delegua](linguagem/11_dicionarios.delegua)                     | Dicionários e desestruturação          |
+| [12_tuplas.delegua](linguagem/12_tuplas.delegua)                               | Tuplas e contratos                     |
+| [13_texto_unicode.delegua](linguagem/13_texto_unicode.delegua)                 | Texto e Unicode                        |
+| [14_classes.delegua](linguagem/14_classes.delegua)                             | Classes                                |
+| [15_heranca.delegua](linguagem/15_heranca.delegua)                             | Herança e métodos ligados              |
+| [16_privacidade_acessores.delegua](linguagem/16_privacidade_acessores.delegua) | Privacidade e acessores                |
+| [17_excecoes.delegua](linguagem/17_excecoes.delegua)                           | Exceções                               |
+| [18_finalmente_retorno.delegua](linguagem/18_finalmente_retorno.delegua)       | Finalmente em retornos e laços         |
+| [19_excecoes_tipadas.delegua](linguagem/19_excecoes_tipadas.delegua)           | Exceções tipadas                       |
+| [20_clonagem.delegua](linguagem/20_clonagem.delegua)                           | Clonagem e ciclos                      |
+| [21_biblioteca.delegua](linguagem/21_biblioteca.delegua)                       | Biblioteca nativa                      |
+| [22_contratos_aliases.delegua](linguagem/22_contratos_aliases.delegua)         | Contratos através de aliases           |
+| [23_decoradores.delegua](linguagem/23_decoradores.delegua)                     | Decoradores                            |
+| [24_assercoes.delegua](linguagem/24_assercoes.delegua)                         | Asserções                              |
+| [25_escopos.delegua](linguagem/25_escopos.delegua)                             | Escopos e funções internas sem captura |
+| [26_ctfe.delegua](linguagem/26_ctfe.delegua)                                   | Avaliação em compilação                |
+| [27_entrada.delegua](linguagem/27_entrada.delegua)                             | Entrada padrão                         |
 
 | [28_metodos_texto.delegua](linguagem/28_metodos_texto.delegua) | Métodos de texto |
 | [29_metodos_numero.delegua](linguagem/29_metodos_numero.delegua) | Métodos de número |
@@ -76,3 +76,31 @@ imutabilidade de tuplas e overflow. Não devem encerrar com sucesso.
 
 Os exemplos históricos na raiz e em `ctfe/` continuam fazendo parte da suíte.
 Nenhum exemplo demonstra carregamento nativo arbitrário como recurso permitido.
+
+## Engenharia do compilador
+
+Os exemplos em `compilador/` mostram contratos que os passes devem preservar:
+
+| Exemplo                                                          | Contrato                                           |
+| ---------------------------------------------------------------- | -------------------------------------------------- |
+| [Constantes e escopos](compilador/01_constantes_escopos.delegua) | Propagação pela identidade da declaração           |
+| [Efeitos](compilador/02_efeitos.delegua)                         | Chamadas observáveis não desaparecem               |
+| [Fluxo](compilador/03_fluxo.delegua)                             | Aviso de código morto e preservação de finalmente  |
+| [Curto-circuito](compilador/04_curto_circuito.delegua)           | Ramos descartados não executam                     |
+| [Diagnósticos](compilador/05_diagnosticos.delegua)               | Recuperação de mais de um erro                     |
+| [Sugestão](compilador/06_sugestao.delegua)                       | Sugestão de símbolo existente                      |
+| [Métodos e padrões](compilador/07_metodos_e_padroes.delegua)     | Travessia de métodos, lambdas e padrões            |
+| [Módulos](compilador/08_otimizacao_modulos.delegua)              | Inicialização única com referências compartilhadas |
+
+Experimente `./cgd exemplo.delegua --verificar --diagnosticos=json` para análise
+sem gerar executável, ou `--emitir-c -o -s out/exemplo` para inspecionar o C.
+
+As regressões [CTFE e escopos](compilador/09_ctfe_fluxo_escopos.delegua),
+[CTFE e exceção tratável](compilador/10_ctfe_excecao.delegua) e
+[CTFE e contrato de tipo](compilador/11_ctfe_contrato.delegua) mostram que avaliar
+em compilação deve preservar o mesmo comportamento da execução nativa.
+
+Os exemplos [divisão estática](compilador/12_divisao_estatica.delegua) e
+[índice Unicode](compilador/13_indice_unicode.delegua) falham antes de gerar C,
+com E3101 e E3103. [Falha tratada](compilador/14_falha_tratada.delegua) demonstra
+um aviso W3101 em região com pegue, preservando o tratamento em execução.

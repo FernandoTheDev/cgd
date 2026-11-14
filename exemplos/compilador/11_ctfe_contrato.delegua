@@ -1,0 +1,7 @@
+//# 1
+//? fase: compilacao
+//? erro: E3104
+// A otimização não pode remover a validação de inteiro, nem em funções puras.
+//>puro
+funcao incrementar(valor: inteiro) { retorna valor + 1 }
+escreva(incrementar(2.5))

@@ -1,0 +1,3 @@
+//! 7falsoverdadeiro8
+funcao proibida() { falhar "Não deveria executar" }
+escreva(verdadeiro ? 7 : proibida(), falso e proibida(), verdadeiro ou proibida(), nulo ?: 8)
