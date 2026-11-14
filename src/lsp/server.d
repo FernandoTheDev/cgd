@@ -347,22 +347,26 @@ class LanguageServer
                     {
                         seen[current] = true;
                         foreach (FnDecl method; current.methods)
+                        {
+                            string name = method.fn.to!string;
+                            if (name in names)
+                                continue;
+                            names[name] = true;
                             if ((!classReceiver || method.isStatic) && (method.access == 0
-                                    || internal && (method.access == 2 || current is cls)) && method.fn != "construtor"
-                                    && !method.fn.to!string.startsWith("#") && method.fn.to!string !in names)
-                            {
-                                names[method.fn.to!string] = true;
-                                items ~= completionItem(method.fn.to!string, "method", doc.signature(method));
-                            }
-                        if (!classReceiver)
-                            foreach (ClassField field; current.fields)
-                                if ((field.access == 0 || internal && (field.access == 2
-                                        || current is cls)) && field.name.to!string !in names)
-                                {
-                                    names[field.name.to!string] = true;
-                                    items ~= completionItem(field.name.to!string, "property",
-                                            "campo " ~ field.name.to!string ~ ": " ~ field.type.toStr().to!string);
-                                }
+                                    || internal && (method.access == 2 || current is cls))
+                                    && method.fn != "construtor" && !name.startsWith("#"))
+                                items ~= completionItem(name, "method", doc.signature(method));
+                        }
+                        foreach (ClassField field; current.fields)
+                        {
+                            string name = field.name.to!string;
+                            if (name in names)
+                                continue;
+                            names[name] = true;
+                            if (!classReceiver && (field.access == 0 || internal && (field.access == 2 || current is cls)))
+                                items ~= completionItem(name, "property",
+                                        "campo " ~ name ~ ": " ~ field.type.toStr().to!string);
+                        }
                     }
                     return JSONValue(["isIncomplete": JSONValue(false), "items": arrayJSON(items)]);
                 }

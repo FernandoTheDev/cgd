@@ -342,6 +342,20 @@ with tempfile.TemporaryDirectory(prefix="cgd lsp ") as directory:
         )["items"]
     }
     assert labels == {"analisar", "serializar"}, labels
+    # A private override hides a public base method instead of leaking its suggestion.
+    source = "classe Base{agir(): inteiro{retorna 1}} classe Filha herda Base{privado{agir(): inteiro{retorna 2}}} var filha: Filha=Filha()\nfilha."
+    client.send(
+        "textDocument/didChange",
+        {"textDocument": {"uri": uri, "version": 18}, "contentChanges": [{"text": source}]},
+    )
+    labels = {
+        item["label"]
+        for item in client.request(
+            "textDocument/completion",
+            {"textDocument": {"uri": uri}, "position": {"line": 1, "character": 6}},
+        )["items"]
+    }
+    assert "agir" not in labels, labels
     # Unsaved untitled documents do not require a real filesystem entry.
     untitled = "untitled:Untitled-1"
     client.send(
