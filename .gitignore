@@ -26,3 +26,5 @@ __pycache__/
 
 /cgd-unit
 /out/
+
+!requirements-site.txt

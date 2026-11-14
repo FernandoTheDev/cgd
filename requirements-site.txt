@@ -1,0 +1,2 @@
+# Opcional: apenas para testes/site.py; não é dependência do compilador ou do website.
+websocket-client>=1.6,<2
