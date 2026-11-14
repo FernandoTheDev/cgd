@@ -17,9 +17,7 @@ void main(string[] args)
         cli_parse(args, arguments);
     catch (GetOptException e)
     {
-        writefln("Flag invalida: %s\n", e.msg[20..$]);
-        cli_ajuda();
-        return;
+        cgd_erro("Flag inválida: " ~ e.msg);
     }
 
     if (arguments.showHelp)
@@ -34,5 +32,21 @@ void main(string[] args)
         return;
     }
 
-    compile(arguments, args[1]);
+    try
+        compile(arguments, args[1]);
+    catch (Exception e)
+        cgd_erro("Falha na compilação: " ~ e.msg);
+}
+
+version (D_Coverage) shared static this()
+{
+    import core.runtime : dmd_coverDestPath;
+    import std.process : environment;
+    import std.file : exists, mkdirRecurse;
+
+    string dir = environment.get("COVDIR", "");
+    if (dir.length && !dir.exists)
+        mkdirRecurse(dir);
+    if (dir.length)
+        dmd_coverDestPath(dir);
 }

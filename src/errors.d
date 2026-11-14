@@ -51,8 +51,9 @@ struct Diagnostic
 
 private void renderDiagnostic(ref Diagnostic d)
 {
-    writefln("%s: %s", label(d.severity), d.message);
-    writefln(" --> %s", d.position.toStr());
+    stderr.writefln("%s: %s", label(d.severity), d.message);
+    if (d.position is null) return;
+    stderr.writefln(" --> %s", d.position.toStr());
 
     string[] lines;
 
@@ -60,7 +61,7 @@ private void renderDiagnostic(ref Diagnostic d)
         lines = linesOf(d.position.filename);
     catch (Exception)
     {
-        writeln();
+        stderr.writeln();
         return;
     }
 
@@ -75,7 +76,7 @@ private void renderDiagnostic(ref Diagnostic d)
     uint gutterWidth = cast(uint) format("%d", lineEnd).length;
     string gutter = ' '.repeat(gutterWidth + 1).array;
 
-    writefln("%s|", gutter);
+    stderr.writefln("%s|", gutter);
 
     foreach (uint n; lineStart .. lineEnd + 1)
     {
@@ -83,7 +84,7 @@ private void renderDiagnostic(ref Diagnostic d)
             continue;
 
         string line = lines[n - 1];
-        writefln("%*d | %s", gutterWidth, n, line);
+        stderr.writefln("%*d | %s", gutterWidth, n, line);
 
         uint spanStart = (n == lineStart) ? colStart : 1;
         uint spanEnd = (n == lineEnd) ? colEnd : cast(uint) line.length;
@@ -96,11 +97,11 @@ private void renderDiagnostic(ref Diagnostic d)
         string tilde = cast(string)(
             spanEnd > spanStart ? '~'.repeat(spanEnd - spanStart).array : "");
 
-        writefln("%s%s%s", spaces, caret, tilde);
+        stderr.writefln("%s%s%s", spaces, caret, tilde);
     }
 
-    writefln("%s|", gutter);
-    writeln();
+    stderr.writefln("%s|", gutter);
+    stderr.writeln();
 }
 
 class Diagnostics
@@ -149,12 +150,14 @@ public:
 
         if (errors > 0 || warnings > 0)
         {
-            writefln("resultado: %d erro(s), %d aviso(s)", errors, warnings);
-            writeln();
+            stderr.writefln("resultado: %d erro(s), %d aviso(s)", errors, warnings);
+            stderr.writeln();
         }
 
         return errors > 0;
     }
+
+    const(Diagnostic)[] entries() const { return _list; }
 
     void clear()
     {

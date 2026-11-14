@@ -20,9 +20,9 @@ T as(T)(Node v)
 
 void cgd_erro(string message)
 {
-    writefln("Erro: %s", message);
+    stderr.writefln("Erro: %s", message);
     import core.stdc.stdlib:exit;
-    exit(1);   
+    exit(1);
 }
 
 void cgd_validar(bool cond, string message)
@@ -62,7 +62,7 @@ Position getPosFromSymbol(Symbol* sym)
 
 void verificar_erros(Diagnostics d)
 {
-    d.report();
-    if (!d.hasErrors()) return;
-    exit(1);
+    bool failed = d.report();
+    d.clear();
+    if (failed) exit(1);
 }

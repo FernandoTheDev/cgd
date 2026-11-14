@@ -1,6 +1,7 @@
 module ctfe.vm.cgd_vm;
 
 import std.traits : EnumMembers;
+import core.checkedint : adds, subs, muls, negs;
 import std.exception;
 import std.stdio;
 
@@ -15,7 +16,7 @@ enum CGDTypeKind : ubyte
     Logico,
 }
 
-struct CGDValue 
+struct CGDValue
 {
     CGDTypeKind type;
     union {
@@ -47,6 +48,7 @@ enum VMOpCode : ubyte
     Sub,
     Mul,
     Div,
+    IDiv,
     Le,
     Lt,
     Mod,
@@ -71,7 +73,7 @@ enum VMOpCode : ubyte
     Halt,
 }
 
-struct VMInstruction 
+struct VMInstruction
 {
     VMOpCode opCode;
     size_t param; // para LoadParam
@@ -101,6 +103,7 @@ struct VM
 
     CGDValue[] stack;
     size_t pc;
+    bool executing, halted;
 
     pragma(inline, true)
     CGDValue pop()
@@ -127,15 +130,16 @@ const VMHandleFn[OpCodes.length] handlers = [
     &vmStore,
 
     &vmPush,
-    
+
     &vmJmp,
     &vmJz,
     &vmJnz,
-    
+
     &vmAdd,
     &vmSub,
     &vmMul,
     &vmDiv,
+    &vmIDiv,
     &vmLe,
     &vmLt,
     &vmMod,
@@ -153,10 +157,10 @@ const VMHandleFn[OpCodes.length] handlers = [
     &vmNeg,
     &vmNot,
     &vmBNot,
-    
+
     &vmCall,
     &vmRet,
-    
+
     &vmHalt,
 ];
 
@@ -209,6 +213,7 @@ void vmRet(VMInstruction* instr, VM* vm)
 {
     if (vm.stack.length > 0)
         vm.context.ret[0] = vm.pop();
+    vm.halted = true;
     // vmHandle(vm);
 }
 
@@ -221,15 +226,15 @@ void vmJmp(VMInstruction* instr, VM* vm)
 void vmJz(VMInstruction* instr, VM* vm)
 {
     CGDValue cond = vm.pop();
-    if (!isTruthy(cond)) 
+    if (!isTruthy(cond))
         vm.pc = instr.param;
     vmHandle(vm);
 }
 
 void vmJnz(VMInstruction* instr, VM* vm)
 {
-    CGDValue cond = vm.pop();   
-    if (isTruthy(cond)) 
+    CGDValue cond = vm.pop();
+    if (isTruthy(cond))
         vm.pc = instr.param;
     vmHandle(vm);
 }
@@ -243,7 +248,7 @@ private long coerceToInteiro(CGDValue v)
         case CGDTypeKind.Real:    return cast(long) v.d;
         case CGDTypeKind.Logico:  return v.b1 ? 1 : 0;
         case CGDTypeKind.Texto:
-            assert(0, "operador bitwise nao suporta Texto");
+            throw new Exception("operador bitwise nao suporta Texto");
     }
 }
 
@@ -253,9 +258,9 @@ private bool isTruthy(CGDValue v)
     final switch (v.type)
     {
         case CGDTypeKind.Logico:  return v.b1;
-        case CGDTypeKind.Inteiro: return v.i != 0;
-        case CGDTypeKind.Real:    return v.d != 0.0;
-        case CGDTypeKind.Texto:   return v.s.length != 0;
+        case CGDTypeKind.Inteiro:
+        case CGDTypeKind.Real:
+        case CGDTypeKind.Texto: return true;
     }
 }
 
@@ -268,7 +273,10 @@ void vmAdd(VMInstruction* instr, VM* vm)
     final switch (left.type)
     {
         case CGDTypeKind.Inteiro:
-            vm.push(CGDValue.inteiro(left.i + right.i));
+            bool overflow;
+            auto result = adds(left.i, right.i, overflow);
+            enforce(!overflow, "Overflow inteiro em tempo de compilação.");
+            vm.push(CGDValue.inteiro(result));
             break;
 
         case CGDTypeKind.Real:
@@ -280,7 +288,7 @@ void vmAdd(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Logico:
-            assert(0, "operador + nao suportado entre Logico e Logico");
+            throw new Exception("operador + nao suportado entre Logico e Logico");
     }
 
     vmHandle(vm);
@@ -295,7 +303,10 @@ void vmSub(VMInstruction* instr, VM* vm)
     final switch (left.type)
     {
         case CGDTypeKind.Inteiro:
-            vm.push(CGDValue.inteiro(left.i - right.i));
+            bool overflow;
+            auto result = subs(left.i, right.i, overflow);
+            enforce(!overflow, "Overflow inteiro em tempo de compilação.");
+            vm.push(CGDValue.inteiro(result));
             break;
 
         case CGDTypeKind.Real:
@@ -303,10 +314,10 @@ void vmSub(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            assert(0, "operador - nao suportado para Texto");
+            throw new Exception("operador - nao suportado para Texto");
 
         case CGDTypeKind.Logico:
-            assert(0, "operador - nao suportado para Logico");
+            throw new Exception("operador - nao suportado para Logico");
     }
 
     vmHandle(vm);
@@ -321,7 +332,10 @@ void vmMul(VMInstruction* instr, VM* vm)
     final switch (left.type)
     {
         case CGDTypeKind.Inteiro:
-            vm.push(CGDValue.inteiro(left.i * right.i));
+            bool overflow;
+            auto result = muls(left.i, right.i, overflow);
+            enforce(!overflow, "Overflow inteiro em tempo de compilação.");
+            vm.push(CGDValue.inteiro(result));
             break;
 
         case CGDTypeKind.Real:
@@ -329,10 +343,10 @@ void vmMul(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            assert(0, "operador * nao suportado para Texto");
+            throw new Exception("operador * nao suportado para Texto");
 
         case CGDTypeKind.Logico:
-            assert(0, "operador * nao suportado para Logico");
+            throw new Exception("operador * nao suportado para Logico");
     }
 
     vmHandle(vm);
@@ -347,23 +361,44 @@ void vmDiv(VMInstruction* instr, VM* vm)
     final switch (left.type)
     {
         case CGDTypeKind.Inteiro:
-            assert(right.i != 0, "divisao por zero");
-            vm.push(CGDValue.inteiro(left.i / right.i));
+            enforce(right.i != 0, "Divisão por zero em tempo de compilação.");
+            enforce(left.i != long.min || right.i != -1, "Overflow na divisão em tempo de compilação.");
+            vm.push(left.i % right.i == 0 ? CGDValue.inteiro(left.i / right.i)
+                : CGDValue.real_(cast(double)left.i / right.i));
             break;
 
         case CGDTypeKind.Real:
-            // divisao por zero em float gera inf/nan, que e valido em ponto
-            // flutuante — nao explode aqui de proposito.
+            enforce(right.d != 0, "Divisão por zero em tempo de compilação.");
             vm.push(CGDValue.real_(left.d / right.d));
             break;
 
         case CGDTypeKind.Texto:
-            assert(0, "operador / nao suportado para Texto");
+            throw new Exception("operador / nao suportado para Texto");
 
         case CGDTypeKind.Logico:
-            assert(0, "operador / nao suportado para Logico");
+            throw new Exception("operador / nao suportado para Logico");
     }
 
+    vmHandle(vm);
+}
+
+void vmIDiv(VMInstruction* instr, VM* vm)
+{
+    auto right = vm.pop(), left = vm.pop();
+    promote(left, right);
+    if (left.type == CGDTypeKind.Inteiro)
+    {
+        enforce(right.i != 0 && (left.i != long.min || right.i != -1), "Divisão inteira inválida em tempo de compilação.");
+        vm.push(CGDValue.inteiro(left.i / right.i));
+    }
+    else if (left.type == CGDTypeKind.Real)
+    {
+        auto result = left.d / right.d;
+        enforce(right.d != 0 && result >= cast(double)long.min && result < 9223372036854775808.0,
+            "Divisão inteira fora do intervalo em tempo de compilação.");
+        vm.push(CGDValue.inteiro(cast(long)result));
+    }
+    else throw new Exception("Divisão inteira exige números.");
     vmHandle(vm);
 }
 
@@ -376,8 +411,8 @@ void vmMod(VMInstruction* instr, VM* vm)
     final switch (left.type)
     {
         case CGDTypeKind.Inteiro:
-            assert(right.i != 0, "modulo por zero");
-            vm.push(CGDValue.inteiro(left.i % right.i));
+            enforce(right.i != 0, "Módulo por zero em tempo de compilação.");
+            vm.push(CGDValue.inteiro(left.i == long.min && right.i == -1 ? 0 : left.i % right.i));
             break;
 
         case CGDTypeKind.Real:
@@ -385,10 +420,10 @@ void vmMod(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            assert(0, "operador % nao suportado para Texto");
+            throw new Exception("operador % nao suportado para Texto");
 
         case CGDTypeKind.Logico:
-            assert(0, "operador % nao suportado para Logico");
+            throw new Exception("operador % nao suportado para Logico");
     }
 
     vmHandle(vm);
@@ -411,10 +446,10 @@ void vmLt(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            assert(0, "operador < nao suportado para Texto");
+            throw new Exception("operador < nao suportado para Texto");
 
         case CGDTypeKind.Logico:
-            assert(0, "operador < nao suportado para Logico");
+            throw new Exception("operador < nao suportado para Logico");
     }
 
     vmHandle(vm);
@@ -437,10 +472,10 @@ void vmLe(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            assert(0, "operador <= nao suportado para Texto");
+            throw new Exception("operador <= nao suportado para Texto");
 
         case CGDTypeKind.Logico:
-            assert(0, "operador <= nao suportado para Logico");
+            throw new Exception("operador <= nao suportado para Logico");
     }
 
     vmHandle(vm);
@@ -463,10 +498,10 @@ void vmGt(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            assert(0, "operador > nao suportado para Texto");
+            throw new Exception("operador > nao suportado para Texto");
 
         case CGDTypeKind.Logico:
-            assert(0, "operador > nao suportado para Logico");
+            throw new Exception("operador > nao suportado para Logico");
     }
 
     vmHandle(vm);
@@ -489,10 +524,10 @@ void vmGe(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            assert(0, "operador >= nao suportado para Texto");
+            throw new Exception("operador >= nao suportado para Texto");
 
         case CGDTypeKind.Logico:
-            assert(0, "operador >= nao suportado para Logico");
+            throw new Exception("operador >= nao suportado para Logico");
     }
 
     vmHandle(vm);
@@ -597,7 +632,7 @@ void vmShl(VMInstruction* instr, VM* vm)
 
     long l = coerceToInteiro(left);
     long r = coerceToInteiro(right);
-    assert(r >= 0, "shift negativo indefinido");
+    enforce(r >= 0 && r < 64, "Deslocamento deve estar entre 0 e 63.");
 
     vm.push(CGDValue.inteiro(l << r));
     vmHandle(vm);
@@ -610,7 +645,7 @@ void vmShr(VMInstruction* instr, VM* vm)
 
     long l = coerceToInteiro(left);
     long r = coerceToInteiro(right);
-    assert(r >= 0, "shift negativo indefinido");
+    enforce(r >= 0 && r < 64, "Deslocamento deve estar entre 0 e 63.");
 
     vm.push(CGDValue.inteiro(l >> r));
     vmHandle(vm);
@@ -623,6 +658,7 @@ void vmNeg(VMInstruction* instr, VM* vm)
     final switch (v.type)
     {
         case CGDTypeKind.Inteiro:
+            enforce(v.i != long.min, "Overflow na negação em tempo de compilação.");
             vm.push(CGDValue.inteiro(-v.i));
             break;
 
@@ -631,10 +667,10 @@ void vmNeg(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            assert(0, "operador unario - nao suportado para Texto");
+            throw new Exception("operador unario - nao suportado para Texto");
 
         case CGDTypeKind.Logico:
-            assert(0, "operador unario - nao suportado para Logico");
+            throw new Exception("operador unario - nao suportado para Logico");
     }
 
     vmHandle(vm);
@@ -671,14 +707,22 @@ void vmBNot(VMInstruction* instr, VM* vm)
 
 void vmHalt(VMInstruction* instr, VM* vm)
 {
-    // fim da VM
+    vm.halted = true;
 }
 
 pragma(inline, true)
 void vmHandle(VM* vm)
 {
-    VMInstruction instr = vm.instructions[vm.pc++];
-    handlers[instr.opCode](&instr, vm);
+    if (vm.executing) return;
+    vm.executing = true;
+    scope(exit) vm.executing = false;
+    while (!vm.halted)
+    {
+        vm.ctfe.consumeInstruction();
+        enforce(vm.pc < vm.instructions.length, "Bytecode inválido: fim inesperado da função.");
+        VMInstruction instr = vm.instructions[vm.pc++];
+        handlers[instr.opCode](&instr, vm);
+    }
 }
 
 pragma(inline, true)

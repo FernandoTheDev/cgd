@@ -47,7 +47,7 @@ final class CTFECompile
                 compile((cast(ReturnStmt) node).val);
                 return emit(VMInstruction.instr(VMOpCode.Ret));
 
-            case NodeKind.VarDecl:  
+            case NodeKind.VarDecl:
                 VarDecl var = cast(VarDecl) node;
                 dstring name = var.name;
                 fnVars[name] = fnVars.length;
@@ -71,6 +71,7 @@ final class CTFECompile
                     TokenKind.Star:     VMOpCode.Mul,
                     TokenKind.Plus:     VMOpCode.Add,
                     TokenKind.Slash:    VMOpCode.Div,
+                    TokenKind.IntDiv: VMOpCode.IDiv,
                     TokenKind.Minus:    VMOpCode.Sub,
                     TokenKind.Modulo:   VMOpCode.Mod,
 
@@ -109,7 +110,7 @@ final class CTFECompile
 
                 if (size_t* param = id.value in fnArgs)
                     return emit(VMInstruction.instr(VMOpCode.LoadParam, *param));
-                
+
                 return emit(VMInstruction.instr(VMOpCode.Load, fnVars[id.value]));
 
             case NodeKind.CallExpr:
@@ -171,7 +172,7 @@ final class CTFECompile
 
             case NodeKind.AssignStmt:
                 AssignStmt ass = cast(AssignStmt) node;
-                
+
                 dstring name = (cast(Identifier) ass.left).value;
                 compile(ass.value);
 
@@ -215,7 +216,7 @@ final class CTFECompile
 
         if (value.type == CGDTypeKind.Texto)
             return new StringLit(value.s, Position.init);
-        
+
         // TODO: dar erro
         return new IntLit(-1, Position.init);
     }
@@ -235,7 +236,7 @@ final class CTFECompile
         labelOrder = null;
         label = null;
 
-        foreach (size_t i, FnArg arg; fn.args) 
+        foreach (size_t i, FnArg arg; fn.args)
             fnArgs[arg.name] = i;
 
         enterLabel(newLabel());
@@ -259,8 +260,8 @@ final class CTFECompile
         foreach (size_t i, ref VMInstruction instr; instrs)
         {
             if (
-                instr.opCode == VMOpCode.Jnz 
-                || instr.opCode == VMOpCode.Jz 
+                instr.opCode == VMOpCode.Jnz
+                || instr.opCode == VMOpCode.Jz
                 || instr.opCode == VMOpCode.Jmp
             )
             {

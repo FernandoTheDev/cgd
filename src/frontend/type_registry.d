@@ -11,6 +11,20 @@ public:
     this()
     {
         // inicializa com os tipos builtin da linguagem
+        types["dicionario"] = new TypeSemaBuiltin(TypeSemaBase.Map);
+        types["dicionário"] = types["dicionario"];
+        types["tupla"] = new TypeSemaBuiltin(TypeSemaBase.Tuple);
+        types["funcao"] = new TypeSemaBuiltin(TypeSemaBase.Function);
+        types["função"] = types["funcao"];
+        types["Objeto"]=new TypeSemaBuiltin(TypeSemaBase.Any);
+        types["Excecao"]=new TypeSemaBuiltin(TypeSemaBase.Any);
+        types["decimal"]=new TypeSemaBuiltin(TypeSemaBase.Double);
+        types["longo"]=new TypeSemaBuiltin(TypeSemaBase.Int);
+        types["nulo"]=new TypeSemaBuiltin(TypeSemaBase.Any);
+        types["binário"]=new TypeSemaBuiltin(TypeSemaBase.Bool);
+        types["vazio"] = new TypeSemaBuiltin(TypeSemaBase.Void);
+        types["número"] = new TypeSemaBuiltin(TypeSemaBase.Int);
+        types["lógico"] = new TypeSemaBuiltin(TypeSemaBase.Bool);
         types["texto"] = new TypeSemaBuiltin(TypeSemaBase.String);
 
         types["inteiro"] = new TypeSemaBuiltin(TypeSemaBase.Int);

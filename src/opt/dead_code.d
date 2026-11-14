@@ -24,16 +24,16 @@ private:
         foreach (Node child; body)
         {
             Node res = remove(child);
-            
-            if (res is null) 
+
+            if (res is null)
                 continue;
-            
-            if (ret) 
+
+            if (ret && res.kind!=NodeKind.FnDecl && res.kind!=NodeKind.ClassDecl)
                 continue;
-            
+
             if (res.kind == NodeKind.ReturnStmt)
                 ret = true;
-            
+
             newBody ~= res;
         }
         return newBody;
@@ -53,25 +53,18 @@ private:
             case NodeKind.FnDecl:
                 FnDecl fn = cast(FnDecl) node;
                 fn.body = remove(fn.body);
-                return context.get(fn.fn).uses > 0 ? node : null;
+                return node;
 
             case NodeKind.VarDecl:
-                Symbol* sym = context.get((cast(VarDecl) node).name);
-                if (sym is null) return node;
-                long uses = sym.uses;
-                // writefln("var: %s = %d", (cast(SymbolVar*)sym).node.name, uses);
-                return uses > 0 ? node : null;
-
             case NodeKind.AssignStmt:
-                AssignStmt assign = cast(AssignStmt) node;
-                return context.get((cast(Identifier)assign.left).value).uses > 0 ? node : null;
+                // Inicializadores e escritas podem ter efeitos, validar ou lançar erros.
+                return node;
 
             case NodeKind.IfStmt:
                 IfStmt ifstmt = cast(IfStmt) node;
                 ifstmt.body = remove(ifstmt.body);
-                
-                if (ifstmt.expr is null)
-                    return new BlockStmt(ifstmt.body, ifstmt.pos);
+
+                if (ifstmt.expr is null) return node;
 
                 if (ifstmt._else !is null)
                     ifstmt._else = cast(IfStmt) remove(cast(Node) ifstmt._else);
@@ -86,7 +79,7 @@ private:
                         return cast(Node) ifstmt._else;
                     }
                 }
-                
+
                 return node;
 
             default:

@@ -40,6 +40,7 @@ class SymbolFn : Symbol
         this.kind = SymbolKind.Fn;
         this.node = node;
         this.isRuntime = isRuntime;
+        if (isRuntime) node.builtinName = node.fn;
     }
 }
 

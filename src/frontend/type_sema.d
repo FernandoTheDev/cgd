@@ -9,6 +9,9 @@ enum TypeSemaBase : dstring
     String = "texto",
     Void = "vazio",
     Any = "qualquer",
+    Function = "funcao",
+    Map = "dicionario",
+    Tuple = "tupla",
 }
 
 enum TypeSemaKind : ubyte
@@ -30,7 +33,7 @@ abstract class TypeSema
     bool isNumeric();
     bool isBool();
     bool isAny() => false;
-    
+
     bool isComp(TypeSema type);
     TypeSema promote(TypeSema other );
 
@@ -80,18 +83,18 @@ class TypeSemaBuiltin : TypeSema
     {
         TypeSemaBuiltin t = cast(TypeSemaBuiltin) other;
         if (t is null) return this; // tipos incompatíveis, sem promoção
-        
+
         // Double domina Int
         if (base == TypeSemaBase.Double || t.base == TypeSemaBase.Double)
             return new TypeSemaBuiltin(TypeSemaBase.Double);
 
         if (base == TypeSemaBase.String || t.base == TypeSemaBase.String)
             return new TypeSemaBuiltin(TypeSemaBase.String);
-        
+
         // Any domina tudo
         if (base == TypeSemaBase.Any || t.base == TypeSemaBase.Any)
             return new TypeSemaBuiltin(TypeSemaBase.Any);
-        
+
         // mesmo tipo, sem promoção necessária
         return this;
     }
@@ -155,4 +158,22 @@ class TypeSemaArray : TypeSema
     {
         return base.toStr() ~ "[]";
     }
+}
+
+class TypeSemaClass : TypeSema
+{
+    import frontend.parser.ast : ClassDecl;
+    ClassDecl declaration;
+    this(ClassDecl declaration){kind=TypeSemaKind.Class;this.declaration=declaration;}
+    override bool isNumeric(){return false;}
+    override bool isBool(){return false;}
+    override bool isComp(TypeSema other)
+    {
+        if(other.isAny())return true;
+        if(auto c=cast(TypeSemaClass)other)
+            for(auto node=c.declaration;node !is null;node=node.superClass)if(node is declaration)return true;
+        return false;
+    }
+    override TypeSema promote(TypeSema other){return this;}
+    override dstring toStr(){return declaration.name;}
 }

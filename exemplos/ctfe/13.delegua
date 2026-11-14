@@ -3,7 +3,7 @@
 
 //>puro
 funcao eh_par(n) {
-    retorne !(n & 1)
+    retorne (n & 1) == 0
 }
 
 //>puro
@@ -108,7 +108,7 @@ funcao soma_digitos(n) {
     var atual = n
     enquanto atual > 0 {
         soma = soma + (atual % 10)
-        atual = atual / 10
+        atual = atual \ 10
     }
     retorne soma
 }
@@ -120,7 +120,7 @@ funcao eh_palindromo_numerico(n) {
     var atual = n
     enquanto atual > 0 {
         invertido = (invertido * 10) + (atual % 10)
-        atual = atual / 10
+        atual = atual \ 10
     }
     retorne original == invertido
 }

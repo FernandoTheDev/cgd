@@ -10,7 +10,7 @@ class ParseType
 {
 private:
     Parser p;
-    
+
 public:
     this(Parser p)
     {
@@ -22,19 +22,32 @@ public:
         Token tk = p.advance();
         switch (tk.kind) with (TokenKind)
         {
-            case Identifier:
-                return new TypeExprNamed(tk.value.s, tk.pos);
+        case LParen:
+            TypeExpr[] elements;
+            do
+            {
+                elements ~= parse();
+            }
+            while (p.match(TokenKind.Comma));
+            p.consume(TokenKind.RParen, "Esperado ')' após tipos da tupla.");
+            return new TypeExprTuple(elements, tk.pos);
+        case Null:
+            return new TypeExprNamed("nulo", tk.pos);
+        case Fn:
+            return new TypeExprNamed("funcao", tk.pos);
+        case Identifier:
+            return new TypeExprNamed(tk.value.s, tk.pos);
 
-            default:
-                p.err.error(tk.pos, "Tipo inválido.");
-                return TypeExpr.init;
+        default:
+            p.err.error(tk.pos, "Tipo inválido.");
+            return TypeExpr.init;
         }
     }
 
     TypeExpr parse()
     {
         TypeExpr type = parsePrimary();
-        if (p.match(TokenKind.LBracket))
+        while (p.match(TokenKind.LBracket))
         {
             type = new TypeExprArray(type, type.pos);
             p.consume(TokenKind.RBracket, "Esperado ']' após o tipo.");

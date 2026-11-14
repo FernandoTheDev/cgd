@@ -19,6 +19,7 @@ import opt.dead_code;
 import driver.args;
 import driver.time;
 import frontend;
+import frontend.modules;
 import backend;
 import errors;
 import utils;
@@ -26,7 +27,13 @@ import ctfe;
 
 
 pragma(inline, true)
-bool which(string c) => executeShell(format("which %s", c)).status == 0;
+bool which(string c)
+{
+    if (c.canFind('/')) return exists(c) && isFile(c);
+    foreach (dir; environment.get("PATH").split(":"))
+        if (exists(buildPath(dir, c)) && isFile(buildPath(dir, c))) return true;
+    return false;
+}
 
 void compile(CGDArguments args, string filename)
 {
@@ -48,7 +55,7 @@ void compile(CGDArguments args, string filename)
     timer.start("Lendo arquivo");
     string source = readText(filename);
     timer.show();
-    
+
     Diagnostics diag = new Diagnostics;
     Program program;
 
@@ -64,18 +71,18 @@ void compile(CGDArguments args, string filename)
         timer.start("Fazendo a geração da AST");
         program = parser.parse();
         timer.show();
-        
+
         verificar_erros(diag);
     } catch (Exception e) {
         verificar_erros(diag);
-        writeln("Ocorreu um erro interno no compilador");
-        writeln(e);
-        return;
+        cgd_erro("Falha no frontend: " ~ e.msg);
     }
 
+    new ModuleLoader(diag).load(program,filename);
+    verificar_erros(diag);
     Context context = new Context;
     TypeRegistry registry = new TypeRegistry;
-    TypeResolver resolver = new TypeResolver(registry);
+    TypeResolver resolver = new TypeResolver(registry, diag);
 
     Sema1 sema1 = new Sema1(context, diag);
     timer.start("Semantica 1");
@@ -136,36 +143,34 @@ void compile(CGDArguments args, string filename)
     //                                                          .delegua
     string output = args.output == "" ? baseName(filename)[0 .. $ - 8] : args.output;
     string outc = output ~ ".c";
-    
+
     timer.start("Escrevendo o arquivo '.c'");
     write(outc, cSource);
     timer.show();
 
     string cc = environment.get("CC");
-    string[] cCompilers = ["tcc", "gcc", "clang"].filter!(c => which(c)).array;
+    string[] cCompilers = ["clang", "gcc", "tcc"].filter!(c => which(c)).array;
 
     if (cc == "" && cCompilers.length > 0)
         cc = cCompilers[0];
     else if (cc == "")
     {
-        writefln("Não foi possível encontrar um compilador C. Tentativas: tcc, gcc e clang");
-        return;
+        cgd_erro("Não foi possível encontrar um compilador C. Tentativas: tcc, gcc e clang");
     }
 
-    string command = format("%s %s -o %s %s lib/libdelegua_rt.o $(pkg-config --libs bdw-gc) -rdynamic",
-        cc,
-        outc,
-        output,
-        args.opt ? "-O2" : "-g -O0"
-    );
-
-    if (args.showDebug)
-        writefln("Command: %s", command);
-
+    string runtimeRoot = dirName(thisExePath());
+    string runtimeObject = buildPath(runtimeRoot, "lib", "libdelegua_rt.o");
+    if (!exists(runtimeObject)) cgd_erro("Runtime ausente. Execute ./build-runtime antes de compilar.");
+    auto pkg = execute(["pkg-config", "--cflags", "--libs", "bdw-gc"]);
+    if (pkg.status) cgd_erro("Não foi possível localizar bdw-gc: " ~ pkg.output);
+    string[] command = [cc, "-std=c99", "-Werror=implicit-function-declaration", "-Werror=return-type", "-Werror=incompatible-pointer-types",
+        "-I", runtimeRoot, outc, "-o", output, args.opt ? "-O2" : "-O0", runtimeObject];
+    command ~= pkg.output.split();
+    command ~= ["-rdynamic", "-ldl", "-lm"];
+    if (args.showDebug) writeln(command);
     timer.start("Compilando");
-    auto exec = executeShell(command);
+    auto exec = execute(command);
     timer.show();
-
-    // if (exec.status != 0)
+    if (exec.status) cgd_erro("O compilador C falhou:\n" ~ exec.output);
     wrt(exec.output);
 }

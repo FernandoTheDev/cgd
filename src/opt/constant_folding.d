@@ -21,42 +21,47 @@ private:
     Node getConstant(Node n)
     {
         // writeln("get: ", n);
-        if (n is null) goto end;
+        if (n is null)
+            goto end;
 
         switch (n.kind)
         {
-            case NodeKind.Identifier:
-                Identifier id = as!Identifier(n);
-                Symbol* sym = context.get(id.value);
+        case NodeKind.Identifier:
+            Identifier id = as!Identifier(n);
+            Symbol* sym = context.get(id.value);
 
-                // writeln(id.value);
-                // writeln(sym);
+            // writeln(id.value);
+            // writeln(sym);
 
-                if (sym is null) 
-                    goto end;
+            if (sym is null)
+                goto end;
 
-                SymbolVar symv = cast(SymbolVar)*sym;
-                if (symv is null) 
-                    goto end;
+            SymbolVar symv = cast(SymbolVar)*sym;
+            if (symv is null || !symv.isConstant)
+                goto end;
 
-                sym.uses--;
-                return getConstant(symv.node.value);
+            sym.uses--;
+            return getConstant(symv.node.value);
 
             // constantes
-            case NodeKind.IntLit:
-            case NodeKind.DoubleLit:
-            case NodeKind.BoolLit:
-            case NodeKind.StringLit:
-                return n;
+        case NodeKind.IntLit:
+        case NodeKind.DoubleLit:
+        case NodeKind.BoolLit:
+        case NodeKind.StringLit:
+            return n;
 
-            case NodeKind.BinaryExpr:
-                return foldBinary(as!BinaryExpr(n));
+        case NodeKind.BinaryExpr:
+            return foldBinary(as!BinaryExpr(n));
 
-            case NodeKind.CallExpr:
-                return opt(n);
+        case NodeKind.CallExpr:
+            Node result = opt(n);
+            if (result.kind == NodeKind.IntLit || result.kind == NodeKind.DoubleLit
+                || result.kind == NodeKind.StringLit || result.kind == NodeKind.BoolLit)
+                return result;
+            return null;
 
-            default:
-                break;
+        default:
+            break;
         }
 
     end:
@@ -84,52 +89,118 @@ private:
         {
             static if (is(T == IntLit))
             {
-                if (op == "/" && (as!IntLit(r)).value == 0) 
-                    return null;
-            }
-            else static if (is(T == DoubleLit))
-                if (op == "/" && (as!DoubleLit(r)).value == 0.0) 
-                    return null;
+                import std.bigint : BigInt;
+                import std.conv : to;
 
-            switch (op)
-            {
-                static foreach (OP; [
-                        "+", "-", "*", "/", "<", ">", "<=", ">=", "=="
-                    ])
+                auto a = BigInt((as!IntLit(l)).value), b = BigInt((as!IntLit(r)).value);
+                BigInt value;
+                switch (op)
                 {
-                case OP:
-                        return new T(
-                            mixin("(as!T(l)).value " ~ OP ~ " (as!T(r)).value"),
-                            expr.pos
-                        );
-                    }
+                case "+":
+                    value = a + b;
+                    break;
+                case "-":
+                    value = a - b;
+                    break;
+                case "*":
+                    value = a * b;
+                    break;
+                case "/":
+                    if (b == 0 || (a == BigInt(long.min) && b == -1))
+                        return null;
+                    if (a % b != 0)
+                        return new DoubleLit(cast(double)(as!IntLit(l))
+                                .value / (as!IntLit(r)).value, expr.pos);
+                    value = a / b;
+                    break;
+                case "<":
+                    return new BoolLit(a < b, expr.pos);
+                case ">":
+                    return new BoolLit(a > b, expr.pos);
+                case "<=":
+                    return new BoolLit(a <= b, expr.pos);
+                case ">=":
+                    return new BoolLit(a >= b, expr.pos);
+                case "==":
+                    return new BoolLit(a == b, expr.pos);
                 default:
                     return null;
+                }
+                if (value < BigInt(long.min) || value > BigInt(long.max))
+                    return null;
+                return new IntLit(value.toLong(), expr.pos);
+            }
+            else
+            {
+                double a = (as!DoubleLit(l)).value, b = (as!DoubleLit(r)).value;
+                switch (op)
+                {
+                case "+":
+                    return new DoubleLit(a + b, expr.pos);
+                case "-":
+                    return new DoubleLit(a - b, expr.pos);
+                case "*":
+                    return new DoubleLit(a * b, expr.pos);
+                case "/":
+                    return b == 0 ? null : new DoubleLit(a / b, expr.pos);
+                case "<":
+                    return new BoolLit(a < b, expr.pos);
+                case ">":
+                    return new BoolLit(a > b, expr.pos);
+                case "<=":
+                    return new BoolLit(a <= b, expr.pos);
+                case ">=":
+                    return new BoolLit(a >= b, expr.pos);
+                case "==":
+                    return new BoolLit(a == b, expr.pos);
+                default:
+                    return null;
+                }
             }
         }
 
         string op;
         switch (expr.op) with (TokenKind)
         {
-            case Plus:    op = "+";  break;
-            case Minus:   op = "-";  break;
-            case Star:    op = "*";  break;
-            case Slash:   op = "/";  break;
-            case LThan:   op = "<";  break;
-            case GThan:   op = ">";  break;
-            case LEquals: op = "<="; break;
-            case GEquals: op = ">="; break;
-            case EEquals: op = "=="; break;
-            default:
-                return null;
+        case Plus:
+            op = "+";
+            break;
+        case Minus:
+            op = "-";
+            break;
+        case Star:
+            op = "*";
+            break;
+        case Slash:
+            op = "/";
+            break;
+        case LThan:
+            op = "<";
+            break;
+        case GThan:
+            op = ">";
+            break;
+        case LEquals:
+            op = "<=";
+            break;
+        case GEquals:
+            op = ">=";
+            break;
+        case EEquals:
+            op = "==";
+            break;
+        default:
+            return null;
         }
 
         if (l.kind == NodeKind.StringLit && r.kind == NodeKind.StringLit)
         {
             dstring s1 = (cast(StringLit) l).value;
             dstring s2 = (cast(StringLit) r).value;
-            if (op == "+")  return new StringLit(s1 ~ s2, l.pos);
-            if (op == "==") return new BoolLit(s1 == s2, l.pos);
+            if (op == "+")
+                return new StringLit(s1 ~ s2, l.pos);
+            if (op == "==")
+                return new BoolLit(s1 == s2, l.pos);
         }
 
         if (l.kind == NodeKind.IntLit)
@@ -143,130 +214,127 @@ private:
 
     Node opt(Node node)
     {
-        if (node is null) return node;
+        if (node is null)
+            return node;
 
         switch (node.kind)
         {
-            case NodeKind.Program:
-                foreach (ref Node child; (as!Program(node)).body)
+        case NodeKind.Program:
+            foreach (ref Node child; (as!Program(node)).body)
+                child = opt(child);
+            return node;
+
+        case NodeKind.FnDecl:
+            foreach (ref Node child; (as!FnDecl(node)).body)
+                child = opt(child);
+            return node;
+
+        case NodeKind.VarDecl:
+            VarDecl var = as!VarDecl(node);
+            Node folded = getConstant(var.value);
+
+            if (folded !is null)
+            {
+                var.value = folded;
+                var.type_sema = folded.type_sema;
+            }
+
+            return node;
+
+        case NodeKind.ReturnStmt:
+            ReturnStmt ret = as!ReturnStmt(node);
+
+            Node folded = getConstant(ret.val);
+            if (folded !is null)
+                ret.val = folded;
+
+            return node;
+
+        case NodeKind.CallExpr:
+            CallExpr call = as!CallExpr(node);
+
+            auto id = cast(Identifier) call.fn;
+            dstring name = id is null ? ""d : id.value;
+            bool allArgsIsFromComptime = true;
+
+            foreach (ref Node child; call.args)
+            {
+                Node fold = getConstant(child);
+                if (fold !is null)
+                    child = fold;
+                else
+                {
                     child = opt(child);
-                return node;
-
-            case NodeKind.FnDecl:
-                foreach (ref Node child; (as!FnDecl(node)).body)
-                    child = opt(child);
-                return node;
-
-            case NodeKind.VarDecl:
-                VarDecl var = as!VarDecl(node);
-                Node folded = getConstant(var.value);
-                
-                if (folded !is null)
-                {
-                    var.value = folded;
-                    var.type_sema = folded.type_sema;
+                    allArgsIsFromComptime = false;
                 }
-                
-                return node;
+            }
 
-            case NodeKind.ReturnStmt:
-                ReturnStmt ret = as!ReturnStmt(node);
-                
-                Node folded = getConstant(ret.val);
-                if (folded !is null)
-                    ret.val = folded;
-                
-                return node;
+            // writeln(name, " ", allArgsIsFromComptime);
+            // writeln(allArgsIsFromComptime);
+            // writeln(ctfe.functions);
 
-            case NodeKind.CallExpr:
-                CallExpr call = as!CallExpr(node);
-
-                dstring name = (cast(Identifier) call.fn).value;
-                bool allArgsIsFromComptime = true;
-                
-                foreach (ref Node child; call.args)
-                {
-                    Node fold = getConstant(child);
-                    if (fold !is null)
-                        child = fold;
-                    else
-                    {
-                        child = opt(child);
-                        allArgsIsFromComptime = false;
-                    }
-                }
-
-                // writeln(name, " ", allArgsIsFromComptime);
-                // writeln(allArgsIsFromComptime);
-                // writeln(ctfe.functions);
-
-                if (allArgsIsFromComptime && name in ctfe.functions)
-                {
-                    CGDValue[] params = call.args.map!(arg => CTFECompile.nodeToCgdValue(arg)).array;
+            if (allArgsIsFromComptime && name in ctfe.functions)
+            {
+                CGDValue[] params = call.args.map!(arg => CTFECompile.nodeToCgdValue(arg)).array;
+                try
                     node = ctfe.call(name, params);
+                catch (CTFELimitException)
+                    return node; // Preserva a chamada para execução nativa.
 
-                    Symbol* sym = context.get(name);
-                    sym.uses--;
-                }
-                
-                return node;
+                Symbol* sym = context.get(name);
+                sym.uses--;
+            }
 
-            case NodeKind.IfStmt:
-                IfStmt ifs = as!IfStmt(node);
-                
-                Node constant = getConstant(ifs.expr);
-                if (constant)
-                {
-                    ifs.opt = true;
-                    ifs.expr = constant;
-                }
-                
-                foreach (ref Node child; ifs.body)
-                    child = opt(child);
-                
-                if (ifs._else !is null)
-                    ifs._else = cast(IfStmt) opt(ifs._else);
-                
-                return node;
+            return node;
 
-            case NodeKind.AssignStmt:
-                AssignStmt assign = as!AssignStmt(node);
-                Node folded = getConstant(assign.value);
-                
-                if (folded !is null)
-                {
-                    assign.value = folded;
-                    assign.type_sema = folded.type_sema;
+        case NodeKind.IfStmt:
+            IfStmt ifs = as!IfStmt(node);
 
-                    dstring name = as!Identifier(assign.left).value;
-                    Symbol* sym = context.get(name);
-                    
-                    if (sym)
-                    {
-                        SymbolVar* symv = cast(SymbolVar*) sym;
-                        symv.node.value = folded;
-                    }
-                }
-                
-                return node;
+            Node constant = getConstant(ifs.expr);
+            if (constant)
+            {
+                ifs.opt = true;
+                ifs.expr = constant;
+            }
 
-            case NodeKind.WhileStmt:
-                /* TODO:
+            foreach (ref Node child; ifs.body)
+                child = opt(child);
+
+            if (ifs._else !is null)
+                ifs._else = cast(IfStmt) opt(ifs._else);
+
+            return node;
+
+        case NodeKind.AssignStmt:
+            AssignStmt assign = as!AssignStmt(node);
+            Node folded = getConstant(assign.value);
+
+            if (folded !is null)
+            {
+                assign.value = folded;
+                assign.type_sema = folded.type_sema;
+
+            }
+
+            return node;
+
+        case NodeKind.WhileStmt:
+            /* TODO:
                 ** LOOPS PRECISAM DE ANALISE PROFUNDA PRA EVITAR EFEITO COLATERAL
                 ** NÃO DÁ PRA RESOLVER AQUI ASSSIM
                 **/
 
-                // WhileStmt wstmt = as!WhileStmt(node);
-                // Node constant = getConstant(wstmt.expr);
-                // if (constant)
-                //     wstmt.expr = constant;
-                // foreach (ref Node child; wstmt.body)
-                //     child = opt(child);
+            // WhileStmt wstmt = as!WhileStmt(node);
+            // Node constant = getConstant(wstmt.expr);
+            // if (constant)
+            //     wstmt.expr = constant;
+            // foreach (ref Node child; wstmt.body)
+            //     child = opt(child);
 
-                return node;
+            return node;
 
-            default:
-                return node;
+        default:
+            return node;
         }
     }
 

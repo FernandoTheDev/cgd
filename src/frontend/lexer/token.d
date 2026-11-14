@@ -16,6 +16,14 @@ enum TokenKind : ubyte
     Else,
     While,
     For,
+    At,
+    Question, Spread, Switch, Case, Default, Assert,
+    Import,
+    Try, Catch, Finally, Fail,
+    Class, Extends, This, Super, Public, Private, Protected,
+    Each,
+    Do, Break, Continue, And, Or, Coalesce, In, Pow, IntDiv,
+    PlusAssign, MinusAssign, MulAssign, DivAssign, ModAssign,
     Type,
     Of,
 
@@ -127,6 +135,7 @@ class Position
 
 class Token
 {
+    size_t[] escapedInterpolation;
     TokenKind kind;
     TokenRaw value;
     Position pos;

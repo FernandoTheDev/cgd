@@ -65,7 +65,7 @@ private:
 
 public:
     size_t cursor;
-    
+
     void push()
     {
         scopes ~= new Scope;
@@ -113,8 +113,22 @@ public:
             if (i < limit) break;
             if (auto sym = sc.get(name)) return sym;
         }
+        // Funções globais não precisam capturar o ambiente externo.
+        foreach_reverse (sc; scopes[0 .. limit])
+            if (auto sym = sc.get(name)) return sym.isFn()?sym:null;
         return null;
     }
+
+    bool requiresCapture(dstring name)
+    {
+        if (!functionBoundaries.length) return false;
+        size_t limit = functionBoundaries[$ - 1];
+        foreach_reverse (sc; scopes[0 .. limit])
+            if (auto sym = sc.get(name)) return !sym.isFn();
+        return false;
+    }
+
+    Symbol* getLocal(dstring name) { return scopes[cursor].get(name); }
 
     bool set(dstring name, Symbol sym)
     {

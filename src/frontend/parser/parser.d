@@ -15,8 +15,10 @@ private:
 
 public:
     ubyte flags;
+    size_t sequenceId;
+    dstring hiddenName() { import std.conv : to; return "#seq_"d ~ (sequenceId++).to!dstring; }
     Diagnostics err;
-    
+
     ParseType parseType;
     ParseExpr parseExpr;
     ParseStmt parseStmt;
@@ -38,7 +40,12 @@ public:
 
     void checkIsAtEnd(uint n = 0)
     {
-        enforce(!isAtEnd(n), "Source out of bounds in parser.");
+        if (isAtEnd(n))
+        {
+            auto pos = tokens.length ? tokens[$ - 1].pos : null;
+            err.error(pos, "Fim inesperado do arquivo; verifique delimitadores e expressões incompletas.");
+            throw new Exception("Fim inesperado do arquivo.");
+        }
     }
 
     Token peek()
@@ -63,10 +70,12 @@ public:
         return false;
     }
 
+    bool checkNext(TokenKind kind,uint distance=1)
+    { return !isAtEnd(distance) && tokens[offset+distance].kind==kind; }
+
     bool check(TokenKind kind)
     {
-        checkIsAtEnd();
-        return tokens[offset].kind == kind;
+        return !isAtEnd() && tokens[offset].kind == kind;
     }
 
     Token consume(TokenKind kind, string message)
@@ -77,11 +86,25 @@ public:
         return tk;
     }
 
+    Token consumeName(string message)
+    {
+        auto token=advance();
+        if((token.kind==TokenKind.Identifier || token.kind<=TokenKind.Of) && token.value.s.length)
+            return new Token(TokenKind.Identifier,token.value,token.pos);
+        err.error(token.pos,message);
+        return new Token(TokenKind.Identifier,TokenRaw._s("#invalid"),token.pos);
+    }
+
     bool isStmt()
     {
         switch (peek().kind) with (TokenKind)
         {
+            case Switch: case Assert:
+            case Try: case Fail:
             case For:
+            case Do:
+            case Break:
+            case Continue:
             case If:
             case While:
             case Return:
@@ -95,6 +118,7 @@ public:
     {
         switch (peek().kind) with (TokenKind)
         {
+            case Class:
             case Var:
             case Const:
             case Fn:
@@ -107,7 +131,7 @@ public:
     pragma(inline, true)
     bool needSemiColon(NodeKind kind)
     {
-        switch (kind) with (NodeKind) 
+        switch (kind) with (NodeKind)
         {
             case ReturnStmt:
             case CallExpr:
@@ -126,17 +150,45 @@ public:
                 bool _ = match(TokenKind.Semicolon);
     }
 
+    Decorator[] parseDecorators()
+    {
+        Decorator[] result;
+        while(match(TokenKind.At))
+        {
+            auto name=consumeName("Esperado nome do decorador.");Decorator d;d.name=name.value.s;
+            if(match(TokenKind.LParen))
+            {
+                while(!isAtEnd()&&!check(TokenKind.RParen))
+                {
+                    auto key=consumeName("Esperado nome do argumento do decorador.");
+                    consume(TokenKind.Equals,"Esperado '=' após argumento do decorador.");
+                    d.keys ~= key.value.s;d.values ~= parseExpr.parse();
+                    if(!check(TokenKind.RParen))consume(TokenKind.Comma,"Esperado ',' após argumento.");
+                }
+                consume(TokenKind.RParen,"Esperado ')' após decorador.");
+            }
+            result ~= d;
+        }
+        return result;
+    }
+
     Node parseIntern()
     {
         Node node;
-        
+
+        if (match(TokenKind.Semicolon)) return new NaN(tokens[offset - 1].pos);
+
+        if(check(TokenKind.At))
+        {
+            auto decorators=parseDecorators();node=parseIntern();node.decorators=decorators;return node;
+        }
         if (isDecl())
             node = parseDecl.parse();
         else if (isStmt())
             node = parseStmt.parse();
         else
-            node = parseExpr.parse();
-        
+            node = parseExpr.parseStatement();
+
         checkSemiColon(node.kind);
         return node;
     }
@@ -150,8 +202,8 @@ public:
         else
         {
             consume(TokenKind.LBrace, "Esperado '{'");
-            
-            while (!check(TokenKind.RBrace))
+
+            while (!isAtEnd() && !check(TokenKind.RBrace))
             {
                 Node node = parseIntern();
                 if (node.kind == NodeKind.NaN) continue; // ignora

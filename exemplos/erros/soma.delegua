@@ -1,7 +1,7 @@
-//# 1
+//! 5
 funcao soma(x: inteiro, y: inteiro) {
     retorna x + y
 }
 
 var x = soma
-escreva(x)
+escreva(x(2, 3))

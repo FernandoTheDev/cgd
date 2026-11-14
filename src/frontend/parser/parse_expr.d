@@ -8,7 +8,7 @@ import frontend.lexer;
 import frontend;
 import ctfe;
 
-enum Precedence : ubyte 
+enum Precedence : ubyte
 {
     Low,
     Assign, // = += -= etc
@@ -23,6 +23,7 @@ enum Precedence : ubyte
     Shift, // << >>
     Plus, // + -
     Mul, // * / %
+    Power,
     Unary, // ! ~ - * &
     Call, // () [] .
     High,
@@ -32,11 +33,45 @@ class ParseExpr
 {
 private:
     Parser p;
-    
+
 public:
     this(Parser p)
     {
         this.p = p;
+    }
+
+    Node parseText(Token tk)
+    {
+        import std.algorithm : canFind;
+        import std.conv : to;
+        auto text=tk.value.s; size_t start=0,i=0; Node result;
+        while(i+1<text.length)
+        {
+            if(text[i]!='$' || text[i+1]!='{' || tk.escapedInterpolation.canFind(i)) { i++; continue; }
+            auto literal=new StringLit(text[start..i],tk.pos);
+            result=result is null?literal:new BinaryExpr(result,literal,TokenKind.Plus,tk.pos);
+            size_t begin=i+2; i=begin;uint nesting=1;dchar quote=0;bool escaped;
+            while(i<text.length && nesting)
+            {
+                auto c=text[i++];
+                if(quote){if(escaped)escaped=false;else if(c=='\\')escaped=true;else if(c==quote)quote=0;}
+                else if(c=='\''||c=='"')quote=c;
+                else if(c=='{')nesting++;
+                else if(c=='}')nesting--;
+            }
+            if(nesting){p.err.error(tk.pos,"Interpolação não foi fechada.");return new StringLit(text,tk.pos);}
+            auto tokens=new Lexer(text[begin..i-1].to!string,tk.pos.filename,p.err).tokenizer();
+            foreach(token;tokens) token.pos=tk.pos;
+            auto parser=new Parser(tokens,p.err);
+            auto value=parser.parseExpr.parse();
+            if(!parser.isAtEnd())p.err.error(tk.pos,"Conteúdo inesperado na interpolação.");
+            auto converted=new CallExpr(new Identifier("delegua_para_texto",tk.pos),[value],tk.pos);
+            converted.intrinsic=true;converted.runtimeCall=true;
+            result=new BinaryExpr(result,converted,TokenKind.Plus,tk.pos);
+            start=i;
+        }
+        auto tail=new StringLit(text[start..$],tk.pos);
+        return result is null?tail:new BinaryExpr(result,tail,TokenKind.Plus,tk.pos);
     }
 
     Node nud()
@@ -44,30 +79,74 @@ public:
         Token tk = p.advance();
         switch (tk.kind)
         {
+            case TokenKind.LBrace:
+                Node[] keys, values;
+                while (!p.isAtEnd() && !p.check(TokenKind.RBrace))
+                {
+                    if(p.match(TokenKind.Spread)){keys ~= null;values ~= new SpreadExpr(parse(),tk.pos);}
+                    else {
+                        if(p.checkNext(TokenKind.Colon)&&(p.peek().kind==TokenKind.Identifier||p.peek().kind<=TokenKind.Of)&&p.peek().value.s.length){auto name=p.advance();keys ~= new StringLit(name.value.s,name.pos);}
+                        else keys ~= parse();
+                        p.consume(TokenKind.Colon, "Esperado ':' após chave do dicionário.");
+                        values ~= parse();
+                    }
+                    if (!p.check(TokenKind.RBrace)) p.consume(TokenKind.Comma, "Esperado ',' após entrada do dicionário.");
+                }
+                auto end = p.consume(TokenKind.RBrace, "Esperado '}' após dicionário.").pos;
+                return new MapLit(keys, values, p.getPos(tk.pos, end));
+            case TokenKind.Assert: return new Identifier("assercao",tk.pos);
+            case TokenKind.Spread: return new SpreadExpr(parse(Precedence.Assign),tk.pos);
+            case TokenKind.While: return new LoopExpr(p.parseStmt.parseWhileStmt(tk.pos),tk.pos);
+            case TokenKind.For: return new LoopExpr(p.parseStmt.parseFor(tk.pos),tk.pos);
+            case TokenKind.Do:
+                auto body=p.parseBody();p.consume(TokenKind.While,"Esperado enquanto após fazer.");
+                return new LoopExpr(new DoStmt(parse(),body,tk.pos),tk.pos);
+            case TokenKind.Import:
+                p.consume(TokenKind.LParen,"Esperado '(' após importar.");
+                auto path=parse(); p.consume(TokenKind.RParen,"Esperado ')' após caminho do módulo.");
+                return new ImportExpr(path,tk.pos);
+            case TokenKind.Fail: return new Identifier("falhar",tk.pos);
+            case TokenKind.This: return new Identifier("isto",tk.pos);
+            case TokenKind.Super:
+                dstring name="construtor";
+                if(p.match(TokenKind.Dot)) name=p.consume(TokenKind.Identifier,"Esperado método após super.").value.s;
+                return new SuperExpr(name,tk.pos);
+            case TokenKind.Fn:
+                auto name = new Token(TokenKind.Identifier, TokenRaw._s("anonima"), tk.pos);
+                return new FunctionExpr(cast(FnDecl)p.parseDecl.parseFnDecl(name));
+            case TokenKind.Null:
+                return new NullLit(tk.pos);
+
             case TokenKind.String:
-                return new StringLit(tk.value.s, tk.pos);
+                return parseText(tk);
 
             case TokenKind.Identifier:
                 return new Identifier(tk.value.s, tk.pos);
-            
+
             case TokenKind.Int:
                 return new IntLit(tk.value.i, tk.pos);
-            
+
             case TokenKind.Double:
                 return new DoubleLit(tk.value.d, tk.pos);
 
             case TokenKind.True:
             case TokenKind.False:
                 return new BoolLit(tk.kind == TokenKind.True, tk.pos);
-            
+
             case TokenKind.LParen:
                 Node node = parse();
+                if(p.match(TokenKind.Comma))
+                {
+                    Node[] values=[node];do{values ~= parse();}while(p.match(TokenKind.Comma));
+                    auto end=p.consume(TokenKind.RParen,"Esperado ')' após tupla.").pos;
+                    return new TupleLit(values,p.getPos(tk.pos,end));
+                }
                 p.consume(TokenKind.RParen, "Esperado um ')' após a expressão.");
                 return node;
 
             case TokenKind.Type:
                 p.consume(TokenKind.Of, "Esperado 'de' após o 'tipo'.");
-                Node val = parse();
+                Node val = parse(Precedence.Unary);
                 return new TypeOfExpr(val, p.getPos(tk.pos, val.pos));
 
             case TokenKind.Pure:
@@ -79,6 +158,17 @@ public:
                 while (!p.isAtEnd() && !p.check(TokenKind.RBracket))
                 {
                     values ~= parse();
+                    if(values.length==1 && p.match(TokenKind.For))
+                    {
+                        p.consume(TokenKind.Each,"Esperado cada na compreensão.");
+                        auto name=p.consume(TokenKind.Identifier,"Esperado variável da compreensão.");
+                        if(!p.match(TokenKind.In))p.consume(TokenKind.Of,"Esperado em/de na compreensão.");
+                        auto iterable=parse();Node condition;
+                        if(p.match(TokenKind.If))condition=parse();
+                        p.consume(TokenKind.RBracket,"Esperado ']' após compreensão.");
+                        return new Comprehension(values[0],iterable,condition,name.value.s,tk.pos);
+                    }
+                    if(values.length==1 && values[0].kind==NodeKind.TupleLit && p.check(TokenKind.RBracket)){p.advance();return values[0];}
                     if (!p.check(TokenKind.RBracket))
                         p.consume(TokenKind.Comma, "Esperado ',' após o elemento.");
                 }
@@ -93,7 +183,7 @@ public:
             case TokenKind.Bang:
                 Node expr = parse(Precedence.Unary);
                 return new UnaryExpr(expr, tk.kind, false, p.getPos(tk.pos, expr.pos));
-            
+
             default:
                 p.err.error(tk.pos, "Uma expressão é esperada.");
                 return new Identifier("null", tk.pos);
@@ -102,7 +192,7 @@ public:
 
     Node parseBinaryExpr(TokenKind op, Node left)
     {
-        Node right = parse(getPrecedence(op));
+        Node right = parse(op == TokenKind.Pow ? Precedence.Mul : getPrecedence(op));
         return new BinaryExpr(left, right, op, p.getPos(left.pos, right.pos));
     }
 
@@ -127,14 +217,23 @@ public:
 
     Node parseIndexExpr(Node value)
     {
-        Node index = parse(Precedence.Call);
-        Position end = p.consume(TokenKind.RBracket, "Esperado ']' após o indice.").pos;
-        return new IndexExpr(value, index, p.getPos(value.pos, end));
+        Node start,end,step;
+        if(!p.check(TokenKind.Colon))start=parse();
+        if(p.match(TokenKind.Colon))
+        {
+            if(!p.check(TokenKind.Colon)&&!p.check(TokenKind.RBracket))end=parse();
+            if(p.match(TokenKind.Colon)&&!p.check(TokenKind.RBracket))step=parse();
+            auto pos=p.consume(TokenKind.RBracket,"Esperado ']' após fatia.").pos;
+            return new SliceExpr(value,start,end,step,p.getPos(value.pos,pos));
+        }
+        auto pos=p.consume(TokenKind.RBracket,"Esperado ']' após índice.").pos;
+        return new IndexExpr(value,start,p.getPos(value.pos,pos));
     }
 
     Node parseMemberExpr(Node left)
     {
-        Node right = parse();
+        auto name = p.consumeName("Esperado nome de propriedade após '.'.");
+        Node right = new Identifier(name.value.s, name.pos);
         return new MemberExpr(left, right, p.getPos(left.pos, right.pos));
     }
 
@@ -143,6 +242,20 @@ public:
         Token tk = p.advance();
         switch (tk.kind) with (TokenKind)
         {
+            case Question:
+                auto yes=parse();p.consume(Colon,"Esperado ':' na expressão condicional.");
+                auto no=parse(Precedence.Assign);
+                return new ConditionalExpr(left,yes,no,p.getPos(left.pos,no.pos));
+            case Bang:
+                if ((tk.value.s == "não" || tk.value.s == "nao") && p.match(TokenKind.In))
+                {
+                    auto right = parse(Precedence.Cmp);
+                    auto membership = new BinaryExpr(left, right, TokenKind.In, p.getPos(left.pos, right.pos));
+                    return new UnaryExpr(membership, TokenKind.Bang, false, membership.pos);
+                }
+                p.err.error(tk.pos, "Operador de negação em posição inválida.");
+                return left;
+            case And: case Or: case Coalesce: case In: case Pow: case IntDiv: case NEquals:
             case Plus:
             case Minus:
             case Star:
@@ -161,7 +274,7 @@ public:
                 return parseBinaryExpr(tk.kind, left);
             case LParen:
                 return parseCallExpr(left);
-            case Equals:
+            case Equals: case PlusAssign: case MinusAssign: case MulAssign: case DivAssign: case ModAssign:
                 return parseAssignStmt(left, tk.kind);
             case LBracket:
                 return parseIndexExpr(left);
@@ -179,8 +292,15 @@ public:
     {
         switch (kind) with (TokenKind)
         {
-            case Equals:
+            case Equals: case PlusAssign: case MinusAssign: case MulAssign: case DivAssign: case ModAssign:
                 return Precedence.Assign;
+            case And: return Precedence.And;
+            case Or: return Precedence.Or;
+            case Coalesce: case Question: return Precedence.Ternary;
+            case In: return Precedence.Cmp;
+            case Pow: return Precedence.Power;
+            case IntDiv: return Precedence.Mul;
+            case NEquals: return Precedence.Eq;
             case Plus:
             case Minus:
                 return Precedence.Plus;
@@ -216,6 +336,21 @@ public:
             default:
                 return Precedence.Low;
         }
+    }
+
+    Node parseStatement()
+    {
+        auto first=parse();
+        if(!p.match(TokenKind.Comma))return first;
+        Node[] targets=[first];
+        do {targets ~= parse(Precedence.Assign);}while(p.match(TokenKind.Comma));
+        p.consume(TokenKind.Equals,"Esperado '=' na atribuição múltipla.");
+        Node[] values;do {values ~= parse();}while(p.match(TokenKind.Comma));
+        if(values.length!=targets.length){p.err.error(first.pos,"Quantidade de destinos e valores incompatível.");return new NaN(first.pos);}
+        Node[] body;dstring[] temps;
+        foreach(value;values){auto name=p.hiddenName();temps ~= name;body ~= new VarDecl(name,value,true,null,value.pos);}
+        foreach(i,target;targets)body ~= new AssignStmt(target,new Identifier(temps[i],target.pos),TokenKind.Equals,target.pos);
+        return new SequenceStmt(body,first.pos);
     }
 
     Node parse(Precedence pre = Precedence.Low)
