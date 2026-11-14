@@ -3,29 +3,20 @@
   "description": "Compilador Geral Delégua",
   "targetName": "cgd",
   "targetType": "executable",
-  "authors": [
-    "FernandoDev"
-  ],
+  "authors": ["FernandoDev"],
   "license": "Apache-2.0",
   "copyright": "Copyright © 2026, FernandoDev",
   "configurations": [
     {
       "name": "application",
-      "sourcePaths": [
-        "src"
-      ],
+      "sourcePaths": ["src"],
       "mainSourceFile": "src/main.d"
     },
     {
       "name": "unittest",
       "targetName": "cgd-unit",
-      "sourcePaths": [
-        "src",
-        "testes/unit"
-      ],
-      "excludedSourceFiles": [
-        "src/main.d"
-      ],
+      "sourcePaths": ["src", "testes/unit"],
+      "excludedSourceFiles": ["src/main.d"],
       "mainSourceFile": "testes/unit/main.d"
     }
   ]

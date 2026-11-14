@@ -27,16 +27,16 @@ string escape(string str)
             char esc = str[offset];
             switch (esc)
             {
-            case 'n':
-                buffer ~= '\n';
-                offset++;
-                continue;
-            case '\\':
-                buffer ~= '\\';
-                offset++;
-                continue;
-            default:
-                break;
+                case 'n':
+                    buffer ~= '\n';
+                    offset++;
+                    continue;
+                case '\\':
+                    buffer ~= '\\';
+                    offset++;
+                    continue;
+                default:
+                    break;
             }
         }
         buffer ~= [ch];
@@ -57,7 +57,8 @@ enum COV_RAW_DIR = "cov_raw";
 
 auto runExample(string binary, string input)
 {
-    if (!input.length) return execute([absolutePath(binary)]);
+    if (!input.length)
+        return execute([absolutePath(binary)]);
     auto process = pipeProcess([absolutePath(binary)], Redirect.stdin | Redirect.stdout | Redirect.stderrToStdout);
     process.stdin.write(input);
     process.stdin.close();
@@ -84,7 +85,7 @@ TestResult runTest(string filename, bool coverageMode)
     string directiveLine = useOptFlag ? lines.front.idup : line1;
     content.close();
 
-    bool fromCode   = directiveLine.length > 3 && directiveLine[0 .. 3] == "//#";
+    bool fromCode = directiveLine.length > 3 && directiveLine[0 .. 3] == "//#";
     bool fromOutput = directiveLine.length > 3 && directiveLine[0 .. 3] == "//!";
 
     if (!fromCode && !fromOutput)
@@ -96,7 +97,7 @@ TestResult runTest(string filename, bool coverageMode)
     // conteúdo após o prefixo "//#" ou "//!"
     string directive = directiveLine[3 .. $].strip;
 
-    string cFile   = filename ~ ".c";
+    string cFile = filename ~ ".c";
     string binFile = filename.stripExtension.baseName;
 
     // garante que não sobrou binário de uma rodada anterior antes de compilar
@@ -113,9 +114,7 @@ TestResult runTest(string filename, bool coverageMode)
         env["COVDIR"] = covDir;
     }
 
-    string compileCmd = useOptFlag
-        ? format("./cgd %s -o", filename)
-        : format("./cgd %s", filename);
+    string compileCmd = useOptFlag ? format("./cgd %s -o", filename) : format("./cgd %s", filename);
 
     auto compile = executeShell(compileCmd, env);
     bool compileFailed = compile.status != 0;
@@ -131,28 +130,27 @@ TestResult runTest(string filename, bool coverageMode)
                 expected = to!int(directive);
             catch (Exception e)
             {
-                res.ok  = false;
+                res.ok = false;
                 res.err = format("Invalid //# directive: '%s' (%s)", directive, e.msg);
                 return res;
             }
 
             res.ok = expected == compile.status;
             if (!res.ok)
-                res.err = format(
-                    "Expected compiler exit code '%d', got '%d'.\n%s",
-                    expected, compile.status, compile.output
-                );
+                res.err = format("Expected compiler exit code '%d', got '%d'.\n%s", expected,
+                        compile.status, compile.output);
             return res;
         }
 
-        res.ok  = false;
+        res.ok = false;
         res.err = "CGD compiler failed:\n" ~ compile.output;
         return res;
     }
 
     string input;
     foreach (line; readText(filename).splitLines())
-        if (line.startsWith("//? entrada:")) input = escape(line[12 .. $].strip());
+        if (line.startsWith("//? entrada:"))
+            input = escape(line[12 .. $].strip());
     auto run = runExample(binFile, input);
     int code = run.status;
     string output = run.output.strip;
@@ -166,7 +164,7 @@ TestResult runTest(string filename, bool coverageMode)
             expected = to!int(directive);
         catch (Exception e)
         {
-            res.ok  = false;
+            res.ok = false;
             res.err = format("Invalid //# directive: '%s' (%s)", directive, e.msg);
             remove_if_exists(cFile);
             remove_if_exists(binFile);
@@ -175,7 +173,7 @@ TestResult runTest(string filename, bool coverageMode)
 
         if (expected != code)
         {
-            res.ok  = false;
+            res.ok = false;
             res.err = format("Expected exit code '%d', got '%d'.", expected, code);
         }
     }
@@ -184,7 +182,7 @@ TestResult runTest(string filename, bool coverageMode)
         string expected = escape(directive).strip;
         if (output != expected)
         {
-            res.ok  = false;
+            res.ok = false;
             res.err = format("Expected output '%s', got '%s'.", expected, output);
         }
     }
@@ -218,9 +216,9 @@ string sanitizeTestName(string filename)
 
 struct ModuleCoverage
 {
-    string sourceFile;      // ex: src/frontend/lexer/lexer.d
-    long[] execCounts;      // execCounts[i] = quantas vezes a linha i executou (soma de todas as runs); -1 = linha não executável
-    string[] lines;         // texto da linha, sem o prefixo de contagem
+    string sourceFile; // ex: src/frontend/lexer/lexer.d
+    long[] execCounts; // execCounts[i] = quantas vezes a linha i executou (soma de todas as runs); -1 = linha não executável
+    string[] lines; // texto da linha, sem o prefixo de contagem
 }
 
 // Um .lst do D tem o formato:
@@ -241,7 +239,7 @@ ModuleCoverage parseLst(string path)
             continue; // linha de rodapé tipo "X.d is YY% covered" ou lixo
 
         string countPart = line[0 .. pipeIdx].strip;
-        string codePart  = pipeIdx + 1 <= line.length ? line[pipeIdx + 1 .. $] : "";
+        string codePart = pipeIdx + 1 <= line.length ? line[pipeIdx + 1 .. $] : "";
 
         long count = -1; // não executável
         if (countPart.length)
@@ -311,9 +309,7 @@ void reportCoverage()
 
     ModuleCoverage[string] merged;
 
-    auto lstFiles = dirEntries(COV_RAW_DIR, SpanMode.depth)
-        .filter!(x => x.name.endsWith(".lst"))
-        .array;
+    auto lstFiles = dirEntries(COV_RAW_DIR, SpanMode.depth).filter!(x => x.name.endsWith(".lst")).array;
 
     foreach (entry; lstFiles)
     {
@@ -367,8 +363,7 @@ int main(string[] args)
     string folder = "exemplos";
     ulong sucesso, erros, ignorados;
 
-    DirEntry[] dir = dirEntries(folder, SpanMode.depth)
-        .filter!(x => x.name.endsWith(".delegua"))
+    DirEntry[] dir = dirEntries(folder, SpanMode.depth).filter!(x => x.name.endsWith(".delegua"))
         .array
         .sort!((a, b) => a.name < b.name)
         .array;

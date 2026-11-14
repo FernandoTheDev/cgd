@@ -20,22 +20,38 @@ O diretório --bin-dir recebe um link simbólico chamado cgd.
 EOF
 }
 
-fail() { printf 'Erro: %s\n' "$*" >&2; exit 1; }
+fail() {
+    printf 'Erro: %s\n' "$*" >&2
+    exit 1
+}
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --compiler|--prefix|--bin-dir)
-            [ "$#" -ge 2 ] || fail "Falta valor para $1."
-            case "$1" in
-                --compiler) d_compiler=$2 ;;
-                --prefix) install_prefix=$2 ;;
-                --bin-dir) install_bin_dir=$2 ;;
-            esac
-            shift 2 ;;
-        --release|-r) build_profile=release; shift ;;
-        --debug) build_profile=debug; shift ;;
-        --no-build) build_required=0; shift ;;
-        --help|-h) usage; exit 0 ;;
-        *) fail "Opção desconhecida: $1" ;;
+    --compiler | --prefix | --bin-dir)
+        [ "$#" -ge 2 ] || fail "Falta valor para $1."
+        case "$1" in
+        --compiler) d_compiler=$2 ;;
+        --prefix) install_prefix=$2 ;;
+        --bin-dir) install_bin_dir=$2 ;;
+        esac
+        shift 2
+        ;;
+    --release | -r)
+        build_profile=release
+        shift
+        ;;
+    --debug)
+        build_profile=debug
+        shift
+        ;;
+    --no-build)
+        build_required=0
+        shift
+        ;;
+    --help | -h)
+        usage
+        exit 0
+        ;;
+    *) fail "Opção desconhecida: $1" ;;
     esac
 done
 
@@ -45,8 +61,10 @@ cd "$project_dir"
 if [ "$build_required" -eq 1 ]; then
     command -v dub >/dev/null 2>&1 || fail 'Instale DUB.'
     if [ -z "$d_compiler" ]; then
-        if command -v ldc2 >/dev/null 2>&1; then d_compiler=ldc2
-        elif command -v dmd >/dev/null 2>&1; then d_compiler=dmd
+        if command -v ldc2 >/dev/null 2>&1; then
+            d_compiler=ldc2
+        elif command -v dmd >/dev/null 2>&1; then
+            d_compiler=dmd
         else fail 'Instale DMD ou LDC2.'; fi
     fi
     command -v "$d_compiler" >/dev/null 2>&1 || fail "Compilador D ausente: $d_compiler"
