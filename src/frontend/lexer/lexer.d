@@ -183,8 +183,7 @@ public:
             validate(source);
         catch (UTFException)
         {
-            err.error(new Position(filename, new PosLine(1, 1), new PosLine(1, 1)),
-                    "Arquivo fonte não contém UTF-8 válido.", "E1002");
+            err.errorCode(new Position(filename, new PosLine(1, 1), new PosLine(1, 1)), invalidUTF8);
             return [];
         }
         while (!isAtEnd())

@@ -17,6 +17,7 @@ import opt.pass_manager;
 import driver.toolchain;
 import frontend.flow;
 import frontend.validation;
+import frontend.static_safety;
 import middle.lowering;
 import opt.dead_code;
 import driver.args;
@@ -94,6 +95,11 @@ void compile(CGDArguments args, string filename)
     Sema3 sema3 = new Sema3(context, registry, resolver, diag);
     timer.start("Semantica 3");
     sema3.analyze(program);
+    timer.show();
+    verificar_erros(diag);
+
+    timer.start("Verificações estáticas de segurança");
+    new StaticSafety(diag).analyze(program);
     timer.show();
     verificar_erros(diag);
 

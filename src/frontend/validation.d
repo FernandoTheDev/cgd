@@ -23,8 +23,7 @@ bool validateStructure(Program program, Diagnostics diagnostics)
         seen[current.node] = true;
         if (current.depth > 512 || seen.length > 500_000)
         {
-            diagnostics.error(current.node.pos,
-                    "Limite estrutural da AST excedido; divida a expressão ou o módulo.", "E1004");
+            diagnostics.errorCode(current.node.pos, astLimit);
             return false;
         }
         foreach (child; childNodes(current.node))

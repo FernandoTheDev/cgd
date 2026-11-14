@@ -83,3 +83,17 @@ ou stashes do vendor. Versione configurações e ofereça um comando de verifica
 - `docs/linguagem.json` e os exemplos alimentam `scripts/gerar_referencia.py`;
   regenere `docs/linguagem.html` em vez de editar o HTML gerado manualmente.
 - Leia `docs/desenvolvimento.md` para códigos de diagnóstico, limites e contratos.
+
+## Segurança estática e localização (solicitação adicional do usuário)
+
+- `frontend/static_safety.d` antecipa falhas provadas mesmo sem otimização;
+  preserve ramos descartados e tratamento deliberado com avisos W31xx em pegue.
+- Mensagens/códigos/explicações ficam em `diagnostics/catalog.d`, usados também
+  por `--explicar` e pela tabela gerada da referência web.
+- O C gerado usa descritores estáticos e atribuição de ponteiro em operações
+  falíveis. Não reintroduza chamadas a delegua_localizar por nó/linha.
+- O runtime mantém compatibilidade da API C anterior. Formate/imprima localização
+  apenas no caminho de erro. R0001 ainda é a categoria dinâmica genérica.
+- O usuário confirmou o remote FernandoTheDev/delegua-runtime e pediu commits no
+  vendor. Use o Git próprio do submódulo, publique-o primeiro e atualize a referência
+  no CGD. Não inicialize outro repositório nem converta o vendor em cópia de arquivos.

@@ -1,0 +1,92 @@
+module diagnostics.catalog;
+
+/// Mensagens e códigos públicos vivem juntos. Os parâmetros nunca são código.
+struct MessageSpec
+{
+    string code, message, explanation;
+}
+
+enum MessageSpec runtimeError = MessageSpec("R0001", "%s", "Falha dinâmica do runtime; consulte a operação e a localização informadas. Tipos dinâmicos, aliases e entrada externa continuam validados em execução.");
+enum MessageSpec genericError = MessageSpec("E0001", "%s", "Diagnóstico legado; consulte a mensagem e a posição.");
+enum MessageSpec genericWarning = MessageSpec("W0001", "%s", "Aviso legado; consulte a mensagem e a posição.");
+enum MessageSpec genericHint = MessageSpec("H0001", "%s", "Informação complementar de um diagnóstico.");
+enum MessageSpec diagnosticLimit = MessageSpec("E0002",
+            "Limite de diagnósticos atingido; corrija os erros anteriores.",
+            "O limite protege contra uma cascata de erros.");
+enum MessageSpec driverFailure = MessageSpec("E9001", "%s",
+            "Verifique arquivos, opções, dependências e a toolchain configurada.");
+enum MessageSpec moduleCycle = MessageSpec("E2001", "Ciclo de importação detectado: %s",
+            "Quebre a dependência circular mostrada pela cadeia de importação.");
+enum MessageSpec moduleBudget = MessageSpec("E2002", "Limite de recursos de carregamento de módulos excedido.",
+            "Divida o grafo; os limites de tamanho e quantidade são documentados.");
+enum MessageSpec moduleLoad = MessageSpec("E2003", "%s\nImportado por: %s",
+            "Confira o caminho literal relativo ao módulo que importa.");
+enum MessageSpec dynamicWarning = MessageSpec("W4002",
+            "Carregamento dinâmico/NPM/FFI não é suportado por segurança.",
+            "Use fontes .delegua conhecidas na compilação.");
+enum MessageSpec dynamicError = MessageSpec("E4002", "Importe um módulo fonte .delegua.",
+            "Importação de código nativo ou carregado dinamicamente é excluída.");
+enum MessageSpec unexpectedEnd = MessageSpec("E1000",
+            "Fim inesperado do arquivo; verifique delimitadores e expressões incompletas.",
+            "Feche os delimitadores e complete a última expressão.");
+enum MessageSpec expectedToken = MessageSpec("E1001", "%s",
+            "A mensagem descreve o token ou expressão esperado; o parser tenta recuperar em outro comando.");
+enum MessageSpec incompatibleTypes = MessageSpec("E3002",
+            "Incompatibilidade de tipo: era esperado '%s' mas foi recebido '%s'.",
+            "Use um tipo compatível com o contrato declarado.");
+enum MessageSpec captureWarning = MessageSpec("W4001",
+            "Captura externa de '%s' detectada: exigiria upvalues, recurso desabilitado por segurança.",
+            "Passe estado por parâmetros ou receptor explícito.");
+enum MessageSpec captureError = MessageSpec("E4001",
+            "A captura foi bloqueada; passe o valor como parâmetro explícito.",
+            "Capturas de ambiente são excluídas deliberadamente do perfil compilado.");
+enum MessageSpec invalidUTF8 = MessageSpec("E1002", "Arquivo fonte não contém UTF-8 válido.",
+            "Salve a fonte como UTF-8.");
+enum MessageSpec syntaxDepth = MessageSpec("E1003", "Limite de aninhamento sintático excedido.",
+            "Divida expressões ou blocos profundamente aninhados.");
+enum MessageSpec astLimit = MessageSpec("E1004",
+            "Limite estrutural da AST excedido; divida a expressão ou o módulo.",
+            "O frontend limita profundidade e quantidade de nós antes dos passes recursivos.");
+enum MessageSpec missingSymbol = MessageSpec("E3001", "O símbolo '%s' não foi declarado.",
+            "Verifique escopo e grafia; funções não capturam ambientes externos.");
+enum MessageSpec suggestion = MessageSpec("H3001", "Você quis dizer '%s'?",
+            "Sugestão determinística de nome visível no escopo.");
+enum MessageSpec unreachable = MessageSpec("W3001", "Código inalcançável após transferência de controle.",
+            "Remova ou reorganize a cauda que não executa.");
+enum MessageSpec implicitReturn = MessageSpec("W3002",
+            "Função com retorno tipado pode terminar sem retornar valor; o retorno implícito é nulo.",
+            "Garanta um retorno nos caminhos relevantes.");
+enum MessageSpec zeroDivision = MessageSpec("E3101", "Divisão ou módulo por zero demonstrável em compilação.",
+            "O denominador é uma expressão constante igual a zero.");
+enum MessageSpec integerOverflow = MessageSpec("E3102", "Resultado inteiro fora do intervalo de 64 bits.",
+            "Altere o cálculo ou use valores reais quando apropriado.");
+enum MessageSpec invalidIndex = MessageSpec("E3103", "Índice constante inválido: %s.",
+            "Índices negativos são aceitos dentro dos limites da coleção.");
+enum MessageSpec typeContract = MessageSpec("E3104",
+            "Incompatibilidade de tipo demonstrável: esperado '%s', recebido '%s'.",
+            "Contratos explícitos não são removidos pela otimização.");
+enum MessageSpec invalidOperation = MessageSpec("E3105",
+            "Operação demonstravelmente inválida: %s.", "Use os tipos e limites aceitos pelo runtime.");
+enum MessageSpec invalidConversion = MessageSpec("E3106", "Conversão literal inválida para '%s'.",
+            "Valide o texto de entrada ou trate dados recebidos em execução.");
+enum MessageSpec invalidShift = MessageSpec("E3107", "Deslocamento constante fora do intervalo [0, 63].",
+            "A quantidade de bits precisa estar dentro dos limites de 64 bits.");
+enum MessageSpec invalidSlice = MessageSpec("E3108", "O passo constante de uma fatia não pode ser zero.",
+            "Use um passo positivo ou negativo diferente de zero.");
+
+immutable MessageSpec[] messages = [
+    runtimeError, genericError, genericWarning, genericHint, diagnosticLimit, driverFailure,
+    moduleCycle, moduleBudget, moduleLoad, dynamicWarning, dynamicError, unexpectedEnd,
+    expectedToken, incompatibleTypes,
+    captureWarning, captureError, invalidUTF8, syntaxDepth, astLimit, missingSymbol, suggestion,
+    unreachable, implicitReturn, zeroDivision, integerOverflow, invalidIndex, typeContract,
+    invalidOperation, invalidConversion, invalidShift, invalidSlice
+];
+
+const(MessageSpec)* lookupMessage(string code)
+{
+    foreach (ref spec; messages)
+        if (spec.code == code || (code.length == 5 && code[0] == 'W' && spec.code == "E" ~ code[1 .. $]))
+            return &spec;
+    return null;
+}

@@ -40,8 +40,8 @@ CASES = [
     ("operadores", r"escreva(2 ** 3 ** 2, 100 \\ 3, -5, +7)".replace("\\\\", "\\"), "51233-57"),
     (
         "curto_circuito",
-        """funcao falha() { retorna 1 / 0 }
-        escreva(falso e falha(), verdadeiro ou falha(), nulo ?: 8, falso ?: 9)""",
+        """funcao falha(zero) { retorna 1 / zero }
+        escreva(falso e falha(0), verdadeiro ou falha(0), nulo ?: 8, falso ?: 9)""",
         "falsoverdadeiro8falso",
     ),
     (
@@ -148,7 +148,7 @@ CASES += MORE_CASES
 ERRORS += MORE_ERRORS
 RUNTIME_ERRORS += MORE_RUNTIME_ERRORS
 
-from casos_compilador import CASES as OPT_CASES, RUNTIME_ERRORS as OPT_ERRORS
+from casos_compilador import CASES as OPT_CASES, RUNTIME_ERRORS as OPT_ERRORS, STATIC_ERRORS
 
 CASES += OPT_CASES
 RUNTIME_ERRORS += OPT_ERRORS
@@ -188,6 +188,15 @@ with tempfile.TemporaryDirectory(prefix="cgd testes ") as directory:
             compiled = run(
                 [str(ROOT / "cgd"), str(file), "-s", str(output)] + (["-o"] if opt else [])
             )
+            if name in STATIC_ERRORS:
+                assert compiled.returncode == 1 and STATIC_ERRORS[name] in compiled.stderr, (
+                    name,
+                    opt,
+                    compiled,
+                )
+                assert not output.exists(), name
+                count += 1
+                continue
             assert compiled.returncode == 0, (name, opt, compiled.stdout, compiled.stderr)
             result = run([str(output)])
             assert (

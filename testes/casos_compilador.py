@@ -1,6 +1,7 @@
 """Regressões das otimizações: efeitos, contratos, escopos e fronteiras numéricas."""
 
 CASES = [
+    ("composta_promocao_logica", "var x:inteiro=1; x+=verdadeiro; escreva(x)", "2"),
     ("ctfe_senao", "//>puro\nfuncao f(x){se x{retorna 1}senao{retorna 2}} escreva(f(falso))", "2"),
     (
         "ctfe_escopo",
@@ -97,3 +98,19 @@ RUNTIME_ERRORS = [
     ("opt_overflow_aninhado", "escreva((9223372036854775806+1)+1)"),
     ("opt_modulo_zero", "escreva(4%0)"),
 ]
+
+# Casos que agora falham antes de gerar C, com o código público esperado.
+STATIC_ERRORS = {
+    "soma_overflow_constante": "E3102",
+    "zero": "E3101",
+    "potencia_overflow": "E3102",
+    "conversao": "E3106",
+    "passo_zero": "E3108",
+    "ctfe_modulo_real": "E3105",
+    "ctfe_contrato_parametro": "E3104",
+    "ctfe_contrato_local": "E3104",
+    "ctfe_contrato_retorno": "E3104",
+    "opt_const_tipado": "E3104",
+    "opt_overflow_aninhado": "E3102",
+    "opt_modulo_zero": "E3101",
+}

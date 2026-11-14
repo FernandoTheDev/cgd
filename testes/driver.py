@@ -153,4 +153,33 @@ with tempfile.TemporaryDirectory(prefix="cgd driver ") as tmp:
         assert "-ldl" not in argv and "-rdynamic" not in argv
         checks += 1
 
+result = subprocess.run(
+    [str(ROOT / "cgd"), "--explicar", "E3101"], capture_output=True, text=True, timeout=10
+)
+assert result.returncode == 0 and "denominador" in result.stdout
+checks += 1
+
+with tempfile.TemporaryDirectory(prefix="cgd localizacao ") as tmp:
+    folder = Path(tmp)
+    source = folder / "origem.delegua"
+    output = folder / "programa"
+    source.write_text("funcao dividir(a,b){\n retorna a/b\n}\nvar zero=0\ndividir(1,zero)")
+    result = run(source, "-s", str(output))
+    assert result.returncode == 0, result.stderr
+    code = (folder / "programa.c").read_text()
+    assert (
+        "delegua_localizar(" not in code and "static const delegua_local cgd_source_sites[]" in code
+    )
+    result = subprocess.run([str(output)], capture_output=True, text=True, timeout=10)
+    assert (
+        result.returncode == 1 and f"{source}:2:" in result.stderr and "R0001" in result.stderr
+    ), result.stderr
+    checks += 1
+    source.write_text("var primeiro=1;var segundo=2;var terceiro=3")
+    result = run(source, "--emitir-c", "-s", str(output))
+    assert (
+        result.returncode == 0 and "delegua_local_atual=" not in (folder / "programa.c").read_text()
+    )
+    checks += 1
+
 print(f"{checks} verificações de driver passaram.")

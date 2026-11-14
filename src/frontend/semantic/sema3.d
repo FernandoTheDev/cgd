@@ -1,5 +1,6 @@
 // resolve todos os nodes
 module frontend.semantic.sema3;
+import catalog = diagnostics.catalog;
 
 import std.algorithm;
 import std.exception;
@@ -37,17 +38,15 @@ private:
     {
         if (context.requiresCapture(node.value))
         {
-            err.warning(node.pos,
-                    format("Captura externa de '%s' detectada: exigiria upvalues, recurso desabilitado por segurança.",
-                        node.value));
-            err.error(node.pos, "A captura foi bloqueada; passe o valor como parâmetro explícito.");
+            err.warningCode(node.pos, catalog.captureWarning, node.value);
+            err.errorCode(node.pos, catalog.captureError);
         }
         else
         {
-            err.error(node.pos, format("O símbolo '%s' não foi declarado.", node.value), "E3001");
+            err.errorCode(node.pos, catalog.missingSymbol, node.value);
             auto suggestion = context.suggest(node.value);
             if (suggestion.length)
-                err.hint(node.pos, format("Você quis dizer '%s'?", suggestion), "H3001");
+                err.hintCode(node.pos, catalog.suggestion, suggestion);
         }
         node.type_sema = anyType();
     }
@@ -849,8 +848,7 @@ private:
         }
         bool comp = t1.isComp(t2);
         if (!comp)
-            err.error(pos, format("Incompatibilidade de tipo: era esperado '%s' mas foi recebido '%s'.",
-                    t1.toStr(), t2.toStr()));
+            err.errorCode(pos, catalog.incompatibleTypes, t1.toStr(), t2.toStr());
         return comp;
     }
 

@@ -29,7 +29,7 @@ public:
     {
         if (nesting >= 256)
         {
-            err.error(isAtEnd() ? null : peek().pos, "Limite de aninhamento sintático excedido.", "E1003");
+            err.errorCode(isAtEnd() ? null : peek().pos, syntaxDepth);
             throw new ParseException;
         }
         nesting++;
@@ -74,7 +74,7 @@ public:
         if (isAtEnd(n))
         {
             auto pos = tokens.length ? tokens[$ - 1].pos : null;
-            err.error(pos, "Fim inesperado do arquivo; verifique delimitadores e expressões incompletas.", "E1001");
+            err.errorCode(pos, unexpectedEnd);
             throw new ParseException;
         }
     }
@@ -116,7 +116,7 @@ public:
         Token tk = advance();
         if (tk.kind == kind)
             return tk;
-        err.error(tk.pos, message, "E1001");
+        err.errorCode(tk.pos, expectedToken, message);
         throw new ParseException;
     }
 

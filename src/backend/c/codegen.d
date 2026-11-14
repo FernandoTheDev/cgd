@@ -20,6 +20,8 @@ class BackendC
 {
 private:
     size_t tmp;
+    dstring[] sourceSites;
+    size_t[string] sourceSiteIds;
     ClassDecl currentClass;
     TypeExpr functionReturn;
     dstring descriptor(TypeExpr type)
@@ -39,10 +41,13 @@ private:
         return "delegua_descr_nome(\"qualquer\")";
     }
 
-    dstring checked(dstring value, TypeExpr type)
+    dstring checked(dstring value, TypeExpr type, Position pos = null)
     {
-        return type is null || type.toStr() == "qualquer" ? value
-            : formatD("delegua_assegurar_descr(%s,%s)", value, descriptor(type));
+        if (type is null || type.toStr() == "qualquer")
+            return value;
+        auto site = location(pos is null ? type.pos : pos);
+        auto expression = formatD("delegua_assegurar_descr(%s,%s)", value, descriptor(type));
+        return site.length ? "(" ~ site ~ ", " ~ expression ~ ")" : expression;
     }
 
     dstring lexicalClass()
@@ -92,7 +97,7 @@ private:
         else
         {
             auto old = formatD("cgd_tmp_%s", tmp++);
-            emitLocal(formatD("delegua_value %s=%s;", old, lv.read()));
+            emitLocal(formatD("delegua_value %s=%s;", old, atSite(lv.read(), assign.pos)));
             dstring op;
             switch (assign.op)
             {
@@ -115,11 +120,11 @@ private:
                     throw new Exception("Atribuição inválida no backend.");
             }
             auto rhs = materialize(assign.value);
-            value = formatD("delegua_op_%s(%s,%s)", op, old, rhs);
+            value = atSite(formatD("delegua_op_%s(%s,%s)", op, old, rhs), assign.pos);
         }
         auto result = formatD("cgd_tmp_%s", tmp++);
-        emitLocal(formatD("delegua_value %s=%s;", result, checked(value, assign.left.type_expr)));
-        emitLocal(lv.write(result) ~ ";");
+        emitLocal(formatD("delegua_value %s=%s;", result, checked(value, assign.left.type_expr, assign.pos)));
+        emitLocal(atSite(lv.write(result), assign.pos) ~ ";");
         return result;
     }
 
@@ -223,7 +228,7 @@ private:
         foreach (child; node.finalBody)
             result ~= compileStmtOrdered(child);
         result ~= formatD("delegua_falhar(%s->error); } }", outer);
-        return result.join("\n");
+        return location(node) ~ ";\n" ~ result.join("\n");
     }
 
     public dstring materialize(Node node)
@@ -363,7 +368,8 @@ private:
             case NodeKind.TryStmt:
                 return compileTry(cast(TryStmt) node);
             case NodeKind.ThrowStmt:
-                return formatD("delegua_falhar(%s);", compileExpr((cast(ThrowStmt) node).value));
+                auto thrown = materialize((cast(ThrowStmt) node).value);
+                return location(node) ~ ";" ~ formatD("delegua_falhar(%s);", thrown);
             case NodeKind.ForStmt:
                 auto loop = cast(ForStmt) node;
                 auto init = loop.init is null ? ""d : compileStmtOrdered(loop.init);
@@ -377,8 +383,10 @@ private:
                 return cleanupCode(loopTryDepth[$ - 1]) ~ "\ngoto " ~ continueLabels[$ - 1] ~ ";";
             case NodeKind.VarDecl:
                 VarDecl var = cast(VarDecl) node;
-                return formatD("volatile %s %s = %s;", VALUE, cName(var.name),
-                        checked(compileExpr(var.value), var.uninitialized ? null : var.type_expr));
+                auto initial = var.type_expr !is null && !var.uninitialized
+                    && var.type_expr.toStr() != "qualquer" ? materialize(var.value) : compileExpr(var.value);
+                return formatD("volatile %s %s = %s;", VALUE, cName(var.name), checked(initial,
+                        var.uninitialized ? null : var.type_expr, var.pos));
 
             case NodeKind.ReturnStmt:
                 ReturnStmt ret = cast(ReturnStmt) node;
@@ -389,7 +397,7 @@ private:
                     return cleanupCode(collector.depth) ~ formatD("\ndelegua_vetor_adicionar(&%s,%s); goto %s;",
                             collector.output, value, collector.label);
                 }
-                return cleanupCode(0) ~ formatD("\nreturn %s;", checked(value, functionReturn));
+                return cleanupCode(0) ~ formatD("\nreturn %s;", checked(value, functionReturn, ret.pos));
 
             case NodeKind.CallExpr:
             case NodeKind.UnaryExpr:
@@ -441,9 +449,6 @@ private:
         pushFrame();
         dstring result = compileStmt(node);
         dstring[] sideEffects = popFrame();
-        auto loc = location(node);
-        if (loc.length)
-            sideEffects = [loc ~ ";"] ~ sideEffects;
 
         if (sideEffects.length == 0)
             return result;
@@ -451,19 +456,63 @@ private:
         return (sideEffects ~ result).join("\n");
     }
 
+    dstring location(Position pos)
+    {
+        if (pos is null)
+            return "";
+        auto key = format("%s:%s:%s", pos.filename, pos.start.line, pos.start.offset);
+        size_t index;
+        if (auto cached = key in sourceSiteIds)
+            index = *cached;
+        else
+        {
+            index = sourceSites.length;
+            sourceSiteIds[key] = index;
+            sourceSites ~= formatD("{%s,%s,%s}", cString(pos.filename.to!dstring), pos.start.line, pos.start.offset);
+        }
+        return formatD("delegua_local_atual=&cgd_source_sites[%s]", index);
+    }
+
     dstring location(Node node)
     {
-        if (node is null || node.pos is null)
-            return "";
-        return formatD("delegua_localizar(%s, %s, %s)", cString(node.pos.filename.to!dstring),
-                node.pos.start.line, node.pos.start.offset);
+        return node is null ? ""d : location(node.pos);
+    }
+
+    dstring atSite(dstring expression, Position pos)
+    {
+        auto site = location(pos);
+        return site.length ? "(" ~ site ~ ", " ~ expression ~ ")" : expression;
+    }
+
+    bool canFail(Node node)
+    {
+        if (node is null)
+            return false;
+        switch (node.kind)
+        {
+            case NodeKind.CallExpr:
+            case NodeKind.IndexExpr:
+            case NodeKind.MemberExpr:
+            case NodeKind.UnaryExpr:
+            case NodeKind.SliceExpr:
+            case NodeKind.ImportExpr:
+                return true;
+            default:
+                return false;
+        }
     }
 
     public dstring compileExpr(Node node)
     {
+        if (node !is null && (cast(ArrayLit) node || cast(MapLit) node || cast(Comprehension) node))
+        {
+            auto site = location(node);
+            if (site.length)
+                emitLocal(site ~ ";");
+        }
         auto expression = compileExprIntern(node);
-        auto loc = location(node);
-        return loc.length ? "(" ~ loc ~ ", " ~ expression ~ ")" : expression;
+        auto site = canFail(node) ? location(node) : ""d;
+        return site.length ? "(" ~ site ~ ", " ~ expression ~ ")" : expression;
     }
 
     private dstring compileExprIntern(Node node)
@@ -531,10 +580,13 @@ private:
                 auto lv = resolveLValue(unary.value);
                 auto previous = formatD("cgd_tmp_%d", tmp++);
                 auto updated = formatD("cgd_tmp_%d", tmp++);
+                auto site = location(node);
+                if (site.length)
+                    emitLocal(site ~ ";");
                 emitLocal(formatD("%s %s = %s;", VALUE, previous, lv.read()));
-                emitLocal(formatD("%s %s = delegua_op_%s(%s, create_num(1));", VALUE, updated,
-                        unary.op == TokenKind.PPlus ? "add" : "sub", previous));
-                emitLocal(lv.write(updated) ~ ";");
+                emitLocal(formatD("%s %s = %s;", VALUE, updated, atSite(formatD("delegua_op_%s(%s,create_num(1))",
+                        unary.op == TokenKind.PPlus ? "add" : "sub", previous), node.pos)));
+                emitLocal(atSite(lv.write(updated), node.pos) ~ ";");
                 return unary.post ? previous : updated;
             case NodeKind.MapLit:
                 auto map = cast(MapLit) node;
@@ -945,6 +997,8 @@ public:
         emit("}");
 
         dstring source = includes.join("\n");
+        if (sourceSites.length)
+            source ~= "\nstatic const delegua_local cgd_source_sites[]={" ~ sourceSites.join(",") ~ "};\n";
         source ~= prototypes.join("\n");
         source ~= code.join("\n");
         return source;

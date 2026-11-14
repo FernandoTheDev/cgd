@@ -80,8 +80,8 @@ class ModuleLoader
             }
             if (extension(path) != ".delegua")
             {
-                diagnostics.warning(node.pos, "Carregamento dinâmico/NPM/FFI não é suportado por segurança.");
-                diagnostics.error(node.pos, "Importe um módulo fonte .delegua.");
+                diagnostics.warningCode(node.pos, dynamicWarning);
+                diagnostics.errorCode(node.pos, dynamicError);
                 return;
             }
             try
@@ -89,8 +89,7 @@ class ModuleLoader
                 auto target = canonical(buildPath(dirName(filename), path));
                 if (target in active)
                 {
-                    diagnostics.error(node.pos,
-                            "Ciclo de importação detectado: " ~ importStack.join(" -> ") ~ " -> " ~ target, "E2001");
+                    diagnostics.errorCode(node.pos, moduleCycle, importStack.join(" -> ") ~ " -> " ~ target);
                     return;
                 }
                 if (auto cached = target in cache)
@@ -106,7 +105,7 @@ class ModuleLoader
                 auto bytes = getSize(target);
                 if (bytes > 4 * 1024 * 1024 || totalBytes + bytes > 64 * 1024 * 1024 || cache.length >= 1024)
                 {
-                    diagnostics.error(node.pos, "Limite de recursos de carregamento de módulos excedido.", "E2002");
+                    diagnostics.errorCode(node.pos, moduleBudget);
                     return;
                 }
                 totalBytes += cast(size_t) bytes;
@@ -132,7 +131,7 @@ class ModuleLoader
             }
             catch (Exception e)
             {
-                diagnostics.error(node.pos, e.msg ~ "\nImportado por: " ~ importStack.join(" -> "), "E2003");
+                diagnostics.errorCode(node.pos, moduleLoad, e.msg, importStack.join(" -> "));
             }
             return;
         }

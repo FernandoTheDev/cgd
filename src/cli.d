@@ -7,6 +7,7 @@ import std.stdio;
 import env;
 
 enum Flag[] FLAGS = [
+    Flag("", "explicar", "explain", "Explica um código de diagnóstico sem compilar"),
     Flag("a", "ajuda", "showHelp", "Exibe esta mensagem de ajuda"),
     Flag("v", "versao", "showVersion", "Exibe a versão atual do compilador"),
     Flag("d", "depurar", "showDebug", "Ativa o modo de depuração do compilador"),

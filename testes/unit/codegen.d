@@ -27,3 +27,25 @@ unittest
         assert(cString(text) == expected);
     }
 }
+
+unittest
+{
+    import frontend;
+    import backend.c.codegen;
+    import middle.lowering;
+    import std.string : indexOf;
+
+    auto diagnostics = new Diagnostics;
+    auto program = new Parser(new Lexer("var a=1;var b=2;var c=3;escreva(a+b+c)", "origem.delegua",
+            diagnostics).tokenizer(), diagnostics).parse();
+    auto context = new Context;
+    auto registry = new TypeRegistry;
+    new Sema1(context, diagnostics).analyze(program);
+    new Sema2(registry).analyze(program);
+    new Sema3(context, registry, new TypeResolver(registry, diagnostics), diagnostics).analyze(program);
+    new CgdLowering(diagnostics).lowering(program);
+    auto code = new BackendC().compile(program).to!string;
+    assert(code.indexOf("delegua_localizar(") < 0);
+    assert(code.indexOf("static const delegua_local cgd_source_sites[]") >= 0);
+    assert(code.indexOf("delegua_local_atual=&cgd_source_sites[") >= 0);
+}

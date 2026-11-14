@@ -54,9 +54,7 @@ class FlowAnalysis
             inspect(n.body);
             if (auto type = cast(TypeExprNamed) n.type_expr)
                 if (type.name != "qualquer" && type.name != "vazio" && !n.classFactory && !terminates(n.body))
-                    diagnostics.warning(n.pos,
-                            "Função com retorno tipado pode terminar sem retornar valor; o retorno implícito é nulo.",
-                            "W3002");
+                    diagnostics.warningCode(n.pos, implicitReturn);
         }
         else if (auto n = cast(BlockStmt) node)
             inspect(n.body);
@@ -98,7 +96,7 @@ class FlowAnalysis
                 continue;
             if (stopped && !warned && !cast(FnDecl) node && !cast(ClassDecl) node)
             {
-                diagnostics.warning(node.pos, "Código inalcançável após transferência de controle.", "W3001");
+                diagnostics.warningCode(node.pos, unreachable);
                 warned = true;
             }
             stopped = stopped || terminates(node);

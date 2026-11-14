@@ -1,5 +1,7 @@
 module errors;
 
+public import diagnostics.catalog;
+
 import frontend.lexer.token : Position;
 import std.algorithm : any, count, min, max;
 import std.array : array, split;
@@ -55,6 +57,8 @@ string diagnosticJSON(const Diagnostic d)
         "code": JSONValue(d.code),
         "message": JSONValue(d.message)
     ]);
+    if (auto spec = lookupMessage(d.code))
+        result["explanation"] = spec.explanation;
     if (d.position !is null)
     {
         result["file"] = d.position.filename;
@@ -155,6 +159,21 @@ class Diagnostics
                     "Limite de diagnósticos atingido; corrija os erros anteriores.", "E0002");
         else
             list ~= Diagnostic(severity, pos, message, code);
+    }
+
+    void errorCode(Args...)(Position pos, MessageSpec spec, Args arguments)
+    {
+        error(pos, format(spec.message, arguments), spec.code);
+    }
+
+    void warningCode(Args...)(Position pos, MessageSpec spec, Args arguments)
+    {
+        warning(pos, format(spec.message, arguments), spec.code);
+    }
+
+    void hintCode(Args...)(Position pos, MessageSpec spec, Args arguments)
+    {
+        hint(pos, format(spec.message, arguments), spec.code);
     }
 
     void error(Position pos, string message, string code = "")

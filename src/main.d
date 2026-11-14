@@ -33,6 +33,15 @@ void main(string[] args)
     if (arguments.showDebug && diagnosticFormat == DiagnosticFormat.json)
         cgd_erro("--depurar não pode ser combinado com diagnósticos JSON.");
 
+    if (arguments.explain.length)
+    {
+        auto specification = lookupMessage(arguments.explain);
+        if (specification is null)
+            cgd_erro("Código de diagnóstico desconhecido: " ~ arguments.explain);
+        writeln(arguments.explain, ": ", specification.message);
+        writeln(specification.explanation);
+        return;
+    }
     if (arguments.showHelp)
     {
         cli_ajuda();
