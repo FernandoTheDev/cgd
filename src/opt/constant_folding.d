@@ -63,7 +63,7 @@ final class CgdConstantFolding : AstRewriter
                 import std.bigint : BigInt;
                 import std.conv : to;
 
-                auto a = BigInt((as!IntLit(l)).value), b = BigInt((as!IntLit(r)).value);
+                BigInt a = BigInt((as!IntLit(l)).value), b = BigInt((as!IntLit(r)).value);
                 BigInt value;
                 switch (op)
                 {
@@ -205,33 +205,33 @@ final class CgdConstantFolding : AstRewriter
     override protected Node transform(Node node)
     {
         Node result;
-        if (auto id = cast(Identifier) node)
+        if (Identifier id = cast(Identifier) node)
         {
-            auto declaration = id.variableRef;
+            VarDecl declaration = id.variableRef;
             // Tipos explícitos podem converter/verificar o valor: mantenha essa fronteira.
             if (declaration !is null && declaration.isConst && declaration.type_expr is null)
             {
-                auto value = declaration.value;
-                if (auto n = cast(IntLit) value)
+                Node value = declaration.value;
+                if (IntLit n = cast(IntLit) value)
                     result = new IntLit(n.value, node.pos);
-                else if (auto n = cast(DoubleLit) value)
+                else if (DoubleLit n = cast(DoubleLit) value)
                     result = new DoubleLit(n.value, node.pos);
-                else if (auto n = cast(StringLit) value)
+                else if (StringLit n = cast(StringLit) value)
                     result = new StringLit(n.value, node.pos);
-                else if (auto n = cast(BoolLit) value)
+                else if (BoolLit n = cast(BoolLit) value)
                     result = new BoolLit(n.value, node.pos);
                 else if (cast(NullLit) value)
                     result = new NullLit(node.pos);
             }
         }
-        else if (auto binary = cast(BinaryExpr) node)
+        else if (BinaryExpr binary = cast(BinaryExpr) node)
             result = foldBinary(binary);
-        else if (auto unary = cast(UnaryExpr) node)
+        else if (UnaryExpr unary = cast(UnaryExpr) node)
         {
-            if (auto value = cast(BoolLit) unary.value)
+            if (BoolLit value = cast(BoolLit) unary.value)
                 if (unary.op == TokenKind.Bang)
                     result = new BoolLit(!value.value, node.pos);
-            if (auto value = cast(IntLit) unary.value)
+            if (IntLit value = cast(IntLit) unary.value)
             {
                 if (unary.op == TokenKind.Minus && value.value != long.min)
                     result = new IntLit(-value.value, node.pos);
@@ -239,31 +239,32 @@ final class CgdConstantFolding : AstRewriter
                     result = new IntLit(value.value, node.pos);
             }
         }
-        else if (auto conditional = cast(ConditionalExpr) node)
+        else if (ConditionalExpr conditional = cast(ConditionalExpr) node)
         {
-            if (auto condition = cast(BoolLit) conditional.condition)
+            if (BoolLit condition = cast(BoolLit) conditional.condition)
                 result = condition.value ? conditional.yes : conditional.no;
         }
-        else if (auto call = cast(CallExpr) node)
+        else if (CallExpr call = cast(CallExpr) node)
         {
-            auto id = cast(Identifier) call.fn;
+            Identifier id = cast(Identifier) call.fn;
             // Identidade resolvida impede CTFE da função homônima de outro escopo.
             if (id !is null && id.functionRef !is null && ctfe !is null)
-                if (auto symbol = id.value in ctfe.symbols)
+                if (SymbolFn* symbol = id.value in ctfe.symbols)
                     if ((*symbol).node is id.functionRef
                             && call.args.length == id.functionRef.args.length
-                            && call.args.all!(arg => literal(arg) !is null && arg.kind != NodeKind.NullLit))
+                            && call.args.all!((Node arg) => literal(arg) !is null && arg.kind != NodeKind.NullLit))
                     {
                         try
-                            result = ctfe.call(id.value, call.args.map!(arg => CTFECompile.nodeToCgdValue(arg)).array);
+                            result = ctfe.call(id.value,
+                                    call.args.map!((Node arg) => CTFECompile.nodeToCgdValue(arg)).array);
                         catch (Exception)
                         {
                         } // Limites, contratos e falhas da avaliação preservam a chamada nativa.
                     }
         }
-        if (auto binary = cast(BinaryExpr) node)
+        if (BinaryExpr binary = cast(BinaryExpr) node)
         {
-            if (auto left = cast(BoolLit) binary.left)
+            if (BoolLit left = cast(BoolLit) binary.left)
             {
                 if (binary.op == TokenKind.And && !left.value)
                     result = new BoolLit(false, node.pos);
@@ -275,7 +276,7 @@ final class CgdConstantFolding : AstRewriter
         }
         if (result is null)
             return node;
-        if (auto number = cast(DoubleLit) result)
+        if (DoubleLit number = cast(DoubleLit) result)
             if (!isFinite(number.value))
                 return node;
         result.pos = node.pos;

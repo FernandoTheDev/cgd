@@ -1,0 +1,14 @@
+//! 6\n8\n10
+classe Calculadora {
+    estatico dobro(valor: inteiro): inteiro {
+        retorna valor * 2
+    }
+}
+
+classe Avancada herda Calculadora {
+}
+
+escreva(Calculadora.dobro(3))
+escreva(Avancada.dobro(4))
+var calculadora: Calculadora = Calculadora()
+escreva(calculadora.dobro(5))

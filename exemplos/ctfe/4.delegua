@@ -1,22 +1,22 @@
 //$
 //! 100\n19\n8
 //>puro
-funcao dobro(x) {
+funcao dobro(x: qualquer): qualquer {
     retorne x * 2
 }
 
 //>puro
-funcao quadrado(x) {
+funcao quadrado(x: qualquer): qualquer {
     retorne x * x
 }
 
 //>puro
-funcao soma(a, b) {
+funcao soma(a: qualquer, b: qualquer): qualquer {
     retorne a + b
 }
 
-var x = 5
-var y = 3
+var x: numero = 5
+var y: numero = 3
 
 escreva(quadrado(dobro(x)))
 escreva(soma(dobro(x), quadrado(y)))

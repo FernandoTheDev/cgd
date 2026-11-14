@@ -1,5 +1,5 @@
 //# 1
 //? fase: compilacao
 //? erro: literal
-var caminho = "modulo.delegua"
-var modulo = importar(caminho)
+var caminho: texto = "modulo.delegua"
+var modulo: qualquer = importar(caminho)

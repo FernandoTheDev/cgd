@@ -22,26 +22,28 @@ public:
         if (p.match(TokenKind.LBrace))
         {
             Token[] names;
+            TypeExpr[] memberTypes;
             do
             {
                 names ~= p.consume(TokenKind.Identifier, "Esperado nome na desestruturação.");
+                memberTypes ~= p.match(TokenKind.Colon) ? p.parseType.parse() : null;
             }
             while (p.match(TokenKind.Comma));
             p.consume(TokenKind.RBrace, "Esperado '}' após nomes.");
             p.consume(TokenKind.Equals, "Esperado '=' após desestruturação.");
-            auto value = p.parseExpr.parse();
-            auto temp = p.hiddenName();
+            Node value = p.parseExpr.parse();
+            dstring temp = p.hiddenName();
             Node[] body = [new VarDecl(temp, value, true, null, value.pos)];
-            foreach (name; names)
+            foreach (size_t i, Token name; names)
                 body ~= new VarDecl(name.value.s, new MemberExpr(new Identifier(temp, value.pos),
-                        new Identifier(name.value.s, name.pos), name.pos), isConst, null, name.pos);
+                        new Identifier(name.value.s, name.pos), name.pos), isConst, memberTypes[i], name.pos);
             return new SequenceStmt(body, value.pos);
         }
         Token[] names;
         TypeExpr[] types;
         do
         {
-            auto name = p.consume(TokenKind.Identifier, "Esperado nome de variável.");
+            Token name = p.consume(TokenKind.Identifier, "Esperado nome de variável.");
             names ~= name;
             types ~= p.match(TokenKind.Colon) ? p.parseType.parse() : null;
         }
@@ -56,7 +58,7 @@ public:
         while (p.match(TokenKind.Comma));
             else
         {
-            foreach (name; names)
+            foreach (Token name; names)
                 values ~= new NullLit(name.pos);
             if (isConst)
                 p.err.error(names[0].pos, "Uma constante exige inicializador.");
@@ -68,21 +70,22 @@ public:
         }
         if (names.length == 1)
         {
-            auto variable = new VarDecl(names[0].value.s, values[0], isConst, types[0], names[0].pos);
+            VarDecl variable = new VarDecl(names[0].value.s, values[0], isConst, types[0], names[0].pos);
             variable.uninitialized = !initialized;
             return variable;
         }
         Node[] body;
         dstring[] temps;
-        foreach (value; values)
+        foreach (Node value; values)
         {
-            auto name = p.hiddenName();
+            dstring name = p.hiddenName();
             temps ~= name;
             body ~= new VarDecl(name, value, true, null, value.pos);
         }
-        foreach (i, name; names)
+        foreach (size_t i, Token name; names)
         {
-            auto variable = new VarDecl(name.value.s, new Identifier(temps[i], name.pos), isConst, types[i], name.pos);
+            VarDecl variable = new VarDecl(name.value.s, new Identifier(temps[i], name.pos),
+                    isConst, types[i], name.pos);
             variable.uninitialized = !initialized;
             body ~= variable;
         }
@@ -119,7 +122,7 @@ public:
             if (!p.check(TokenKind.RParen))
                 p.consume(TokenKind.Comma, "Esperado ',' após o argumento.");
 
-            auto arg = new FnArg(argName.value.s, type, val, argName.pos);
+            FnArg arg = new FnArg(argName.value.s, type, val, argName.pos);
             arg.rest = rest;
             args ~= arg;
             if (rest && !p.check(TokenKind.RParen))
@@ -145,16 +148,16 @@ public:
     {
         if (p.check(TokenKind.Identifier) && p.peek().value.s == "estrangeira")
         {
-            auto unsafeToken = p.advance();
+            Token unsafeToken = p.advance();
             p.err.warning(unsafeToken.pos,
                     "Classe estrangeira/FFI detectada: execução nativa arbitrária desabilitada.");
             p.err.error(unsafeToken.pos, "FFI não é suportada neste compilador por segurança.");
         }
-        auto name = p.consume(TokenKind.Identifier, "Esperado nome da classe.");
+        Token name = p.consume(TokenKind.Identifier, "Esperado nome da classe.");
         dstring parent;
         if (p.match(TokenKind.Extends))
             parent = p.consume(TokenKind.Identifier, "Esperado nome da superclasse.").value.s;
-        auto node = new ClassDecl(name.value.s, parent, name.pos);
+        ClassDecl node = new ClassDecl(name.value.s, parent, name.pos);
         p.consume(TokenKind.LBrace, "Esperado '{' na classe.");
         parseClassMembers(node, 0);
         return node;
@@ -168,24 +171,33 @@ public:
                 continue;
             if (p.check(TokenKind.Private) || p.check(TokenKind.Protected) || p.check(TokenKind.Public))
             {
-                auto kind = p.advance().kind;
+                TokenKind kind = p.advance().kind;
                 int visibility = kind == TokenKind.Private ? 1 : kind == TokenKind.Protected ? 2 : 0;
                 p.consume(TokenKind.LBrace, "Esperado bloco de visibilidade.");
                 parseClassMembers(node, visibility);
                 continue;
             }
-            auto decorators = p.parseDecorators();
-            auto name = p.consumeName("Esperado propriedade ou método.");
+            Decorator[] decorators = p.parseDecorators();
+            bool isStatic;
+            if (p.check(TokenKind.Identifier) && (p.peek().value.s == "estatico" || p.peek().value.s == "estático"))
+            {
+                p.advance();
+                isStatic = true;
+            }
+            Token name = p.consumeName("Esperado propriedade ou método.");
             if (p.match(TokenKind.Colon))
             {
-                auto type = p.parseType.parse();
+                TypeExpr type = p.parseType.parse();
+                if (isStatic)
+                    p.err.error(name.pos,
+                            "Campos estáticos ainda não são suportados; declare um método estático.");
                 ClassField field = ClassField(name.value.s, type, access, name.pos);
                 if (p.match(TokenKind.LBrace))
                 {
                     field.customAccess = true;
                     while (!p.isAtEnd() && !p.check(TokenKind.RBrace))
                     {
-                        auto token = p.consume(TokenKind.Identifier, "Esperado obter ou definir.");
+                        Token token = p.consume(TokenKind.Identifier, "Esperado obter ou definir.");
                         bool getter = token.value.s == "obter";
                         if (!getter && token.value.s != "definir")
                             p.err.error(token.pos, "Acessor desconhecido.");
@@ -195,7 +207,7 @@ public:
                             field.writable = true;
                         if (p.check(TokenKind.LParen))
                         {
-                            auto method = cast(FnDecl) parseFnDecl(token);
+                            FnDecl method = cast(FnDecl) parseFnDecl(token);
                             method.isMethod = true;
                             method.ownerClass = node;
                             method.accessor = true;
@@ -222,8 +234,11 @@ public:
             }
             else
             {
-                auto method = cast(FnDecl) parseFnDecl(name);
+                FnDecl method = cast(FnDecl) parseFnDecl(name);
                 method.isMethod = true;
+                method.isStatic = isStatic;
+                if (isStatic && name.value.s == "construtor")
+                    p.err.error(name.pos, "Construtor não pode ser estático.");
                 method.ownerClass = node;
                 method.access = access;
                 method.decorators = decorators;
@@ -248,11 +263,11 @@ public:
                 bool envelope = p.match(TokenKind.Of);
                 if (envelope)
                 {
-                    auto marker = p.consumeName("Esperado decorador após função de.");
+                    Token marker = p.consumeName("Esperado decorador após função de.");
                     if (marker.value.s != "decorador")
                         p.err.error(marker.pos, "Esperado decorador.");
                 }
-                auto fn = cast(FnDecl) parseFnDecl();
+                FnDecl fn = cast(FnDecl) parseFnDecl();
                 fn.decoratorEnvelope = envelope;
                 return fn;
 

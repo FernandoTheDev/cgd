@@ -1,4 +1,5 @@
 module driver.compile;
+import std.typecons : Tuple;
 
 import std.stdio : writeln, writefln, wrt = write;
 import core.stdc.stdlib : exit;
@@ -119,7 +120,7 @@ void compile(CGDArguments args, string filename)
     if (args.opt)
     {
         timer.start("Otimização até ponto fixo");
-        auto stats = optimize(program, context, ctfeContext);
+        OptimizationStats stats = optimize(program, context, ctfeContext);
         if (args.showDebug)
             writefln("Otimização: %d iteração(ões), %d dobras, %d eliminações",
                     stats.iterations, stats.folded, stats.removed);
@@ -157,12 +158,12 @@ void compile(CGDArguments args, string filename)
 
     if (args.emitC)
         return;
-    auto toolchain = CToolchain.discover(args);
-    auto command = toolchain.command(absolutePath(outc), absolutePath(output), args.opt, toolchain.gcFlags());
+    CToolchain toolchain = CToolchain.discover(args);
+    string[] command = toolchain.command(absolutePath(outc), absolutePath(output), args.opt, toolchain.gcFlags());
     if (args.showDebug)
         writeln(command);
     timer.start("Compilando");
-    auto result = execute(command);
+    Tuple!(int, "status", string, "output") result = execute(command);
     timer.show();
     if (result.status)
         cgd_erro("O compilador C falhou:\n" ~ result.output);

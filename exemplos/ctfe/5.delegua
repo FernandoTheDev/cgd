@@ -1,33 +1,33 @@
 //$
 //# 0
 //>puro
-funcao dobro(x) {
+funcao dobro(x: qualquer): qualquer {
     retorne x * 2
 }
 
 //>puro
-funcao quadrado(x) {
+funcao quadrado(x: qualquer): qualquer {
     retorne x * x
 }
 
 //>puro
-funcao cubo(x) {
+funcao cubo(x: qualquer): qualquer {
     retorne x * x * x
 }
 
 //>puro
-funcao soma(a, b) {
+funcao soma(a: qualquer, b: qualquer): qualquer {
     retorne a + b
 }
 
 //>puro
-funcao media(a, b, c) {
-    retorne (a + b + c) / 3
+funcao media(a: qualquer, b: qualquer, c: qualquer): qualquer {
+    retorne(a + b + c) / 3
 }
 
-var x = 5
-var y = 3
-var z = 2
+var x: numero = 5
+var y: numero = 3
+var z: numero = 2
 
 escreva(quadrado(dobro(x)))
 escreva(soma(dobro(x), quadrado(y)))
@@ -35,7 +35,7 @@ escreva(cubo(x) + cubo(y) + cubo(z))
 
 x = 10
 y = x * 2 - 1
-z = quadrado(z) + (y - x)
+z = quadrado(z) +(y - x)
 
 escreva(soma(x, soma(y, z)))
 escreva(media(x, y, z))
@@ -45,6 +45,6 @@ y = cubo(x) - quadrado(y) + dobro(z)
 
 escreva(soma(x, y))
 
-z = (x + y) - (x * y)
+z =(x + y) -(x * y)
 escreva(z)
 escreva(quadrado(x - y))

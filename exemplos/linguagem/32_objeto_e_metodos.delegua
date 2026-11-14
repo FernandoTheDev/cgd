@@ -1,10 +1,16 @@
 //! Pessoa\nverdadeiroverdadeiro\nPessoa: Ada
 classe Pessoa {
     nome: texto
-    construtor(nome) { isto.nome = nome }
-    paraTexto() { retorna "Pessoa: ${isto.nome}" }
+    construtor(nome: qualquer) {
+        isto.nome = nome
+    }
+
+    paraTexto(): qualquer {
+        retorna "Pessoa: ${isto.nome}"
+    }
 }
-var p = Pessoa("Ada")
+
+var p: Pessoa = Pessoa("Ada")
 escreva(p.tipo())
 escreva(p.respondeA("paraTexto"), p.eInstanciaDe(Objeto))
 escreva(p)

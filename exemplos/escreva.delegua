@@ -1,7 +1,7 @@
 //$
 //! Fernando e Leonel
-var nome = "Jonas"
+var nome: texto = "Jonas"
 nome = "Fernando"
-var outro_nome = "Leonel"
+var outro_nome: texto = "Leonel"
 
 escreva(nome + " e " + outro_nome)

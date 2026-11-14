@@ -26,7 +26,7 @@ private:
         if (!(fn.ctfe_flags & CTFEFlags.Pure))
             return false;
 
-        foreach (d; fn.decorators)
+        foreach (Decorator d; fn.decorators)
             if (d.envelope !is null)
             {
                 err.error(fn.pos, "Função com envelope de decorador não aceita avaliação //>puro.");
@@ -130,7 +130,7 @@ private:
                 return nodeAnalysisBlockStmt(cast(BlockStmt) node);
 
             case NodeKind.ReturnStmt:
-                auto value = (cast(ReturnStmt) node).val;
+                Node value = (cast(ReturnStmt) node).val;
                 if (value is null)
                 {
                     err.error(node.pos, "Retorno sem valor ainda não é suportado em funções puras.");
@@ -189,25 +189,25 @@ private:
 
     bool nodeAnalysisCallExpr(CallExpr node)
     {
-        auto identifier = cast(Identifier) node.fn;
+        Identifier identifier = cast(Identifier) node.fn;
         if (identifier is null || identifier.functionRef is null)
         {
             err.error(node.pos,
                     "Chamada indireta/método ainda não é suportada na avaliação em tempo de compilação.");
             return false;
         }
-        auto name = identifier.value;
-        auto sym = context.get(name);
+        dstring name = identifier.value;
+        Symbol* sym = context.get(name);
         if (sym is null || !sym.isFn() || (cast(SymbolFn*) sym).node !is identifier.functionRef)
         {
             err.error(node.pos, "Identidade da função não disponível na avaliação em tempo de compilação.");
             return false;
         }
-        auto symf = cast(SymbolFn*) sym;
+        SymbolFn* symf = cast(SymbolFn*) sym;
         if (symf.node.ctfe_flags & CTFEFlags.Pure)
         {
             bool valid = true;
-            foreach (arg; node.args)
+            foreach (Node arg; node.args)
                 if (!nodeAnalysis(arg))
                     valid = false;
             return valid;
@@ -232,7 +232,7 @@ public:
 
     void analysis(Program program)
     {
-        FnDecl[] functions = cast(FnDecl[]) program.body.filter!(node => node.kind == NodeKind.FnDecl).array;
+        FnDecl[] functions = cast(FnDecl[]) program.body.filter!((Node node) => node.kind == NodeKind.FnDecl).array;
         foreach (FnDecl fn; functions)
             analysis(fn);
     }

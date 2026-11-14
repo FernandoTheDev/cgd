@@ -79,6 +79,9 @@ for compiler in args.compilers:
             ],
         )
         command(f"{compiler}/{build}/driver", [sys.executable, "testes/driver.py"])
+        command(f"{compiler}/{build}/LSP", [sys.executable, "testes/lsp.py"])
+        command(f"{compiler}/{build}/bibliotecas", [sys.executable, "testes/bibliotecas.py"])
+
         for cc in args.c_compilers:
             environment = {**os.environ, "CC": cc}
             command(

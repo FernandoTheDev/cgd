@@ -10,11 +10,11 @@ import std.algorithm : any;
 
 private Program program(string source, out Context context)
 {
-    auto diagnostics = new Diagnostics;
-    auto result = new Parser(new Lexer(source, "opt.delegua", diagnostics).tokenizer(), diagnostics).parse();
+    Diagnostics diagnostics = new Diagnostics;
+    Program result = new Parser(new Lexer(source, "opt.delegua", diagnostics).tokenizer(), diagnostics).parse();
     context = new Context;
-    auto registry = new TypeRegistry;
-    auto resolver = new TypeResolver(registry, diagnostics);
+    TypeRegistry registry = new TypeRegistry;
+    TypeResolver resolver = new TypeResolver(registry, diagnostics);
     new Sema1(context, diagnostics).analyze(result);
     new Sema2(registry).analyze(result);
     new Sema3(context, registry, resolver, diagnostics).analyze(result);
@@ -27,8 +27,8 @@ private Program program(string source, out Context context)
 unittest
 {
     Context context;
-    auto p = program("var a=(2+3)*4; var b=7%3; var c='a'+'b'; var d=1!=2; var flag=verdadeiro==falso", context);
-    auto stats = optimize(p, context, new CTFEContext);
+    Program p = program("var a=(2+3)*4; var b=7%3; var c='a'+'b'; var d=1!=2; var flag=verdadeiro==falso", context);
+    OptimizationStats stats = optimize(p, context, new CTFEContext);
     assert(stats.iterations == 2 && stats.folded >= 6);
     assert((cast(IntLit)(cast(VarDecl) p.body[0]).value).value == 20);
     assert((cast(IntLit)(cast(VarDecl) p.body[1]).value).value == 1);
@@ -41,7 +41,7 @@ unittest
 unittest
 {
     Context context;
-    auto p = program("var a=9223372036854775807+1; var b=1/0; var c=7/2; var d=2.0+3.0", context);
+    Program p = program("var a=9223372036854775807+1; var b=1/0; var c=7/2; var d=2.0+3.0", context);
     optimize(p, context, new CTFEContext);
     assert(cast(BinaryExpr)(cast(VarDecl) p.body[0]).value);
     assert(cast(BinaryExpr)(cast(VarDecl) p.body[1]).value);
@@ -51,9 +51,9 @@ unittest
 unittest
 {
     Context context;
-    auto p = program("const x=2; se verdadeiro { const x=9; escreva(x+1) } escreva(x+1)", context);
+    Program p = program("const x=2; se verdadeiro { const x=9; escreva(x+1) } escreva(x+1)", context);
     optimize(p, context, new CTFEContext);
-    auto inner = cast(BlockStmt) p.body[1];
+    BlockStmt inner = cast(BlockStmt) p.body[1];
     assert((cast(IntLit)(cast(CallExpr) inner.body[1]).args[0]).value == 10);
     assert((cast(IntLit)(cast(CallExpr) p.body[2]).args[0]).value == 3);
 }
@@ -61,7 +61,7 @@ unittest
 unittest
 {
     Context context;
-    auto p = program("funcao f(){escreva(1);retorna 2} var x=f(); var y=f()*0; enquanto falso {f()} var z=falso e f(); var t=verdadeiro?7:f()",
+    Program p = program("funcao f(){escreva(1);retorna 2} var x=f(); var y=f()*0; enquanto falso {f()} var z=falso e f(); var t=verdadeiro?7:f()",
             context);
     optimize(p, context, new CTFEContext);
     assert(cast(CallExpr)(cast(VarDecl) p.body[1]).value); // inicializador com efeito
@@ -74,11 +74,12 @@ unittest
 unittest
 {
     Context context;
-    auto p = program("funcao f(x){se x {retorna 1} senao {falhar 'erro'} escreva(99); funcao g(){retorna 2}}", context);
-    auto fn = cast(FnDecl) p.body[0];
-    auto diagnostics = new Diagnostics;
+    Program p = program("funcao f(x){se x {retorna 1} senao {falhar 'erro'} escreva(99); funcao g(){retorna 2}}",
+            context);
+    FnDecl fn = cast(FnDecl) p.body[0];
+    Diagnostics diagnostics = new Diagnostics;
     new FlowAnalysis(diagnostics).analyze(p);
-    assert(diagnostics.entries.any!(d => d.code == "W3001"));
+    assert(diagnostics.entries.any!((const(Diagnostic) d) => d.code == "W3001"));
     optimize(p, context, new CTFEContext);
     assert(fn.body.length == 2 && cast(FnDecl) fn.body[1]);
 }
@@ -86,32 +87,32 @@ unittest
 unittest
 {
     Context context;
-    auto p = program("funcao f(){tente{retorna 1;escreva(99)}finalmente{escreva(2)}}", context);
+    Program p = program("funcao f(){tente{retorna 1;escreva(99)}finalmente{escreva(2)}}", context);
     optimize(p, context, new CTFEContext);
-    auto attempt = cast(TryStmt)(cast(FnDecl) p.body[0]).body[0];
+    TryStmt attempt = cast(TryStmt)(cast(FnDecl) p.body[0]).body[0];
     assert(attempt.body.length == 1 && attempt.finalBody.length == 1);
 }
 
 unittest
 {
     Context context;
-    auto p = program(
+    Program p = program(
             "var a=[(1+2) para cada x em [1+2]]; var b=funcao(x=1+2){retorna 2+3}; classe C{f(){retorna 3+4}}", context);
     optimize(p, context, new CTFEContext);
-    auto comprehension = cast(Comprehension)(cast(VarDecl) p.body[0]).value;
+    Comprehension comprehension = cast(Comprehension)(cast(VarDecl) p.body[0]).value;
     assert((cast(IntLit) comprehension.value).value == 3);
-    auto lambda = cast(FunctionExpr)(cast(VarDecl) p.body[1]).value;
+    FunctionExpr lambda = cast(FunctionExpr)(cast(VarDecl) p.body[1]).value;
     assert((cast(IntLit) lambda.declaration.args[0].value).value == 3);
-    auto c = cast(ClassDecl) p.body[2];
+    ClassDecl c = cast(ClassDecl) p.body[2];
     assert((cast(IntLit)(cast(ReturnStmt) c.methods[0].body[0]).val).value == 7);
 }
 
 unittest
 {
     Context context;
-    auto p = program("//>puro\nfuncao soma(x){retorna x+1} var resultado=soma(2)", context);
-    auto diagnostics = new Diagnostics;
-    auto ctfe = new CTFEContext;
+    Program p = program("//>puro\nfuncao soma(x){retorna x+1} var resultado=soma(2)", context);
+    Diagnostics diagnostics = new Diagnostics;
+    CTFEContext ctfe = new CTFEContext;
     new PurityAnalysis(context, diagnostics, ctfe).analysis(p);
     assert(!diagnostics.hasErrors());
     optimize(p, context, ctfe);
@@ -121,9 +122,9 @@ unittest
 unittest
 {
     Context context;
-    auto p = program("funcao soma(x){retorna x+10} var resultado=soma(2)", context);
-    auto impostor = new FnDecl("soma", [], new TypeExprNamed("qualquer", null), [], 0, null);
-    auto ctfe = new CTFEContext;
+    Program p = program("funcao soma(x){retorna x+10} var resultado=soma(2)", context);
+    FnDecl impostor = new FnDecl("soma", [], new TypeExprNamed("qualquer", null), [], 0, null);
+    CTFEContext ctfe = new CTFEContext;
     ctfe.symbols["soma"] = new SymbolFn(impostor);
     // Há nome registrado, mas a identidade não corresponde: não chama a VM.
     optimize(p, context, ctfe);
@@ -134,9 +135,9 @@ unittest
 {
     import middle.rewrite;
 
-    auto unit = new ModuleUnit("modulo.delegua", new Program([new IntLit(1, null)]), null);
-    auto a = new ImportExpr(new StringLit("modulo.delegua", null), null);
-    auto b = new ImportExpr(new StringLit("modulo.delegua", null), null);
+    ModuleUnit unit = new ModuleUnit("modulo.delegua", new Program([new IntLit(1, null)]), null);
+    ImportExpr a = new ImportExpr(new StringLit("modulo.delegua", null), null);
+    ImportExpr b = new ImportExpr(new StringLit("modulo.delegua", null), null);
     a.target = unit;
     b.target = unit;
     class Counter : AstRewriter
@@ -150,7 +151,7 @@ unittest
         }
     }
 
-    auto counter = new Counter;
+    Counter counter = new Counter;
     counter.rewrite(new Program([a, b]));
     assert(counter.modules == 1);
 }
@@ -158,9 +159,9 @@ unittest
 unittest
 {
     Context context;
-    auto p = program("//>puro\nfuncao f(x){se x{retorna 1}senao{retorna 2}} var resultado=f(falso)", context);
-    auto diagnostics = new Diagnostics;
-    auto ctfe = new CTFEContext;
+    Program p = program("//>puro\nfuncao f(x){se x{retorna 1}senao{retorna 2}} var resultado=f(falso)", context);
+    Diagnostics diagnostics = new Diagnostics;
+    CTFEContext ctfe = new CTFEContext;
     new PurityAnalysis(context, diagnostics, ctfe).analysis(p);
     optimize(p, context, ctfe);
     assert((cast(IntLit)(cast(VarDecl) p.body[1]).value).value == 2);
@@ -169,9 +170,9 @@ unittest
 unittest
 {
     Context context;
-    auto p = program("//>puro\nfuncao f(x:inteiro){retorna x+1} var resultado=f(2.5)", context);
-    auto diagnostics = new Diagnostics;
-    auto ctfe = new CTFEContext;
+    Program p = program("//>puro\nfuncao f(x:inteiro){retorna x+1} var resultado=f(2.5)", context);
+    Diagnostics diagnostics = new Diagnostics;
+    CTFEContext ctfe = new CTFEContext;
     new PurityAnalysis(context, diagnostics, ctfe).analysis(p);
     optimize(p, context, ctfe);
     assert(cast(CallExpr)(cast(VarDecl) p.body[1]).value);
@@ -180,9 +181,9 @@ unittest
 unittest
 {
     Context context;
-    auto p = program("//>puro\nfuncao f(x){retorna 1/x} var resultado=f(0)", context);
-    auto diagnostics = new Diagnostics;
-    auto ctfe = new CTFEContext;
+    Program p = program("//>puro\nfuncao f(x){retorna 1/x} var resultado=f(0)", context);
+    Diagnostics diagnostics = new Diagnostics;
+    CTFEContext ctfe = new CTFEContext;
     new PurityAnalysis(context, diagnostics, ctfe).analysis(p);
     optimize(p, context, ctfe);
     assert(cast(CallExpr)(cast(VarDecl) p.body[1]).value);
@@ -192,8 +193,8 @@ unittest
 unittest
 {
     Context context;
-    auto p = program("//>puro\nfuncao f(g){retorna g()}", context);
-    auto diagnostics = new Diagnostics;
+    Program p = program("//>puro\nfuncao f(g){retorna g()}", context);
+    Diagnostics diagnostics = new Diagnostics;
     new PurityAnalysis(context, diagnostics, new CTFEContext).analysis(p);
     assert(diagnostics.hasErrors());
 }
@@ -201,8 +202,8 @@ unittest
 unittest
 {
     Context context;
-    auto p = program("//>puro\nfuncao f(x){retorna x} //>puro\nfuncao g(){retorna f(escreva(1))}", context);
-    auto diagnostics = new Diagnostics;
+    Program p = program("//>puro\nfuncao f(x){retorna x} //>puro\nfuncao g(){retorna f(escreva(1))}", context);
+    Diagnostics diagnostics = new Diagnostics;
     new PurityAnalysis(context, diagnostics, new CTFEContext).analysis(p);
     assert(diagnostics.hasErrors());
 }
@@ -210,8 +211,8 @@ unittest
 unittest
 {
     Context context;
-    auto p = program("funcao g(){retorna 1} //>puro\nfuncao f(){retorna g}", context);
-    auto diagnostics = new Diagnostics;
+    Program p = program("funcao g(){retorna 1} //>puro\nfuncao f(){retorna g}", context);
+    Diagnostics diagnostics = new Diagnostics;
     new PurityAnalysis(context, diagnostics, new CTFEContext).analysis(p);
     assert(diagnostics.hasErrors());
 }

@@ -1,0 +1,148 @@
+// Wrapper de rede em Delégua sobre primitivas nativas controladas do CGD.
+classe Sessao {
+    privado {
+        _nativa: qualquer
+    }
+
+    construtor() {
+        isto._nativa = cgdCurlCriar()
+    }
+
+    opcao(nome: texto, valor: qualquer): Sessao {
+        se tipo de valor == "logico" {
+            valor = valor ? 1: 0
+        }
+        cgdCurlOpcao(isto._nativa, nome, valor);
+        retorna isto
+    }
+
+    executar(): dicionario {
+        retorna cgdCurlExecutar(isto._nativa)
+    }
+
+    multipart(partes: dicionario[]): Sessao {
+        cgdCurlMultipart(isto._nativa, partes);
+        retorna isto
+    }
+
+    upload(dados: texto): Sessao {
+        isto.opcao("CGD_UPLOAD_BODY", dados);
+        isto.opcao("UPLOAD", 1);
+        retorna isto
+    }
+
+    enviar(dados: texto): dicionario {
+        retorna cgdCurlEnviar(isto._nativa, dados)
+    }
+
+    receber(limite: inteiro = 65536): dicionario {
+        retorna cgdCurlReceber(isto._nativa, limite)
+    }
+
+    esperar(milisegundos: inteiro = 1000, escrita: logico = falso): logico {
+        retorna cgdCurlEsperar(isto._nativa, milisegundos, escrita)
+    }
+
+    enviarWebSocket(dados: texto, flags: inteiro = 1): dicionario {
+        retorna cgdCurlWsEnviar(isto._nativa, dados, flags)
+    }
+
+    receberWebSocket(limite: inteiro = 65536): dicionario {
+        retorna cgdCurlWsReceber(isto._nativa, limite)
+    }
+
+    info(nome: texto): qualquer {
+        retorna cgdCurlInfo(isto._nativa, nome)
+    }
+
+    manter(): vazio {
+        cgdCurlManter(isto._nativa)
+    }
+
+    resetar(): Sessao {
+        cgdCurlResetar(isto._nativa);
+        retorna isto
+    }
+
+    fechar(): vazio {
+        cgdCurlFechar(isto._nativa)
+    }
+
+    nativa(): qualquer {
+        retorna isto._nativa
+    }
+}
+
+funcao versao(): texto {
+    retorna cgdCurlVersao()
+}
+
+funcao opcoes(): dicionario[] {
+    retorna cgdCurlOpcoes()
+}
+
+funcao escapar(valor: texto): texto {
+    retorna cgdCurlEscapar(valor)
+}
+
+funcao decodificar(valor: texto): texto {
+    retorna cgdCurlDecodificar(valor)
+}
+
+funcao requisitar(url: texto, metodo: texto = "GET", corpo: qualquer = nulo, cabecalhos: qualquer = [],
+    opcoes: qualquer = {}): dicionario {
+    var sessao: Sessao = Sessao()
+    tente {
+        sessao.opcao("URL", url)
+        sessao.opcao("CUSTOMREQUEST", metodo)
+        se corpo != nulo {
+            sessao.opcao("COPYPOSTFIELDS", corpo)
+        }
+        se tamanho(cabecalhos) > 0 {
+            sessao.opcao("HTTPHEADER", cabecalhos)
+        }
+        para cada nome: texto em opcoes.chaves() {
+            sessao.opcao(nome, opcoes[nome])
+        }
+        retorna sessao.executar()
+    } finalmente {
+        sessao.fechar()
+    }
+}
+
+funcao obter(url: texto, opcoes: qualquer = {}): dicionario {
+    retorna requisitar(url, "GET", nulo, [], opcoes)
+}
+
+funcao enviar(url: texto, corpo: qualquer, cabecalhos: qualquer = [], opcoes: qualquer = {}): dicionario {
+    retorna requisitar(url, "POST", corpo, cabecalhos, opcoes)
+}
+
+funcao lote(sessoes: qualquer[]): dicionario[] {
+    var nativas: qualquer[] = []
+    para cada sessao: Sessao em sessoes {
+        nativas.adicionar(sessao.nativa())
+    }
+
+    retorna cgdCurlLote(nativas)
+}
+
+funcao detalhes(): dicionario {
+    retorna cgdCurlDetalhes()
+}
+
+funcao mensagemErro(codigo: inteiro): texto {
+    retorna cgdCurlErro(codigo)
+}
+
+funcao data(textoData: texto): inteiro {
+    retorna cgdCurlData(textoData)
+}
+
+funcao componenteUrl(url: texto, parte: texto): texto {
+    retorna cgdCurlUrl(url, parte, nulo)
+}
+
+funcao alterarUrl(url: texto, parte: texto, valor: qualquer): texto {
+    retorna cgdCurlUrl(url, parte, valor)
+}

@@ -101,6 +101,7 @@ RUNTIME_ERRORS = [
 
 # Casos que agora falham antes de gerar C, com o código público esperado.
 STATIC_ERRORS = {
+    "campo_tipo": "E3104",
     "soma_overflow_constante": "E3102",
     "zero": "E3101",
     "potencia_overflow": "E3102",

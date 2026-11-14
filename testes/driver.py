@@ -182,4 +182,20 @@ with tempfile.TemporaryDirectory(prefix="cgd localizacao ") as tmp:
     )
     checks += 1
 
+with tempfile.TemporaryDirectory(prefix="cgd formatacao ") as tmp:
+    source = Path(tmp) / "com espacos.delegua"
+    source.write_text("funcao dobro(x:inteiro):inteiro{retorna x*2;}")
+    environment = {**os.environ, "CC": "/compilador/inexistente"}
+    assert run("--verificar-formatacao", str(source), env=environment).returncode == 1
+    assert run("--formatar", str(source), env=environment).returncode == 0
+    assert "\n    retorna x * 2;" in source.read_text()
+    assert run("--verificar-formatacao", str(source), env=environment).returncode == 0
+    missing = run("--formatar", str(Path(tmp) / "ausente.delegua"), env=environment)
+    assert (
+        missing.returncode == 1
+        and "E9001" in missing.stderr
+        and "Falha ao formatar" in missing.stderr
+    )
+    checks += 4
+
 print(f"{checks} verificações de driver passaram.")

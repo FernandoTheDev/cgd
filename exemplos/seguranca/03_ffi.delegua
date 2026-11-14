@@ -2,4 +2,5 @@
 //? fase: compilacao
 //? erro: segurança
 // Código nativo arbitrário não faz parte do perfil compilado.
-classe estrangeira Biblioteca {}
+classe estrangeira Biblioteca {
+}

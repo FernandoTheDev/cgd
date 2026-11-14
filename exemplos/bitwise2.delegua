@@ -1,5 +1,5 @@
 //! 20\n5\n0\n11\n11
-var x = 10
+var x: numero = 10
 escreva(x << 1)
 escreva(x >> 1)
 escreva(x & 1)

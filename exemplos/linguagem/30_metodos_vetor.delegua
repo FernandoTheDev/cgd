@@ -1,9 +1,15 @@
 //! [4, 3, 2, 1]\n14\n3\n2\n[3, 6]
-var v = [1, 2]
+var v: qualquer[] = [1, 2]
 v.empilhar(3)
-escreva(v.concatenar([4]).ordenar(funcao(a, b) { retorna b - a }))
+escreva(v.concatenar([4]).ordenar(funcao(a: qualquer, b: qualquer): qualquer {
+    retorna b - a
+}))
 v.adicionar(4)
 escreva(v.removerPrimeiro(), v.removerUltimo())
 escreva(v.removerUltimo())
 escreva(v.removerPrimeiro())
-escreva([1, 2, 3].filtrarPor(funcao(x) { retorna x < 3 }).mapear(funcao(x) { retorna x * 3 }))
+escreva([1, 2, 3].filtrarPor(funcao(x: qualquer): qualquer {
+    retorna x < 3
+}).mapear(funcao(x: qualquer): qualquer {
+    retorna x * 3
+}))

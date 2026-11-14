@@ -1,10 +1,18 @@
 //! 6\n9\n[3, 6, 9]
-funcao dobro(x) { retorna x * 2 }
-var operacao = dobro
-funcao criar() {
-    // Esta função não captura nenhuma variável de criar().
-    retorna funcao(x) { retorna x + 4 }
+funcao dobro(x: qualquer): qualquer {
+    retorna x * 2
 }
+
+var operacao: funcao = dobro
+funcao criar(): qualquer {
+    // Esta função não captura nenhuma variável de criar().
+    retorna funcao(x: qualquer): qualquer {
+        retorna x + 4
+    }
+}
+
 escreva(operacao(3))
 escreva(criar()(5))
-escreva(mapear([1, 2, 3], funcao(x) { retorna x * 3 }))
+escreva(mapear([1, 2, 3], funcao(x: qualquer): qualquer {
+    retorna x * 3
+}))

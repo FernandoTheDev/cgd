@@ -85,7 +85,7 @@ immutable MessageSpec[] messages = [
 
 const(MessageSpec)* lookupMessage(string code)
 {
-    foreach (ref spec; messages)
+    foreach (ref immutable(MessageSpec) spec; messages)
         if (spec.code == code || (code.length == 5 && code[0] == 'W' && spec.code == "E" ~ code[1 .. $]))
             return &spec;
     return null;

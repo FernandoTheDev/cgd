@@ -19,16 +19,16 @@ final class CgdDeadCode : AstRewriter
     {
         Node[] result;
         bool stopped;
-        foreach (original; body)
+        foreach (Node original; body)
         {
-            auto node = original;
+            Node node = original;
             if (stopped && !cast(FnDecl) node && !cast(ClassDecl) node)
             {
                 changes++;
                 continue;
             }
-            if (auto branch = cast(IfStmt) node)
-                if (auto condition = cast(BoolLit) branch.expr)
+            if (IfStmt branch = cast(IfStmt) node)
+                if (BoolLit condition = cast(BoolLit) branch.expr)
                 {
                     changes++;
                     if (condition.value)
@@ -39,8 +39,8 @@ final class CgdDeadCode : AstRewriter
                         continue;
                 }
             // Nunca remove um laço com declaração: o backend mantém os vínculos.
-            if (auto loop = cast(WhileStmt) node)
-                if (auto condition = cast(BoolLit) loop.expr)
+            if (WhileStmt loop = cast(WhileStmt) node)
+                if (BoolLit condition = cast(BoolLit) loop.expr)
                     if (!condition.value)
                     {
                         changes++;
@@ -54,35 +54,35 @@ final class CgdDeadCode : AstRewriter
 
     override protected Node transform(Node node)
     {
-        if (auto n = cast(Program) node)
+        if (Program n = cast(Program) node)
             clean(n.body);
-        else if (auto n = cast(FnDecl) node)
+        else if (FnDecl n = cast(FnDecl) node)
             clean(n.body);
-        else if (auto n = cast(BlockStmt) node)
+        else if (BlockStmt n = cast(BlockStmt) node)
             clean(n.body);
-        else if (auto n = cast(SequenceStmt) node)
+        else if (SequenceStmt n = cast(SequenceStmt) node)
             clean(n.body);
-        else if (auto n = cast(IfStmt) node)
+        else if (IfStmt n = cast(IfStmt) node)
             clean(n.body);
-        else if (auto n = cast(WhileStmt) node)
+        else if (WhileStmt n = cast(WhileStmt) node)
             clean(n.body);
-        else if (auto n = cast(ForStmt) node)
+        else if (ForStmt n = cast(ForStmt) node)
             clean(n.body);
-        else if (auto n = cast(DoStmt) node)
+        else if (DoStmt n = cast(DoStmt) node)
             clean(n.body);
-        else if (auto n = cast(EachStmt) node)
+        else if (EachStmt n = cast(EachStmt) node)
             clean(n.body);
-        else if (auto n = cast(TryStmt) node)
+        else if (TryStmt n = cast(TryStmt) node)
         {
             clean(n.body);
             clean(n.finalBody);
-            foreach (ref c; n.catches)
+            foreach (ref CatchClause c; n.catches)
                 clean(c.body);
         }
-        else if (auto n = cast(SwitchStmt) node)
+        else if (SwitchStmt n = cast(SwitchStmt) node)
         {
             clean(n.fallback);
-            foreach (ref c; n.cases)
+            foreach (ref SwitchCase c; n.cases)
                 clean(c.body);
         }
         return node;

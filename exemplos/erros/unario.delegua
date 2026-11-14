@@ -1,4 +1,4 @@
 //# 1
-var n = 0
+var n: inteiro = 0
 n++++
 escreva(n)

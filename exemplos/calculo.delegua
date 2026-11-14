@@ -1,4 +1,4 @@
 //! 67
-var x = 60 + 7 - 1
+var x: numero = 60 + 7 - 1
 x++
 escreva(x)

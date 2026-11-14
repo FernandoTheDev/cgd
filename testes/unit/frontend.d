@@ -15,12 +15,12 @@ private Program parsed(string source, Diagnostics diagnostics)
 
 private Diagnostics analyzed(string source)
 {
-    auto diagnostics = new Diagnostics;
-    auto program = parsed(source, diagnostics);
+    Diagnostics diagnostics = new Diagnostics;
+    Program program = parsed(source, diagnostics);
     if (diagnostics.hasErrors())
         return diagnostics;
-    auto context = new Context;
-    auto registry = new TypeRegistry;
+    Context context = new Context;
+    TypeRegistry registry = new TypeRegistry;
     new Sema1(context, diagnostics).analyze(program);
     new Sema2(registry).analyze(program);
     new Sema3(context, registry, new TypeResolver(registry, diagnostics), diagnostics).analyze(program);
@@ -29,23 +29,24 @@ private Diagnostics analyzed(string source)
 
 unittest
 {
-    auto diagnostics = new Diagnostics;
-    auto tokens = new Lexer("classe A {} tente {} pegue {} finalmente {} importar('m.delegua')",
+    Diagnostics diagnostics = new Diagnostics;
+    Token[] tokens = new Lexer("classe A {} tente {} pegue {} finalmente {} importar('m.delegua')",
             "teste.delegua", diagnostics).tokenizer();
     assert(!diagnostics.hasErrors());
-    assert(tokens.any!(t => t.kind == TokenKind.Class));
-    assert(tokens.any!(t => t.kind == TokenKind.Try));
-    assert(tokens.any!(t => t.kind == TokenKind.Catch));
-    assert(tokens.any!(t => t.kind == TokenKind.Finally));
-    assert(tokens.any!(t => t.kind == TokenKind.Import));
+    assert(tokens.any!((Token t) => t.kind == TokenKind.Class));
+    assert(tokens.any!((Token t) => t.kind == TokenKind.Try));
+    assert(tokens.any!((Token t) => t.kind == TokenKind.Catch));
+    assert(tokens.any!((Token t) => t.kind == TokenKind.Finally));
+    assert(tokens.any!((Token t) => t.kind == TokenKind.Import));
 }
 
 unittest
 {
-    auto diagnostics = analyzed("funcao criar(x) { retorna funcao() { retorna x } }");
+    Diagnostics diagnostics = analyzed("funcao criar(x) { retorna funcao() { retorna x } }");
     assert(diagnostics.hasErrors());
     assert(diagnostics.hasWarnings());
-    assert(diagnostics.entries.any!(d => d.severity == Severity.Warning && d.message.indexOf("upvalues") >= 0));
+    assert(diagnostics.entries.any!((const(Diagnostic) d) => d.severity == Severity.Warning
+            && d.message.indexOf("upvalues") >= 0));
 }
 
 unittest
@@ -70,7 +71,7 @@ unittest
 
 unittest
 {
-    auto diagnostics = new Diagnostics;
+    Diagnostics diagnostics = new Diagnostics;
     bool failed;
     try
         parsed("funcao f() { retorna 1", diagnostics);
@@ -102,7 +103,7 @@ unittest
 
 unittest
 {
-    auto diagnostics = analyzed(q{
+    Diagnostics diagnostics = analyzed(q{
         var x=2;
         escreva("valor ${x+1}");
         var v=[x*2 para cada x em [1,2,3] se x>1];
@@ -113,29 +114,57 @@ unittest
 
 unittest
 {
-    auto diagnostics = new Diagnostics;
-    auto program = parsed("classe A {} classe B herda A {}", diagnostics);
-    auto a = cast(ClassDecl) program.body[0];
-    auto b = cast(ClassDecl) program.body[1];
+    Diagnostics diagnostics = new Diagnostics;
+    Program program = parsed("classe A {} classe B herda A {}", diagnostics);
+    ClassDecl a = cast(ClassDecl) program.body[0];
+    ClassDecl b = cast(ClassDecl) program.body[1];
     b.superClass = a;
-    auto other = new ClassDecl("A", "", null);
+    ClassDecl other = new ClassDecl("A", "", null);
     assert(new TypeSemaClass(a).isComp(new TypeSemaClass(b)));
     assert(!new TypeSemaClass(a).isComp(new TypeSemaClass(other)));
 }
 
 unittest
 {
-    auto folder = buildPath(tempDir(), "cgd-module-" ~ randomUUID().toString());
+    string folder = buildPath(tempDir(), "cgd-module-" ~ randomUUID().toString());
     mkdirRecurse(folder);
     scope (exit)
         rmdirRecurse(folder);
-    auto root = buildPath(folder, "main.delegua");
+    string root = buildPath(folder, "main.delegua");
     write(root, "var a=importar('a.delegua')");
     write(buildPath(folder, "a.delegua"), "var b=importar('b.delegua')");
     write(buildPath(folder, "b.delegua"), "var a=importar('a.delegua')");
-    auto diagnostics = new Diagnostics;
-    auto program = parsed(readText(root), diagnostics);
+    Diagnostics diagnostics = new Diagnostics;
+    Program program = parsed(readText(root), diagnostics);
     new ModuleLoader(diagnostics).load(program, root);
     assert(diagnostics.hasErrors());
-    assert(diagnostics.entries.any!(d => d.message.indexOf("Ciclo") >= 0));
+    assert(diagnostics.entries.any!((const(Diagnostic) d) => d.message.indexOf("Ciclo") >= 0));
+}
+
+unittest
+{
+    // Identidade/signatura pronta antes dos corpos: referências mútuas não são herança.
+    assert(!analyzed("classe A{criar():qualquer{retorna B()}} classe B{criar():qualquer{retorna A()}}").hasErrors());
+    assert(!analyzed("classe A{estatico dobro(x:inteiro):inteiro{retorna x*2}} var a:inteiro=A.dobro(2)").hasErrors());
+    assert(analyzed("classe A{estatico erro():qualquer{retorna isto}}").hasErrors());
+    assert(analyzed("classe A{estatico construtor(){}}").hasErrors());
+    assert(!analyzed("para cada valor:inteiro em [1,2]{escreva(valor)}").hasErrors());
+}
+
+unittest
+{
+    import frontend.flow : terminates;
+
+    Diagnostics diagnostics = new Diagnostics;
+    Program program = parsed("funcao a():inteiro{tente{retorna 1}finalmente{escreva(2)}} funcao b():inteiro{tente{retorna 1}pegue(erro){escreva(erro)}}",
+            diagnostics);
+    assert(terminates((cast(FnDecl) program.body[0]).body));
+    assert(!terminates((cast(FnDecl) program.body[1]).body));
+}
+
+unittest
+{
+    assert(!analyzed("const {nome:texto, idade:inteiro}={nome:'CGD',idade:1}").hasErrors());
+    assert(!analyzed("para cada {nome:texto, valor:inteiro} em {x:1}{escreva(nome,valor)}").hasErrors());
+    assert(!analyzed("var v:inteiro[]=[1,2];escreva([x+1 para cada x:inteiro em v])").hasErrors());
 }

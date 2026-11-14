@@ -99,7 +99,7 @@ class Program : Node
     override void print(uint indent = 0)
     {
         writeln("Program");
-        foreach (i, node; body)
+        foreach (size_t i, Node node; body)
         {
             bool isLast = (i == cast(size_t)
                     body.length - 1);
@@ -215,6 +215,8 @@ class BoolLit : Node
 
 class Identifier : Node
 {
+    FnArg parameterRef;
+    ClassDecl lexicalClass;
     VarDecl variableRef;
     FnDecl functionRef;
     ClassDecl classRef;
@@ -307,7 +309,7 @@ class CallExpr : Node
         writeln();
         printIndent(indent, args.length == 0);
         fn.print(indent + 1);
-        foreach (i, arg; args)
+        foreach (size_t i, Node arg; args)
         {
             bool isLast = (i == cast(size_t) args.length - 1);
             printIndent(indent, isLast);
@@ -345,7 +347,7 @@ class FnDecl : Node
     dstring fn;
     dstring linkName;
     dstring builtinName;
-    bool analyzed, isMethod, accessor, anonymous, decoratorEnvelope;
+    bool analyzed, isMethod, isStatic, accessor, anonymous, decoratorEnvelope;
     ClassDecl ownerClass, classFactory;
     int access;
     FnArg[] args;
@@ -388,7 +390,7 @@ class FnDecl : Node
         writeln();
 
         // argumentos
-        foreach (i, arg; args)
+        foreach (size_t i, FnArg arg; args)
         {
             bool isLastArg = (i == cast(size_t) args.length - 1) && body.length == 0;
             printIndent(indent, isLastArg);
@@ -401,7 +403,7 @@ class FnDecl : Node
         }
 
         // corpo
-        foreach (i, node; body)
+        foreach (size_t i, Node node; body)
         {
             bool isLast = (i == cast(size_t)
                     body.length - 1);
@@ -461,7 +463,7 @@ class IfStmt : Node
             writeln("ElseStmt");
         }
 
-        foreach (i, node; body)
+        foreach (size_t i, Node node; body)
         {
             bool isLast = (i == cast(size_t)
                     body.length - 1) && _else is null;
@@ -547,7 +549,7 @@ class BlockStmt : Node
     override void print(uint indent = 0)
     {
         writefln("BlockStmt");
-        foreach (i, node; body)
+        foreach (size_t i, Node node; body)
         {
             bool isLast = (i == cast(size_t)
                     body.length - 1);
@@ -609,7 +611,7 @@ class WhileStmt : Node
         writefln("WhileStmt");
         printIndent(indent);
         expr.print(indent);
-        foreach (i, node; body)
+        foreach (size_t i, Node node; body)
         {
             bool isLast = (i == cast(size_t)
                     body.length - 1);
@@ -642,14 +644,14 @@ class MemberExpr : Node
 
 private void printIndent(uint indent, bool isLast = false)
 {
-    foreach (i; 0 .. indent)
+    foreach (uint i; 0 .. indent)
         write("│   ");
     write(isLast ? "└── " : "├── ");
 }
 
 private void printIndentContinue(uint indent)
 {
-    foreach (i; 0 .. indent)
+    foreach (uint i; 0 .. indent)
         write("│   ");
 }
 
@@ -738,7 +740,9 @@ class MapLit : Node
 
 class EachStmt : Node
 {
+    TypeExpr bindingType;
     dstring[] destructured;
+    TypeExpr[] destructuredTypes;
     dstring name;
     Node iterable;
     Node[] body;
@@ -777,90 +781,90 @@ Node[] childNodes(Node node)
 {
     if (node is null)
         return [];
-    if (auto n = cast(SequenceStmt) node)
+    if (SequenceStmt n = cast(SequenceStmt) node)
         return n.body;
-    if (auto n = cast(ConditionalExpr) node)
+    if (ConditionalExpr n = cast(ConditionalExpr) node)
         return [n.condition, n.yes, n.no];
-    if (auto n = cast(SliceExpr) node)
+    if (SliceExpr n = cast(SliceExpr) node)
         return [n.value, n.start, n.end, n.step];
-    if (auto n = cast(SpreadExpr) node)
+    if (SpreadExpr n = cast(SpreadExpr) node)
         return [n.value];
-    if (auto n = cast(Comprehension) node)
+    if (Comprehension n = cast(Comprehension) node)
         return [n.value, n.iterable, n.condition];
-    if (auto n = cast(LoopExpr) node)
+    if (LoopExpr n = cast(LoopExpr) node)
         return [n.loop];
-    if (auto n = cast(SwitchStmt) node)
+    if (SwitchStmt n = cast(SwitchStmt) node)
     {
         Node[] nodes = [n.value] ~ n.fallback;
-        foreach (c; n.cases)
+        foreach (SwitchCase c; n.cases)
             nodes ~= c.values ~ c.body;
         return nodes;
     }
-    if (auto n = cast(ModuleUnit) node)
+    if (ModuleUnit n = cast(ModuleUnit) node)
         return [n.program];
-    if (auto n = cast(ImportExpr) node)
+    if (ImportExpr n = cast(ImportExpr) node)
         return n.target is null ? [n.path] : [n.path, cast(Node) n.target];
-    if (auto n = cast(TryStmt) node)
+    if (TryStmt n = cast(TryStmt) node)
     {
         Node[] result = n.body ~ n.finalBody;
-        foreach (c; n.catches)
+        foreach (CatchClause c; n.catches)
             result ~= c.body;
         return result;
     }
-    if (auto n = cast(ThrowStmt) node)
+    if (ThrowStmt n = cast(ThrowStmt) node)
         return [n.value];
-    if (auto n = cast(ClassDecl) node)
+    if (ClassDecl n = cast(ClassDecl) node)
     {
         Node[] nodes;
-        foreach (m; n.methods)
+        foreach (FnDecl m; n.methods)
             nodes ~= m;
         return nodes;
     }
-    if (auto n = cast(Program) node)
+    if (Program n = cast(Program) node)
         return n.body;
-    if (auto n = cast(FnDecl) node)
+    if (FnDecl n = cast(FnDecl) node)
     {
         Node[] result = n.body.dup;
-        foreach (a; n.args)
+        foreach (FnArg a; n.args)
             if (a.value !is null)
                 result ~= a.value;
         return result;
     }
-    if (auto n = cast(FunctionExpr) node)
+    if (FunctionExpr n = cast(FunctionExpr) node)
         return [n.declaration];
-    if (auto n = cast(VarDecl) node)
+    if (VarDecl n = cast(VarDecl) node)
         return [n.value];
-    if (auto n = cast(BinaryExpr) node)
+    if (BinaryExpr n = cast(BinaryExpr) node)
         return [n.left, n.right];
-    if (auto n = cast(UnaryExpr) node)
+    if (UnaryExpr n = cast(UnaryExpr) node)
         return [n.value];
-    if (auto n = cast(CallExpr) node)
+    if (CallExpr n = cast(CallExpr) node)
         return [n.fn] ~ n.args;
-    if (auto n = cast(ReturnStmt) node)
+    if (ReturnStmt n = cast(ReturnStmt) node)
         return [n.val];
-    if (auto n = cast(IfStmt) node)
+    if (IfStmt n = cast(IfStmt) node)
         return [n.expr, cast(Node) n._else] ~ n.body;
-    if (auto n = cast(BlockStmt) node)
+    if (BlockStmt n = cast(BlockStmt) node)
         return n.body;
-    if (auto n = cast(WhileStmt) node)
+    if (WhileStmt n = cast(WhileStmt) node)
         return [n.expr] ~ n.body;
-    if (auto n = cast(ForStmt) node)
+    if (ForStmt n = cast(ForStmt) node)
         return [n.init, n.condition, n.step] ~ n.body;
-    if (auto n = cast(DoStmt) node)
+    if (DoStmt n = cast(DoStmt) node)
         return [n.condition] ~ n.body;
-    if (auto n = cast(EachStmt) node)
+    if (EachStmt n = cast(EachStmt) node)
         return [n.iterable] ~ n.body;
-    if (auto n = cast(ArrayLit) node)
+    if (ArrayLit n = cast(ArrayLit) node)
         return n.elements;
-    if (auto n = cast(MapLit) node)
+    if (MapLit n = cast(MapLit) node)
         return n.keys ~ n.values;
-    if (auto n = cast(IndexExpr) node)
+    if (IndexExpr n = cast(IndexExpr) node)
         return [n.value, n.idx];
-    if (auto n = cast(MemberExpr) node)
+    if (MemberExpr n = cast(MemberExpr) node)
         return [n.left, n.right];
-    if (auto n = cast(AssignStmt) node)
+    if (AssignStmt n = cast(AssignStmt) node)
         return [n.left, n.value];
-    if (auto n = cast(TypeOfExpr) node)
+    if (TypeOfExpr n = cast(TypeOfExpr) node)
         return [n.value];
     return [];
 }
@@ -1043,6 +1047,7 @@ class SpreadExpr : Node
 
 class Comprehension : Node
 {
+    TypeExpr bindingType;
     Node value, iterable, condition;
     dstring name;
     this(Node v, Node source, Node cond, dstring name, Position pos)

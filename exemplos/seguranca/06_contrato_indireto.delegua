@@ -1,6 +1,9 @@
 //# 1
 //? fase: execucao
 //? erro: Incompatibilidade
-funcao identidade(x: inteiro): inteiro { retorna x }
-var operacao = identidade
+funcao identidade(x: inteiro): inteiro {
+    retorna x
+}
+
+var operacao: funcao = identidade
 operacao("texto") // A chamada indireta também valida o contrato.

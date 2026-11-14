@@ -11,6 +11,7 @@ import errors;
 
 class Lexer
 {
+    public bool includeComments;
 private:
     Diagnostics err;
     Token[] tokens;
@@ -274,7 +275,7 @@ public:
                         bool escaped;
                         while (!isAtEnd() && nesting)
                         {
-                            auto x = advance();
+                            dchar x = advance();
                             buffer ~= x;
                             if (x == '\n')
                             {
@@ -339,7 +340,7 @@ public:
                     return tokens;
                 }
 
-                auto token = new Token(TokenKind.String, TokenRaw._s(buffer), getPosition(start, l));
+                Token token = new Token(TokenKind.String, TokenRaw._s(buffer), getPosition(start, l));
                 token.escapedInterpolation = escapedInterpolation;
                 pushToken(token);
                 continue;
@@ -390,8 +391,11 @@ public:
 
                 if (tk == "//")
                 {
+                    uint start = l_offset;
                     while (!isAtEnd() && peek() != '\n')
                         advance();
+                    if (includeComments)
+                        pushToken(new Token(TokenKind.Comment, TokenRaw.init, getPosition(start, line)));
                     continue;
                 }
 

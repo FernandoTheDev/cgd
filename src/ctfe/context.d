@@ -1,4 +1,5 @@
 module ctfe.context;
+import frontend.parser.ast : FnDecl, FnArg;
 
 import std.stdio;
 
@@ -85,11 +86,11 @@ class CTFEContext
         if (depth >= 128)
             throw new CTFELimitException("Limite de recursão em tempo de compilação.");
         enforce(name in functions, "Função indisponível na avaliação em tempo de compilação.");
-        auto symbol = name in symbols;
+        SymbolFn* symbol = name in symbols;
         enforce(symbol !is null, "Identidade da função ausente na CTFE.");
-        auto functionNode = (*symbol).node;
+        FnDecl functionNode = (*symbol).node;
         enforce(params.length == functionNode.args.length, "Aridade/defaults exigem execução nativa.");
-        foreach (i, arg; functionNode.args)
+        foreach (size_t i, FnArg arg; functionNode.args)
         {
             enforce(!arg.rest, "Parâmetro variável exige execução nativa.");
             if (arg.type_expr !is null)
@@ -102,7 +103,7 @@ class CTFEContext
         vm.instructions = functions[name].instructions;
         vm.ctfe = this;
         size_t locals = 0;
-        foreach (instruction; vm.instructions)
+        foreach (VMInstruction instruction; vm.instructions)
             if (instruction.opCode == VMOpCode.Store || instruction.opCode == VMOpCode.Load)
             {
                 enforce(instruction.param < 100_000,

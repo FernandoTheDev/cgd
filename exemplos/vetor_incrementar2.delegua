@@ -1,7 +1,7 @@
 //! 67
-var x = [[66]]
+var x: qualquer[] = [[66]]
 
-var i = 0
-var j = 0
+var i: numero = 0
+var j: numero = 0
 
-escreva(++x[i][j])
+escreva(++ x[i][j])

@@ -1,0 +1,29 @@
+// Operações determinísticas; callbacks nativos continuam sem capturas.
+classe Colecoes {
+    estatico unicos(valores: qualquer[]): qualquer[] {
+        var resultado: qualquer[] = []
+        para cada valor: qualquer em valores {
+            se !resultado.inclui(valor) {
+                resultado.adicionar(valor)
+            }
+        }
+        retorna resultado
+    }
+
+    // Intervalo semiaberto com passo positivo ou negativo e limite de alocação.
+    estatico intervalo(inicio: inteiro, fim: inteiro, passo: inteiro = 1): inteiro[] {
+        se passo == 0 {
+            falhar "Passo de intervalo não pode ser zero"
+        }
+        var resultado: inteiro[] = []
+        var atual: inteiro = inicio
+        enquanto (passo > 0 e atual < fim) ou(passo < 0 e atual > fim) {
+            se tamanho(resultado) >= 1000000 {
+                falhar "Intervalo excede um milhão de elementos"
+            }
+            resultado.adicionar(atual)
+            atual += passo
+        }
+        retorna resultado
+    }
+}

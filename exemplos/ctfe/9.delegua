@@ -1,9 +1,9 @@
 //$
 //! verdadeiro
 //>puro
-funcao menorQue(n, m) {
+funcao menorQue(n: qualquer, m: qualquer): qualquer {
     se n <= m
-        retorne verdadeiro
+    retorne verdadeiro
     retorne falso
 }
 

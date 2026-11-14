@@ -13,8 +13,8 @@ import backend.c.lvalue;
 import frontend.parser;
 import backend.c.utils;
 
-enum VALUE = "delegua_value";
-enum ENTRY = "delegua_main";
+enum string VALUE = "delegua_value";
+enum string ENTRY = "delegua_main";
 
 class BackendC
 {
@@ -26,15 +26,15 @@ private:
     TypeExpr functionReturn;
     dstring descriptor(TypeExpr type)
     {
-        if (auto named = cast(TypeExprNamed) type)
+        if (TypeExprNamed named = cast(TypeExprNamed) type)
             return named.classLinkName.length ? formatD("delegua_descr_classe(%s)",
                     cName(named.classLinkName)) : formatD("delegua_descr_nome(%s)", cString(named.name));
-        if (auto array = cast(TypeExprArray) type)
+        if (TypeExprArray array = cast(TypeExprArray) type)
             return formatD("delegua_descr_array(%s)", descriptor(array.base));
-        if (auto tuple = cast(TypeExprTuple) type)
+        if (TypeExprTuple tuple = cast(TypeExprTuple) type)
         {
             dstring[] children;
-            foreach (t; tuple.types)
+            foreach (TypeExpr t; tuple.types)
                 children ~= descriptor(t);
             return formatD("delegua_descr_tupla(%s,(delegua_tipo*[]){%s})", children.length, children.join(","));
         }
@@ -45,8 +45,8 @@ private:
     {
         if (type is null || type.toStr() == "qualquer")
             return value;
-        auto site = location(pos is null ? type.pos : pos);
-        auto expression = formatD("delegua_assegurar_descr(%s,%s)", value, descriptor(type));
+        dstring site = location(pos is null ? type.pos : pos);
+        dstring expression = formatD("delegua_assegurar_descr(%s,%s)", value, descriptor(type));
         return site.length ? "(" ~ site ~ ", " ~ expression ~ ")" : expression;
     }
 
@@ -90,13 +90,13 @@ private:
 
     dstring compileAssignment(AssignStmt assign)
     {
-        auto lv = resolveLValue(assign.left);
+        LValue lv = resolveLValue(assign.left);
         dstring value;
         if (assign.op == TokenKind.Equals)
             value = materialize(assign.value);
         else
         {
-            auto old = formatD("cgd_tmp_%s", tmp++);
+            dstring old = formatD("cgd_tmp_%s", tmp++);
             emitLocal(formatD("delegua_value %s=%s;", old, atSite(lv.read(), assign.pos)));
             dstring op;
             switch (assign.op)
@@ -119,10 +119,10 @@ private:
                 default:
                     throw new Exception("Atribuição inválida no backend.");
             }
-            auto rhs = materialize(assign.value);
+            dstring rhs = materialize(assign.value);
             value = atSite(formatD("delegua_op_%s(%s,%s)", op, old, rhs), assign.pos);
         }
-        auto result = formatD("cgd_tmp_%s", tmp++);
+        dstring result = formatD("cgd_tmp_%s", tmp++);
         emitLocal(formatD("delegua_value %s=%s;", result, checked(value, assign.left.type_expr, assign.pos)));
         emitLocal(atSite(lv.write(result), assign.pos) ~ ";");
         return result;
@@ -130,29 +130,29 @@ private:
 
     dstring compileSwitch(SwitchStmt node)
     {
-        auto value = materialize(node.value), label = formatD("cgd_switch_%s", tmp++),
+        dstring value = materialize(node.value), label = formatD("cgd_switch_%s", tmp++),
             done = formatD("cgd_done_%s", tmp++);
         breakLabels ~= label;
         breakTryDepth ~= cleanups.length;
         dstring[] result = [formatD("{bool %s=false;", done)];
-        foreach (c; node.cases)
+        foreach (SwitchCase c; node.cases)
         {
-            auto matched = formatD("cgd_match_%s", tmp++);
+            dstring matched = formatD("cgd_match_%s", tmp++);
             result ~= formatD("if(!%s){bool %s=false;", done, matched);
-            foreach (v; c.values)
+            foreach (Node v; c.values)
             {
                 dstring expression;
-                auto setup = captureExpr(v, expression);
+                dstring setup = captureExpr(v, expression);
                 result ~= formatD("if(!%s){%s\n%s=delegua_op_eq(%s,%s).value.b1;}", matched, setup,
                         matched, value, expression);
             }
             result ~= formatD("if(%s){%s=true;", matched, done);
-            foreach (child; c.body)
+            foreach (Node child; c.body)
                 result ~= compileStmtOrdered(child);
             result ~= "}}";
         }
         result ~= formatD("if(!%s){", done);
-        foreach (child; node.fallback)
+        foreach (Node child; node.fallback)
             result ~= compileStmtOrdered(child);
         result ~= "}";
         result ~= label ~ ":; }";
@@ -177,14 +177,14 @@ private:
 
     dstring cleanupCode(size_t limit)
     {
-        auto original = cleanups.dup;
+        Cleanup[] original = cleanups.dup;
         dstring[] result;
         while (cleanups.length > limit)
         {
-            auto current = cleanups[$ - 1];
+            Cleanup current = cleanups[$ - 1];
             cleanups.length--;
             result ~= formatD("delegua_sair_tente(%s);", current.frame);
-            foreach (child; current.finalBody)
+            foreach (Node child; current.finalBody)
                 result ~= compileStmtOrdered(child);
         }
         cleanups = original;
@@ -193,7 +193,7 @@ private:
 
     dstring compileTry(TryStmt node)
     {
-        auto outer = formatD("cgd_try_%s", tmp++), inner = formatD("cgd_try_%s", tmp++);
+        dstring outer = formatD("cgd_try_%s", tmp++), inner = formatD("cgd_try_%s", tmp++);
         dstring[] result = [
             "{", formatD("delegua_try_frame *const %s=delegua_tentar();", outer),
             formatD("if(setjmp(%s->env)==0) {", outer)
@@ -202,19 +202,19 @@ private:
         result ~= formatD("delegua_try_frame *const %s=delegua_tentar();", inner);
         result ~= formatD("if(setjmp(%s->env)==0) {", inner);
         cleanups ~= Cleanup(inner, []);
-        foreach (child; node.body)
+        foreach (Node child; node.body)
             result ~= compileStmtOrdered(child);
         result ~= formatD("delegua_sair_tente(%s); } else {", inner);
         cleanups.length--;
         result ~= formatD("delegua_sair_tente(%s);", inner);
-        foreach (i, c; node.catches)
+        foreach (size_t i, CatchClause c; node.catches)
         {
-            auto condition = c.type is null ? "true"d : formatD("delegua_tipo_compativel(%s->error,%s)",
+            dstring condition = c.type is null ? "true"d : formatD("delegua_tipo_compativel(%s->error,%s)",
                     inner, cString(c.type.toStr()));
             result ~= formatD("%sif(%s) {", i ? "else "d : ""d, condition);
             if (c.name.length)
                 result ~= formatD("volatile delegua_value %s=%s->error;", cName(c.name), inner);
-            foreach (child; c.body)
+            foreach (Node child; c.body)
                 result ~= compileStmtOrdered(child);
             result ~= "}";
         }
@@ -222,10 +222,10 @@ private:
         result ~= "}";
         result ~= formatD("delegua_sair_tente(%s);", outer);
         cleanups.length--;
-        foreach (child; node.finalBody)
+        foreach (Node child; node.finalBody)
             result ~= compileStmtOrdered(child);
         result ~= formatD("} else { delegua_sair_tente(%s);", outer);
-        foreach (child; node.finalBody)
+        foreach (Node child; node.finalBody)
             result ~= compileStmtOrdered(child);
         result ~= formatD("delegua_falhar(%s->error); } }", outer);
         return location(node) ~ ";\n" ~ result.join("\n");
@@ -233,8 +233,8 @@ private:
 
     public dstring materialize(Node node)
     {
-        auto expr = compileExpr(node);
-        auto name = formatD("cgd_tmp_%d", tmp++);
+        dstring expr = compileExpr(node);
+        dstring name = formatD("cgd_tmp_%d", tmp++);
         emitLocal(formatD("%s %s = %s;", VALUE, name, expr));
         return name;
     }
@@ -248,15 +248,15 @@ private:
 
     dstring loopCode(Node condition, Node[] body, Node step = null, bool post = false)
     {
-        auto label = formatD("cgd_continue_%d", tmp++);
+        dstring label = formatD("cgd_continue_%d", tmp++);
         enterLoop(label);
         dstring test;
-        auto setup = condition is null ? ""d : captureExpr(condition, test);
-        auto check = condition is null ? ""d : setup ~ formatD("\nif (!delegua_is_truthy(%s)) break;", test);
+        dstring setup = condition is null ? ""d : captureExpr(condition, test);
+        dstring check = condition is null ? ""d : setup ~ formatD("\nif (!delegua_is_truthy(%s)) break;", test);
         dstring[] result = ["while (1) {"d];
         if (!post)
             result ~= check;
-        foreach (child; body)
+        foreach (Node child; body)
             result ~= compileStmtOrdered(child);
         result ~= label ~ ":;";
         if (step !is null)
@@ -346,20 +346,27 @@ private:
         {
             case NodeKind.SequenceStmt:
                 dstring[] statements;
-                foreach (child; (cast(SequenceStmt) node).body)
+                foreach (Node child; (cast(SequenceStmt) node).body)
                     statements ~= compileStmtOrdered(child);
                 return statements.join("\n");
             case NodeKind.EachStmt:
-                auto loop = cast(EachStmt) node;
-                auto iterable = materialize(loop.iterable);
-                auto idx = formatD("cgd_idx_%d", tmp++);
-                auto label = formatD("cgd_continue_%d", tmp++);
+                EachStmt loop = cast(EachStmt) node;
+                dstring iterable = materialize(loop.iterable);
+                dstring idx = formatD("cgd_idx_%d", tmp++);
+                dstring label = formatD("cgd_continue_%d", tmp++);
                 enterLoop(label);
                 dstring[] body;
-                foreach (i, name; loop.destructured)
-                    body ~= formatD("volatile delegua_value %s=delegua_obter(%s,create_num(%s));",
-                            cName(name), cName(loop.name), i);
-                foreach (child; loop.body)
+                if (loop.bindingType !is null && loop.bindingType.toStr() != "qualquer")
+                    body ~= atSite(formatD("%s=%s", cName(loop.name), checked(cName(loop.name),
+                            loop.bindingType)), loop.pos) ~ ";";
+                foreach (size_t i, dstring name; loop.destructured)
+                {
+                    dstring element = formatD("delegua_obter(%s,create_num(%s))", cName(loop.name), i);
+                    TypeExpr type = i < loop.destructuredTypes.length ? loop.destructuredTypes[i] : null;
+                    body ~= formatD("volatile delegua_value %s=%s;", cName(name),
+                            atSite(checked(element, type), loop.pos));
+                }
+                foreach (Node child; loop.body)
                     body ~= compileStmtOrdered(child);
                 leaveLoop(label);
                 return formatD("for (sz %s = 0; %s < delegua_tamanho(%s); ++%s) {\n%s %s = delegua_iterar(%s, %s);\n%s\n%s:;\n}\n%s_break:;",
@@ -368,14 +375,14 @@ private:
             case NodeKind.TryStmt:
                 return compileTry(cast(TryStmt) node);
             case NodeKind.ThrowStmt:
-                auto thrown = materialize((cast(ThrowStmt) node).value);
+                dstring thrown = materialize((cast(ThrowStmt) node).value);
                 return location(node) ~ ";" ~ formatD("delegua_falhar(%s);", thrown);
             case NodeKind.ForStmt:
-                auto loop = cast(ForStmt) node;
-                auto init = loop.init is null ? ""d : compileStmtOrdered(loop.init);
+                ForStmt loop = cast(ForStmt) node;
+                dstring init = loop.init is null ? ""d : compileStmtOrdered(loop.init);
                 return "{\n" ~ init ~ "\n" ~ loopCode(loop.condition, loop.body, loop.step) ~ "\n}";
             case NodeKind.DoStmt:
-                auto loop = cast(DoStmt) node;
+                DoStmt loop = cast(DoStmt) node;
                 return loopCode(loop.condition, loop.body, null, true);
             case NodeKind.BreakStmt:
                 return cleanupCode(breakTryDepth[$ - 1]) ~ "\ngoto " ~ breakLabels[$ - 1] ~ ";";
@@ -383,17 +390,17 @@ private:
                 return cleanupCode(loopTryDepth[$ - 1]) ~ "\ngoto " ~ continueLabels[$ - 1] ~ ";";
             case NodeKind.VarDecl:
                 VarDecl var = cast(VarDecl) node;
-                auto initial = var.type_expr !is null && !var.uninitialized
+                dstring initial = var.type_expr !is null && !var.uninitialized
                     && var.type_expr.toStr() != "qualquer" ? materialize(var.value) : compileExpr(var.value);
                 return formatD("volatile %s %s = %s;", VALUE, cName(var.name), checked(initial,
                         var.uninitialized ? null : var.type_expr, var.pos));
 
             case NodeKind.ReturnStmt:
                 ReturnStmt ret = cast(ReturnStmt) node;
-                auto value = ret.val is null ? "create_nulo()"d : materialize(ret.val);
+                dstring value = ret.val is null ? "create_nulo()"d : materialize(ret.val);
                 if (ret.collectionReturn)
                 {
-                    auto collector = collectors[$ - 1];
+                    Collector collector = collectors[$ - 1];
                     return cleanupCode(collector.depth) ~ formatD("\ndelegua_vetor_adicionar(&%s,%s); goto %s;",
                             collector.output, value, collector.label);
                 }
@@ -401,13 +408,13 @@ private:
 
             case NodeKind.CallExpr:
             case NodeKind.UnaryExpr:
-                return compileExpr(node) ~ ";";
+                return "(void)(" ~ compileExpr(node) ~ ");";
 
             case NodeKind.IfStmt:
                 return compileIfStmt(to!IfStmt(node));
 
             case NodeKind.AssignStmt:
-                return compileExpr(node) ~ ";";
+                return "(void)(" ~ compileExpr(node) ~ ");";
             case NodeKind.SwitchStmt:
                 return compileSwitch(cast(SwitchStmt) node);
             case NodeKind.NaN:
@@ -429,7 +436,7 @@ private:
             case NodeKind.FnDecl:
                 return ";";
             case NodeKind.MemberExpr:
-                return compileExpr(node) ~ ";";
+                return "(void)(" ~ compileExpr(node) ~ ");";
 
             default:
                 return "/* statement desconhecido. */";
@@ -460,9 +467,9 @@ private:
     {
         if (pos is null)
             return "";
-        auto key = format("%s:%s:%s", pos.filename, pos.start.line, pos.start.offset);
+        string key = format("%s:%s:%s", pos.filename, pos.start.line, pos.start.offset);
         size_t index;
-        if (auto cached = key in sourceSiteIds)
+        if (size_t* cached = key in sourceSiteIds)
             index = *cached;
         else
         {
@@ -480,7 +487,7 @@ private:
 
     dstring atSite(dstring expression, Position pos)
     {
-        auto site = location(pos);
+        dstring site = location(pos);
         return site.length ? "(" ~ site ~ ", " ~ expression ~ ")" : expression;
     }
 
@@ -506,12 +513,12 @@ private:
     {
         if (node !is null && (cast(ArrayLit) node || cast(MapLit) node || cast(Comprehension) node))
         {
-            auto site = location(node);
+            dstring site = location(node);
             if (site.length)
                 emitLocal(site ~ ";");
         }
-        auto expression = compileExprIntern(node);
-        auto site = canFail(node) ? location(node) : ""d;
+        dstring expression = compileExprIntern(node);
+        dstring site = canFail(node) ? location(node) : ""d;
         return site.length ? "(" ~ site ~ ", " ~ expression ~ ")" : expression;
     }
 
@@ -529,58 +536,58 @@ private:
             case NodeKind.SpreadExpr:
                 throw new Exception("Espalhamento fora de chamada/coleção.");
             case NodeKind.ConditionalExpr:
-                auto c = cast(ConditionalExpr) node;
-                auto test = materialize(c.condition);
-                auto resultName = formatD("cgd_cond_%s", tmp++);
+                ConditionalExpr c = cast(ConditionalExpr) node;
+                dstring test = materialize(c.condition);
+                dstring resultName = formatD("cgd_cond_%s", tmp++);
                 emitLocal(formatD("delegua_value %s;", resultName));
                 dstring yes, no;
-                auto yesSetup = captureExpr(c.yes, yes), noSetup = captureExpr(c.no, no);
+                dstring yesSetup = captureExpr(c.yes, yes), noSetup = captureExpr(c.no, no);
                 emitLocal(formatD("if(delegua_is_truthy(%s)){%s\n%s=%s;}else{%s\n%s=%s;}", test,
                         yesSetup, resultName, yes, noSetup, resultName, no));
                 return resultName;
             case NodeKind.SliceExpr:
-                auto s = cast(SliceExpr) node;
-                auto value = materialize(s.value);
-                auto start = s.start is null ? "create_nulo()"d : materialize(s.start);
-                auto end = s.end is null ? "create_nulo()"d : materialize(s.end);
-                auto step = s.step is null ? "create_nulo()"d : materialize(s.step);
+                SliceExpr s = cast(SliceExpr) node;
+                dstring value = materialize(s.value);
+                dstring start = s.start is null ? "create_nulo()"d : materialize(s.start);
+                dstring end = s.end is null ? "create_nulo()"d : materialize(s.end);
+                dstring step = s.step is null ? "create_nulo()"d : materialize(s.step);
                 return formatD("delegua_intervalo(%s,%s,%s,%s)", value, start, end, step);
             case NodeKind.LoopExpr:
-                auto l = cast(LoopExpr) node;
-                auto resultName = formatD("cgd_loop_%s", tmp++);
+                LoopExpr l = cast(LoopExpr) node;
+                dstring resultName = formatD("cgd_loop_%s", tmp++);
                 emitLocal(formatD("delegua_value %s=create_vetor();", resultName));
-                auto oldPending = pendingCollector;
+                dstring oldPending = pendingCollector;
                 pendingCollector = resultName;
                 emitLocal(compileStmtOrdered(l.loop));
                 pendingCollector = oldPending;
                 return resultName;
             case NodeKind.Comprehension:
-                auto c = cast(Comprehension) node;
-                auto source = materialize(c.iterable);
-                auto resultName = formatD("cgd_comp_%s", tmp++), idx = formatD("cgd_comp_i_%s", tmp++);
+                Comprehension c = cast(Comprehension) node;
+                dstring source = materialize(c.iterable);
+                dstring resultName = formatD("cgd_comp_%s", tmp++), idx = formatD("cgd_comp_i_%s", tmp++);
                 emitLocal(formatD("delegua_value %s=create_vetor();", resultName));
                 dstring value, condition;
-                auto valueSetup = captureExpr(c.value, value);
-                auto condSetup = c.condition is null ? ""d : captureExpr(c.condition, condition);
+                dstring valueSetup = captureExpr(c.value, value);
+                dstring condSetup = c.condition is null ? ""d : captureExpr(c.condition, condition);
                 dstring body = formatD("%s\ndelegua_vetor_adicionar(&%s,%s);", valueSetup, resultName, value);
                 if (c.condition !is null)
                     body = formatD("%s\nif(delegua_is_truthy(%s)){%s}", condSetup, condition, body);
-                emitLocal(formatD(
-                        "for(sz %s=0;%s<delegua_tamanho(%s);++%s){volatile delegua_value %s=delegua_iterar(%s,%s);%s}",
-                        idx, idx, source, idx, cName(c.name), source, idx, body));
+                emitLocal(formatD("for(sz %s=0;%s<delegua_tamanho(%s);++%s){volatile delegua_value %s=%s;%s}", idx,
+                        idx, source, idx, cName(c.name), checked(formatD("delegua_iterar(%s,%s)",
+                        source, idx), c.bindingType, c.pos), body));
                 return resultName;
             case NodeKind.Identifier:
-                auto id = cast(Identifier) node;
+                Identifier id = cast(Identifier) node;
                 if (id.classRef !is null)
                     return classValue(id.classRef);
                 return id.functionRef is null ? cName(id.value) : functionValue(id.functionRef);
 
             case NodeKind.UnaryExpr:
-                auto unary = cast(UnaryExpr) node;
-                auto lv = resolveLValue(unary.value);
-                auto previous = formatD("cgd_tmp_%d", tmp++);
-                auto updated = formatD("cgd_tmp_%d", tmp++);
-                auto site = location(node);
+                UnaryExpr unary = cast(UnaryExpr) node;
+                LValue lv = resolveLValue(unary.value);
+                dstring previous = formatD("cgd_tmp_%d", tmp++);
+                dstring updated = formatD("cgd_tmp_%d", tmp++);
+                dstring site = location(node);
                 if (site.length)
                     emitLocal(site ~ ";");
                 emitLocal(formatD("%s %s = %s;", VALUE, previous, lv.read()));
@@ -589,53 +596,53 @@ private:
                 emitLocal(atSite(lv.write(updated), node.pos) ~ ";");
                 return unary.post ? previous : updated;
             case NodeKind.MapLit:
-                auto map = cast(MapLit) node;
-                auto name = formatD("cgd_map_%d", tmp++);
+                MapLit map = cast(MapLit) node;
+                dstring name = formatD("cgd_map_%d", tmp++);
                 emitLocal(formatD("%s %s = create_map();", VALUE, name));
-                foreach (i, key; map.keys)
+                foreach (size_t i, Node key; map.keys)
                 {
                     if (key is null)
                     {
-                        auto spread = cast(SpreadExpr) map.values[i];
+                        SpreadExpr spread = cast(SpreadExpr) map.values[i];
                         emitLocal(formatD("delegua_map_expandir(%s,%s);", name, materialize(spread.value)));
                         continue;
                     }
-                    auto k = materialize(key);
-                    auto v = materialize(map.values[i]);
+                    dstring k = materialize(key);
+                    dstring v = materialize(map.values[i]);
                     emitLocal(formatD("delegua_map_setar(%s, %s, %s);", name, k, v));
                 }
                 return name;
             case NodeKind.NullLit:
                 return "create_nulo()";
             case NodeKind.BinaryExpr:
-                auto binary = cast(BinaryExpr) node;
-                auto left = materialize(binary.left);
-                auto result = formatD("cgd_tmp_%d", tmp++);
+                BinaryExpr binary = cast(BinaryExpr) node;
+                dstring left = materialize(binary.left);
+                dstring result = formatD("cgd_tmp_%d", tmp++);
                 emitLocal(formatD("%s %s = %s;", VALUE, result, left));
                 dstring condition = binary.op == TokenKind.And ? formatD("delegua_is_truthy(%s)",
                         left) : binary.op == TokenKind.Or
                     ? formatD("!delegua_is_truthy(%s)", left) : formatD("%s.type == DELEGUA_T_NULO", left);
                 dstring right;
-                auto setup = captureExpr(binary.right, right);
+                dstring setup = captureExpr(binary.right, right);
                 emitLocal(formatD("if (%s) {\n%s\n%s = %s;\n}", condition, setup, result, right));
                 return result;
             case NodeKind.ImportExpr:
-                auto imported = cast(ImportExpr) node;
-                auto name = cName(imported.target.linkName);
+                ImportExpr imported = cast(ImportExpr) node;
+                dstring name = cName(imported.target.linkName);
                 return formatD("(%s_init(), %s)", name, name);
             case NodeKind.SuperExpr:
-                auto superExpr = cast(SuperExpr) node;
+                SuperExpr superExpr = cast(SuperExpr) node;
                 return formatD("delegua_super_metodo(%s, %s, %s)", lexicalClass(), cName("isto"),
                         cString(superExpr.name));
             case NodeKind.FunctionExpr:
                 return functionValue((cast(FunctionExpr) node).declaration);
             case NodeKind.MemberExpr:
-                auto member = cast(MemberExpr) node;
-                auto receiver = materialize(member.left);
+                MemberExpr member = cast(MemberExpr) node;
+                dstring receiver = materialize(member.left);
                 return formatD("delegua_propriedade_em(%s, %s, %s)", receiver,
                         cString((cast(Identifier) member.right).value), lexicalClass());
             case NodeKind.StringLit:
-                auto text = (cast(StringLit) node).value;
+                dstring text = (cast(StringLit) node).value;
                 return formatD("create_text_len(%s, %s)", cString(text), text.to!string.length);
 
             case NodeKind.IntLit:
@@ -648,24 +655,24 @@ private:
                 return formatD("create_bool(%d)", (cast(BoolLit) node).value);
 
             case NodeKind.CallExpr:
-                auto call = cast(CallExpr) node;
+                CallExpr call = cast(CallExpr) node;
                 if (call.runtimeCall)
                     return formatD("%s(%s)", (cast(Identifier) call.fn).value, nodesToStr(call.args));
-                auto callee = materialize(call.fn);
-                if (call.args.any!(a => a.kind == NodeKind.SpreadExpr))
+                dstring callee = materialize(call.fn);
+                if (call.args.any!((Node a) => a.kind == NodeKind.SpreadExpr))
                 {
-                    auto vector = formatD("cgd_args_%s", tmp++);
+                    dstring vector = formatD("cgd_args_%s", tmp++);
                     emitLocal(formatD("delegua_value %s=create_vetor();", vector));
-                    foreach (arg; call.args)
+                    foreach (Node arg; call.args)
                     {
-                        if (auto spread = cast(SpreadExpr) arg)
+                        if (SpreadExpr spread = cast(SpreadExpr) arg)
                             emitLocal(formatD("delegua_expandir(&%s,%s);", vector, materialize(spread.value)));
                         else
                             emitLocal(formatD("delegua_vetor_adicionar(&%s,%s);", vector, materialize(arg)));
                     }
                     return formatD("delegua_chamar_vetor(%s,%s)", callee, vector);
                 }
-                auto args = nodesToStr(call.args);
+                dstring args = nodesToStr(call.args);
                 return formatD("delegua_chamar(%s, %s, %s)", callee, call.args.length,
                         call.args.length ? "(delegua_value[]){" ~ args ~ "}" : "NULL");
 
@@ -678,7 +685,7 @@ private:
                 emitLocal(formatD("%s %s = create_vetor();", VALUE, temp));
 
                 foreach (Node element; arr.elements)
-                    if (auto spread = cast(SpreadExpr) element)
+                    if (SpreadExpr spread = cast(SpreadExpr) element)
                         emitLocal(formatD("delegua_expandir(&%s,%s);", temp, materialize(spread.value)));
                     else
                         emitLocal(formatD("delegua_vetor_adicionar(&%s, %s);", temp, compileExpr(element)));
@@ -711,7 +718,7 @@ private:
         switch (node.kind)
         {
             case NodeKind.MemberExpr:
-                auto member = cast(MemberExpr) node;
+                MemberExpr member = cast(MemberExpr) node;
                 return LValue(LValueKind.Member, null, materialize(member.left),
                         cString((cast(Identifier) member.right).value), lexicalClass());
             case NodeKind.Identifier:
@@ -744,10 +751,10 @@ private:
         if (node.builtinName.length)
             return formatD("delegua_builtin(%s)", cString(node.builtinName));
         size_t minimum;
-        foreach (arg; node.args)
+        foreach (FnArg arg; node.args)
             if (arg.value is null && !arg.rest)
                 minimum++;
-        auto maximum = node.args.length && node.args[$ - 1].rest ? "SIZE_MAX"d : node.args.length.to!dstring;
+        dstring maximum = node.args.length && node.args[$ - 1].rest ? "SIZE_MAX"d : node.args.length.to!dstring;
         if (node.anonymous)
             return formatD("create_funcao_intervalo(&%s,%s,%s)", cName(node.linkName), minimum, maximum);
         return formatD("delegua_funcao_cache(&%s_slot,&%s,%s,%s)", cName(node.linkName),
@@ -756,38 +763,39 @@ private:
 
     void compileFnDecl(FnDecl node)
     {
-        auto proto = formatD("delegua_value %s(sz argc, delegua_value *argv)", cName(node.linkName));
+        dstring proto = formatD("delegua_value %s(sz argc, delegua_value *argv)", cName(node.linkName));
         emitProto(proto ~ ";");
         emitProto(formatD("static delegua_value %s_slot;", cName(node.linkName)));
-        auto previousClass = currentClass;
+        ClassDecl previousClass = currentClass;
         currentClass = node.ownerClass;
-        auto previousReturn = functionReturn;
+        TypeExpr previousReturn = functionReturn;
         functionReturn = node.type_expr;
         emit(proto ~ " {\n(void)argc; (void)argv;");
-        if (node.isMethod)
+        if (node.isMethod && !node.isStatic)
             emit(formatD("volatile delegua_value %s=argv[0];", cName("isto")));
-        foreach (i, arg; node.args)
+        foreach (size_t i, FnArg arg; node.args)
         {
-            auto binding = formatD("volatile delegua_value %s;", cName(arg.name));
+            dstring binding = formatD("volatile delegua_value %s;", cName(arg.name));
             emit(binding);
             if (arg.rest)
-                emit(formatD("%s=delegua_rest(argc,argv,%s);", cName(arg.name), i + (node.isMethod ? 1 : 0)));
+                emit(formatD("%s=delegua_rest(argc,argv,%s);", cName(arg.name), i + (node.isMethod
+                        && !node.isStatic ? 1 : 0)));
             else if (arg.value is null)
-                emit(formatD("%s = argv[%s];", cName(arg.name), i + (node.isMethod ? 1 : 0)));
+                emit(formatD("%s = argv[%s];", cName(arg.name), i + (node.isMethod && !node.isStatic ? 1 : 0)));
             else
             {
                 dstring value;
-                auto setup = captureExpr(arg.value, value);
+                dstring setup = captureExpr(arg.value, value);
                 emit(formatD("if (argc > %s) %s = argv[%s]; else {\n%s\n%s = %s;\n}",
-                        i + (node.isMethod ? 1 : 0), cName(arg.name), i + (node.isMethod ? 1 : 0),
-                        setup, cName(arg.name), value));
+                        i + (node.isMethod && !node.isStatic ? 1 : 0), cName(arg.name),
+                        i + (node.isMethod && !node.isStatic ? 1 : 0), setup, cName(arg.name), value));
             }
         }
-        foreach (arg; node.args)
+        foreach (FnArg arg; node.args)
             if (arg.type_expr !is null)
                 emit(formatD("%s=%s;", cName(arg.name), checked(cName(arg.name), arg.rest
                         ? new TypeExprArray(arg.type_expr, arg.pos) : arg.type_expr)));
-        foreach (n; node.body)
+        foreach (Node n; node.body)
             emit(compileStmtOrdered(n), 4);
         emit("return " ~ checked("create_nulo()", functionReturn) ~ ";\n}");
         currentClass = previousClass;
@@ -798,13 +806,13 @@ private:
     bool[FnDecl] functionsInitialized, functionsInitializing;
     dstring metadata(Decorator[] decorators)
     {
-        auto list = formatD("cgd_attrs_%s", tmp++);
+        dstring list = formatD("cgd_attrs_%s", tmp++);
         emitLocal(formatD("delegua_value %s=create_vetor();", list));
-        foreach (d; decorators)
+        foreach (Decorator d; decorators)
         {
-            auto attr = formatD("cgd_attr_%s", tmp++), args = formatD("cgd_attr_args_%s", tmp++);
+            dstring attr = formatD("cgd_attr_%s", tmp++), args = formatD("cgd_attr_args_%s", tmp++);
             emitLocal(formatD("delegua_value %s=create_map(),%s=create_map();", attr, args));
-            foreach (i, value; d.values)
+            foreach (size_t i, Node value; d.values)
                 emitLocal(formatD("delegua_map_setar(%s,create_text(%s),%s);", args,
                         cString(d.keys[i]), materialize(value)));
             emitLocal(formatD("delegua_map_setar(%s,create_text(\"nome\"),create_text(%s));", attr, cString(d.name)));
@@ -821,19 +829,19 @@ private:
         if (fn in functionsInitializing)
             throw new Exception("Ciclo entre envelopes de decoradores.");
         functionsInitializing[fn] = true;
-        foreach (d; fn.decorators)
+        foreach (Decorator d; fn.decorators)
             if (d.envelope !is null)
                 initializeFunction(d.envelope);
         if (fn.decorators.length)
         {
-            auto original = functionValue(fn);
-            auto name = cName(fn.linkName) ~ "_slot";
+            dstring original = functionValue(fn);
+            dstring name = cName(fn.linkName) ~ "_slot";
             emit(formatD("%s=%s;", name, original));
-            foreach_reverse (d; fn.decorators)
+            foreach_reverse (Decorator d; fn.decorators)
                 if (d.envelope !is null)
                     emit(formatD("%s=delegua_assegurar_tipo(delegua_chamar(%s,1,&%s),\"funcao\");",
                             name, functionValue(d.envelope), name));
-            auto attrs = metadata(fn.decorators);
+            dstring attrs = metadata(fn.decorators);
             emit(formatD("delegua_definir_decoradores(%s,%s);", name, attrs));
         }
         functionsInitializing.remove(fn);
@@ -852,7 +860,7 @@ private:
         classShells[c] = true;
         if (c.superClass !is null)
             createClassShell(c.superClass);
-        auto name = cName(c.signature.linkName);
+        dstring name = cName(c.signature.linkName);
         emit(formatD("%s=create_classe(%s,%s);", name, cString(c.name), c.superClass is null
                 ? "delegua_classe_objeto()"d : classValue(c.superClass)));
         emit(formatD("delegua_classe_fechada(%s);", name));
@@ -865,61 +873,62 @@ private:
         initializedClasses[c] = true;
         if (c.superClass !is null)
             initializeClass(c.superClass);
-        auto name = cName(c.signature.linkName);
+        dstring name = cName(c.signature.linkName);
         if (c.decorators.length)
             emit(formatD("delegua_definir_decoradores(%s,%s);", name, metadata(c.decorators)));
-        foreach (field; c.fields)
+        foreach (ClassField field; c.fields)
             if (field.decorators.length)
                 emit(formatD("delegua_classe_decoradores_campo(%s,%s,%s);", name,
                         cString(field.name), metadata(field.decorators)));
-        foreach (field; c.fields)
+        foreach (ClassField field; c.fields)
             emit(formatD("delegua_classe_campo_tipo(%s,%s,%s,%s);", name, cString(field.name),
                     descriptor(field.type), field.access));
-        foreach (field; c.fields)
+        foreach (ClassField field; c.fields)
             if (field.customAccess)
                 emit(formatD("delegua_classe_acessor(%s,%s,%s,%s,%s,%s);", name, cString(field.name),
                         field.getter is null ? "create_nulo()"d : functionValue(field.getter),
                         field.setter is null ? "create_nulo()"d : functionValue(field.setter),
                         field.readable ? 1 : 0, field.writable ? 1 : 0));
-        foreach (method; c.methods)
+        foreach (FnDecl method; c.methods)
             if (!method.accessor)
-                emit(formatD("delegua_classe_metodo_acesso(%s,%s,%s,%s);", name,
-                        cString(method.fn), functionValue(method), method.access));
+                emit(formatD(method.isStatic
+                        ? "delegua_classe_metodo_estatico(%s,%s,%s,%s);" : "delegua_classe_metodo_acesso(%s,%s,%s,%s);",
+                        name, cString(method.fn), functionValue(method), method.access));
     }
 
     void compileModule(ModuleUnit m)
     {
-        auto name = cName(m.linkName), frame = name ~ "_frame";
+        dstring name = cName(m.linkName), frame = name ~ "_frame";
         emit(formatD("static void %s_init(void) { if(%s_state==2) return; if(%s_state==1) delegua_panic(\"Ciclo de inicialização de módulos.\"); %s_state=1;",
                 name, name, name, name));
         emit(formatD("delegua_try_frame *const %s=delegua_tentar(); if(setjmp(%s->env)!=0) { delegua_sair_tente(%s); %s_state=0; delegua_falhar(%s->error); }",
                 frame, frame, frame, name, frame));
-        foreach (node; m.program.body)
+        foreach (Node node; m.program.body)
             if (!isDecl(node.kind))
                 emit(compileStmtOrdered(node));
         emit(formatD("delegua_value %s_exports=create_map();", name));
         Node[] exports;
-        foreach (node; m.program.body)
+        foreach (Node node; m.program.body)
         {
-            if (auto sequence = cast(SequenceStmt) node)
+            if (SequenceStmt sequence = cast(SequenceStmt) node)
                 exports ~= sequence.body;
             else
                 exports ~= node;
         }
-        foreach (node; exports)
+        foreach (Node node; exports)
         {
             dstring key, value;
-            if (auto v = cast(VarDecl) node)
+            if (VarDecl v = cast(VarDecl) node)
             {
                 key = v.name;
                 value = cName(v.name);
             }
-            if (auto fn = cast(FnDecl) node)
+            if (FnDecl fn = cast(FnDecl) node)
             {
                 key = fn.fn;
                 value = functionValue(fn);
             }
-            if (auto c = cast(ClassDecl) node)
+            if (ClassDecl c = cast(ClassDecl) node)
             {
                 key = c.name;
                 value = classValue(c);
@@ -936,20 +945,20 @@ private:
         if (node is null || node in collected)
             return;
         collected[node] = true;
-        if (auto m = cast(ModuleUnit) node)
+        if (ModuleUnit m = cast(ModuleUnit) node)
         {
             modules ~= m;
             emitProto(formatD("static delegua_value %s; static int %s_state; static void %s_init(void);",
                     cName(m.linkName), cName(m.linkName), cName(m.linkName)));
         }
-        if (auto c = cast(ClassDecl) node)
+        if (ClassDecl c = cast(ClassDecl) node)
         {
             classes ~= c;
             emitProto(formatD("static delegua_value %s;", cName(c.signature.linkName)));
         }
-        foreach (child; childNodes(node))
+        foreach (Node child; childNodes(node))
             collectFunctions(child);
-        if (auto fn = cast(FnDecl) node)
+        if (FnDecl fn = cast(FnDecl) node)
         {
             functions ~= fn;
             compileFnDecl(fn);
@@ -959,13 +968,13 @@ private:
     dstring compileIfStmt(IfStmt node, bool fromIf = false)
     {
         dstring[] body;
-        foreach (child; node.body)
+        foreach (Node child; node.body)
             body ~= compileStmtOrdered(child);
         if (node.expr is null)
             return "{\n" ~ body.join("\n") ~ "\n}";
         dstring condition;
-        auto setup = captureExpr(node.expr, condition);
-        auto result = setup ~ formatD("\nif (delegua_is_truthy(%s)) {\n%s\n}", condition, body.join("\n"));
+        dstring setup = captureExpr(node.expr, condition);
+        dstring result = setup ~ formatD("\nif (delegua_is_truthy(%s)) {\n%s\n}", condition, body.join("\n"));
         if (node._else !is null)
             result ~= " else {\n" ~ compileIfStmt(node._else) ~ "\n}";
         return result;
@@ -973,21 +982,22 @@ private:
 
     pragma(inline, true) bool isDecl(NodeKind kind) => kind == NodeKind.FnDecl || kind == NodeKind.ClassDecl;
 
-    pragma(inline, true) public dstring nodesToStr(Node[] nodes) => (nodes.map!(n => materialize(n)).array).join(", ");
+    pragma(inline, true) public dstring nodesToStr(Node[] nodes) => (nodes.map!((Node n) => materialize(n)).array).join(
+            ", ");
 
 public:
     dstring compile(Program prog)
     {
         collectFunctions(prog);
-        foreach (m; modules)
+        foreach (ModuleUnit m; modules)
             compileModule(m);
 
         emit(formatD("void %s(void) {", ENTRY));
-        foreach (c; classes)
+        foreach (ClassDecl c; classes)
             createClassShell(c);
-        foreach (c; classes)
+        foreach (ClassDecl c; classes)
             initializeClass(c);
-        foreach (fn; functions)
+        foreach (FnDecl fn; functions)
             initializeFunction(fn);
 
         foreach (Node node; prog.body)

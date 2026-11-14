@@ -57,7 +57,7 @@ string diagnosticJSON(const Diagnostic d)
         "code": JSONValue(d.code),
         "message": JSONValue(d.message)
     ]);
-    if (auto spec = lookupMessage(d.code))
+    if (const(MessageSpec)* spec = lookupMessage(d.code))
         result["explanation"] = spec.explanation;
     if (d.position !is null)
     {
@@ -83,13 +83,13 @@ string diagnosticText(const Diagnostic d, string source = "")
     if (d.position is null)
         return result;
     result ~= format(" --> %s\n", d.position.toStr());
-    auto lines = source.splitLines();
+    string[] lines = source.splitLines();
     if (!lines.length)
         return result;
-    auto first = max(1u, d.position.start.line);
-    auto last = min(cast(uint) lines.length, max(first, d.position.end.line));
+    uint first = max(1u, d.position.start.line);
+    uint last = min(cast(uint) lines.length, max(first, d.position.end.line));
     last = min(last, first + 4); // Limita snippets de erros que abrangem arquivos inteiros.
-    foreach (lineNo; first .. last + 1)
+    foreach (uint lineNo; first .. last + 1)
     {
         dstring line;
         try
@@ -99,20 +99,20 @@ string diagnosticText(const Diagnostic d, string source = "")
             result ~= "     | [trecho indisponível: UTF-8 inválido]\n";
             continue;
         }
-        auto start = lineNo == first ? min(line.length, max(1u, d.position.start.offset) - 1) : 0;
-        auto end = lineNo == d.position.end.line ? min(line.length, max(1u, d.position.end.offset) - 1) : line.length;
+        uint start = lineNo == first ? min(line.length, max(1u, d.position.start.offset) - 1) : 0;
+        size_t end = lineNo == d.position.end.line ? min(line.length, max(1u, d.position.end.offset) - 1) : line.length;
         size_t visualStart, visualEnd;
         string display;
-        foreach (i, ch; line)
+        foreach (size_t i, dchar ch; line)
         {
-            auto width = ch == '\t' ? 4 - visualEnd % 4 : 1;
+            size_t width = ch == '\t' ? 4 - visualEnd % 4 : 1;
             if (i < start)
                 visualStart += width;
             visualEnd += width;
             display ~= ch == '\t' ? ' '.repeat(width).array : [ch].to!string;
         }
         size_t markerWidth;
-        foreach (ch; line[start .. max(start, end)])
+        foreach (dchar ch; line[start .. max(start, end)])
             markerWidth += ch == '\t' ? 4 - (visualStart + markerWidth) % 4 : 1;
         result ~= format("%4d | %s\n     | %s^%s\n", lineNo, display, ' '.repeat(visualStart)
                 .array, '~'.repeat(markerWidth ? markerWidth - 1 : 0).array);
@@ -124,7 +124,7 @@ string diagnosticText(const Diagnostic d, string source = "")
 
 void reportFatal(string message, string code = "E9001")
 {
-    auto d = Diagnostic(Severity.Error, null, message, code);
+    Diagnostic d = Diagnostic(Severity.Error, null, message, code);
     stderr.write(diagnosticFormat == DiagnosticFormat.json ? diagnosticJSON(d) ~ "\n" : diagnosticText(d));
 }
 
@@ -134,7 +134,7 @@ class Diagnostics
     private string[string] sources;
     private size_t emitted;
     private size_t errors;
-    enum maxErrors = 100;
+    enum size_t maxErrors = 100;
 
     void registerSource(string filename, string source)
     {
@@ -148,7 +148,7 @@ class Diagnostics
             return;
         if (!code.length)
             code = severity == Severity.Error ? "E0001" : severity == Severity.Warning ? "W0001" : "H0001";
-        foreach (d; list)
+        foreach (Diagnostic d; list)
             if (d.severity == severity && d.code == code && d.message == message && ((d.position is null
                     && pos is null) || (d.position !is null && pos !is null
                     && d.position.filename == pos.filename
@@ -193,17 +193,17 @@ class Diagnostics
 
     bool hasErrors() const
     {
-        return list.any!(d => d.severity == Severity.Error);
+        return list.any!((const(Diagnostic) d) => d.severity == Severity.Error);
     }
 
     bool hasWarnings() const
     {
-        return list.any!(d => d.severity == Severity.Warning);
+        return list.any!((const(Diagnostic) d) => d.severity == Severity.Warning);
     }
 
     bool report()
     {
-        foreach (d; list[emitted .. $])
+        foreach (Diagnostic d; list[emitted .. $])
         {
             if (diagnosticFormat == DiagnosticFormat.json)
                 stderr.writeln(diagnosticJSON(d));
@@ -212,7 +212,7 @@ class Diagnostics
                 string source;
                 if (d.position !is null)
                 {
-                    if (auto cached = d.position.filename in sources)
+                    if (string* cached = d.position.filename in sources)
                         source = *cached;
                     else
                         try
@@ -231,6 +231,15 @@ class Diagnostics
     const(Diagnostic)[] entries() const
     {
         return list;
+    }
+
+    void merge(Diagnostics other)
+    {
+        foreach (Diagnostic diagnostic; other.list)
+            add(diagnostic.severity, diagnostic.position, diagnostic.message, diagnostic.code);
+        foreach (string filename, string source; other.sources)
+            if (filename !in sources)
+                sources[filename] = source;
     }
 
     void clear()

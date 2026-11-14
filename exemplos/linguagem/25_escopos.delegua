@@ -1,9 +1,16 @@
 //! 2\n1\n8
-var x = 1
-se verdadeiro { var x = 2; escreva(x) }
-escreva(x)
-funcao criar() {
-    retorna auxiliar
-    funcao auxiliar(x) { retorna x * 2 }
+var x: numero = 1
+se verdadeiro {
+    var x: numero = 2;
+    escreva(x)
 }
+
+escreva(x)
+funcao criar(): qualquer {
+    retorna auxiliar
+    funcao auxiliar(x: qualquer): qualquer {
+        retorna x * 2
+    }
+}
+
 escreva(criar()(4))

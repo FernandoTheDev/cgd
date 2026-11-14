@@ -2,7 +2,13 @@
 //? fase: execucao
 //? erro: privado
 classe Segredo {
-    privado { valor: numero }
-    construtor() { isto.valor = 42 }
+    privado {
+        valor: numero
+    }
+
+    construtor() {
+        isto.valor = 42
+    }
 }
+
 escreva(Segredo().valor)

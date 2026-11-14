@@ -1,7 +1,10 @@
 //! tratado
 // Uma falha da CTFE preserva a chamada para permitir tratamento em execução.
 //>puro
-funcao dividir(valor) { retorna 1 / valor }
+funcao dividir(valor: qualquer): qualquer {
+    retorna 1 / valor
+}
+
 tente {
     dividir(0)
 } pegue (erro) {

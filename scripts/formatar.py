@@ -39,6 +39,7 @@ def files(folder):
 sources = files(ROOT) + files(ROOT / "vendor/delegua-runtime")
 groups = {
     "D": [p for p in sources if p.suffix == ".d"],
+    "Delégua": [p for p in sources if p.suffix == ".delegua"],
     "C": [p for p in sources if p.suffix in (".c", ".h") and p.name != "unicode_tables.h"],
     "Python": [p for p in sources if p.suffix == ".py"],
     "Web/docs": [
@@ -74,6 +75,18 @@ commands = {
 }
 for name, paths in groups.items():
     if paths:
+        if name == "Delégua":
+            for path in paths:
+                subprocess.run(
+                    [
+                        str(ROOT / "cgd"),
+                        "--verificar-formatacao" if args.check else "--formatar",
+                        str(path),
+                    ],
+                    cwd=ROOT,
+                    check=True,
+                )
+            continue
         print(f"{name}: {len(paths)} arquivos", flush=True)
         if name == "D" and args.check:
             for path in paths:
@@ -87,5 +100,5 @@ for name, paths in groups.items():
 print(
     "Formatação verificada."
     if args.check
-    else "Formatação concluída. .delegua e tabelas geradas preservados."
+    else "Formatação concluída; Delégua pelo CGD, tabelas geradas preservadas."
 )

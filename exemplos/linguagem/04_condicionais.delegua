@@ -1,6 +1,6 @@
 //! adulto\ndois ou tres
-var idade = 20
-escreva(idade >= 18 ? "adulto" : "menor")
+var idade: numero = 20
+escreva(idade >= 18 ? "adulto": "menor")
 escolha 2 {
     caso 1: escreva("um")
     caso 2:

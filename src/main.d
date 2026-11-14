@@ -11,9 +11,34 @@ import errors;
 
 void main(string[] args)
 {
+    if (args.length >= 2 && args[1] == "--lsp" && (args.length == 2 || (args.length == 3 && args[2] == "--stdio")))
+    {
+        import lsp.server : runLanguageServer;
+
+        runLanguageServer();
+        return;
+    }
+    if (args.length == 3 && (args[1] == "--formatar" || args[1] == "--verificar-formatacao"))
+    {
+        import frontend.formatter : formatDelegua;
+        import std.file : readText, write;
+        import core.stdc.stdlib : exit;
+
+        try
+        {
+            string source = readText(args[2]);
+            string formatted = formatDelegua(source);
+            if (args[1] == "--verificar-formatacao")
+                exit(source == formatted ? 0 : 1);
+            write(args[2], formatted);
+        }
+        catch (Exception error)
+            cgd_erro("Falha ao formatar: " ~ error.msg);
+        return;
+    }
     cgd_validar(args.length > 1, "Esperado ao menos um argumento.");
     CGDArguments arguments;
-    foreach (i, arg; args)
+    foreach (size_t i, string arg; args)
         if (arg == "--diagnosticos=json" || (arg == "--diagnosticos" && i + 1 < args.length && args[i + 1] == "json"))
             diagnosticFormat = DiagnosticFormat.json;
 
@@ -35,7 +60,7 @@ void main(string[] args)
 
     if (arguments.explain.length)
     {
-        auto specification = lookupMessage(arguments.explain);
+        const(MessageSpec)* specification = lookupMessage(arguments.explain);
         if (specification is null)
             cgd_erro("Código de diagnóstico desconhecido: " ~ arguments.explain);
         writeln(arguments.explain, ": ", specification.message);

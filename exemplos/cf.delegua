@@ -1,16 +1,16 @@
 //$
 //! real\nCGD\nNenhum\ny: 67
-variavel x = 10
-fixo z = 60
-var y = x * 10 - z * (1.0 * 76) + 4460.0 + 67
+variavel x: numero = 10
+fixo z: numero = 60
+var y: real = x * 10 - z *(1.0 * 76) + 4460.0 + 67
 
 escreva(tipo de 3.141592)
 
 se (tipo de y) == "real"
-    escreva("CGD")
+escreva("CGD")
 
 se (tipo de y) == "número"
-    escreva("Delegua")
+escreva("Delegua")
 
 se (tipo de y) == "logico" {
     escreva("CGD")

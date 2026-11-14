@@ -102,6 +102,7 @@ enum TokenKind : ubyte
 
     // eof
     Eof,
+    Comment,
 }
 
 union TokenRaw

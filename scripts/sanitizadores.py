@@ -61,6 +61,7 @@ try:
         environment = {**sanitized, "CC": str(wrapper)}
         run("Integração sanitizada", [sys.executable, "testes/integracao.py"], environment)
         run("Todos os exemplos sanitizados", [sys.executable, "testes/exemplos.py"], environment)
+        run("Bibliotecas sanitizadas", [sys.executable, "testes/bibliotecas.py"], environment)
         passed = True
 finally:
     restored = subprocess.run(

@@ -33,7 +33,7 @@ private:
 
     void lowerDecorators(ref Decorator[] decorators)
     {
-        foreach (ref d; decorators)
+        foreach (ref Decorator d; decorators)
             d.values = loweringBody(d.values, true);
     }
 
@@ -54,13 +54,13 @@ private:
         switch (node.kind)
         {
             case NodeKind.SequenceStmt:
-                auto sequence = cast(SequenceStmt) node;
+                SequenceStmt sequence = cast(SequenceStmt) node;
                 sequence.body = loweringBody(sequence.body);
                 return node;
             case NodeKind.SwitchStmt:
-                auto s = cast(SwitchStmt) node;
+                SwitchStmt s = cast(SwitchStmt) node;
                 s.value = loweringExpr(s.value);
-                foreach (ref c; s.cases)
+                foreach (ref SwitchCase c; s.cases)
                 {
                     c.values = loweringBody(c.values, true);
                     c.body = loweringBody(c.body);
@@ -70,12 +70,12 @@ private:
             case NodeKind.NaN:
                 return node;
             case NodeKind.EachStmt:
-                auto loop = cast(EachStmt) node;
+                EachStmt loop = cast(EachStmt) node;
                 loop.iterable = loweringExpr(loop.iterable);
                 loop.body = loweringBody(loop.body);
                 return node;
             case NodeKind.ForStmt:
-                auto loop = cast(ForStmt) node;
+                ForStmt loop = cast(ForStmt) node;
                 if (loop.init !is null)
                     loop.init = loweringStmt(loop.init);
                 if (loop.condition !is null)
@@ -85,7 +85,7 @@ private:
                 loop.body = loweringBody(loop.body);
                 return node;
             case NodeKind.DoStmt:
-                auto loop = cast(DoStmt) node;
+                DoStmt loop = cast(DoStmt) node;
                 loop.condition = loweringExpr(loop.condition);
                 loop.body = loweringBody(loop.body);
                 return node;
@@ -93,28 +93,28 @@ private:
             case NodeKind.ContinueStmt:
                 return node;
             case NodeKind.ThrowStmt:
-                auto t = cast(ThrowStmt) node;
+                ThrowStmt t = cast(ThrowStmt) node;
                 t.value = loweringExpr(t.value);
                 return node;
             case NodeKind.TryStmt:
-                auto t = cast(TryStmt) node;
+                TryStmt t = cast(TryStmt) node;
                 t.body = loweringBody(t.body);
                 t.finalBody = loweringBody(t.finalBody);
-                foreach (ref c; t.catches)
+                foreach (ref CatchClause c; t.catches)
                     c.body = loweringBody(c.body);
                 return node;
             case NodeKind.ClassDecl:
-                auto c = cast(ClassDecl) node;
+                ClassDecl c = cast(ClassDecl) node;
                 lowerDecorators(c.decorators);
-                foreach (ref field; c.fields)
+                foreach (ref ClassField field; c.fields)
                     lowerDecorators(field.decorators);
-                foreach (ref method; c.methods)
+                foreach (ref FnDecl method; c.methods)
                     method = cast(FnDecl) loweringStmt(method);
                 return node;
             case NodeKind.FnDecl:
                 FnDecl fn = cast(FnDecl) node;
                 lowerDecorators(fn.decorators);
-                foreach (arg; fn.args)
+                foreach (FnArg arg; fn.args)
                     if (arg.value !is null)
                         arg.value = loweringExpr(arg.value);
                 fn.body = loweringBody(fn.body);
@@ -128,9 +128,9 @@ private:
             case NodeKind.AssignStmt:
                 AssignStmt ass = cast(AssignStmt) node;
                 checkLValue(ass.left);
-                if (auto member = cast(MemberExpr) ass.left)
+                if (MemberExpr member = cast(MemberExpr) ass.left)
                     member.left = loweringExpr(member.left);
-                if (auto idx = cast(IndexExpr) ass.left)
+                if (IndexExpr idx = cast(IndexExpr) ass.left)
                 {
                     idx.value = loweringExpr(idx.value);
                     idx.idx = loweringExpr(idx.idx);
@@ -199,17 +199,17 @@ private:
             case NodeKind.AssignStmt:
                 return loweringStmt(node);
             case NodeKind.ConditionalExpr:
-                auto c = cast(ConditionalExpr) node;
+                ConditionalExpr c = cast(ConditionalExpr) node;
                 c.condition = loweringExpr(c.condition);
                 c.yes = loweringExpr(c.yes);
                 c.no = loweringExpr(c.no);
                 return node;
             case NodeKind.SpreadExpr:
-                auto s = cast(SpreadExpr) node;
+                SpreadExpr s = cast(SpreadExpr) node;
                 s.value = loweringExpr(s.value);
                 return node;
             case NodeKind.SliceExpr:
-                auto s = cast(SliceExpr) node;
+                SliceExpr s = cast(SliceExpr) node;
                 s.value = loweringExpr(s.value);
                 if (s.start !is null)
                     s.start = loweringExpr(s.start);
@@ -219,18 +219,18 @@ private:
                     s.step = loweringExpr(s.step);
                 return node;
             case NodeKind.Comprehension:
-                auto c = cast(Comprehension) node;
+                Comprehension c = cast(Comprehension) node;
                 c.value = loweringExpr(c.value);
                 c.iterable = loweringExpr(c.iterable);
                 if (c.condition !is null)
                     c.condition = loweringExpr(c.condition);
                 return node;
             case NodeKind.LoopExpr:
-                auto l = cast(LoopExpr) node;
+                LoopExpr l = cast(LoopExpr) node;
                 l.loop = loweringStmt(l.loop);
                 return node;
             case NodeKind.ImportExpr:
-                auto imported = cast(ImportExpr) node;
+                ImportExpr imported = cast(ImportExpr) node;
                 if (imported.target !is null && !imported.target.lowered)
                 {
                     imported.target.lowered = true;
@@ -238,40 +238,40 @@ private:
                 }
                 return node;
             case NodeKind.FunctionExpr:
-                auto fn = cast(FunctionExpr) node;
+                FunctionExpr fn = cast(FunctionExpr) node;
                 fn.declaration = cast(FnDecl) loweringStmt(fn.declaration);
                 return node;
             case NodeKind.MapLit:
-                auto map = cast(MapLit) node;
-                foreach (ref key; map.keys)
+                MapLit map = cast(MapLit) node;
+                foreach (ref Node key; map.keys)
                     if (key !is null)
                         key = loweringExpr(key);
                 map.values = loweringBody(map.values, true);
                 return node;
             case NodeKind.TypeOfExpr:
-                auto type = cast(TypeOfExpr) node;
+                TypeOfExpr type = cast(TypeOfExpr) node;
                 return createCallExpr("delegua_tipo_objeto", [loweringExpr(type.value)], type.pos);
             case NodeKind.Identifier:
             case NodeKind.SuperExpr:
                 return node;
             case NodeKind.CallExpr:
-                auto call = cast(CallExpr) node;
+                CallExpr call = cast(CallExpr) node;
                 if (!call.runtimeCall)
                     call.fn = loweringExpr(call.fn);
                 call.args = loweringBody(call.args, true);
                 return node;
             case NodeKind.TupleLit:
             case NodeKind.ArrayLit:
-                auto arr = cast(ArrayLit) node;
+                ArrayLit arr = cast(ArrayLit) node;
                 arr.elements = loweringBody(arr.elements, true);
                 return node;
             case NodeKind.IndexExpr:
-                auto idx = cast(IndexExpr) node;
+                IndexExpr idx = cast(IndexExpr) node;
                 idx.value = loweringExpr(idx.value);
                 idx.idx = loweringExpr(idx.idx);
                 return node;
             case NodeKind.MemberExpr:
-                auto member = cast(MemberExpr) node;
+                MemberExpr member = cast(MemberExpr) node;
                 member.left = loweringExpr(member.left);
                 member.right = loweringExpr(member.right);
                 return node;
@@ -343,7 +343,7 @@ private:
 
     pragma(inline, true) Node createCallExpr(dstring name, Node[] args, Position pos = Position.init)
     {
-        auto call = new CallExpr(new Identifier(name, pos), args, pos);
+        CallExpr call = new CallExpr(new Identifier(name, pos), args, pos);
         call.runtimeCall = true;
         return call;
     }

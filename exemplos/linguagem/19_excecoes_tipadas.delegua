@@ -1,5 +1,13 @@
 //! meu erro
-classe MeuErro herda Excecao {}
-tente { falhar MeuErro("meu erro") }
-pegue (erro: MeuErro) { escreva(erro) }
-pegue { escreva("outro erro") }
+classe MeuErro herda Excecao {
+}
+
+tente {
+    falhar MeuErro("meu erro")
+}
+pegue (erro: MeuErro) {
+    escreva(erro)
+}
+pegue {
+    escreva("outro erro")
+}

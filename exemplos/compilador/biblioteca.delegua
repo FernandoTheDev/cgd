@@ -1,3 +1,5 @@
 //! módulo inicializado
 escreva("módulo inicializado")
-funcao dobro(valor) { retorna valor * 2 }
+funcao dobro(valor: qualquer): qualquer {
+    retorna valor * 2
+}

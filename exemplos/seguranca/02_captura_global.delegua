@@ -1,5 +1,7 @@
 //# 1
 //? fase: compilacao
 //? erro: upvalues
-var externo = 1
-funcao obter() { retorna externo }
+var externo: inteiro = 1
+funcao obter() {
+    retorna externo
+}

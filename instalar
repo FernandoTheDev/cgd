@@ -86,6 +86,8 @@ cp cgd "$install_prefix/.cgd-install-$$"
 chmod +x "$install_prefix/.cgd-install-$$"
 mv -f "$install_prefix/.cgd-install-$$" "$install_prefix/cgd"
 cp lib/libdelegua_rt.o "$install_prefix/lib/"
+mkdir -p "$install_prefix/bibliotecas"
+cp bibliotecas/*.delegua "$install_prefix/bibliotecas/"
 cp vendor/delegua-runtime/src/*.h "$install_prefix/vendor/delegua-runtime/src/"
 if [ "$install_bin_dir/cgd" != "$install_prefix/cgd" ]; then
     ln -sf "$install_prefix/cgd" "$install_bin_dir/cgd"

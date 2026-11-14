@@ -1,10 +1,16 @@
 //! 36\n8
 classe Ponto {
     x: numero
-    construtor(x: numero) { isto.x = x }
-    dobro() { retorna isto.x * 2 }
+    construtor(x: numero) {
+        isto.x = x
+    }
+
+    dobro(): qualquer {
+        retorna isto.x * 2
+    }
 }
-var ponto = Ponto(3)
+
+var ponto: Ponto = Ponto(3)
 escreva(ponto.x, ponto.dobro())
 ponto.x = 4
 escreva(ponto.dobro())

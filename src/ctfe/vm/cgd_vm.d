@@ -124,7 +124,7 @@ struct VM
 
 alias VMHandleFn = void function(VMInstruction*, VM*);
 
-enum OpCodes = EnumMembers!VMOpCode;
+enum VMOpCode[] OpCodes = [EnumMembers!VMOpCode];
 const VMHandleFn[OpCodes.length] handlers = [
     &vmLoadParam, &vmLoad, &vmStore, &vmValidate, &vmPush, &vmJmp, &vmJz, &vmJnz, &vmAdd,
     &vmSub, &vmMul, &vmDiv, &vmIDiv, &vmLe, &vmLt, &vmMod, &vmGt, &vmGe, &vmEq, &vmNeq,
@@ -168,7 +168,7 @@ void vmCall(VMInstruction* instr, VM* vm)
     dstring name = instr.str;
 
     CGDValue[] args;
-    foreach (i; 0 .. numArgs)
+    foreach (long i; 0 .. numArgs)
         args ~= vm.pop();
 
     size_t pc = vm.pc;
@@ -247,7 +247,7 @@ void vmAdd(VMInstruction* instr, VM* vm)
     {
         case CGDTypeKind.Inteiro:
             bool overflow;
-            auto result = adds(left.i, right.i, overflow);
+            long result = adds(left.i, right.i, overflow);
             enforce(!overflow, "Overflow inteiro em tempo de compilação.");
             vm.push(CGDValue.inteiro(result));
             break;
@@ -276,7 +276,7 @@ void vmSub(VMInstruction* instr, VM* vm)
     {
         case CGDTypeKind.Inteiro:
             bool overflow;
-            auto result = subs(left.i, right.i, overflow);
+            long result = subs(left.i, right.i, overflow);
             enforce(!overflow, "Overflow inteiro em tempo de compilação.");
             vm.push(CGDValue.inteiro(result));
             break;
@@ -304,7 +304,7 @@ void vmMul(VMInstruction* instr, VM* vm)
     {
         case CGDTypeKind.Inteiro:
             bool overflow;
-            auto result = muls(left.i, right.i, overflow);
+            long result = muls(left.i, right.i, overflow);
             enforce(!overflow, "Overflow inteiro em tempo de compilação.");
             vm.push(CGDValue.inteiro(result));
             break;
@@ -353,7 +353,7 @@ void vmDiv(VMInstruction* instr, VM* vm)
 
 void vmIDiv(VMInstruction* instr, VM* vm)
 {
-    auto right = vm.pop(), left = vm.pop();
+    CGDValue right = vm.pop(), left = vm.pop();
     promote(left, right);
     if (left.type == CGDTypeKind.Inteiro)
     {
@@ -363,7 +363,7 @@ void vmIDiv(VMInstruction* instr, VM* vm)
     }
     else if (left.type == CGDTypeKind.Real)
     {
-        auto result = left.d / right.d;
+        double result = left.d / right.d;
         enforce(right.d != 0 && result >= cast(double) long.min && result < 9223372036854775808.0,
                 "Divisão inteira fora do intervalo em tempo de compilação.");
         vm.push(CGDValue.inteiro(cast(long) result));

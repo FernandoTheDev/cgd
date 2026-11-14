@@ -22,6 +22,7 @@ private:
     uint offset;
 
 public:
+    bool recoverIncomplete;
     ubyte flags;
     size_t nesting;
 
@@ -73,7 +74,7 @@ public:
     {
         if (isAtEnd(n))
         {
-            auto pos = tokens.length ? tokens[$ - 1].pos : null;
+            Position pos = tokens.length ? tokens[$ - 1].pos : null;
             err.errorCode(pos, unexpectedEnd);
             throw new ParseException;
         }
@@ -113,6 +114,13 @@ public:
 
     Token consume(TokenKind kind, string message)
     {
+        if (recoverIncomplete && isAtEnd() && (kind == TokenKind.RBrace || kind == TokenKind.RParen
+                || kind == TokenKind.RBracket))
+        {
+            Position pos = tokens.length ? tokens[$ - 1].pos : null;
+            err.errorCode(pos, unexpectedEnd);
+            return new Token(kind, TokenRaw.init, pos);
+        }
         Token tk = advance();
         if (tk.kind == kind)
             return tk;
@@ -122,7 +130,7 @@ public:
 
     Token consumeName(string message)
     {
-        auto token = advance();
+        Token token = advance();
         if ((token.kind == TokenKind.Identifier || token.kind <= TokenKind.Of) && token.value.s.length)
             return new Token(TokenKind.Identifier, token.value, token.pos);
         err.error(token.pos, message, "E1001");
@@ -189,14 +197,14 @@ public:
         Decorator[] result;
         while (match(TokenKind.At))
         {
-            auto name = consumeName("Esperado nome do decorador.");
+            Token name = consumeName("Esperado nome do decorador.");
             Decorator d;
             d.name = name.value.s;
             if (match(TokenKind.LParen))
             {
                 while (!isAtEnd() && !check(TokenKind.RParen))
                 {
-                    auto key = consumeName("Esperado nome do argumento do decorador.");
+                    Token key = consumeName("Esperado nome do argumento do decorador.");
                     consume(TokenKind.Equals, "Esperado '=' após argumento do decorador.");
                     d.keys ~= key.value.s;
                     d.values ~= parseExpr.parse();
@@ -222,7 +230,7 @@ public:
 
         if (check(TokenKind.At))
         {
-            auto decorators = parseDecorators();
+            Decorator[] decorators = parseDecorators();
             node = parseIntern();
             node.decorators = decorators;
             return node;
@@ -250,7 +258,7 @@ public:
 
             while (!isAtEnd() && !check(TokenKind.RBrace))
             {
-                auto before = offset;
+                uint before = offset;
                 try
                 {
                     Node node = parseIntern();
@@ -302,7 +310,7 @@ public:
         Node[] body;
         while (!isAtEnd())
         {
-            auto before = offset;
+            uint before = offset;
             try
             {
                 Node node = parseIntern();

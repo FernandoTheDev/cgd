@@ -2,5 +2,9 @@
 //? fase: compilacao
 //? erro: upvalues
 funcao criar(x) {
-    retorna funcao() { retorna x } // Captura implícita proibida.
+    retorna funcao() {
+        retorna x
+    }
+
+    // Captura implícita proibida.
 }

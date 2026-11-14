@@ -1,7 +1,13 @@
 //! 12\nx7\nverdadeiro
-var original = {a: 1}
-var dados = {...original, b: 2}
-const {a, b} = dados
+var original: dicionario = { a: 1 }
+
+var dados: dicionario = { ... original, b: 2 }
+
+const { a: qualquer, b: qualquer } = dados
 escreva(a, b)
-para cada {chave, valor} em {x: 7} { escreva(chave, valor) }
+
+para cada { chave: texto, valor: inteiro } em { x: 7 } {
+    escreva(chave, valor)
+}
+
 escreva("a" em dados)

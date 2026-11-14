@@ -187,8 +187,8 @@ class TypeSemaClass : TypeSema
     {
         if (other.isAny())
             return true;
-        if (auto c = cast(TypeSemaClass) other)
-            for (auto node = c.declaration; node !is null; node = node.superClass)
+        if (TypeSemaClass c = cast(TypeSemaClass) other)
+            for (ClassDecl node = c.declaration; node !is null; node = node.superClass)
                 if (node is declaration)
                     return true;
         return false;

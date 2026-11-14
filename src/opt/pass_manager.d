@@ -16,11 +16,11 @@ struct OptimizationStats
 OptimizationStats optimize(Program program, Context context, CTFEContext ctfe)
 {
     OptimizationStats stats;
-    foreach (_; 0 .. 8)
+    foreach (int _; 0 .. 8)
     {
-        auto folding = new CgdConstantFolding(program, context, ctfe);
+        CgdConstantFolding folding = new CgdConstantFolding(program, context, ctfe);
         folding.opt();
-        auto dead = new CgdDeadCode(program, context);
+        CgdDeadCode dead = new CgdDeadCode(program, context);
         dead.remove();
         stats.iterations++;
         stats.folded += folding.changes;

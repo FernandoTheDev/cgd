@@ -1,7 +1,7 @@
 //$
 //# 1
 //>puro
-funcao teste(mensagem: texto) {
+funcao teste(mensagem: texto): qualquer {
     escreva(mensagem)
 }
 

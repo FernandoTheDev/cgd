@@ -1,12 +1,12 @@
 //$
 //! 4
 //>puro
-funcao multiplicacao(x, y) {
+funcao multiplicacao(x: qualquer, y: qualquer): qualquer {
     retorne x * y
 }
 
 //>puro
-funcao quadrado(x) {
+funcao quadrado(x: qualquer): qualquer {
     retorne multiplicacao(x, x)
 }
 

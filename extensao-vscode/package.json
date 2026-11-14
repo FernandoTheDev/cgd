@@ -1,0 +1,193 @@
+{
+  "name": "cgd",
+  "displayName": "CGD — Delégua compilada",
+  "description": "LSP local do CGD, tokens semânticos, navegação e compilação explícita de Delégua.",
+  "version": "0.2.0",
+  "publisher": "fernandothedev",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FernandoTheDev/cgd"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:cgd",
+    "onDebugResolve:cgd"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Compilar e executar exige confiança no workspace.",
+      "restrictedConfigurations": [
+        "cgd.executable"
+      ]
+    }
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "cgd",
+        "aliases": [
+          "CGD / Delégua",
+          "cgd"
+        ],
+        "extensions": [
+          ".delegua"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "cgd.compilar",
+        "title": "CGD: Compilar arquivo",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "cgd.executar",
+        "title": "CGD: Compilar e executar arquivo",
+        "icon": "$(play)"
+      },
+      {
+        "command": "cgd.verificar",
+        "title": "CGD: Verificar arquivo"
+      },
+      {
+        "command": "cgd.reiniciarServidor",
+        "title": "CGD: Reiniciar servidor de linguagem"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "cgd.executar",
+          "when": "resourceLangId == cgd",
+          "group": "navigation"
+        },
+        {
+          "command": "cgd.compilar",
+          "when": "resourceLangId == cgd",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "cgd.compilar",
+        "key": "ctrl+shift+b",
+        "when": "editorLangId == cgd"
+      },
+      {
+        "command": "editor.action.formatDocument",
+        "key": "ctrl+shift+i",
+        "when": "editorTextFocus && editorLangId == cgd"
+      }
+    ],
+    "configuration": {
+      "title": "CGD",
+      "properties": {
+        "cgd.executable": {
+          "type": "string",
+          "default": "",
+          "description": "Caminho de um CGD já compilado. Não executa DUB automaticamente."
+        },
+        "cgd.optimizar": {
+          "type": "boolean",
+          "default": false,
+          "description": "Ativar -o nas compilações explícitas."
+        },
+        "cgd.inlayHints": {
+          "type": "boolean",
+          "default": false,
+          "description": "Exibir dicas de tipos fornecidas pelo LSP."
+        }
+      }
+    },
+    "configurationDefaults": {
+      "[cgd]": {
+        "editor.semanticHighlighting.enabled": true,
+        "editor.inlayHints.enabled": "offUnlessPressed",
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true,
+        "editor.defaultFormatter": "fernandothedev.cgd"
+      }
+    },
+    "semanticTokenScopes": [
+      {
+        "language": "cgd",
+        "scopes": {
+          "class": [
+            "entity.name.type.class"
+          ],
+          "function": [
+            "entity.name.function"
+          ],
+          "method": [
+            "entity.name.function.member"
+          ],
+          "parameter": [
+            "variable.parameter"
+          ],
+          "variable": [
+            "variable.other.readwrite"
+          ],
+          "property": [
+            "variable.other.property"
+          ],
+          "keyword": [
+            "keyword.control"
+          ],
+          "comment": [
+            "comment.line"
+          ],
+          "string": [
+            "string.quoted"
+          ],
+          "number": [
+            "constant.numeric"
+          ],
+          "operator": [
+            "keyword.operator"
+          ]
+        }
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "cgd",
+        "label": "CGD — executar sem depurador",
+        "languages": [
+          "cgd"
+        ],
+        "initialConfigurations": [
+          {
+            "type": "cgd",
+            "request": "launch",
+            "name": "CGD: compilar e executar (sem depuração)"
+          }
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [],
+            "properties": {}
+          }
+        }
+      }
+    ]
+  },
+  "dependencies": {
+    "vscode-languageclient": "9.0.1"
+  },
+  "devDependencies": {
+    "jsonc-parser": "3.3.1"
+  },
+  "scripts": {
+    "package": "python3 ../scripts/instalar_extensao.py --package-only"
+  }
+}

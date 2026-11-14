@@ -37,7 +37,7 @@ public:
                     return new TypeSemaBuiltin(TypeSemaBase.Any);
                 }
 
-                if (auto c = cast(TypeSemaClass)*tsema)
+                if (TypeSemaClass c = cast(TypeSemaClass)*tsema)
                     named.classLinkName = c.declaration.signature.linkName;
                 return *tsema;
 

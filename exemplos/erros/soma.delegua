@@ -1,7 +1,7 @@
 //! 5
-funcao soma(x: inteiro, y: inteiro) {
+funcao soma(x: inteiro, y: inteiro): qualquer {
     retorna x + y
 }
 
-var x = soma
+var x: funcao = soma
 escreva(x(2, 3))

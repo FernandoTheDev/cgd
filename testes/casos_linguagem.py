@@ -1,6 +1,11 @@
 """Casos de linguagem para a suíte de integração, sem dependências externas."""
 
 CASES = [
+    (
+        "campo_tipo_capturado",
+        'classe A{x:inteiro}var a=A();tente{a.x="texto"}pegue(erro){escreva("capturado")}',
+        "capturado",
+    ),
     ("funcao_valor", "funcao f(x){retorna x*2} var g=f;escreva(g(3))", "6"),
     ("anonima", "var f=funcao(x){retorna x+1};escreva(f(2))", "3"),
     ("retorna_funcao", "funcao criar(){retorna funcao(x){retorna x+4}} escreva(criar()(5))", "9"),

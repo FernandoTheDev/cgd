@@ -33,8 +33,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--compiler", type=Path, default=ROOT / "cgd")
     parser.add_argument("--once", action="store_true", help="Usa somente o modo sem -o.")
+    parser.add_argument("--examples-dir", type=Path, default=ROOT / "exemplos")
     args = parser.parse_args()
-    files = sorted((ROOT / "exemplos").rglob("*.delegua"))
+    files = sorted(args.examples_dir.rglob("*.delegua"))
     failures = []
     checks = 0
     with tempfile.TemporaryDirectory(prefix="cgd exemplos ") as tmp:

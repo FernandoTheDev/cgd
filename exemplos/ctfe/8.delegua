@@ -1,9 +1,9 @@
 //$
 //! 55
 //>puro
-função fibonacci(n) {
+função fibonacci(n: qualquer): qualquer {
     se n <= 1
-        retorne n
+    retorne n
     retorne fibonacci(n - 1) + fibonacci(n - 2)
 }
 

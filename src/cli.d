@@ -43,7 +43,7 @@ GetoptResult cli_parse(ref string[] args, ref CGDArguments arguments)
 private string generateGetoptCall()
 {
     string code = "return getopt(args";
-    foreach (flag; FLAGS)
+    foreach (Flag flag; FLAGS)
     {
         string pattern = flag.curta.length ? flag.curta ~ "|" ~ flag.longa : flag.longa;
         code ~= format(`, "%s", &arguments.%s`, pattern, flag.campo);
@@ -57,9 +57,12 @@ void cli_ajuda()
     cli_versao();
     writeln();
     writeln("USO:");
-    writeln("    cgd [arquivo] [flags]\n");
+    writeln("    cgd [arquivo] [flags]");
+    writeln("    cgd --formatar arquivo.delegua");
+    writeln("    cgd --verificar-formatacao arquivo.delegua");
+    writeln("    cgd --lsp --stdio\n");
     writeln("FLAGS:");
-    foreach (flag; FLAGS)
+    foreach (Flag flag; FLAGS)
         writefln("    -%-4s --%-10s  %s", flag.curta, flag.longa, flag.descricao);
     writeln();
 }

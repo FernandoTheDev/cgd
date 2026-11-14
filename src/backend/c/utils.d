@@ -25,7 +25,7 @@ dstring strToDstr(string str) => to!dstring(str);
 
 dstring formatD(Args...)(string fmt, Args args)
 {
-    auto app = appender!dstring();
+    Appender!dstring app = appender!dstring();
     formattedWrite(app, fmt, args);
     return app.data;
 }
@@ -44,10 +44,10 @@ dstring compileEscreva(BackendC ctx, Node node)
 dstring cName(dstring name)
 {
     enum dstring digits = "0123456789abcdef"d;
-    auto result = appender!dstring();
+    Appender!dstring result = appender!dstring();
     result.reserve(8 + name.length * 7);
     result.put("cgd_user"d);
-    foreach (c; name)
+    foreach (dchar c; name)
     {
         dchar[8] buffer;
         size_t start = buffer.length;
@@ -68,8 +68,8 @@ dstring cName(dstring name)
 /// caractere se una ao escape e evita injetar aspas, barras ou diretivas C.
 dstring cString(dstring value)
 {
-    auto bytes = value.to!string;
-    auto result = appender!dstring();
+    string bytes = value.to!string;
+    Appender!dstring result = appender!dstring();
     result.reserve(2 + bytes.length * 4);
     result.put('"');
     foreach (ubyte c; cast(const(ubyte)[]) bytes)

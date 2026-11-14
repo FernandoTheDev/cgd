@@ -1,0 +1,437 @@
+// JSON: gramática, estruturas, escapes e serialização implementados em Delégua.
+// Números além da representação nativa usam NumeroJSON para manter o lexema.
+classe NumeroJSON {
+    privado {
+        _lexema: texto
+    }
+
+    construtor(lexema: texto) {
+        var leitor: LeitorJSON = LeitorJSON(lexema)
+        var validado: qualquer = leitor.numeroLexema()
+        se leitor.posicao() != tamanho(lexema) {
+            falhar "Lexema numérico JSON inválido"
+        }
+        isto._lexema = validado
+    }
+
+    lexema(): texto {
+        retorna isto._lexema
+    }
+
+    paraTexto(): texto {
+        retorna isto._lexema
+    }
+}
+
+classe LeitorJSON {
+    _fonte: texto
+    _caracteres: qualquer
+    _tamanho: inteiro
+    _pos: inteiro
+    _prof: inteiro
+    _nos: inteiro
+    _limite: inteiro
+    _maxNos: inteiro
+    construtor(fonte: texto, limite: inteiro = 128, maxNos: inteiro = 100000) {
+        isto._fonte = fonte
+        isto._tamanho = tamanho(fonte)
+        se isto._tamanho > 1048576 {
+            falhar "JSON excede 1048576 pontos de código"
+        }
+        isto._caracteres = fonte.dividir("")
+        isto._pos = 0
+        isto._prof = 0
+        isto._nos = 0
+        isto._limite = limite
+        isto._maxNos = maxNos
+    }
+
+    posicao(): inteiro {
+        retorna isto._pos
+    }
+
+    erro(mensagem: texto): vazio {
+        falhar "JSON na posição ${isto._pos}: ${mensagem}"
+    }
+
+    atual(): texto {
+        se isto._pos >= isto._tamanho {
+            retorna ""
+        }
+        retorna isto._caracteres[isto._pos]
+    }
+
+    espacos(): vazio {
+        enquanto isto._pos < isto._tamanho e " \t\r\n".inclui(isto.atual()) {
+            isto._pos += 1
+        }
+    }
+
+    exigir(ch: texto): vazio {
+        se isto.atual() != ch {
+            isto.erro("Esperado '${ch}'")
+        }
+        isto._pos += 1
+    }
+
+    digito(): logico {
+        retorna isto._pos < isto._tamanho e "0123456789".inclui(isto.atual())
+    }
+
+    hex4(): inteiro {
+        var resultado: inteiro = 0
+        var alfabeto: texto = "0123456789abcdef"
+        para (var i: inteiro = 0; i < 4; i++) {
+            se isto._pos >= isto._tamanho {
+                isto.erro("Escape Unicode incompleto")
+            }
+            var valor: qualquer = alfabeto.encontrar(isto.atual().minusculo())
+            se valor < 0 {
+                isto.erro("Dígito hexadecimal inválido")
+            }
+            resultado = resultado * 16 + valor
+            isto._pos += 1
+        }
+        retorna resultado
+    }
+
+    texto(): texto {
+        isto.exigir('"')
+        var partes: qualquer[] = []
+        enquanto isto._pos < isto._tamanho {
+            var ch: qualquer = isto.atual()
+            isto._pos += 1
+            se ch == '"' {
+                retorna partes.juntar("")
+            }
+            se ch == '\\' {
+                se isto._pos >= isto._tamanho {
+                    isto.erro("Escape incompleto")
+                }
+                var escape: qualquer = isto.atual()
+                isto._pos += 1
+                se escape == '"' ou escape == '\\' ou escape == '/' {
+                    partes.adicionar(escape)
+                }
+                senao se escape == 'b' {
+                    partes.adicionar(cgdCaractereUnicode(8))
+                }
+                senao se escape == 'f' {
+                    partes.adicionar(cgdCaractereUnicode(12))
+                }
+                senao se escape == 'n' {
+                    partes.adicionar("\n")
+                }
+                senao se escape == 'r' {
+                    partes.adicionar("\r")
+                }
+                senao se escape == 't' {
+                    partes.adicionar("\t")
+                }
+                senao se escape == 'u' {
+                    var codigo: qualquer = isto.hex4()
+                    se codigo >= 55296 e codigo <= 56319 {
+                        isto.exigir('\\')
+                        isto.exigir('u')
+                        var baixo: qualquer = isto.hex4()
+                        se baixo < 56320 ou baixo > 57343 {
+                            isto.erro("Par substituto Unicode inválido")
+                        }
+                        codigo = 65536 +(codigo - 55296) * 1024 + baixo - 56320
+                    } senao se codigo >= 56320 e codigo <= 57343 {
+                        isto.erro("Substituto Unicode isolado")
+                    }
+                    partes.adicionar(cgdCaractereUnicode(codigo))
+                } senao {
+                    isto.erro("Escape desconhecido")
+                }
+            } senao {
+                se cgdCodigoUnicode(ch) < 32 {
+                    isto.erro("Controle não escapado em texto")
+                }
+                partes.adicionar(ch)
+            }
+        }
+        falhar "JSON na posição ${isto._pos}: Texto não fechado"
+    }
+
+    numeroLexema(): texto {
+        var inicio: qualquer = isto._pos
+        se isto.atual() == '-' {
+            isto._pos += 1
+        }
+        se !isto.digito() {
+            isto.erro("Esperado dígito")
+        }
+        se isto.atual() == '0' {
+            isto._pos += 1
+            se isto.digito() {
+                isto.erro("Zero inicial não permitido")
+            }
+        } senao {
+            enquanto isto.digito() {
+                isto._pos += 1
+            }
+        }
+        se isto.atual() == '.' {
+            isto._pos += 1
+            se !isto.digito() {
+                isto.erro("Fração incompleta")
+            }
+            enquanto isto.digito() {
+                isto._pos += 1
+            }
+        }
+        se isto.atual() == 'e' ou isto.atual() == 'E' {
+            isto._pos += 1
+            se isto.atual() == '+' ou isto.atual() == '-' {
+                isto._pos += 1
+            }
+            se !isto.digito() {
+                isto.erro("Expoente incompleto")
+            }
+            enquanto isto.digito() {
+                isto._pos += 1
+            }
+        }
+        retorna isto._caracteres[inicio: isto._pos].juntar("")
+    }
+
+    numero(): qualquer {
+        var lexema: qualquer = isto.numeroLexema()
+        tente {
+            se !lexema.inclui('.') e !lexema.inclui('e') e !lexema.inclui('E') {
+                retorna inteiro(lexema)
+            }
+            retorna real(lexema)
+        } pegue (erro) {
+            retorna NumeroJSON(lexema)
+        }
+    }
+
+    literal(lexema: texto, valor: qualquer): qualquer {
+        se isto._caracteres[isto._pos: isto._pos + tamanho(lexema)].juntar("") != lexema {
+            isto.erro("Literal inválido")
+        }
+        isto._pos += tamanho(lexema)
+        retorna valor
+    }
+
+    valor(): qualquer {
+        isto.espacos()
+        isto._nos += 1
+        se isto._nos > isto._maxNos {
+            isto.erro("Limite de valores excedido")
+        }
+        se isto._prof >= isto._limite {
+            isto.erro("Limite de profundidade excedido")
+        }
+        var ch: qualquer = isto.atual()
+        se ch == '"' {
+            retorna isto.texto()
+        }
+        se ch == 't' {
+            retorna isto.literal("true", verdadeiro)
+        }
+        se ch == 'f' {
+            retorna isto.literal("false", falso)
+        }
+        se ch == 'n' {
+            retorna isto.literal("null", nulo)
+        }
+        se ch == '-' ou isto.digito() {
+            retorna isto.numero()
+        }
+        se ch == '[' {
+            isto._prof += 1
+            isto._pos += 1
+            var itens: qualquer[] = []
+            isto.espacos()
+            se isto.atual() == ']' {
+                isto._pos += 1;
+                isto._prof -= 1;
+                retorna itens
+            }
+            enquanto verdadeiro {
+                itens.adicionar(isto.valor())
+                isto.espacos()
+                se isto.atual() == ']' {
+                    isto._pos += 1;
+                    isto._prof -= 1;
+                    retorna itens
+                }
+                isto.exigir(',')
+            }
+        }
+        se ch == '{' {
+            isto._prof += 1
+            isto._pos += 1
+            var objeto: dicionario = {}
+            isto.espacos()
+            se isto.atual() == '}' {
+                isto._pos += 1;
+                isto._prof -= 1;
+                retorna objeto
+            }
+            enquanto verdadeiro {
+                isto.espacos()
+                se isto.atual() != '"' {
+                    isto.erro("Chave deve ser texto")
+                }
+                var chave: qualquer = isto.texto()
+                isto.espacos()
+                isto.exigir(':')
+                objeto[chave] = isto.valor()
+                isto.espacos()
+                se isto.atual() == '}' {
+                    isto._pos += 1;
+                    isto._prof -= 1;
+                    retorna objeto
+                }
+                isto.exigir(',')
+            }
+        }
+        isto.erro("Esperado valor")
+    }
+
+    analisar(): qualquer {
+        var resultado: qualquer = isto.valor()
+        isto.espacos()
+        se isto._pos != isto._tamanho {
+            isto.erro("Conteúdo após o valor")
+        }
+        retorna resultado
+    }
+}
+
+funcao analisar(fonte: texto, limite: inteiro = 128, maxNos: inteiro = 100000): qualquer {
+    se tipo de fonte != "texto" {
+        falhar "JSON exige texto"
+    }
+
+    se limite < 1 ou limite > 128 ou maxNos < 1 {
+        falhar "Limites JSON inválidos"
+    }
+
+    retorna LeitorJSON(fonte, limite, maxNos).analisar()
+}
+
+funcao escaparTexto(valor: qualquer): texto {
+    var partes: qualquer = ['"']
+    var hex: texto = "0123456789abcdef"
+    para cada ch: texto em valor.dividir("") {
+        var codigo: qualquer = cgdCodigoUnicode(ch)
+        se ch == '"' {
+            partes.adicionar('\\"')
+        }
+        senao se ch == '\\' {
+            partes.adicionar('\\\\')
+        }
+        senao se codigo < 32 {
+            partes.adicionar('\\u00' + hex[codigo \ 16] + hex[codigo % 16])
+        } senao {
+            partes.adicionar(ch)
+        }
+    }
+
+    partes.adicionar('"')
+    retorna partes.juntar("")
+}
+
+funcao emitir(valor: qualquer, ancestrais: qualquer, profundidade: inteiro): texto {
+    se profundidade >= 128 {
+        falhar "Limite de profundidade na serialização JSON"
+    }
+
+    se valor == nulo {
+        retorna "null"
+    }
+
+    var categoria: qualquer = tipo de valor
+    se categoria == "texto" {
+        retorna escaparTexto(valor)
+    }
+
+    se categoria == "logico" {
+        retorna valor ? "true": "false"
+    }
+
+    se categoria == "numero" ou categoria == "real" {
+        se !cgdNumeroFinito(valor) {
+            falhar "JSON não representa números não finitos"
+        }
+        retorna cgdNumeroTexto(valor)
+    }
+
+    se categoria == "NumeroJSON" e valor.eInstanciaDe(NumeroJSON) {
+        retorna valor.lexema()
+    }
+
+    se ancestrais.inclui(valor) {
+        falhar "Ciclo na serialização JSON"
+    }
+
+    ancestrais.adicionar(valor)
+    tente {
+        var partes: qualquer[] = []
+        se categoria == "vetor" ou categoria == "tupla" {
+            para cada item: qualquer em valor {
+                partes.adicionar(emitir(item, ancestrais, profundidade + 1))
+            }
+            retorna '[' + partes.juntar(',') + ']'
+        }
+        se categoria == "dicionário" ou categoria == "dicionario" {
+            para cada chave: texto em valor.chaves() {
+                se tipo de chave != "texto" {
+                    falhar "JSON exige chaves de texto"
+                }
+                partes.adicionar(escaparTexto(chave) + ':' + emitir(valor[chave], ancestrais,
+                    profundidade + 1))
+            }
+            retorna '{' + partes.juntar(',') + '}'
+        }
+        falhar "Tipo não serializável em JSON: ${categoria}"
+    } finalmente {
+        ancestrais.removerUltimo()
+    }
+}
+
+funcao serializar(valor: qualquer): texto {
+    retorna emitir(valor, [], 0)
+}
+
+// API orientada a objetos. O construtor recebe o valor já analisado.
+classe JSON {
+    privado {
+        _valor: qualquer
+    }
+
+    construtor(valor: qualquer = nulo) {
+        isto._valor = valor
+    }
+
+    estatico analisar(fonte: texto, limite: inteiro = 128, maxNos: inteiro = 100000): qualquer {
+        retorna analisar(fonte, limite, maxNos)
+    }
+
+    estatico serializar(valor: qualquer): texto {
+        retorna serializar(valor)
+    }
+
+    valor(): qualquer {
+        retorna isto._valor
+    }
+
+    obter(chave: texto): qualquer {
+        retorna isto._valor[chave]
+    }
+
+    definir(chave: texto, valor: qualquer): JSON {
+        isto._valor[chave] = valor
+        retorna isto
+    }
+
+    texto(): texto {
+        retorna serializar(isto._valor)
+    }
+}

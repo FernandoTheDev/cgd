@@ -1,15 +1,27 @@
 //! 212
 // A VM preserva senão, slots locais, parâmetros mutáveis e ordem de argumentos.
 //>puro
-funcao escolher(condicao) {
-    se condicao { retorna 1 } senao { retorna 2 }
+funcao escolher(condicao: qualquer): qualquer {
+    se condicao {
+        retorna 1
+    } senao {
+        retorna 2
+    }
 }
+
 //>puro
-funcao combinar(a, b) { retorna a * 10 + b }
+funcao combinar(a: qualquer, b: qualquer): qualquer {
+    retorna a * 10 + b
+}
+
 //>puro
-funcao calcular() {
-    var valor = 1
-    se verdadeiro { var valor = 99 }
+funcao calcular(): qualquer {
+    var valor: numero = 1
+    se verdadeiro {
+        var valor: numero = 99
+    }
+
     retorna combinar(valor++, valor++)
 }
+
 escreva(escolher(falso), calcular())

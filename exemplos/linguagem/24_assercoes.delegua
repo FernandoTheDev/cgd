@@ -1,5 +1,9 @@
 //! validado\nmensagem personalizada
 assercao 2 + 2 == 4
 escreva("validado")
-tente { asserção(falso, "mensagem personalizada") }
-pegue (erro) { escreva(erro) }
+tente {
+    asserção(falso, "mensagem personalizada")
+}
+pegue (erro) {
+    escreva(erro)
+}
