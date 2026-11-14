@@ -356,6 +356,19 @@ with tempfile.TemporaryDirectory(prefix="cgd lsp ") as directory:
         )["items"]
     }
     assert "agir" not in labels, labels
+    source = f"var biblioteca: qualquer=importar({json.dumps(library)})\nbiblioteca.JSON("
+    client.send(
+        "textDocument/didChange",
+        {"textDocument": {"uri": uri, "version": 19}, "contentChanges": [{"text": source}]},
+    )
+    help = client.request(
+        "textDocument/signatureHelp",
+        {
+            "textDocument": {"uri": uri},
+            "position": {"line": 1, "character": len("biblioteca.JSON(")},
+        },
+    )
+    assert help and "valor" in help["signatures"][0]["parameters"][0]["label"], help
     # Unsaved untitled documents do not require a real filesystem entry.
     untitled = "untitled:Untitled-1"
     client.send(

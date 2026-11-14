@@ -4,7 +4,9 @@ funcao soma(a: inteiro, b: inteiro = 2): inteiro {
 }
 
 classe Valor {
-    dado: numero construtor(n: qualquer) {
+    dado: numero
+
+    construtor(n: qualquer) {
         isto.dado = n
     }
 }

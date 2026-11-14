@@ -32,6 +32,7 @@ classe LeitorJSON {
     _nos: inteiro
     _limite: inteiro
     _maxNos: inteiro
+
     construtor(fonte: texto, limite: inteiro = 128, maxNos: inteiro = 100000) {
         isto._fonte = fonte
         isto._tamanho = tamanho(fonte)

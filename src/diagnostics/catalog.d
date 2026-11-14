@@ -49,6 +49,10 @@ enum MessageSpec astLimit = MessageSpec("E1004",
             "O frontend limita profundidade e quantidade de nós antes dos passes recursivos.");
 enum MessageSpec missingSymbol = MessageSpec("E3001", "O símbolo '%s' não foi declarado.",
             "Verifique escopo e grafia; funções não capturam ambientes externos.");
+enum MessageSpec unsupportedStaticField = MessageSpec("E3011", "Campos estáticos ainda não são suportados; declare um método estático.",
+            "Esta versão oferece campos de instância e métodos estáticos; a ausência de campos estáticos não é uma exclusão de segurança.");
+enum MessageSpec staticConstructor = MessageSpec("E3012", "Construtor não pode ser estático.",
+            "O construtor inicializa uma instância gerenciada e recebe isto; use outro nome para uma fábrica estática.");
 enum MessageSpec suggestion = MessageSpec("H3001", "Você quis dizer '%s'?",
             "Sugestão determinística de nome visível no escopo.");
 enum MessageSpec unreachable = MessageSpec("W3001", "Código inalcançável após transferência de controle.",
@@ -77,10 +81,10 @@ enum MessageSpec invalidSlice = MessageSpec("E3108", "O passo constante de uma f
 immutable MessageSpec[] messages = [
     runtimeError, genericError, genericWarning, genericHint, diagnosticLimit, driverFailure,
     moduleCycle, moduleBudget, moduleLoad, dynamicWarning, dynamicError, unexpectedEnd,
-    expectedToken, incompatibleTypes,
-    captureWarning, captureError, invalidUTF8, syntaxDepth, astLimit, missingSymbol, suggestion,
-    unreachable, implicitReturn, zeroDivision, integerOverflow, invalidIndex, typeContract,
-    invalidOperation, invalidConversion, invalidShift, invalidSlice
+    expectedToken, incompatibleTypes, captureWarning,
+    captureError, invalidUTF8, syntaxDepth, astLimit, missingSymbol, unsupportedStaticField,
+    staticConstructor, suggestion, unreachable, implicitReturn, zeroDivision, integerOverflow,
+    invalidIndex, typeContract, invalidOperation, invalidConversion, invalidShift, invalidSlice
 ];
 
 const(MessageSpec)* lookupMessage(string code)

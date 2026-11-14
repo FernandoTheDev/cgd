@@ -11,7 +11,8 @@ Implementado nesta continuação; runtime publicado e commit CGD preparado:
 
 - Formatador nativo `frontend/formatter.d`, quatro espaços, comentários/strings
   preservados, mapas/desestruturações compactos, blocos/métodos separados e quebra
-  conservadora de listas longas. CLI --formatar/--verificar-formatacao; LSP
+  conservadora de listas longas. Propriedades/métodos escritos juntos também são
+  separados, com regressão idempotente de classe. CLI --formatar/--verificar-formatacao; LSP
   textDocument/formatting e Ctrl+Shift+I. O estilo é lexical; não inventa tipos.
 - Removido `auto` de src e testes/unit. Tipos concretos também nos foreach e nos
   argumentos das lambdas D. `scripts/verificar_tipos.py` impede regressões.
@@ -32,7 +33,8 @@ Implementado nesta continuação; runtime publicado e commit CGD preparado:
 - LSP: sugestões por receptor conhecido, campos/métodos com kinds distintos,
   herança, estáticos, privados ocultos externamente, encadeamento, namespaces,
   escopos locais, recuperação de ponto incompleto, parâmetros/índice ativo em
-  signature help. Buffers importados em memória e cache por revisão preservados.
+  signature help, incluindo construtores importados (JSON(...)). Buffers em
+  memória e cache por revisão preservados.
 - Assinaturas cgdNativeParameters/cgdNativeReturns descrevem argumentos e retornos
   reais das primitivas controladas; não exibir arg0 genérico quando há contrato.
 - VSIX foi elevado a 0.2.0; instalador deriva versão do manifest. A instalação
@@ -79,7 +81,9 @@ Implementado nesta continuação; runtime publicado e commit CGD preparado:
   instalação nem no uso. Recarregar janela do VS Code para ativar a revisão nova.
 - Runtime commit **a04e04d**, publicado em origin/dev; stashes originais preservados.
 - CGD implementação commit **8b2436d**; correção de sombra privada herdada **a87b914**,
-  também verificada no LSP com DMD/LDC2 release; documentação no próximo commit.
+  também verificada no LSP com DMD/LDC2 release; documentação em 8df1fbe/ee94393.
+  Acabamento posterior: assinaturas de construtores importados e diagnósticos
+  centrais E3011/E3012 para campos estáticos ausentes/construtor estático.
 - Artefatos executáveis não foram versionados. Na conferência final, 07_funcoes
   já havia sido enviado à lixeira (registro local de 19:24); essa mudança externa
   foi respeitada, sem restaurar/substituir o binário. Fontes e stashes preservados.

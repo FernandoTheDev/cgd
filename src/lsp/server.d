@@ -627,7 +627,8 @@ class LanguageServer
                     string signature;
                     FnDecl declaration;
                     SymbolEntry* selectedName = doc.symbolAt(get(doc.positionRange(frame.name.pos), "start"));
-                    if (selectedName !is null && (selectedName.kind == "function" || selectedName.kind == "method"))
+                    if (selectedName !is null && (selectedName.kind == "function"
+                            || selectedName.kind == "method" || selectedName.kind == "class"))
                     {
                         signature = selectedName.detail;
                         if (FnDecl* known = selectedName.key in doc.functions)

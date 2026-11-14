@@ -1,7 +1,7 @@
 module frontend.formatter;
 
 import std.array : appender;
-import std.string : strip, endsWith, indexOf;
+import std.string : strip, endsWith, indexOf, startsWith;
 
 /// Formatação lexical conservadora: nunca reescreve literais ou comentários.
 /// Quebras existentes são mantidas; delimitadores estruturam linhas novas.
@@ -89,6 +89,8 @@ string formatDelegua(string source)
     string previous;
     bool continuation;
     bool[] compactBraces;
+    bool[] classBodies;
+    bool awaitingClass;
     size_t compactDepth;
     void flush()
     {
@@ -122,6 +124,22 @@ string formatDelegua(string source)
             previous = "";
             continue;
         }
+        if (text == "classe" && previous != "." && (index + 1 == pieces.length || pieces[index + 1].text != ":"))
+            awaitingClass = true;
+        if (classBodies.length && classBodies[$ - 1] && !parens && !compactDepth && index + 1 < pieces.length)
+        {
+            string next = pieces[index + 1].text;
+            bool modifier = text == "estatico" || text == "estático";
+            bool method = next == "(" && previous != "@" && previous != "estatico" && previous != "estático";
+            bool field = next == ":" && previous != "var" && previous != "const" && previous != ",";
+            bool visibility = text == "privado" || text == "protegido" || text == "publico" || text == "público";
+            if (modifier || method || field || visibility)
+                flush();
+            if ((modifier || method || visibility) && lines.length && lines[$ - 1].length
+                    && !lines[$ - 1].endsWith("{") && !lines[$ - 1].strip.startsWith("//")
+                    && !lines[$ - 1].strip.startsWith("@"))
+                lines ~= "";
+        }
         if (text == "{")
         {
             import std.algorithm : canFind;
@@ -130,6 +148,9 @@ string formatDelegua(string source)
                 "=", "<-", "retorna", "retorne", ":", ",", "(", "[", "...", "var", "const",
                 "fixo", "cada", "em", "de"
             ].canFind(previous) || compactDepth > 0 && previous == "{";
+            bool visibility = ["privado", "protegido", "publico", "público"].canFind(previous);
+            classBodies ~= !compact && (awaitingClass || visibility && classBodies.length && classBodies[$ - 1]);
+            awaitingClass = false;
             compactBraces ~= compact;
             append(text, previous != "(" && previous != "[");
             if (compact)
@@ -146,6 +167,8 @@ string formatDelegua(string source)
         else if (text == "}")
         {
             bool compact = compactBraces.length && compactBraces[$ - 1];
+            if (classBodies.length)
+                classBodies.length--;
             if (compactBraces.length)
                 compactBraces.length--;
             if (compact)
@@ -270,4 +293,8 @@ unittest
     assert(formatted == formatDelegua(formatted));
     assert(formatted.endsWith("escreva(\"a  b\", soma(1, 2));\n"));
     assert(formatted.indexOf("    retorna a + b;") >= 0);
+    string members = formatDelegua(
+            "classe A{x:inteiro y:texto estatico dobro(x:inteiro):inteiro{retorna x*2} metodo():texto{retorna 'x'}}");
+    assert(members.indexOf("    x: inteiro\n    y: texto\n\n    estatico dobro") >= 0, members);
+    assert(members == formatDelegua(members));
 }

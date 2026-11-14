@@ -647,6 +647,7 @@ escreva(&quot;ABC&quot;.tudoMaiusculo(), &quot;abc&quot;.tudoMinusculo())</code>
           </p>
           <pre><code>classe Ponto {
     x: numero
+
     construtor(x: numero) {
         isto.x = x
     }
@@ -743,6 +744,7 @@ escreva(conta.saldo)</code></pre>
           </p>
           <pre><code>classe Pessoa {
     nome: texto
+
     construtor(nome: qualquer) {
         isto.nome = nome
     }
@@ -1398,6 +1400,22 @@ tente {
                   &#x27;%s&#x27;.
                 </td>
                 <td>Use um tipo compatível com o contrato declarado.</td>
+              </tr>
+              <tr>
+                <td><code>E3011</code></td>
+                <td>Campos estáticos ainda não são suportados; declare um método estático.</td>
+                <td>
+                  Esta versão oferece campos de instância e métodos estáticos; a ausência de campos
+                  estáticos não é uma exclusão de segurança.
+                </td>
+              </tr>
+              <tr>
+                <td><code>E3012</code></td>
+                <td>Construtor não pode ser estático.</td>
+                <td>
+                  O construtor inicializa uma instância gerenciada e recebe isto; use outro nome
+                  para uma fábrica estática.
+                </td>
               </tr>
               <tr>
                 <td><code>E3101</code></td>

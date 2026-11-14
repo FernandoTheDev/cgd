@@ -1,6 +1,7 @@
 //! 36\n8
 classe Ponto {
     x: numero
+
     construtor(x: numero) {
         isto.x = x
     }

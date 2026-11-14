@@ -189,8 +189,7 @@ public:
             {
                 TypeExpr type = p.parseType.parse();
                 if (isStatic)
-                    p.err.error(name.pos,
-                            "Campos estáticos ainda não são suportados; declare um método estático.");
+                    p.err.errorCode(name.pos, unsupportedStaticField);
                 ClassField field = ClassField(name.value.s, type, access, name.pos);
                 if (p.match(TokenKind.LBrace))
                 {
@@ -238,7 +237,7 @@ public:
                 method.isMethod = true;
                 method.isStatic = isStatic;
                 if (isStatic && name.value.s == "construtor")
-                    p.err.error(name.pos, "Construtor não pode ser estático.");
+                    p.err.errorCode(name.pos, staticConstructor);
                 method.ownerClass = node;
                 method.access = access;
                 method.decorators = decorators;

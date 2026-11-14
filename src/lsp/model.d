@@ -281,8 +281,9 @@ class Document
         foreach (FnArg arg; fn.args)
             args ~= (arg.rest ? "..." : "") ~ arg.name.to!string ~ ": " ~ (arg.type_expr is null
                     ? "qualquer" : arg.type_expr.toStr().to!string) ~ (arg.value is null ? "" : " = …");
-        return fn.fn.to!string ~ "(" ~ args.join(", ") ~ "): " ~ (fn.type_expr is null
-                ? "qualquer" : fn.type_expr.toStr().to!string);
+        string result = fn.classFactory !is null ? fn.classFactory.name.to!string
+            : fn.type_expr is null ? "qualquer" : fn.type_expr.toStr().to!string;
+        return fn.fn.to!string ~ "(" ~ args.join(", ") ~ "): " ~ result;
     }
 
     TypeSema expressionType(Node node, size_t depth = 0)
@@ -398,7 +399,8 @@ class Document
                         ? "qualquer" : variable.type_sema.toStr().to!string), true);
         if (ClassDecl cls = cast(ClassDecl) node)
         {
-            add(cls.name.to!string, "class", cls.pos, cls.pos, "classe " ~ cls.name.to!string, true);
+            functions[identity(cls.pos)] = cls.signature;
+            add(cls.name.to!string, "class", cls.pos, cls.pos, signature(cls.signature), true);
             foreach (ClassField field; cls.fields)
                 add(field.name.to!string, "property", field.pos, field.pos,
                         "campo " ~ field.name.to!string ~ ": " ~ field.type.toStr().to!string, true);
@@ -458,7 +460,7 @@ class Document
                                     {
                                         expressionClasses[member] = cls;
                                         add(name.value.to!string, "class", name.pos, cls.pos,
-                                                "classe " ~ name.value.to!string);
+                                                signature(cls.signature));
                                         return;
                                     }
                             }

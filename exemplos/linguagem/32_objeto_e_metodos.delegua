@@ -1,6 +1,7 @@
 //! Pessoa\nverdadeiroverdadeiro\nPessoa: Ada
 classe Pessoa {
     nome: texto
+
     construtor(nome: qualquer) {
         isto.nome = nome
     }
