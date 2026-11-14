@@ -1,0 +1,7 @@
+//! 8\n[1, 2, 3]
+funcao soma(a: inteiro, b: inteiro = a + 2): inteiro {
+    retorna a + b
+}
+funcao reunir(primeiro, ...resto) { retorna [primeiro, ...resto] }
+escreva(soma(3))
+escreva(reunir(1, ...[2, 3]))

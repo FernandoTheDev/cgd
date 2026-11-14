@@ -1,0 +1,5 @@
+//! aá\n[a, b]asão\nverdadeiroverdadeiro
+// Busca, divisão, substituição e testes de caixa.
+escreva("  a".apararInicio(), "á  ".apararFim())
+escreva("a,b".dividir(","), "ação".substituir("ç", "s"))
+escreva("ABC".tudoMaiusculo(), "abc".tudoMinusculo())

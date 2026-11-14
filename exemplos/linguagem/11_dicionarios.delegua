@@ -1,0 +1,7 @@
+//! 12\nx7\nverdadeiro
+var original = {a: 1}
+var dados = {...original, b: 2}
+const {a, b} = dados
+escreva(a, b)
+para cada {chave, valor} em {x: 7} { escreva(chave, valor) }
+escreva("a" em dados)

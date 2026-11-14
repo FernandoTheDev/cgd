@@ -1,0 +1,9 @@
+//! intervalos validados
+// A saída é determinística: verificamos os intervalos, não um valor sorteado.
+para (var i = 0; i < 100; i++) {
+    var real = aleatorio()
+    var inteiro = aleatorioEntre(-3, 4)
+    assercao real >= 0 e real < 1
+    assercao inteiro >= -3 e inteiro < 4
+}
+escreva("intervalos validados")

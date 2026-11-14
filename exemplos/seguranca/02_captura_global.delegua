@@ -1,0 +1,5 @@
+//# 1
+//? fase: compilacao
+//? erro: upvalues
+var externo = 1
+funcao obter() { retorna externo }

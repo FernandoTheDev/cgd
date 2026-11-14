@@ -1,0 +1,3 @@
+//! 332,50\n1.234,568
+escreva((-3).absoluto(), (2.3).arredondarParaCima(), 2.5.formatar(2))
+escreva(1234.5689.formatar({minimoCasasDecimais: 2, maximoCasasDecimais: 3}))

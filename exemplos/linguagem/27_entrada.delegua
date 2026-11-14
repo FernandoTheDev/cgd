@@ -1,0 +1,4 @@
+//! Nome: Olá, Ada
+//? entrada: Ada\n
+var nome = leia("Nome: ")
+escreva("Olá, ${nome}")

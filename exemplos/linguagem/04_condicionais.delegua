@@ -1,0 +1,9 @@
+//! adulto\ndois ou tres
+var idade = 20
+escreva(idade >= 18 ? "adulto" : "menor")
+escolha 2 {
+    caso 1: escreva("um")
+    caso 2:
+    caso 3: escreva("dois ou tres")
+    padrao: escreva("outro")
+}

@@ -1,0 +1,10 @@
+//! 0\n2\nfeito\n6
+para (var i = 0; i < 4; i++) {
+    se i == 1 { continua }
+    se i == 3 { sustar }
+    escreva(i)
+}
+fazer { escreva("feito") } enquanto falso
+var soma = 0
+para cada item em [1, 2, 3] { soma += item }
+escreva(soma)

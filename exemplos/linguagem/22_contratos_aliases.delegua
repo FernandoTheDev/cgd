@@ -1,0 +1,6 @@
+//! bloqueado\n[1]
+var numeros: inteiro[] = [1]
+var alias: qualquer = numeros
+tente { alias.adicionar("texto") }
+pegue { escreva("bloqueado") }
+escreva(numeros)
