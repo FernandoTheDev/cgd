@@ -1,0 +1,141 @@
+module frontend.modules;
+import frontend;
+import std.file;
+import std.path;
+import std.conv;
+import std.string;
+import std.algorithm : canFind;
+import std.array : join;
+
+version (Posix) import core.sys.posix.stdlib : realpath;
+import core.stdc.stdlib : free;
+
+class ModuleLoader
+{
+    Diagnostics diagnostics;
+    ModuleUnit[string] cache;
+    bool[string] active;
+    size_t depth;
+    size_t totalBytes;
+    string[] importStack;
+    this(Diagnostics diagnostics)
+    {
+        this.diagnostics = diagnostics;
+    }
+
+    string canonical(string path)
+    {
+        version (Posix)
+        {
+            auto resolved = realpath(path.toStringz, null);
+            if (resolved is null)
+                throw new Exception("Módulo não encontrado: " ~ path);
+            scope (exit)
+                free(resolved);
+            return resolved.fromStringz.idup;
+        }
+        else
+        {
+            auto normalized = absolutePath(path).asNormalizedPath.to!string;
+            if (!exists(normalized) || !isFile(normalized))
+                throw new Exception("Módulo não encontrado: " ~ path);
+            // A resolução de junctions/symlinks Windows ainda requer validação nativa.
+            version (Windows)
+                return normalized.toLower;
+            else
+                return normalized;
+        }
+    }
+
+    void load(Program program, string filename)
+    {
+        auto path = canonical(filename);
+        active[path] = true;
+        importStack ~= path;
+        scope (exit)
+        {
+            active.remove(path);
+            importStack.length--;
+        }
+        visit(program, path);
+    }
+
+    void visit(Node node, string filename)
+    {
+        if (node is null)
+            return;
+        if (auto imported = cast(ImportExpr) node)
+        {
+            auto literal = cast(StringLit) imported.path;
+            if (literal is null)
+            {
+                diagnostics.error(node.pos, "Importação exige caminho literal conhecido na compilação.");
+                return;
+            }
+            auto path = literal.value.to!string;
+            if (path.canFind('\0'))
+            {
+                diagnostics.error(node.pos, "Caminho de módulo contém byte nulo.");
+                return;
+            }
+            if (extension(path) != ".delegua")
+            {
+                diagnostics.warningCode(node.pos, dynamicWarning);
+                diagnostics.errorCode(node.pos, dynamicError);
+                return;
+            }
+            try
+            {
+                auto target = canonical(buildPath(dirName(filename), path));
+                if (target in active)
+                {
+                    diagnostics.errorCode(node.pos, moduleCycle, importStack.join(" -> ") ~ " -> " ~ target);
+                    return;
+                }
+                if (auto cached = target in cache)
+                {
+                    imported.target = *cached;
+                    return;
+                }
+                if (depth >= 64)
+                {
+                    diagnostics.error(node.pos, "Limite de profundidade de módulos excedido.");
+                    return;
+                }
+                auto bytes = getSize(target);
+                if (bytes > 4 * 1024 * 1024 || totalBytes + bytes > 64 * 1024 * 1024 || cache.length >= 1024)
+                {
+                    diagnostics.errorCode(node.pos, moduleBudget);
+                    return;
+                }
+                totalBytes += cast(size_t) bytes;
+                importStack ~= target;
+                active[target] = true;
+                depth++;
+                scope (exit)
+                {
+                    active.remove(target);
+                    depth--;
+                    importStack.length--;
+                }
+                auto tokens = new Lexer(cast(string) std.file.read(target), target, diagnostics).tokenizer();
+                if (diagnostics.hasErrors())
+                    return;
+                auto program = new Parser(tokens, diagnostics).parse();
+                if (diagnostics.hasErrors())
+                    return;
+                auto unit = new ModuleUnit(target, program, node.pos);
+                cache[target] = unit;
+                imported.target = unit;
+                visit(program, target);
+            }
+            catch (Exception e)
+            {
+                diagnostics.errorCode(node.pos, moduleLoad, e.msg, importStack.join(" -> "));
+            }
+            return;
+        }
+        foreach (child; childNodes(node))
+            visit(child, filename);
+    }
+}

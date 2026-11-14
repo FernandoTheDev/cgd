@@ -1,0 +1,8 @@
+//! nuloverdadeiro\nnumero real texto logico
+// Declaração, valores primitivos e tipo de em execução.
+var vazio
+const ativo = verdadeiro
+var idade: inteiro = 20
+var medida: real = 2.5
+escreva(vazio, ativo)
+escreva(tipo de idade, " ", tipo de medida, " ", tipo de "olá", " ", tipo de ativo)

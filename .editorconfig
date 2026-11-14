@@ -1,0 +1,22 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,html,css,js,md,yml,yaml}]
+indent_size = 2
+
+[*.d]
+dfmt_brace_style = allman
+dfmt_soft_max_line_length = 100
+max_line_length = 120
+dfmt_space_after_cast = true
+dfmt_align_switch_statements = false
+
+[*.{sh,bash}]
+indent_style = tab

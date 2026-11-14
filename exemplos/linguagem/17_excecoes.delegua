@@ -1,0 +1,9 @@
+//! proposital\nlimpeza\nDivisão por zero.
+tente {
+    falhar "proposital"
+} pegue (erro: Excecao) {
+    escreva(erro.mensagem)
+} finalmente {
+    escreva("limpeza")
+}
+tente { escreva(1 / 0) } pegue (erro) { escreva(erro) }

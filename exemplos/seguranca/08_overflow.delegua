@@ -1,0 +1,5 @@
+//# 1
+//? fase: compilacao
+//? erro: E3102
+const maximo = 9223372036854775807
+escreva(maximo + 1)

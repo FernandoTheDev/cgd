@@ -1,0 +1,8 @@
+//! 55
+// A VM é usada na compilação, não na execução do binário final.
+//>puro
+funcao fibonacci(n: inteiro): inteiro {
+    se n < 2 { retorna n }
+    retorna fibonacci(n - 1) + fibonacci(n - 2)
+}
+escreva(fibonacci(10))

@@ -1,19 +1,9 @@
 #!/bin/sh
-set -e
-
-cd vendor/delegua-runtime
-
-# Proteção 1: Só tenta o pull se for um repositório git legítimo
-if [ -d ".git" ]; then
-    # Proteção 2: O '|| true' impede que o 'set -e' mate o script se estiver offline ou der conflito
-    git pull origin dev --rebase > /dev/null 2>&1 || true
-fi
-
+set -eu
+cd "$(dirname "$0")/vendor/delegua-runtime"
 ./build
-mkdir -p ../../lib # Proteção 3: garante que "lib" seja um diretório
-cp libdelegua_rt.o ../../lib
-cd ../..
-
-if [ "$1" = "add" ]; then
-    git add vendor/delegua-runtime
+mkdir -p ../../lib
+cp libdelegua_rt.o ../../lib/
+if [ "${1:-}" = add ]; then
+    git -C ../.. add vendor/delegua-runtime
 fi

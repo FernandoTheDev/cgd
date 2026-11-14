@@ -1,0 +1,10 @@
+//! 91\n1-21\n3
+var n = 8
+escreva(n | 1, n >> 3)
+escreva(3 ^ 2, ~1, 5 & 3)
+var a = 9
+a -= 1
+a *= 2
+a /= 4
+a %= 3
+escreva(++a + 1)

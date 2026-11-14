@@ -1,0 +1,4 @@
+//! 323311\nverdadeirofalso10
+// Potência, divisão inteira, bits, comparação e curto-circuito.
+escreva(2 ** 5, 100 \ 3, 5 & 3, 1 << 0)
+escreva(3 != 4, falso e (1 / 0), nulo ?: 10)

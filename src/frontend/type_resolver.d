@@ -1,6 +1,8 @@
 module frontend.type_resolver;
 
 import frontend;
+import errors;
+import std.format;
 import std.stdio;
 import std.exception;
 
@@ -8,11 +10,13 @@ class TypeResolver
 {
 private:
     TypeRegistry registry;
+    Diagnostics diagnostics;
 
 public:
-    this(TypeRegistry registry)
+    this(TypeRegistry registry, Diagnostics diagnostics = null)
     {
         this.registry = registry;
+        this.diagnostics = diagnostics;
     }
 
     TypeSema resolver(TypeExpr type)
@@ -25,12 +29,20 @@ public:
             case TypeExprKind.Named:
                 TypeExprNamed named = cast(TypeExprNamed) type;
                 TypeSema* tsema = registry.get(named.name);
-            
+
                 if (tsema is null)
-                    enforce(false, "O tipo não existe.");
-            
+                {
+                    if (diagnostics !is null)
+                        diagnostics.error(named.pos, format("O tipo '%s' não existe.", named.name));
+                    return new TypeSemaBuiltin(TypeSemaBase.Any);
+                }
+
+                if (auto c = cast(TypeSemaClass)*tsema)
+                    named.classLinkName = c.declaration.signature.linkName;
                 return *tsema;
 
+            case TypeExprKind.Tuple:
+                return new TypeSemaBuiltin(TypeSemaBase.Tuple);
             case TypeExprKind.Array:
                 TypeExprArray arr = cast(TypeExprArray) type;
                 return new TypeSemaArray(resolver(arr.base));

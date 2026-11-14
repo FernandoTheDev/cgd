@@ -20,28 +20,27 @@ T as(T)(Node v)
 
 void cgd_erro(string message)
 {
-    writefln("Erro: %s", message);
-    import core.stdc.stdlib:exit;
-    exit(1);   
+    reportFatal(message);
+    import core.stdc.stdlib : exit;
+
+    exit(1);
 }
 
 void cgd_validar(bool cond, string message)
 {
-    if (cond) return;
+    if (cond)
+        return;
     cgd_erro(message);
 }
 
-pragma(inline, true)
-dstring ternary(bool cond, dstring s1, dstring s2) => cond ? s1 : s2;
+pragma(inline, true) dstring ternary(bool cond, dstring s1, dstring s2) => cond ? s1 : s2;
 
-pragma(inline, true)
-void alreadyDeclaredHere(dstring name, Position pos, Diagnostics err)
+pragma(inline, true) void alreadyDeclaredHere(dstring name, Position pos, Diagnostics err)
 {
     err.hint(pos, format("O simbolo '%s' foi declarado aqui.", name));
 }
 
-pragma(inline, true)
-void updateType(Node node, TypeResolver resolver)
+pragma(inline, true) void updateType(Node node, TypeResolver resolver)
 {
     if (node.type_sema is null)
         node.type_sema = resolver.resolver(node.type_expr);
@@ -52,17 +51,18 @@ Position getPosFromSymbol(Symbol* sym)
     final switch (sym.kind) with (SymbolKind)
     {
         case Var:
-            return (cast(SymbolVar*)sym).node.pos;
+            return (cast(SymbolVar*) sym).node.pos;
         case Param:
-            return (cast(SymbolParam*)sym).node.pos;
+            return (cast(SymbolParam*) sym).node.pos;
         case Fn:
-            return (cast(SymbolFn*)sym).node.pos;
+            return (cast(SymbolFn*) sym).node.pos;
     }
 }
 
 void verificar_erros(Diagnostics d)
 {
-    d.report();
-    if (!d.hasErrors()) return;
-    exit(1);
+    bool failed = d.report();
+    d.clear();
+    if (failed)
+        exit(1);
 }

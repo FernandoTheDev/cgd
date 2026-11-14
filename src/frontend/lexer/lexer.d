@@ -17,83 +17,50 @@ private:
     string source, filename;
     uint offset, l_offset;
     uint line = 1;
-    
-    immutable TokenKind[dstring] keywords = [
-        "var": TokenKind.Var,
-        "variavel": TokenKind.Var,
-        "variável": TokenKind.Var,
 
-        "const": TokenKind.Const,
-        "fixo": TokenKind.Const,
-        "constante": TokenKind.Const,
+    static immutable TokenKind[dstring] keywords = [
+        "var": TokenKind.Var, "variavel": TokenKind.Var, "variável": TokenKind.Var,
 
-        "funcao": TokenKind.Fn,
-        "função": TokenKind.Fn,
+        "const": TokenKind.Const, "fixo": TokenKind.Const, "constante": TokenKind.Const,
 
-        "se": TokenKind.If,
-        "senao": TokenKind.Else,
-        "senão": TokenKind.Else,
+        "funcao": TokenKind.Fn, "função": TokenKind.Fn, "se": TokenKind.If,
+        "senao": TokenKind.Else, "senão": TokenKind.Else, "enquanto": TokenKind.While,
+        "para": TokenKind.For, "escolha": TokenKind.Switch, "caso": TokenKind.Case,
+        "padrao": TokenKind.Default, "padrão": TokenKind.Default, "assercao": TokenKind.Assert,
+        "asserção": TokenKind.Assert, "importar": TokenKind.Import, "tente": TokenKind.Try,
+        "pegue": TokenKind.Catch, "finalmente": TokenKind.Finally, "falhar": TokenKind.Fail,
+        "classe": TokenKind.Class, "herda": TokenKind.Extends, "isto": TokenKind.This,
+        "super": TokenKind.Super, "publico": TokenKind.Public, "público": TokenKind.Public,
+        "privado": TokenKind.Private, "protegido": TokenKind.Protected, "cada": TokenKind.Each,
+        "fazer": TokenKind.Do, "sustar": TokenKind.Break, "continua": TokenKind.Continue,
+        "e": TokenKind.And, "ou": TokenKind.Or, "em": TokenKind.In, "contem": TokenKind.In,
+        "contém": TokenKind.In, "nao": TokenKind.Bang, "não": TokenKind.Bang,
 
-        "enquanto": TokenKind.While,
-        "para": TokenKind.For,
+        "nulo": TokenKind.Null, "verdadeiro": TokenKind.True, "falso": TokenKind.False,
 
-        "nulo": TokenKind.Null,
-        "verdadeiro": TokenKind.True,
-        "falso": TokenKind.False,
-
-        "tipo": TokenKind.Type,
-        "de": TokenKind.Of,
-
-        "retorne": TokenKind.Return,
+        "tipo": TokenKind.Type, "de": TokenKind.Of, "retorne": TokenKind.Return,
         "retorna": TokenKind.Return,
     ];
 
-    immutable TokenKind[dstring] symbols = [
-        "+": TokenKind.Plus,
-        "++": TokenKind.PPlus,
-        "-": TokenKind.Minus,
-        "--": TokenKind.MMinus,
-        "/": TokenKind.Slash,
-        "*": TokenKind.Star,
-        "%": TokenKind.Modulo,
-        
-        "=": TokenKind.Equals,
-        "==": TokenKind.EEquals,
-        "!=": TokenKind.NEquals,
-        
-        "(": TokenKind.LParen,
-        ")": TokenKind.RParen,
-        
-        "{": TokenKind.LBrace,
-        "}": TokenKind.RBrace,
-        
-        "[": TokenKind.LBracket,
-        "]": TokenKind.RBracket,
-        
-        ":": TokenKind.Colon,
-        ";": TokenKind.Semicolon,
-        "!": TokenKind.Bang,
-        
-        ",": TokenKind.Comma,
-        ".": TokenKind.Dot,
-        
-        "<": TokenKind.LThan,
-        "<=": TokenKind.LEquals,
-        
-        ">": TokenKind.GThan,
-        ">=": TokenKind.GEquals,
+    static immutable TokenKind[dstring] symbols = [
+        "@": TokenKind.At, "?": TokenKind.Question, "**": TokenKind.Pow, "\\": TokenKind.IntDiv,
+        "?:": TokenKind.Coalesce, "<-": TokenKind.Equals, "+=": TokenKind.PlusAssign,
+        "-=": TokenKind.MinusAssign, "*=": TokenKind.MulAssign, "/=": TokenKind.DivAssign,
+        "%=": TokenKind.ModAssign, "+": TokenKind.Plus, "++": TokenKind.PPlus,
+        "-": TokenKind.Minus, "--": TokenKind.MMinus, "/": TokenKind.Slash, "*": TokenKind.Star,
+        "%": TokenKind.Modulo, "=": TokenKind.Equals, "==": TokenKind.EEquals,
+        "!=": TokenKind.NEquals, "(": TokenKind.LParen, ")": TokenKind.RParen,
 
-        "&": TokenKind.BITAnd,
-        "|": TokenKind.BITOr,
-        "~": TokenKind.BITNot,
-        "^": TokenKind.BITXor,
-        "<<": TokenKind.BITSL,
-        ">>": TokenKind.BITSR,
+        "{": TokenKind.LBrace, "}": TokenKind.RBrace, "[": TokenKind.LBracket,
+        "]": TokenKind.RBracket, ":": TokenKind.Colon, ";": TokenKind.Semicolon,
+        "!": TokenKind.Bang, ",": TokenKind.Comma, ".": TokenKind.Dot, "<": TokenKind.LThan,
+        "<=": TokenKind.LEquals, ">": TokenKind.GThan, ">=": TokenKind.GEquals,
+
+        "&": TokenKind.BITAnd, "|": TokenKind.BITOr, "~": TokenKind.BITNot, "^": TokenKind.BITXor,
+        "<<": TokenKind.BITSL, ">>": TokenKind.BITSR,
     ];
 
-    immutable TokenKind[dstring] ctfeKeywords = [
-        "puro": TokenKind.Pure,
-    ];
+    static immutable TokenKind[dstring] ctfeKeywords = ["puro": TokenKind.Pure,];
 
 public:
     this(string source, string filename, Diagnostics err)
@@ -101,16 +68,14 @@ public:
         this.source = source;
         this.filename = filename;
         this.err = err;
+        err.registerSource(filename, source);
     }
 
     bool isAlpha(dchar c)
     {
-        return (c >= 'a' && c <= 'z')
-            || (c >= 'A' && c <= 'Z')
-            || c == '_' // validação para caracteres especiais
-            || (c >= 192 && c <= 214)
-            || (c >= 216 && c <= 246)
-            || (c >= 248 && c <= 255);
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' // validação para caracteres especiais
+         || (c >= 192 && c <= 214)
+            || (c >= 216 && c <= 246) || (c >= 248 && c <= 255);
     }
 
     bool isNumeric(dchar c)
@@ -155,7 +120,8 @@ public:
 
     bool match(dchar ch)
     {
-        checkIsAtEnd();
+        if (isAtEnd())
+            return false;
         if (peek() == ch)
         {
             advance();
@@ -169,6 +135,8 @@ public:
         dstring buffer = [ch];
         while (!isAtEnd() && (isNumeric(peek()) || peek() == '.'))
         {
+            if (peek() == '.' && !isAtEnd(1) && isAlpha(future(1)))
+                break;
             if (!d && peek() == '.')
             {
                 err.error(getPosition(start, line), "Sem permissão para numeros flutuantes.");
@@ -187,27 +155,37 @@ public:
         return buffer;
     }
 
-    Position getPosition(uint s, uint l) => new Position(filename, new PosLine(s, l), new PosLine(l_offset, line));
+    Position getPosition(uint s, uint l) => new Position(filename, new PosLine(s, l), new PosLine(l_offset + 1, line));
 
-    pragma(inline, true)
-    void pushToken(Token tk)
+    pragma(inline, true) void pushToken(Token tk)
     {
         tokens ~= tk;
     }
 
     dstring lexId(dchar ch)
     {
-        if (!isAlpha(ch)) return "";
-        
+        if (!isAlpha(ch))
+            return "";
+
         dstring buffer = [ch];
         while (!isAtEnd() && isAlphaNumeric(peek()))
             buffer ~= [advance()];
-        
+
         return buffer;
     }
 
     Token[] tokenizer()
     {
+        // Valida antes de decodificar; bytes inválidos nunca viram exceção interna.
+        import std.utf : validate, UTFException;
+
+        try
+            validate(source);
+        catch (UTFException)
+        {
+            err.errorCode(new Position(filename, new PosLine(1, 1), new PosLine(1, 1)), invalidUTF8);
+            return [];
+        }
         while (!isAtEnd())
         {
             dchar ch = advance();
@@ -238,13 +216,21 @@ public:
                 TokenKind kind = TokenKind.Int;
                 TokenRaw raw;
 
-                if (isDouble)
+                try
                 {
-                    kind = TokenKind.Double;
-                    raw.d = to!double(buffer);
+                    if (isDouble)
+                    {
+                        kind = TokenKind.Double;
+                        raw.d = to!double(buffer);
+                    }
+                    else
+                        raw.i = to!long(buffer);
                 }
-                else
-                    raw.i = to!long(buffer);
+                catch (ConvException)
+                {
+                    err.error(getPosition(start, line), "Literal numérico inválido ou fora do intervalo.");
+                    continue;
+                }
 
                 pushToken(new Token(kind, raw, getPosition(start, line)));
                 continue;
@@ -263,30 +249,99 @@ public:
                 continue;
             }
 
-            if (ch == '"')
+            if (ch == '"' || ch == '\'')
             {
                 uint start = l_offset;
                 uint l = line;
                 dstring buffer;
+                size_t[] escapedInterpolation;
 
-                // TODO: validar escapes
-                while (!isAtEnd() && peek() != '"')
+                dchar quote = ch;
+                while (!isAtEnd() && peek() != quote)
                 {
                     if (peek() == '\n')
                     {
                         line++;
                         l_offset = 0;
                     }
-                    buffer ~= [advance()];
+                    dchar c = advance();
+                    if (c == '$' && !isAtEnd() && peek() == '{')
+                    {
+                        buffer ~= "${";
+                        advance();
+                        uint nesting = 1;
+                        dchar innerQuote = 0;
+                        bool escaped;
+                        while (!isAtEnd() && nesting)
+                        {
+                            auto x = advance();
+                            buffer ~= x;
+                            if (x == '\n')
+                            {
+                                line++;
+                                l_offset = 0;
+                            }
+                            if (innerQuote)
+                            {
+                                if (escaped)
+                                    escaped = false;
+                                else if (x == '\\')
+                                    escaped = true;
+                                else if (x == innerQuote)
+                                    innerQuote = 0;
+                            }
+                            else if (x == '\'' || x == '"')
+                                innerQuote = x;
+                            else if (x == '{')
+                                nesting++;
+                            else if (x == '}')
+                                nesting--;
+                        }
+                        if (nesting)
+                            err.error(getPosition(start, l), "Interpolação não foi fechada.");
+                        continue;
+                    }
+                    if (c == '\\' && !isAtEnd())
+                    {
+                        c = advance();
+                        switch (c)
+                        {
+                            case 'n':
+                                c = '\n';
+                                break;
+                            case 'r':
+                                c = '\r';
+                                break;
+                            case 't':
+                                c = '\t';
+                                break;
+                            case '0':
+                                c = '\0';
+                                break;
+                            case '$':
+                                escapedInterpolation ~= buffer.length;
+                                break;
+                            case '\\':
+                            case '\'':
+                            case '"':
+                                break;
+                            default:
+                                err.error(getPosition(start, l), "Escape inválido.");
+                                break;
+                        }
+                    }
+                    buffer ~= c;
                 }
 
-                if (isAtEnd() || !match('"'))
+                if (isAtEnd() || !match(quote))
                 {
                     err.error(getPosition(start, l), "String não foi fechada.");
                     return tokens;
                 }
 
-                pushToken(new Token(TokenKind.String, TokenRaw._s(buffer), getPosition(start, l)));
+                auto token = new Token(TokenKind.String, TokenRaw._s(buffer), getPosition(start, l));
+                token.escapedInterpolation = escapedInterpolation;
+                pushToken(token);
                 continue;
             }
 
@@ -296,24 +351,35 @@ public:
             if (!isAtEnd(1))
             {
                 dstring tk = [ch, peek(), future(1)];
-                
+
+                if (tk == "...")
+                {
+                    advance();
+                    advance();
+                    pushToken(new Token(TokenKind.Spread, TokenRaw.init, getPosition(l_offset - 2, line)));
+                    continue;
+                }
                 if (tk == "//>")
                 {
                     advance(); // pula o /
                     advance(); // pula o >
 
                     uint start = l_offset + 1;
+                    if (isAtEnd())
+                    {
+                        err.error(getPosition(start, line), "Esperado qualificador após //>.", "E1001");
+                        continue;
+                    }
                     dstring buffer = lexId(advance());
                     Position pos = getPosition(start, line);
 
                     if (immutable TokenKind* kind = buffer in ctfeKeywords)
                     {
-                        pushToken(new Token(*(cast(TokenKind*)kind), TokenRaw.init, pos));
+                        pushToken(new Token(*kind, TokenRaw.init, pos));
                         continue;
                     }
 
-                    err.error(pos, 
-                        format("Não foi possível detectar o qualificador '%s'.", buffer));
+                    err.error(pos, format("Não foi possível detectar o qualificador '%s'.", buffer));
                     continue;
                 }
             }
@@ -324,7 +390,8 @@ public:
 
                 if (tk == "//")
                 {
-                    while (!isAtEnd() && peek() != '\n') advance();
+                    while (!isAtEnd() && peek() != '\n')
+                        advance();
                     continue;
                 }
 
@@ -336,7 +403,7 @@ public:
                     goto end;
                 }
             }
-            
+
             if (immutable TokenKind* kind = [ch] in symbols)
             {
                 k = *kind;

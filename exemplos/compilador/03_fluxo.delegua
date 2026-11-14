@@ -1,0 +1,11 @@
+//! limpeza\n20
+// --verificar avisa sobre a cauda inalcançável; finalmente permanece em -o.
+funcao resultado() {
+    tente {
+        retorna (2 + 3) * 4
+        escreva("inalcançável")
+    } finalmente {
+        escreva("limpeza")
+    }
+}
+escreva(resultado())

@@ -7,10 +7,10 @@ var valor = 0
 valor = valor | LIGADO
 valor = valor & ~LIGADO
 
-se valor & LIGADO {
+se (valor & LIGADO) != 0 {
     escreva("O valor está ligado.")
 }
 
-se !(valor & DESLIGADO) {
+se (valor & DESLIGADO) == 0 {
     escreva("O valor não está desligado.")
 }

@@ -1,0 +1,15 @@
+//! 84\nverdadeiro
+classe Base {
+    protegido { x: numero }
+    construtor(x) { isto.x = x }
+    valor() { retorna isto.x }
+}
+classe Filha herda Base {
+    construtor(x) { super(x + 1) }
+    valor() { retorna super.valor() * 2 }
+    dado() { retorna isto.x }
+}
+var filha = Filha(3)
+var metodo = filha.valor  // Receptor explícito, gerenciado pelo GC.
+escreva(metodo(), filha.dado())
+escreva(filha.eInstanciaDe(Base))

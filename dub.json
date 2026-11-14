@@ -1,12 +1,23 @@
 {
-	"name": "cgd",
-	"description": "Compilador Geral Delégua",
-	"targetName": "cgd",
-	"targetType": "executable",
-	"authors": [
-		"FernandoDev"
-	],
-	"dflags": ["-J src/middle/"],
-	"license": "Apache-2.0",
-	"copyright": "Copyright © 2026, FernandoDev"
+  "name": "cgd",
+  "description": "Compilador Geral Delégua",
+  "targetName": "cgd",
+  "targetType": "executable",
+  "authors": ["FernandoDev"],
+  "license": "Apache-2.0",
+  "copyright": "Copyright © 2026, FernandoDev",
+  "configurations": [
+    {
+      "name": "application",
+      "sourcePaths": ["src"],
+      "mainSourceFile": "src/main.d"
+    },
+    {
+      "name": "unittest",
+      "targetName": "cgd-unit",
+      "sourcePaths": ["src", "testes/unit"],
+      "excludedSourceFiles": ["src/main.d"],
+      "mainSourceFile": "testes/unit/main.d"
+    }
+  ]
 }

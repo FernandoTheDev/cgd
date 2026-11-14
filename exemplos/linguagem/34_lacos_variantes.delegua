@@ -1,0 +1,8 @@
+//! [1, 2]\n[2, 4]\n[2, 1]
+var i = 0
+var primeiro = fazer { i++; retorna i } enquanto i < 2
+var segundo = para cada valor em [1, 2] { retorna valor * 2 }
+var terceiro = enquanto i > 0 { retorna i-- }
+escreva(primeiro)
+escreva(segundo)
+escreva(terceiro)

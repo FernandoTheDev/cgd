@@ -1,0 +1,12 @@
+//! 6
+classe Conta {
+    privado { _saldo: numero }
+    saldo: numero {
+        obter() { retorna isto._saldo }
+        definir(valor) { isto._saldo = valor * 2 }
+    }
+    construtor() { isto._saldo = 0 }
+}
+var conta = Conta()
+conta.saldo = 3
+escreva(conta.saldo)

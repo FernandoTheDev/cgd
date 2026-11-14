@@ -1,0 +1,9 @@
+//! [1][1, 2]\nverdadeiro
+var original = {dados: [1]}
+var copia = clonar(original)
+copia.dados.adicionar(2)
+escreva(original.dados, copia.dados)
+var ciclo = []
+ciclo.adicionar(ciclo)
+var clonado = clonar(ciclo)
+escreva(clonado[0] == clonado)

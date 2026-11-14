@@ -36,14 +36,49 @@ alias BuiltinFn = dstring function(BackendC, Node);
 dstring compileEscreva(BackendC ctx, Node node)
 {
     CallExpr call = cast(CallExpr) node;
-    return formatD("delegua_escreva(%d, %s)", call.args.length, ctx.nodesToStr(call.args));
+    return formatD("delegua_escreva(%d%s)", call.args.length, call.args.length ? ", "d ~ ctx.nodesToStr(call.args) : ""d);
 }
 
-dstring compileVetorAdicionar(BackendC ctx, Node node)
+/// Codificação injetiva: nomes do usuário não colidem com símbolos internos C.
+/// Emite dígitos diretamente, sem parsear um formato por ponto de código.
+dstring cName(dstring name)
 {
-    MemberExpr member = cast(MemberExpr) node;
-    dstring vetor = ctx.compileExpr(member.left);
-    CallExpr call = cast(CallExpr) member.right;
-    dstring[] args = call.args.map!(arg => ctx.compileExpr(arg)).array;
-    return formatD("delegua_vetor_adicionar(&%s, %s);", vetor, args.join(", "));
+    enum dstring digits = "0123456789abcdef"d;
+    auto result = appender!dstring();
+    result.reserve(8 + name.length * 7);
+    result.put("cgd_user"d);
+    foreach (c; name)
+    {
+        dchar[8] buffer;
+        size_t start = buffer.length;
+        uint value = cast(uint) c;
+        do
+        {
+            buffer[--start] = digits[value & 15];
+            value >>= 4;
+        }
+        while (value);
+        result.put('_');
+        result.put(buffer[start .. $]);
+    }
+    return result.data;
+}
+
+/// Cada byte UTF-8 vira escape octal de três dígitos. Isso impede que o próximo
+/// caractere se una ao escape e evita injetar aspas, barras ou diretivas C.
+dstring cString(dstring value)
+{
+    auto bytes = value.to!string;
+    auto result = appender!dstring();
+    result.reserve(2 + bytes.length * 4);
+    result.put('"');
+    foreach (ubyte c; cast(const(ubyte)[]) bytes)
+    {
+        result.put('\\');
+        result.put(cast(dchar)('0' + ((c >> 6) & 7)));
+        result.put(cast(dchar)('0' + ((c >> 3) & 7)));
+        result.put(cast(dchar)('0' + (c & 7)));
+    }
+    result.put('"');
+    return result.data;
 }

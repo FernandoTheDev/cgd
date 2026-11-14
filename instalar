@@ -1,153 +1,94 @@
 #!/bin/sh
-set -e
+# Instala uma cópia autocontida; nenhum pacote do sistema é instalado automaticamente.
+set -eu
 
-BIN_NAME="cgd"
-REPO_URL="https://github.com/fernandothedev/cgd.git"
-MAIN_DIR="$HOME/.cgd"
-LIBS_DIR="$MAIN_DIR/libs"
-RUNTIME_DIR="$MAIN_DIR/rt"
-INSTALL_DIR="$HOME/.local/bin"
+project_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+install_prefix=${CGD_PREFIX:-${XDG_DATA_HOME:-$HOME/.local/share}/cgd}
+install_bin_dir=${CGD_BIN_DIR:-$HOME/.local/bin}
+build_profile=release
+build_required=1
+d_compiler=${DC:-}
 
-# Cores
-VERDE='\033[0;32m'
-VERMELHO='\033[0;31m'
-AZUL='\033[0;34m'
-AMARELO='\033[1;33m'
-NC='\033[0m'
+usage() {
+    cat <<'EOF'
+Uso: ./instalar [--compiler dmd|ldc2] [--prefix DIRETORIO] [--bin-dir DIRETORIO]
+                  [--release|--debug] [--no-build]
 
-info() { printf "${AZUL}[INFO]${NC} %s\n" "$1"; }
-aviso() { printf "${AMARELO}[AVISO]${NC} %s\n" "$1"; }
-erro() { printf "${VERMELHO}[ERRO]${NC} %s\n" "$1" >&2; exit 1; }
-sucesso() { printf "${VERDE}[SUCESSO]${NC} %s\n" "$1"; }
-
-# --- Detecção do Sistema Operacional ---
-PKG_MGR=""
-INSTALL_CMD=""
-OS_ID="desconhecido"
-
-if [ -f /etc/os-release ]; then
-    # Importa as variáveis do os-release com segurança
-    . /etc/os-release
-    OS_ID=$ID
-fi
-
-case "$OS_ID" in
-    ubuntu|debian|linuxmint|pop)
-        PKG_MGR="apt"
-        INSTALL_CMD="sudo apt update && sudo apt install -y"
-        ;;
-    fedora)
-        PKG_MGR="dnf"
-        INSTALL_CMD="sudo dnf install -y"
-        ;;
-    arch|manjaro|endeavouros)
-        PKG_MGR="pacman"
-        INSTALL_CMD="sudo pacman -S --needed"
-        ;;
-    opensuse*)
-        PKG_MGR="zypper"
-        INSTALL_CMD="sudo zypper in"
-        ;;
-esac
-
-# Função auxiliar para checar dependências e sugerir instalação
-check_dep() {
-    CMD=$1
-    PKG_NAME=$2
-    if ! command -v "$CMD" >/dev/null 2>&1; then
-        aviso "Comando '$CMD' não encontrado."
-        if [ -n "$INSTALL_CMD" ]; then
-            info "Para instalar no seu sistema ($OS_ID), tente:"
-            printf "  ${AMARELO}%s %s${NC}\n" "$INSTALL_CMD" "$PKG_NAME"
-        fi
-        erro "Dependência ausente: $CMD. Abortando."
-    fi
+--no-build reutiliza cgd e lib/libdelegua_rt.o já compilados e validados.
+O diretório --prefix contém o executável, o runtime e os headers.
+O diretório --bin-dir recebe um link simbólico chamado cgd.
+EOF
 }
 
-# --- 1. Validação de Dependências Básicas ---
-info "Verificando dependências de build..."
-
-check_dep "git" "git"
-check_dep "ldc2" "ldc"
-check_dep "dub" "dub"
-
-if ! command -v cc >/dev/null 2>&1 && ! command -v gcc >/dev/null 2>&1 && ! command -v clang >/dev/null 2>&1 && ! command -v tcc >/dev/null 2>&1; then
-    aviso "Nenhum compilador C encontrado."
-    if [ "$PKG_MGR" = "apt" ]; then check_dep "gcc" "build-essential";
-    elif [ "$PKG_MGR" = "pacman" ]; then check_dep "gcc" "base-devel";
-    else check_dep "gcc" "gcc clang"; fi
-fi
-
-# --- 2. Setup do Código-Fonte (Local ou Clone em /tmp) ---
-CLONED=0
-ORIGINAL_DIR=$(pwd)
-
-# Define uma função de limpeza que rodará ao final do script (ou se ele quebrar)
-cleanup() {
-    if [ "$CLONED" -eq 1 ] && [ -n "$TMP_BUILD_DIR" ] && [ -d "$TMP_BUILD_DIR" ]; then
-        info "Limpando repositório temporário em $TMP_BUILD_DIR..."
-        rm -rf "$TMP_BUILD_DIR"
-    fi
+fail() {
+    printf 'Erro: %s\n' "$*" >&2
+    exit 1
 }
-trap cleanup EXIT INT TERM
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+    --compiler | --prefix | --bin-dir)
+        [ "$#" -ge 2 ] || fail "Falta valor para $1."
+        case "$1" in
+        --compiler) d_compiler=$2 ;;
+        --prefix) install_prefix=$2 ;;
+        --bin-dir) install_bin_dir=$2 ;;
+        esac
+        shift 2
+        ;;
+    --release | -r)
+        build_profile=release
+        shift
+        ;;
+    --debug)
+        build_profile=debug
+        shift
+        ;;
+    --no-build)
+        build_required=0
+        shift
+        ;;
+    --help | -h)
+        usage
+        exit 0
+        ;;
+    *) fail "Opção desconhecida: $1" ;;
+    esac
+done
 
-if [ ! -f "dub.json" ]; then
-    aviso "dub.json não encontrado no diretório atual."
-    
-    TMP_BUILD_DIR=$(mktemp -d -t cgd_build_XXXXXX)
-    info "Clonando o repositório em diretório temporário ($TMP_BUILD_DIR)..."
-    
-    git clone --recurse-submodules "$REPO_URL" "$TMP_BUILD_DIR"
-    cd "$TMP_BUILD_DIR" || erro "Não foi possível acessar o diretório clonado."
-    CLONED=1
-
-    if [ ! -f "dub.json" ] && [ ! -f "dub.sdl" ]; then
-        erro "O repositório clonado não parece ser um projeto D válido (falta dub.json)."
+command -v pkg-config >/dev/null 2>&1 || fail 'Instale pkg-config.'
+pkg-config --exists bdw-gc || fail 'Instale os headers e a biblioteca Boehm GC (bdw-gc).'
+cd "$project_dir"
+if [ "$build_required" -eq 1 ]; then
+    command -v dub >/dev/null 2>&1 || fail 'Instale DUB.'
+    if [ -z "$d_compiler" ]; then
+        if command -v ldc2 >/dev/null 2>&1; then
+            d_compiler=ldc2
+        elif command -v dmd >/dev/null 2>&1; then
+            d_compiler=dmd
+        else fail 'Instale DMD ou LDC2.'; fi
     fi
-else
-    info "dub.json encontrado localmente. Usando código atual."
+    command -v "$d_compiler" >/dev/null 2>&1 || fail "Compilador D ausente: $d_compiler"
+    if [ ! -f vendor/delegua-runtime/src/delegua_rt.h ]; then
+        git submodule update --init --recursive
+    fi
+    ./build-runtime
+    dub build --compiler="$d_compiler" --build="$build_profile" --config=application
 fi
+[ -x cgd ] || fail 'Executável cgd ausente. Execute dub build.'
+[ -f lib/libdelegua_rt.o ] || fail 'Runtime ausente. Execute ./build-runtime.'
 
-# --- 3. Preparação do Ambiente CGD ---
-info "Garantindo diretórios de execução em $MAIN_DIR..."
-mkdir -p "$LIBS_DIR"
-mkdir -p "$RUNTIME_DIR"
-mkdir -p "$INSTALL_DIR"
-
-# --- 4. Configuração das Flags de Compilação ---
-DUB_FLAGS="--compiler=ldc2"
-
-if [ "$1" = "--release" ] || [ "$1" = "-r" ]; then
-    info "Modo RELEASE ativado. Otimizando compilação..."
-    DUB_FLAGS="$DUB_FLAGS --build=release"
-else
-    info "Modo DEBUG ativado. (Use '$0 --release' para versão de produção)."
+mkdir -p "$install_prefix/lib" "$install_prefix/vendor/delegua-runtime/src" "$install_bin_dir"
+# Caminhos absolutos tornam o link independente do diretório de execução.
+install_prefix=$(CDPATH= cd -- "$install_prefix" && pwd)
+install_bin_dir=$(CDPATH= cd -- "$install_bin_dir" && pwd)
+[ ! -d "$install_bin_dir/cgd" ] || fail 'O destino do link cgd é um diretório.'
+cp cgd "$install_prefix/.cgd-install-$$"
+chmod +x "$install_prefix/.cgd-install-$$"
+mv -f "$install_prefix/.cgd-install-$$" "$install_prefix/cgd"
+cp lib/libdelegua_rt.o "$install_prefix/lib/"
+cp vendor/delegua-runtime/src/*.h "$install_prefix/vendor/delegua-runtime/src/"
+if [ "$install_bin_dir/cgd" != "$install_prefix/cgd" ]; then
+    ln -sf "$install_prefix/cgd" "$install_bin_dir/cgd"
 fi
-
-# --- 5. Compilação ---
-info "Iniciando compilação (DUB)..."
-dub build $DUB_FLAGS
-
-if [ ! -f "$BIN_NAME" ]; then
-    erro "Falha silenciosa: Binário '$BIN_NAME' não gerado."
-fi
-
-# --- 6. Instalação ---
-mkdir -p ./lib # Proteção: garante que "lib" seja um diretório
-
-info "Construindo o runtime da linguagem..."
-./build-runtime
-
-info "Instalando biblioteca do runtime em $LIBS_DIR..."
-cp lib/libdelegua_rt.o "$LIBS_DIR/"
-
-info "Instalando headers do runtime em $RUNTIME_DIR..."
-# Copia os arquivos .h (e .c, se necessário) para a pasta de runtime global
-cp vendor/delegua-runtime/src/* "$RUNTIME_DIR/"
-
-info "Instalando executável em $INSTALL_DIR..."
-cp "$BIN_NAME" "$INSTALL_DIR/"
-chmod +x "$INSTALL_DIR/$BIN_NAME"
-
-sucesso "Compilador '$BIN_NAME' instalado perfeitamente!"
-sucesso "Verifique se $INSTALL_DIR está no seu \$PATH."
+printf 'Instalado: %s/cgd\nRuntime: %s/lib/libdelegua_rt.o\n' "$install_bin_dir" "$install_prefix"
+printf 'Inclua %s no PATH, se necessário.\n' "$install_bin_dir"

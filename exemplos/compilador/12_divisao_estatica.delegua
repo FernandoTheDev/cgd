@@ -1,0 +1,5 @@
+//# 1
+//? fase: compilacao
+//? erro: E3101
+const zero = 3 - 3
+escreva(10 / zero)

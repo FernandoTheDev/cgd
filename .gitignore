@@ -21,3 +21,10 @@ cgd-test-*
 *.txt
 /rm
 /lib
+
+__pycache__/
+
+/cgd-unit
+/out/
+
+!requirements-site.txt

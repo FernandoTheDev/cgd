@@ -1,0 +1,8 @@
+//! 217\n5
+var a, b = 1, 2
+a, b = b, a  // Os valores da direita são avaliados antes das escritas.
+var contador = 2
+contador += 5
+escreva(a, b, contador)
+var destino = 0
+escreva(destino = 5)

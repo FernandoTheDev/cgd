@@ -43,29 +43,32 @@ private:
 
     size_t levenshtein(dstring a, dstring b)
     {
-        auto la = a.length, lb = b.length;
-        auto dp = new size_t[][](la + 1, lb + 1);
-
-        foreach (i; 0 .. la + 1) dp[i][0] = i;
-        foreach (j; 0 .. lb + 1) dp[0][j] = j;
-
-        foreach (i; 1 .. la + 1)
-            foreach (j; 1 .. lb + 1)
-            {
-                size_t custo = a[i - 1] == b[j - 1] ? 0 : 1;
-                dp[i][j] = min(
-                    dp[i - 1][j] + 1,
-                    dp[i][j - 1] + 1,
-                    dp[i - 1][j - 1] + custo
-                );
-            }
-
-        return dp[la][lb];
+        // Duas linhas em vez de uma matriz por candidato: memória O(min(n,m)).
+        if (a.length > b.length)
+        {
+            auto temp = a;
+            a = b;
+            b = temp;
+        }
+        auto previous = new size_t[a.length + 1];
+        auto current = new size_t[a.length + 1];
+        foreach (i; 0 .. previous.length)
+            previous[i] = i;
+        foreach (j; 1 .. b.length + 1)
+        {
+            current[0] = j;
+            foreach (i; 1 .. a.length + 1)
+                current[i] = min(current[i - 1] + 1, previous[i] + 1, previous[i - 1] + (a[i - 1] == b[j - 1] ? 0 : 1));
+            auto temp = previous;
+            previous = current;
+            current = temp;
+        }
+        return previous[a.length];
     }
 
 public:
     size_t cursor;
-    
+
     void push()
     {
         scopes ~= new Scope;
@@ -105,15 +108,36 @@ public:
 
     Symbol* get(dstring name)
     {
-        size_t limit = functionBoundaries.length > 0
-            ? functionBoundaries[$ - 1] : 0;
+        size_t limit = functionBoundaries.length > 0 ? functionBoundaries[$ - 1] : 0;
 
         foreach_reverse (i, sc; scopes[0 .. cursor + 1])
         {
-            if (i < limit) break;
-            if (auto sym = sc.get(name)) return sym;
+            if (i < limit)
+                break;
+            if (auto sym = sc.get(name))
+                return sym;
         }
+        // Funções globais não precisam capturar o ambiente externo.
+        foreach_reverse (sc; scopes[0 .. limit])
+            if (auto sym = sc.get(name))
+                return sym.isFn() ? sym : null;
         return null;
+    }
+
+    bool requiresCapture(dstring name)
+    {
+        if (!functionBoundaries.length)
+            return false;
+        size_t limit = functionBoundaries[$ - 1];
+        foreach_reverse (sc; scopes[0 .. limit])
+            if (auto sym = sc.get(name))
+                return !sym.isFn();
+        return false;
+    }
+
+    Symbol* getLocal(dstring name)
+    {
+        return scopes[cursor].get(name);
     }
 
     bool set(dstring name, Symbol sym)
@@ -124,25 +148,28 @@ public:
 
     dstring suggest(dstring name, size_t maxDistance = size_t.max)
     {
-        size_t limit = functionBoundaries.length > 0
-            ? functionBoundaries[$ - 1] : 0;
+        size_t limit = functionBoundaries.length > 0 ? functionBoundaries[$ - 1] : 0;
 
         if (maxDistance == size_t.max)
             maxDistance = max(3, name.length / 3);
 
+        if (name.length > 128)
+            return null;
         dstring melhor;
         size_t menorDist = size_t.max;
 
         foreach_reverse (i, sc; scopes[0 .. cursor + 1])
         {
-            if (i < limit) break;
+            if (i < limit)
+                break;
 
             foreach (candidato; sc.names())
             {
-                if (candidato == name) continue; // não sugere ele mesmo
+                if (candidato.length > 128 || candidato == name)
+                    continue; // não sugere ele mesmo
 
                 auto d = levenshtein(name, candidato);
-                if (d < menorDist)
+                if (d < menorDist || (d == menorDist && candidato < melhor))
                 {
                     menorDist = d;
                     melhor = candidato;

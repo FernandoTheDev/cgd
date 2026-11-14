@@ -1,0 +1,8 @@
+//! fim\n3\nloop\nloop
+funcao obter() {
+    tente { retorna 3 } finalmente { escreva("fim") }
+}
+escreva(obter())
+para (var i = 0; i < 2; i++) {
+    tente { continua } finalmente { escreva("loop") }
+}

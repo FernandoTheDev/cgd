@@ -1,0 +1,191 @@
+[
+  {
+    "id": "valores",
+    "title": "Valores, tipos e variáveis",
+    "status": "parcial",
+    "description": "Use var para variáveis e const para vínculos constantes. As anotações aparecem após dois-pontos. Nulo, lógicos, números, textos, coleções, objetos e funções são valores gerenciados.",
+    "examples": [
+      "linguagem/01_tipos.delegua",
+      "linguagem/03_atribuicoes.delegua",
+      "linguagem/25_escopos.delegua"
+    ],
+    "notes": "Constante impede reatribuir o vínculo; coleções continuam tendo sua mutabilidade própria. Inteiros/longo têm 64 bits e reais/decimal usam ponto flutuante de 64 bits. Não há bigint."
+  },
+  {
+    "id": "operadores",
+    "title": "Operadores e ordem de avaliação",
+    "status": "suportado",
+    "description": "Aritmética, potência, divisão inteira, bits, comparações, pertencimento, atribuições compostas e incremento. Os argumentos e índices são avaliados na ordem da fonte.",
+    "examples": ["linguagem/02_operadores.delegua", "linguagem/35_bits_e_atribuicoes.delegua"],
+    "notes": "e/ou retornam o valor selecionado. 0, texto vazio e coleções vazias são verdadeiros; falso e nulo são falsos. ?: troca somente nulo. Overflow e divisão por zero lançam exceção."
+  },
+  {
+    "id": "controle",
+    "title": "Condições, escolha e laços",
+    "status": "suportado",
+    "description": "se/senão, ternário, escolha/caso/padrão, enquanto, fazer/enquanto, para, para cada, sustar e continua controlam o fluxo.",
+    "examples": [
+      "linguagem/04_condicionais.delegua",
+      "linguagem/05_lacos.delegua",
+      "linguagem/34_lacos_variantes.delegua"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "coletores",
+    "title": "Laços como expressões",
+    "status": "suportado",
+    "description": "Um laço usado como expressão constrói um vetor. retorna dentro do coletor contribui um valor ao resultado; o compilador distingue esse retorno do retorno da função.",
+    "examples": ["linguagem/06_lacos_resultado.delegua"],
+    "notes": ""
+  },
+  {
+    "id": "funcoes",
+    "title": "Funções e parâmetros",
+    "status": "suportado",
+    "description": "Declare funções nomeadas ou anônimas; passe funções como argumentos, retorne funções sem captura e use métodos ligados. Valores padrão são avaliados no chamado e podem usar parâmetros anteriores. ... recebe argumentos variáveis.",
+    "examples": ["linguagem/07_funcoes.delegua", "linguagem/08_funcoes_valores.delegua"],
+    "notes": "Capturas de variáveis externas são bloqueadas. Passe o estado explicitamente por parâmetros; um método ligado mantém apenas seu receptor gerenciado."
+  },
+  {
+    "id": "vetores",
+    "title": "Vetores, compreensão e fatias",
+    "status": "suportado",
+    "description": "Vetores são mutáveis. Há índices negativos, espalhamento, compreensão com filtro e fatiamento com passo. Contratos de tipos continuam válidos através de aliases.",
+    "examples": [
+      "linguagem/09_vetores.delegua",
+      "linguagem/10_compreensao_fatias.delegua",
+      "linguagem/22_contratos_aliases.delegua",
+      "linguagem/30_metodos_vetor.delegua"
+    ],
+    "notes": "Métodos: adicionar, empilhar, tamanho, inclui/contem/contém, fatiar, mapear, filtrarPor, remover, removerPrimeiro, removerUltimo, inverter, somar, juntar, concatenar, encaixar e ordenar. Restrições por aliases são monotônicas; modificar durante a iteração não cria snapshot. filtrar global recebe vetor e função; não existe método reduzir neste perfil."
+  },
+  {
+    "id": "dicionarios",
+    "title": "Dicionários, tuplas e clonagem",
+    "status": "suportado",
+    "description": "Dicionários associam chaves a valores; tuplas são imutáveis. Desestruture propriedades e use propriedades ordinais de tuplas. clonar copia grafos e preserva ciclos.",
+    "examples": [
+      "linguagem/11_dicionarios.delegua",
+      "linguagem/12_tuplas.delegua",
+      "linguagem/20_clonagem.delegua",
+      "linguagem/31_metodos_dicionario.delegua"
+    ],
+    "notes": "Dicionários: chaves, valores, tamanho, remover e inclui/contem/contém. Tuplas: tamanho, inclui/contem/contém e fatiar, além das propriedades ordinais demonstradas. A iteração de dicionários não garante ordem de inserção."
+  },
+  {
+    "id": "texto",
+    "title": "Texto, Unicode e interpolação",
+    "status": "suportado",
+    "description": "Textos usam UTF-8. Tamanho, índices e fatias contam pontos de código. Interpole expressões com ${...} e use escapes; mudanças de caixa seguem as tabelas Unicode do runtime.",
+    "examples": ["linguagem/13_texto_unicode.delegua", "linguagem/28_metodos_texto.delegua"],
+    "notes": "Métodos: tamanho, inclui/contem/contém, fatiar/subtexto, aparar, apararInicio, apararFim, maiusculo/tudoMaiusculo, minusculo/tudoMinusculo, encontrar, dividir, substituir e concatenar. Pontos de código não equivalem a grafemas visuais."
+  },
+  {
+    "id": "classes",
+    "title": "Classes, herança e acessores",
+    "status": "parcial",
+    "description": "Declare campos e métodos; inicialize com construtor, acesse o receptor por isto e a implementação herdada por super. Visibilidades público, privado e protegido usam a classe lexical.",
+    "examples": [
+      "linguagem/14_classes.delegua",
+      "linguagem/15_heranca.delegua",
+      "linguagem/16_privacidade_acessores.delegua",
+      "linguagem/32_objeto_e_metodos.delegua"
+    ],
+    "notes": "Classes devem estar no nível do módulo. Campos são declarados; não há injeção arbitrária de campos. Herança por alias dinâmico de classe importada e tipos locais não têm resolução completa."
+  },
+  {
+    "id": "excecoes",
+    "title": "Exceções e limpeza",
+    "status": "suportado",
+    "description": "Use tente, pegue, finalmente e falhar. Excecao possui mensagem; subclasses podem ser tratadas por tipo. Finalmente executa também em retornos e desvios de laços.",
+    "examples": [
+      "linguagem/17_excecoes.delegua",
+      "linguagem/18_finalmente_retorno.delegua",
+      "linguagem/19_excecoes_tipadas.delegua"
+    ],
+    "notes": "Falhas do runtime são tratáveis. Sem tratador, o processo termina com status 1. Há localização, mas ainda não uma pilha completa de chamadas Delégua. A localização usa descritores estáticos apenas nas operações falíveis; literais e declarações simples não recebem chamadas de localização. R0001 é o código genérico atual de falha dinâmica."
+  },
+  {
+    "id": "modulos",
+    "title": "Módulos estáticos",
+    "status": "suportado",
+    "description": "importar recebe caminho literal .delegua, relativo ao módulo que importa. O loader canonicaliza, reutiliza unidades, mostra a cadeia de ciclos e impõe limites de recursos.",
+    "examples": ["modulos/01_importacao.delegua", "compilador/08_otimizacao_modulos.delegua"],
+    "notes": "Inicialização é única; se falhar, permite nova tentativa. Exportações não podem ser substituídas. Importação dinâmica, NPM e código estrangeiro são excluídos."
+  },
+  {
+    "id": "biblioteca",
+    "title": "Biblioteca nativa e entrada/saída",
+    "status": "suportado",
+    "description": "escreva, leia, tamanho, inteiro, numero/número, real, texto, tupla, clonar, aleatorio, aleatorioEntre, mapear, filtrar, ordenar, paraCada e todosEmCondicao compõem a biblioteca global.",
+    "examples": [
+      "linguagem/21_biblioteca.delegua",
+      "linguagem/27_entrada.delegua",
+      "linguagem/29_metodos_numero.delegua",
+      "linguagem/33_aleatoriedade.delegua"
+    ],
+    "notes": "Números: absoluto, arredondarParaBaixo, arredondarParaCima e formatar. As bibliotecas de delegua-node não são automaticamente módulos do CGD. leia usa stdin; o catálogo inclui entrada de teste reproduzível."
+  },
+  {
+    "id": "metadados",
+    "title": "Decoradores e asserções",
+    "status": "parcial",
+    "description": "Decoradores registram metadados; decoradores(valor) devolve cópias desses dados. Envelopes de funções livres podem trocar a função, desde que não capturem ambiente. Asserções lançam exceções tratáveis.",
+    "examples": ["linguagem/23_decoradores.delegua", "linguagem/24_assercoes.delegua"],
+    "notes": "Envelopes em métodos ainda são rejeitados. Metadados em métodos, classes e campos são suportados. Asserções não são removidas por -o."
+  },
+  {
+    "id": "otimizacoes",
+    "title": "Otimização e avaliação em compilação",
+    "status": "parcial",
+    "description": "-o habilita passes até ponto fixo. Literais, constantes por identidade, ramos mortos e curto-circuito são simplificados preservando efeitos. //>puro habilita CTFE em uma VM com orçamento.",
+    "examples": [
+      "linguagem/26_ctfe.delegua",
+      "compilador/01_constantes_escopos.delegua",
+      "compilador/02_efeitos.delegua",
+      "compilador/03_fluxo.delegua",
+      "compilador/04_curto_circuito.delegua",
+      "compilador/07_metodos_e_padroes.delegua",
+      "compilador/09_ctfe_fluxo_escopos.delegua",
+      "compilador/10_ctfe_excecao.delegua",
+      "compilador/11_ctfe_contrato.delegua"
+    ],
+    "notes": "A VM preserva senão, escopos, parâmetros mutáveis e a ordem dos argumentos, além de validar contratos primitivos de parâmetros, locais e retorno. Limites, falhas e valores não representáveis mantêm a chamada nativa. Há diagnóstico para recursos fora do subconjunto CTFE. Não há backend próprio LLVM/assembly."
+  },
+  {
+    "id": "diagnosticos",
+    "title": "Diagnósticos e ferramentas",
+    "status": "parcial",
+    "description": "--verificar analisa sem gerar binário. --emitir-c gera C99 sem exigir linker/runtime instalado. --diagnosticos=json produz JSON Lines em stderr, com código, severidade, mensagem, explicação e intervalo. --explicar E3101 consulta o catálogo central sem compilar.",
+    "examples": [
+      "compilador/05_diagnosticos.delegua",
+      "compilador/06_sugestao.delegua",
+      "compilador/12_divisao_estatica.delegua",
+      "compilador/13_indice_unicode.delegua",
+      "compilador/14_falha_tratada.delegua"
+    ],
+    "notes": "O parser recupera erros independentes. A verificação estática antecipa divisão por zero, overflow, índices e contratos literais. Em regiões com pegue, falhas conhecidas geram avisos W31xx e continuam tratáveis. Dados dinâmicos, aliases e retornos de funções ainda exigem validação em execução. Diagnósticos legados usam E0001/W0001/H0001; LSP e fix-its não existem."
+  },
+  {
+    "id": "exclusoes",
+    "title": "Exclusões de segurança",
+    "status": "excluido",
+    "description": "Upvalues/capturas de estado externo, FFI arbitrária, ponteiros crus, eval, carregamento dinâmico e NPM não são expostos. Esses exemplos devem falhar e fazem parte dos testes.",
+    "examples": [
+      "seguranca/01_captura_local.delegua",
+      "seguranca/02_captura_global.delegua",
+      "seguranca/03_ffi.delegua",
+      "seguranca/04_importacao_dinamica.delegua"
+    ],
+    "notes": "Uma função que retorna outra função sem captura é válida. Receptor explícito de método ligado é suportado. Ausência de implementação não é motivo para chamar um recurso de inseguro."
+  },
+  {
+    "id": "plataformas",
+    "title": "Plataformas e limites da implementação",
+    "status": "parcial",
+    "description": "Linux x86_64 é a plataforma validada com DMD e LDC2, Clang e GCC. A CLI permite configurar target, sysroot, compilador e runtime separadamente para preparar builds cruzados.",
+    "examples": [],
+    "notes": "Windows/macOS e executáveis cruzados ainda não foram validados. Instaladores são shell/Linux. Não há bigint, dialetos extras, threads da linguagem, debugger ou bibliotecas Node. Consulte o guia de desenvolvimento para configurar a toolchain."
+  }
+]

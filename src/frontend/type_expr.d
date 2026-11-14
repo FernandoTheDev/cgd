@@ -22,6 +22,7 @@ abstract class TypeExpr
 class TypeExprNamed : TypeExpr
 {
     dstring name;
+    dstring classLinkName;
 
     this(dstring name, Position p)
     {

@@ -1,0 +1,5 @@
+//# 1
+//? fase: compilacao
+//? erro: E3103
+// 'ação' tem quatro pontos de código; o maior índice positivo é 3.
+escreva("ação"[4])

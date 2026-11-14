@@ -13,27 +13,24 @@ import std.file;
 import std.conv;
 import std.path;
 
-import opt.constant_folding;
+import opt.pass_manager;
+import driver.toolchain;
+import frontend.flow;
+import frontend.validation;
+import frontend.static_safety;
 import middle.lowering;
 import opt.dead_code;
 import driver.args;
 import driver.time;
 import frontend;
+import frontend.modules;
 import backend;
 import errors;
 import utils;
 import ctfe;
 
-
-pragma(inline, true)
-bool which(string c) => executeShell(format("which %s", c)).status == 0;
-
 void compile(CGDArguments args, string filename)
 {
-    // .delegua => 8
-    if (filename.length < 9)
-        cgd_erro(format("Arquivo inválido: %s", filename));
-
     if (extension(filename) != ".delegua")
         cgd_erro(format("Extensao de arquivo inválida: %s", filename));
 
@@ -46,13 +43,16 @@ void compile(CGDArguments args, string filename)
     Timer timer = Timer(args.showPerf);
 
     timer.start("Lendo arquivo");
-    string source = readText(filename);
+    if (getSize(filename) > 4 * 1024 * 1024)
+        cgd_erro("Fonte excede o limite de 4 MiB por arquivo.");
+    string source = cast(string) std.file.read(filename);
     timer.show();
-    
+
     Diagnostics diag = new Diagnostics;
     Program program;
 
-    try {
+    try
+    {
         Lexer lexer = new Lexer(source, filename, diag);
         timer.start("Fazendo a geração de tokens");
         Token[] tokens = lexer.tokenizer();
@@ -64,18 +64,22 @@ void compile(CGDArguments args, string filename)
         timer.start("Fazendo a geração da AST");
         program = parser.parse();
         timer.show();
-        
+
         verificar_erros(diag);
-    } catch (Exception e) {
+    }
+    catch (Exception e)
+    {
         verificar_erros(diag);
-        writeln("Ocorreu um erro interno no compilador");
-        writeln(e);
-        return;
+        cgd_erro("Falha no frontend: " ~ e.msg);
     }
 
+    new ModuleLoader(diag).load(program, filename);
+    verificar_erros(diag);
+    validateStructure(program, diag);
+    verificar_erros(diag);
     Context context = new Context;
     TypeRegistry registry = new TypeRegistry;
-    TypeResolver resolver = new TypeResolver(registry);
+    TypeResolver resolver = new TypeResolver(registry, diag);
 
     Sema1 sema1 = new Sema1(context, diag);
     timer.start("Semantica 1");
@@ -94,21 +98,31 @@ void compile(CGDArguments args, string filename)
     timer.show();
     verificar_erros(diag);
 
+    timer.start("Verificações estáticas de segurança");
+    new StaticSafety(diag).analyze(program);
+    timer.show();
+    verificar_erros(diag);
+
     CTFEContext ctfeContext = new CTFEContext;
     timer.start("Anlise de pureza nas funções");
     new PurityAnalysis(context, diag, ctfeContext).analysis(program);
     timer.show();
     verificar_erros(diag);
 
+    timer.start("Análise de fluxo");
+    new FlowAnalysis(diag).analyze(program);
+    timer.show();
+    verificar_erros(diag);
+
+    if (args.checkOnly)
+        return;
     if (args.opt)
     {
-        timer.start("Otimização");
-        enum MAX = 20;
-        for (size_t iter; iter++ < MAX;)
-        {
-            new CgdConstantFolding(program, context, ctfeContext).opt();
-            new CgdDeadCode(program, context).remove();
-        }
+        timer.start("Otimização até ponto fixo");
+        auto stats = optimize(program, context, ctfeContext);
+        if (args.showDebug)
+            writefln("Otimização: %d iteração(ões), %d dobras, %d eliminações",
+                    stats.iterations, stats.folded, stats.removed);
         timer.show();
     }
 
@@ -136,36 +150,21 @@ void compile(CGDArguments args, string filename)
     //                                                          .delegua
     string output = args.output == "" ? baseName(filename)[0 .. $ - 8] : args.output;
     string outc = output ~ ".c";
-    
+
     timer.start("Escrevendo o arquivo '.c'");
     write(outc, cSource);
     timer.show();
 
-    string cc = environment.get("CC");
-    string[] cCompilers = ["tcc", "gcc", "clang"].filter!(c => which(c)).array;
-
-    if (cc == "" && cCompilers.length > 0)
-        cc = cCompilers[0];
-    else if (cc == "")
-    {
-        writefln("Não foi possível encontrar um compilador C. Tentativas: tcc, gcc e clang");
+    if (args.emitC)
         return;
-    }
-
-    string command = format("%s %s -o %s %s lib/libdelegua_rt.o $(pkg-config --libs bdw-gc) -rdynamic",
-        cc,
-        outc,
-        output,
-        args.opt ? "-O2" : "-g -O0"
-    );
-
+    auto toolchain = CToolchain.discover(args);
+    auto command = toolchain.command(absolutePath(outc), absolutePath(output), args.opt, toolchain.gcFlags());
     if (args.showDebug)
-        writefln("Command: %s", command);
-
+        writeln(command);
     timer.start("Compilando");
-    auto exec = executeShell(command);
+    auto result = execute(command);
     timer.show();
-
-    // if (exec.status != 0)
-    wrt(exec.output);
+    if (result.status)
+        cgd_erro("O compilador C falhou:\n" ~ result.output);
+    wrt(result.output);
 }

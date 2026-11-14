@@ -1,0 +1,5 @@
+//# 1
+//? fase: compilacao
+//? erro: literal
+var caminho = "modulo.delegua"
+var modulo = importar(caminho)

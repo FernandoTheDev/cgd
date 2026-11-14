@@ -1,36 +1,130 @@
-<p align="center">
-  <img src="docs/assets/logo.png" width="150" alt="cgd logo"/>
-</p>
+<p align="center"><img src="docs/assets/logo.png" width="120" alt="CGD"></p>
 
-<h1 align="center">CGD — Compilador Geral Delégua</h1>
+# CGD — Compilador Geral Delégua
 
-<p align="center">
-  Compilador para a linguagem de programação <a href="https://github.com/DesignLiquido/delegua">Delégua</a>.
-</p>
+Frontend em **D**, saída **C99**, executáveis nativos e runtime gerenciado em C.
+O CGD implementa um perfil compilado de
+[Delégua, da Design Líquido](https://github.com/DesignLiquido/delegua), mantendo
+sua referência à [wiki oficial](https://github.com/DesignLiquido/delegua/wiki).
+Este repositório é uma implementação própria, com limites documentados; não é o
+interpretador original nem oferece todos os seus ambientes e extensões.
 
-<p align="center">
-  <a href="https://github.com/fernandothedev/cgd">
-    <img src="https://img.shields.io/badge/versão-v0.2.0-blue.svg" alt="Versão">
-  </a>
-  <a href="https://www.patreon.com/fernandothedev">
-    <img src="https://img.shields.io/badge/Patreon-Apoie--me-f96854.svg?logo=patreon&logoColor=white" alt="Apoie no Patreon">
-  </a>
-</p>
+**[Website](https://fernandothedev.github.io/cgd/)** ·
+**[Guia da linguagem e compatibilidade](https://fernandothedev.github.io/cgd/linguagem.html)** ·
+[Exemplos executáveis](exemplos/README.md) ·
+[Desenvolvimento e passes](docs/desenvolvimento.md) ·
+[Contexto para agentes](AGENTS.md)
 
-## Aviso
+## Instalar as dependências
 
-> Esta branch contém uma versão totalmente nova do compilador. Ela está **instável** — use por sua conta e risco e espere breaking changes frequentes.
+Ambiente validado: **Linux x86_64**. São necessários DMD ou LDC2, DUB, Clang ou
+GCC, pkg-config e Boehm GC com headers. Python 3 é usado nos testes e ferramentas;
+não é necessário para executar o programa gerado.
 
-## Sobre
+```sh
+# Debian / Ubuntu
+sudo apt-get update
+sudo apt-get install git build-essential clang pkg-config libgc-dev ldc dub python3
 
-O CGD é um compilador para Delégua focado em robustez e eficiência, atualmente em reescrita arquitetural.
+# Fedora
+sudo dnf install git gcc clang pkgconf-pkg-config gc-devel ldc dub python3
 
-## Apoie o projeto
+# Arch Linux
+sudo pacman -S --needed git gcc clang pkgconf gc ldc dub python
+```
 
-Se o CGD te ajudou ou você curte o que está sendo construído aqui, considere apoiar o desenvolvimento no Patreon. Isso ajuda a manter o projeto ativo e dedicar mais tempo a ele.
+Alternativas: [DMD](https://dlang.org/download.html),
+[LDC](https://github.com/ldc-developers/ldc),
+[Boehm GC](https://github.com/bdwgc/bdwgc). Os nomes dos pacotes podem variar.
+Os binários gerados dependem das bibliotecas nativas vinculadas; não são binários
+estáticos automaticamente portáveis entre sistemas.
 
-<p align="center">
-  <a href="https://www.patreon.com/fernandothedev">
-    <img src="https://img.shields.io/badge/Apoie%20no-Patreon-f96854?style=for-the-badge&logo=patreon&logoColor=white" alt="Apoie no Patreon">
-  </a>
-</p>
+## Build do zero
+
+```sh
+git clone --branch dev --recurse-submodules https://github.com/FernandoTheDev/cgd.git
+cd cgd
+
+# Em checkouts existentes:
+git submodule update --init --recursive
+
+./build-runtime
+dub build --compiler=ldc2 --build=release
+# Alternativa: dub build --compiler=dmd --build=release
+```
+
+`CC=gcc ./build-runtime` seleciona GCC para o runtime. O script usa o commit local
+do vendor e não faz pull automaticamente. O vendor já possui Git próprio como submódulo; pode ser editado e commitado
+daqui com `git -C vendor/delegua-runtime`. Veja o [fluxo de trabalho](docs/desenvolvimento.md#editar-o-runtime-a-partir-deste-checkout).
+O runtime é desenvolvido em
+[FernandoTheDev/delegua-runtime](https://github.com/FernandoTheDev/delegua-runtime).
+
+## Instalar no usuário
+
+```sh
+./instalar --compiler ldc2 --release
+export PATH="$HOME/.local/bin:$PATH"
+cgd --versao
+```
+
+A instalação copia executável, headers e runtime para `~/.local/share/cgd` e cria
+um link em `~/.local/bin/cgd`, sem sudo. Use `--prefix DIRETORIO` e
+`--bin-dir DIRETORIO` para outros destinos; `--no-build` reutiliza um build existente.
+Para remover a instalação padrão: apague o link `~/.local/bin/cgd` e o diretório
+`~/.local/share/cgd`. Não há instalação automática de pacotes do sistema.
+
+## Primeiro programa
+
+```sh
+mkdir -p out
+./cgd exemplos/linguagem/14_classes.delegua -o -s out/classes
+./out/classes
+
+# Análise sem toolchain C e diagnósticos consumíveis por ferramentas:
+./cgd exemplos/linguagem/14_classes.delegua --verificar --diagnosticos=json
+
+# C intermediário, sem link:
+./cgd exemplos/linguagem/14_classes.delegua --emitir-c -o -s out/classes
+./cgd --explicar E3101
+./cgd --ajuda
+```
+
+**`-o` ativa otimizações; `-s` define o destino.** Crie o diretório de saída antes.
+O `.c` fica ao lado do executável. `CC=gcc` ou `--cc gcc` seleciona o backend C.
+Opções de alvo, sysroot e runtime estão no [guia de desenvolvimento](docs/desenvolvimento.md).
+A configuração de cross compilation está separada do hospedeiro; Windows e
+executáveis cruzados ainda não foram validados.
+
+## Trabalhar no projeto
+
+```sh
+dub test --compiler=dmd --config=unittest
+dub test --compiler=ldc2 --config=unittest
+python3 testes/driver.py
+python3 testes/integracao.py
+python3 testes/exemplos.py
+python3 scripts/validar.py         # matriz DMD/LDC2 × debug/release × Clang/GCC
+python3 scripts/sanitizadores.py   # ASan/UBSan; restaura o runtime normal
+python3 scripts/formatar.py --check
+python3 scripts/gerar_referencia.py --check
+python3 testes/site.py --static-only
+```
+
+Detalhes de formatadores, contratos de otimização, diagnósticos e novos passes:
+[Desenvolvimento](docs/desenvolvimento.md). O mapa do código e a ABI estão em
+[Arquitetura](docs/arquitetura.md); evidências e limitações dos testes estão em
+[Validação](docs/validacao.md). Relatórios e artefatos são gravados em `out/`.
+O QA de navegador usa Chrome/Chromium e `requirements-site.txt`.
+
+A branch de integração é `dev`. Atualize o runtime explicitamente, preservando
+alterações locais. Quando houver mudanças no submódulo, publique seu commit
+antes de atualizar a referência no CGD. Evite versionar executáveis e C gerado.
+Mantenha testes com e sem otimização e acrescente regressões para cada mudança
+observável. Rode `git diff --check` nos dois repositórios.
+
+Capturas/upvalues, FFI arbitrária e carregamento dinâmico são exclusões deliberadas.
+Outros limites de implementação são descritos separadamente em
+[Compatibilidade](docs/compatibilidade.md) e [Segurança](docs/seguranca.md).
+
+Licença [Apache-2.0](LICENSE). Autoria e referências ao projeto Delégua devem ser
+preservadas. [Apoie o desenvolvimento](https://www.patreon.com/fernandothedev).

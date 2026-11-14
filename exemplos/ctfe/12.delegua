@@ -2,7 +2,7 @@
 //! Maior sequencia de Collatz ate 1000: 178
 //>puro
 funcao modulo_dois(n) {
-    retorne !(n & 1)
+    retorne (n & 1) == 0
 }
 
 //>puro
