@@ -80,12 +80,15 @@ Implementado nesta continuação; runtime publicado e commit CGD preparado:
 - Runtime commit **a04e04d**, publicado em origin/dev; stashes originais preservados.
 - CGD implementação commit **8b2436d**; correção de sombra privada herdada **a87b914**,
   também verificada no LSP com DMD/LDC2 release; documentação no próximo commit.
-- Artefatos json/rede movidos da raiz para out/artefatos. 07_funcoes preservado.
+- Artefatos executáveis não foram versionados. Na conferência final, 07_funcoes
+  já havia sido enviado à lixeira (registro local de 19:24); essa mudança externa
+  foi respeitada, sem restaurar/substituir o binário. Fontes e stashes preservados.
 
 ### Encerramento e publicação
 
-Implementação, testes focados finais e instalação concluídos. O runtime está
-publicado; os commits do CGD são enviados juntos à dev após este registro. O
+Implementação, testes focados finais e instalação concluídos. Runtime e CGD
+foram publicados em origin/dev. Pages confirmou o build da revisão de conteúdo
+8df1fbe em dev/docs; o relatório desta publicação fica em out/pages.json. O
 comando de publicação usado para a revisão final é
 `python3 scripts/github_pages.py --publish` (fonte dev/docs). Seu resultado real
 fica no relatório local em out; não criar outra hospedagem. Para futuras mudanças,
@@ -93,7 +96,7 @@ repetir os testes pertinentes e publicar a revisão enviada, mantendo este regis
 
 A API C normal também passou com GCC; o runtime Clang normal foi restaurado.
 Tipos, formatação geral, referência gerada, Chrome e hash do binário instalado
-foram conferidos. O único arquivo local preexistente a preservar é 07_funcoes.
+foram conferidos. A cópia de 07_funcoes na lixeira não foi alterada.
 Não há implementação pendente escondida: os limites abaixo são explícitos e o
 depurador continua adiado por solicitação do usuário. Novos pedidos devem abrir
 uma seção ativa aqui e registrar decisões/testes antes de encerrar a próxima etapa.
