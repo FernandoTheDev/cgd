@@ -17,8 +17,11 @@ Solicitação: incluir os novos exemplos nos testes e publicar runtime e CGD em 
 - Runtime publicado primeiro em origin/dev: 7833699 (ampliação das APIs nativas,
   inicializadores de classe, comparação textual e diagnósticos visuais), incluindo
   as mudanças validadas na etapa anterior. Sem stashes ou artefatos versionados.
-- CGD: preparado para commit/push com atualização do ponteiro do submódulo;
-  confirmar sincronização com origin/dev ao concluir a publicação.
+- CGD publicado em origin/dev: 0f2f966, com os exemplos, contratos, evolução da
+  linguagem/stdlib/LSP e ponteiro do runtime atualizado para 7833699. Ambos os
+  pushes foram confirmados pelo Git. Formatação completa passou e árvores ficaram
+  limpas após a publicação. Este registro é versionado em commit documental seguinte.
+- Não há push pendente desta solicitação. Não repetir a matriz sem mudanças relevantes.
 
 ---
 
