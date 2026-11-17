@@ -1,5 +1,10 @@
 //! 120.51.234,56\n[2, 4]verdadeiro\n2\n4
 escreva(inteiro("12"), real(".5"), 1234.5689.formatar())
-funcao par(x) { retorna x % 2 == 0 }
+funcao par(x: qualquer): qualquer {
+    retorna x % 2 == 0
+}
+
 escreva(filtrar([1, 2, 3, 4], par), todosEmCondicao([2, 4], par))
-paraCada([1, 2], funcao(x) { escreva(x * 2) })
+paraCada([1, 2], funcao(x: qualquer): qualquer {
+    escreva(x * 2)
+})

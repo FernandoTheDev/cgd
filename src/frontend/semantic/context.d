@@ -4,6 +4,7 @@ import std.exception : enforce;
 import std.algorithm;
 
 import frontend.semantic;
+import frontend.parser.ast : VarDecl;
 
 class Scope
 {
@@ -24,9 +25,9 @@ public:
         return true;
     }
 
-    auto names() const
+    dstring[] names() const
     {
-        return symbols.byKey();
+        return symbols.keys;
     }
 
     void remove(dstring name)
@@ -46,20 +47,20 @@ private:
         // Duas linhas em vez de uma matriz por candidato: memória O(min(n,m)).
         if (a.length > b.length)
         {
-            auto temp = a;
+            dstring temp = a;
             a = b;
             b = temp;
         }
-        auto previous = new size_t[a.length + 1];
-        auto current = new size_t[a.length + 1];
-        foreach (i; 0 .. previous.length)
+        size_t[] previous = new size_t[a.length + 1];
+        size_t[] current = new size_t[a.length + 1];
+        foreach (size_t i; 0 .. previous.length)
             previous[i] = i;
-        foreach (j; 1 .. b.length + 1)
+        foreach (size_t j; 1 .. b.length + 1)
         {
             current[0] = j;
-            foreach (i; 1 .. a.length + 1)
+            foreach (size_t i; 1 .. a.length + 1)
                 current[i] = min(current[i - 1] + 1, previous[i] + 1, previous[i - 1] + (a[i - 1] == b[j - 1] ? 0 : 1));
-            auto temp = previous;
+            size_t[] temp = previous;
             previous = current;
             current = temp;
         }
@@ -110,17 +111,26 @@ public:
     {
         size_t limit = functionBoundaries.length > 0 ? functionBoundaries[$ - 1] : 0;
 
-        foreach_reverse (i, sc; scopes[0 .. cursor + 1])
+        foreach_reverse (size_t i, Scope sc; scopes[0 .. cursor + 1])
         {
             if (i < limit)
                 break;
-            if (auto sym = sc.get(name))
+            if (Symbol* sym = sc.get(name))
                 return sym;
         }
         // Funções globais não precisam capturar o ambiente externo.
-        foreach_reverse (sc; scopes[0 .. limit])
-            if (auto sym = sc.get(name))
+        foreach_reverse (Scope sc; scopes[0 .. limit])
+            if (Symbol* sym = sc.get(name))
                 return sym.isFn() ? sym : null;
+        return null;
+    }
+
+    /// Só os membros escalares são reutilizados; nunca captura o mapa do enum.
+    VarDecl enumDeclaration(dstring name)
+    {
+        foreach_reverse (Scope scopeEntry; scopes[0 .. cursor + 1])
+            if (Symbol* symbol = scopeEntry.get(name))
+                return symbol.isVar() && (cast(SymbolVar)*symbol).node.isEnum ? (cast(SymbolVar)*symbol).node : null;
         return null;
     }
 
@@ -129,8 +139,8 @@ public:
         if (!functionBoundaries.length)
             return false;
         size_t limit = functionBoundaries[$ - 1];
-        foreach_reverse (sc; scopes[0 .. limit])
-            if (auto sym = sc.get(name))
+        foreach_reverse (Scope sc; scopes[0 .. limit])
+            if (Symbol* sym = sc.get(name))
                 return !sym.isFn();
         return false;
     }
@@ -158,17 +168,17 @@ public:
         dstring melhor;
         size_t menorDist = size_t.max;
 
-        foreach_reverse (i, sc; scopes[0 .. cursor + 1])
+        foreach_reverse (size_t i, Scope sc; scopes[0 .. cursor + 1])
         {
             if (i < limit)
                 break;
 
-            foreach (candidato; sc.names())
+            foreach (dstring candidato; sc.names())
             {
                 if (candidato.length > 128 || candidato == name)
                     continue; // não sugere ele mesmo
 
-                auto d = levenshtein(name, candidato);
+                size_t d = levenshtein(name, candidato);
                 if (d < menorDist || (d == menorDist && candidato < melhor))
                 {
                     menorDist = d;

@@ -6,7 +6,7 @@ Leia [AGENTS.md](../AGENTS.md) antes de alterar o pipeline. A linguagem original
 ## Pipeline e contratos
 
 A ordem é: UTF-8/tokens → parsing recuperável → loading estático → validação da
-estrutura → símbolos → tipos → resolução semântica → segurança estática → pureza → análise de fluxo →
+estrutura → declaração de símbolos/tipos → resolução semântica → segurança estática → pureza → análise de fluxo →
 otimizações opcionais → lowering → C99 → toolchain externa.
 
 `--verificar` encerra após a análise, sem exigir runtime nem compilador C.
@@ -57,7 +57,7 @@ Códigos: `E1001` sintaxe, `E1002` UTF-8, `E1003` aninhamento sintático,
 `E2003` importação, `E3001/H3001` símbolo ausente/sugestão, `W3001` código
 inalcançável e `W3002` possível retorno implícito em função tipada. Diagnósticos
 legados conservam `E0001/W0001/H0001`. Os códigos são mais estáveis que o texto;
-ainda não há protocolo LSP nem fix-its automáticos.
+o LSP usa os mesmos diagnósticos; não há fix-its automáticos gerais.
 
 O parser sincroniza em declarações, comandos, ponto e vírgula e fechamento de
 bloco. Ele não envia uma AST com erros para a semântica. Há limite de 256 níveis
@@ -116,8 +116,8 @@ Ferramentas usadas nesta revisão: dfmt `c65d1c8`, clang-format 22, Ruff 0.17.5,
 Prettier 3.8.1, shfmt 3.12.0 e Taplo 0.9.0. O script também aceita ferramentas locais em
 `out/tools/`, sem adicioná-las ao Git. Não baixa executáveis automaticamente.
 
-Arquivos `.delegua` mantêm sua sintaxe e contratos: não há formatador Delégua
-configurado e não se usa um parser JavaScript no lugar dele. Tabelas Unicode
+Arquivos `.delegua` usam o formatador próprio `frontend/formatter.d`, com quatro
+espaços, preservando strings e contratos; não se usa um parser JavaScript no lugar dele. Tabelas Unicode
 geradas são reproduzidas pelo gerador e não reformatadas. Licenças e binários
 não são entradas de formatadores de código.
 
@@ -130,7 +130,7 @@ edite os fontes e regenere com `python3 scripts/gerar_referencia.py`.
 
 ## Segurança estática e catálogo de mensagens
 
-`frontend/static_safety.d` prova falhas locais antes do backend e funciona também
+`frontend/semantic/static_safety.d` prova falhas locais antes do backend e funciona também
 sem `-o`. Ele avalia expressões literais e constantes imutáveis, sem executar
 funções ou presumir o conteúdo de vetores compartilhados. Divisão/módulo por
 zero, overflow de 64 bits, índices de literais, passos zero, deslocamentos,
@@ -195,3 +195,69 @@ git commit -m "build: atualizar referencia do runtime"
 Remote original: https://github.com/FernandoTheDev/delegua-runtime. Atualizações
 explícitas usam `git -C vendor/delegua-runtime pull --ff-only origin dev`; preserve
 alterações locais antes disso. Stashes existentes não são descartados.
+
+## Estilo de tipos e formatador Delégua
+
+Declare tipos concretos em D e não introduza `auto`, foreach inferido ou argumentos
+de lambdas sem tipo. Nas bibliotecas e exemplos Delégua, mantenha argumentos,
+retornos e vínculos explícitos; use `qualquer` para o domínio dinâmico. Fixtures
+que exercitam inferência ou erros deliberados conservam sua finalidade de teste.
+`python3 scripts/verificar_tipos.py` verifica a política nos fontes/testes D e nas
+bibliotecas Delégua. `scripts/formatar.py` usa o próprio CGD para `.delegua`; faça
+build do CGD antes. Ctrl+Shift+I no editor aciona o mesmo formatador via LSP.
+
+## Organização da análise e emissão (revisão de 16/11/2026)
+
+`frontend/semantic/pipeline.d` define a sequência compartilhada entre CLI e LSP.
+`declarations.d` registra símbolos e nomes de tipos na mesma passagem; não existe
+mais um passe numérico separado apenas para cadastrar classes. `analyzer.d`
+resolve expressões e escopos; `assignments.d` concentra a mutabilidade de destinos
+para atribuições e incrementos; `members.d` compartilha busca/visibilidade de
+membros com o editor. `native_methods.d` fornece as assinaturas dos métodos
+nativos. Dicionários mantêm propriedades dinâmicas que podem ocultar métodos.
+
+`semantic/flow.d`, `semantic/static_safety.d` e `semantic/purity.d` são análises,
+sem reescrever o programa. Os módulos antigos de fluxo/segurança reexportam essas
+APIs para preservar consumidores. `semantic/constants.d` avalia operações
+primitivas sem alterar a AST; segurança, otimização e hover compartilham essa
+implementação. O frontend não importa o gerador C nem passes de otimização.
+
+A preparação do bytecode em `ctfe/prepare.d` é separada da validação.
+Chamadas da VM usam a identidade resolvida da função, inclusive entre módulos
+homônimos. A VM descarta resultados de comandos, limita textos a 1.048.576 pontos
+de código, operandos por chamada a 16.384 e slots locais ativos a 100.000, além
+dos limites de instruções e recursão. Exceder limites conserva a chamada nativa.
+
+O lowering traduz expressões já verificadas; não decide se um destino é
+modificável. O gerador C omite rótulos que não recebem saltos e resultados
+intermediários de atribuições/incrementos usados só como comando. Vínculos locais
+continuam inicializados; `(void)&vinculo` evita avisos de uso sem ler um valor
+volatile. Essas mudanças não autorizam descartar inicializadores ou contratos.
+
+Os novos diagnósticos E3013–E3017 cobrem destrutores, acesso a membros, uso da
+classe como instância, aridade e destinos imutáveis. E3201 protege a análise de
+pureza contra vínculos externos. As mensagens e explicações permanecem no catálogo.
+
+**Validação:** a suspensão de testes foi revogada em 17/11/2026. A matriz e
+os resultados efetivamente executados estão em `CONTINUIDADE.md` e `out/`.
+Regressões novas incluem `testes/stdlib.py`, `testes/runtime_diagnosticos.py`,
+`testes/expansao.py` e `testes/unit/expansion.d`.
+
+## Defaults e diagnósticos do runtime
+
+`semantic/defaults.d` determina os defaults de variáveis e atributos tipados.
+Inicializadores de atributo são funções de instância internas, avaliadas por
+objeto em ordem de declaração, primeiro nas bases. O runtime armazena a lista de
+inicializadores sem expor métodos internos à linguagem. Strings/literais de
+coleção são avaliados no inicializador; nunca se guarda um vetor mutável de
+atributo no descritor estático da classe. O carregador percorre os valores dos
+campos antes da semântica, e os passes seguintes percorrem as funções sintetizadas.
+
+`vendor/delegua-runtime/src/diagnosticos.c` renderiza erros não capturados sem
+alocar valores gerenciados ou gerar novas exceções. O cabeçalho segue
+`error[R0001]`, com localização, trecho e marcador quando disponíveis. Leitura de
+fonte é limitada e aceita só arquivos regulares, abertos sem bloquear em FIFO.
+Controles são escapados, tabs expandidas e a janela é limitada. A fonte vem do
+disco no momento do erro; mudanças após compilação podem alterar o trecho.
+A API antiga de localização e o custo normal de uma escrita de ponteiro são
+preservados. Tratadores recebem a exceção sem renderização automática.

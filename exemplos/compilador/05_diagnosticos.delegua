@@ -2,5 +2,5 @@
 //? fase: compilacao
 //? erro: E1001
 // Dois erros independentes: o parser recupera e reporta os dois.
-var primeiro = ;
-var segundo = ;
+var primeiro: qualquer =;
+var segundo: qualquer =;

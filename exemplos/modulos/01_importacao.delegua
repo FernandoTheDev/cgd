@@ -1,4 +1,4 @@
 //! 5local4
-var calculos = importar("lib/calculos.delegua")
-var outraReferencia = importar("./lib/calculos.delegua")
+var calculos: qualquer = importar("lib/calculos.delegua")
+var outraReferencia: qualquer = importar("./lib/calculos.delegua")
 escreva(calculos.soma(3), outraReferencia.versao, calculos.Valor(4).dado)

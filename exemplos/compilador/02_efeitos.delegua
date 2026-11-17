@@ -1,7 +1,8 @@
 //! efeito\n0
 // Mesmo com -o, multiplicar por zero não elimina a avaliação da função.
-funcao calcular() {
+funcao calcular(): qualquer {
     escreva("efeito")
     retorna 7
 }
+
 escreva(calcular() * 0)

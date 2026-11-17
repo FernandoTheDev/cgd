@@ -1,7 +1,14 @@
 //! [0, 1, 4, 9]\n[2, 4, 6]
 // Retornos dentro de uma expressão de laço acumulam os valores.
-var quadrados = para (var i = 0; i < 4; i++) { retorna i * i }
-var i = 0
-var pares = enquanto i < 3 { i++; retorna i * 2 }
+var quadrados: qualquer[] = para (var i: numero = 0; i < 4; i++) {
+    retorna i * i
+}
+
+var i: numero = 0
+var pares: qualquer[] = enquanto i < 3 {
+    i++;
+    retorna i * 2
+}
+
 escreva(quadrados)
 escreva(pares)

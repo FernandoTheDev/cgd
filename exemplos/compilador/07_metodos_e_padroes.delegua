@@ -1,7 +1,13 @@
 //! 47
 // Os passes também visitam métodos, valores padrão e funções anônimas.
 classe Medida {
-    dobro(valor = 1 + 1) { retorna valor * 2 }
+    dobro(valor: qualquer = 1 + 1): qualquer {
+        retorna valor * 2
+    }
 }
-var calcular = funcao(valor = 3 + 4) { retorna valor }
+
+var calcular: funcao = funcao(valor: qualquer = 3 + 4): qualquer {
+    retorna valor
+}
+
 escreva(Medida().dobro(), calcular())

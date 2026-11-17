@@ -1,10 +1,9 @@
 module ctfe.context;
-
-import std.stdio;
+import frontend.parser.ast : FnDecl, FnArg;
 
 import frontend.parser.ast : Node;
-import frontend.semantic.symbol;
-import ctfe;
+import ctfe.compile;
+import ctfe.vm.cgd_vm;
 
 class CTFELimitException : Exception
 {
@@ -56,11 +55,12 @@ void validateCTFEValue(CGDValue value, dstring type)
 
 class CTFEContext
 {
-    // todas as funções puras compiladas
-    VM[dstring] functions;
-    SymbolFn[dstring] symbols;
+    // Chaves de identidade emitidas pela resolução, sem colisão por nome.
+    VMInstruction[][dstring] bytecode;
+    FnDecl[dstring] declarations;
 
     size_t depth;
+    size_t liveSlots;
     size_t remainingInstructions;
 
     void consumeInstruction()
@@ -72,9 +72,9 @@ class CTFEContext
         remainingInstructions--;
     }
 
-    Node call(dstring name, CGDValue[] params)
+    Node call(dstring name, CGDValue[] params, size_t budget = 10_000_000)
     {
-        remainingInstructions = 10_000_000;
+        remainingInstructions = budget;
         return CTFECompile.cgdValueToNode(callValue(name, params));
     }
 
@@ -84,12 +84,12 @@ class CTFEContext
 
         if (depth >= 128)
             throw new CTFELimitException("Limite de recursão em tempo de compilação.");
-        enforce(name in functions, "Função indisponível na avaliação em tempo de compilação.");
-        auto symbol = name in symbols;
-        enforce(symbol !is null, "Identidade da função ausente na CTFE.");
-        auto functionNode = (*symbol).node;
+        enforce(name in bytecode, "Função indisponível na avaliação em tempo de compilação.");
+        FnDecl* declaration = name in declarations;
+        enforce(declaration !is null, "Identidade da função ausente na CTFE.");
+        FnDecl functionNode = *declaration;
         enforce(params.length == functionNode.args.length, "Aridade/defaults exigem execução nativa.");
-        foreach (i, arg; functionNode.args)
+        foreach (size_t i, FnArg arg; functionNode.args)
         {
             enforce(!arg.rest, "Parâmetro variável exige execução nativa.");
             if (arg.type_expr !is null)
@@ -99,10 +99,10 @@ class CTFEContext
         scope (exit)
             depth--;
         VM vm;
-        vm.instructions = functions[name].instructions;
+        vm.instructions = bytecode[name];
         vm.ctfe = this;
         size_t locals = 0;
-        foreach (instruction; vm.instructions)
+        foreach (VMInstruction instruction; vm.instructions)
             if (instruction.opCode == VMOpCode.Store || instruction.opCode == VMOpCode.Load)
             {
                 enforce(instruction.param < 100_000,
@@ -110,6 +110,11 @@ class CTFEContext
                 if (instruction.param >= locals)
                     locals = instruction.param + 1;
             }
+        if (locals > 100_000 - liveSlots)
+            throw new CTFELimitException("Limite de slots ativos na avaliação em tempo de compilação.");
+        liveSlots += locals;
+        scope (exit)
+            liveSlots -= locals;
         vm.context.vars = new CGDValue[locals];
         vm.context.params = params;
         vmHandle(&vm);

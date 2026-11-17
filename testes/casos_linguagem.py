@@ -1,6 +1,11 @@
 """Casos de linguagem para a suíte de integração, sem dependências externas."""
 
 CASES = [
+    (
+        "campo_tipo_capturado",
+        'classe A{x:inteiro}var a=A();tente{a.x="texto"}pegue(erro){escreva("capturado")}',
+        "capturado",
+    ),
     ("funcao_valor", "funcao f(x){retorna x*2} var g=f;escreva(g(3))", "6"),
     ("anonima", "var f=funcao(x){retorna x+1};escreva(f(2))", "3"),
     ("retorna_funcao", "funcao criar(){retorna funcao(x){retorna x+4}} escreva(criar()(5))", "9"),
@@ -211,7 +216,7 @@ ERRORS = [
     ("captura_padrao", "var x=1;funcao f(a=x){retorna a}", "upvalues"),
     ("ciclo_heranca", "classe A herda B{}classe B herda A{}", "Ciclo"),
     ("rest_invalido", "funcao f(...a,b){retorna a}", "último"),
-    ("classe_estrangeira", "classe estrangeira A{}", "segurança"),
+    ("classe_estrangeira", "classe estrangeira A{}", "FFI C exige @definicao"),
     ("import_dinamico", "var nome='a.delegua';var m=importar(nome)", "literal"),
     ("import_nativo", "var m=importar('libc.so')", "segurança"),
 ]
@@ -369,7 +374,7 @@ CASES += [
         "classe A{}classe B herda A{}classe C herda A{}var a:A=B();a=C();escreva(a.tipo())",
         "C",
     ),
-    ("tipado_sem_inicializador", "var x:inteiro;escreva(x);x=3;escreva(x)", "nulo\n3"),
+    ("tipado_sem_inicializador", "var x:inteiro;escreva(x);x=3;escreva(x)", "0\n3"),
 ]
 MODULE_CASES += [
     (

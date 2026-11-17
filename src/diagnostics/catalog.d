@@ -44,11 +44,17 @@ enum MessageSpec invalidUTF8 = MessageSpec("E1002", "Arquivo fonte não contém 
             "Salve a fonte como UTF-8.");
 enum MessageSpec syntaxDepth = MessageSpec("E1003", "Limite de aninhamento sintático excedido.",
             "Divida expressões ou blocos profundamente aninhados.");
+enum MessageSpec invalidNumericLiteral = MessageSpec("E1005", "Literal numérico inválido ou fora do intervalo.",
+            "Literais inteiros exigem 64 bits; literais reais precisam ser finitos e representáveis em 64 bits.");
 enum MessageSpec astLimit = MessageSpec("E1004",
             "Limite estrutural da AST excedido; divida a expressão ou o módulo.",
             "O frontend limita profundidade e quantidade de nós antes dos passes recursivos.");
 enum MessageSpec missingSymbol = MessageSpec("E3001", "O símbolo '%s' não foi declarado.",
             "Verifique escopo e grafia; funções não capturam ambientes externos.");
+enum MessageSpec unsupportedStaticField = MessageSpec("E3011", "Campos estáticos ainda não são suportados; declare um método estático.",
+            "Esta versão oferece campos de instância e métodos estáticos; a ausência de campos estáticos não é uma exclusão de segurança.");
+enum MessageSpec staticConstructor = MessageSpec("E3012", "Construtor não pode ser estático.",
+            "O construtor inicializa uma instância gerenciada e recebe isto; use outro nome para uma fábrica estática.");
 enum MessageSpec suggestion = MessageSpec("H3001", "Você quis dizer '%s'?",
             "Sugestão determinística de nome visível no escopo.");
 enum MessageSpec unreachable = MessageSpec("W3001", "Código inalcançável após transferência de controle.",
@@ -74,18 +80,35 @@ enum MessageSpec invalidShift = MessageSpec("E3107", "Deslocamento constante for
 enum MessageSpec invalidSlice = MessageSpec("E3108", "O passo constante de uma fatia não pode ser zero.",
             "Use um passo positivo ou negativo diferente de zero.");
 
+enum MessageSpec inaccessibleMember = MessageSpec("E3014", "Membro '%s' não é acessível neste contexto.",
+            "Respeite a visibilidade público, protegido ou privado da declaração que oculta as herdadas.");
+enum MessageSpec instanceMember = MessageSpec("E3015", "Membro '%s' exige uma instância.",
+            "Instancie a classe antes de acessar campos e métodos de instância.");
+enum MessageSpec invalidArity = MessageSpec("E3016", "A função '%s' espera entre %s e %s argumentos; recebeu %s.",
+            "Respeite argumentos obrigatórios, opcionais e variáveis da função ou método.");
+enum MessageSpec invalidAssignment = MessageSpec("E3017", "%s",
+            "O destino precisa ser modificável; funções, constantes e o receptor isto não podem ser reatribuídos.");
+enum MessageSpec impureState = MessageSpec("E3201", "Função pura depende do estado externo '%s'.",
+            "Passe o valor por parâmetro; a CTFE não lê nem modifica variáveis externas à função.");
+enum MessageSpec invalidDestructor = MessageSpec("E3013",
+            "Destrutor deve ser público, de instância, sem parâmetros e retornar vazio.",
+            "Declare destrutor(): vazio e use destruir(objeto) em finalmente para liberar recursos explicitamente.");
+
 immutable MessageSpec[] messages = [
     runtimeError, genericError, genericWarning, genericHint, diagnosticLimit, driverFailure,
     moduleCycle, moduleBudget, moduleLoad, dynamicWarning, dynamicError, unexpectedEnd,
-    expectedToken, incompatibleTypes,
-    captureWarning, captureError, invalidUTF8, syntaxDepth, astLimit, missingSymbol, suggestion,
-    unreachable, implicitReturn, zeroDivision, integerOverflow, invalidIndex, typeContract,
-    invalidOperation, invalidConversion, invalidShift, invalidSlice
+    expectedToken, incompatibleTypes, captureWarning,
+    captureError, invalidUTF8, syntaxDepth, invalidNumericLiteral, astLimit, missingSymbol,
+    unsupportedStaticField, staticConstructor, suggestion, unreachable, implicitReturn,
+    zeroDivision, integerOverflow, invalidIndex, typeContract,
+    invalidOperation, invalidConversion,
+    invalidShift, invalidSlice, impureState, invalidDestructor, inaccessibleMember, instanceMember,
+    invalidArity, invalidAssignment
 ];
 
 const(MessageSpec)* lookupMessage(string code)
 {
-    foreach (ref spec; messages)
+    foreach (ref immutable(MessageSpec) spec; messages)
         if (spec.code == code || (code.length == 5 && code[0] == 'W' && spec.code == "E" ~ code[1 .. $]))
             return &spec;
     return null;

@@ -79,6 +79,16 @@ for compiler in args.compilers:
             ],
         )
         command(f"{compiler}/{build}/driver", [sys.executable, "testes/driver.py"])
+        command(f"{compiler}/{build}/LSP", [sys.executable, "testes/lsp.py"])
+        command(f"{compiler}/{build}/bibliotecas", [sys.executable, "testes/bibliotecas.py"])
+        command(f"{compiler}/{build}/expansão", [sys.executable, "testes/expansao.py"])
+        command(f"{compiler}/{build}/enums", [sys.executable, "testes/enums.py"])
+        command(f"{compiler}/{build}/stdlib", [sys.executable, "testes/stdlib.py"])
+        command(
+            f"{compiler}/{build}/runtime diagnósticos",
+            [sys.executable, "testes/runtime_diagnosticos.py"],
+        )
+
         for cc in args.c_compilers:
             environment = {**os.environ, "CC": cc}
             command(

@@ -97,3 +97,48 @@ ou stashes do vendor. Versione configurações e ofereça um comando de verifica
 - O usuário confirmou o remote FernandoTheDev/delegua-runtime e pediu commits no
   vendor. Use o Git próprio do submódulo, publique-o primeiro e atualize a referência
   no CGD. Não inicialize outro repositório nem converta o vendor em cópia de arquivos.
+
+## Continuidade obrigatória de novas tarefas
+
+Mantenha `docs/CONTINUIDADE.md` atualizado com a solicitação ativa, decisões,
+implementação concluída, testes realmente executados, pendências e próximos
+comandos. O usuário pediu esse registro também para solicitações futuras, para
+poder retomar após expiração do limite. A tarefa atual inclui libcurl por API
+controlada, bibliotecas de rede/JSON em Delégua e extensão VS Code com LSP local
+persistente e tokens semânticos. O depurador foi adiado; não confundir execução
+com depuração. Não compilar/linkar por edição do documento.
+
+## Estilo explícito e ferramentas (nova solicitação)
+
+- Não introduzir `auto` em D; declarar tipos concretos. Bibliotecas Delégua devem
+  anotar variáveis, argumentos e retornos, usando `qualquer` quando dinâmico.
+- O formatador Delégua próprio está em frontend/formatter.d; quatro espaços são
+  contrato. Preservar strings, comentários e contratos dos exemplos. A CLI tem
+  --formatar/--verificar-formatacao e o LSP documentFormatting.
+- Não oferecer métodos globais como fallback de completion após ponto. Módulos
+  importados são namespaces; respeitar escopo, receptor, herança e visibilidade.
+- Métodos estáticos possuem isStatic; não recebem isto. Campos estáticos continuam
+  sem suporte. Bibliotecas JSON/rede/coleções e extensão estão em evolução; ler
+  docs/CONTINUIDADE.md antes de retomar e registrar testes efetivamente executados.
+
+## Evolução autorizada em 16/11/2026
+
+- O usuário pediu FFI da wiki, revogando a exclusão anterior para assinaturas
+  estrangeiras explícitas. Classes @definicao usam ABI C escalar ou ABI gerenciada
+  delegua; não expor ponteiros/structs/callbacks por conversões presumidas.
+- JSON/rede/arquivos usam cgd:nativo.Primitivas; entradas cgd\* antigas continuam
+  por compatibilidade. Não remover antes de validar migração e API C anterior.
+- Classes abstratas/interfaces, enums numéricos e arrows foram acrescentados.
+  Leia docs/evolucao-linguagem.md para diferenças e pendências reais da wiki.
+- **Não executar testes até ordem explícita do usuário.** Builds/formatação e
+  instalação do LSP foram autorizados, mas não substituem validação funcional.
+
+## Solicitação de 17/11/2026
+
+- O usuário autorizou executar todos os testes necessários; a suspensão anterior
+  foi revogada. Documentar testes e resultados reais em CONTINUIDADE.md.
+- Compatibilidade JS, integração com classes de host JavaScript, herança de
+  interfaces e múltiplos dialetos são exclusões definitivas, não pendências.
+- Defaults tipados e inicializadores de atributos devem criar coleções por
+  instância, respeitar herança, ordem, contratos e efeitos. Não construir classes
+  implicitamente. Tipos inferidos aparecem como dicas virtuais, sem editar fontes.

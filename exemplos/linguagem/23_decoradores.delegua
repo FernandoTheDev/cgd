@@ -1,9 +1,21 @@
 //! minimo\n9
-@minimo(valor=0)
-classe Medida { lado: numero }
+@minimo(valor = 0)
+classe Medida {
+    lado: numero
+}
+
 escreva(decoradores(Medida).classe[0].nome)
-funcao alternativa() { retorna 9 }
-funcao de decorador trocar(original) { retorna alternativa }
+funcao alternativa(): qualquer {
+    retorna 9
+}
+
+funcao de decorador trocar(original: qualquer): qualquer {
+    retorna alternativa
+}
+
 @trocar
-funcao obter() { retorna 1 }
+funcao obter(): qualquer {
+    retorna 1
+}
+
 escreva(obter())

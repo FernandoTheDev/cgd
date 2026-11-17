@@ -16,7 +16,7 @@ bool validateStructure(Program program, Diagnostics diagnostics)
     bool[Node] seen;
     while (pending.length)
     {
-        auto current = pending[$ - 1];
+        Pending current = pending[$ - 1];
         pending.length--;
         if (current.node is null || current.node in seen)
             continue;
@@ -26,7 +26,7 @@ bool validateStructure(Program program, Diagnostics diagnostics)
             diagnostics.errorCode(current.node.pos, astLimit);
             return false;
         }
-        foreach (child; childNodes(current.node))
+        foreach (Node child; childNodes(current.node))
             pending ~= Pending(child, current.depth + 1);
     }
     return true;

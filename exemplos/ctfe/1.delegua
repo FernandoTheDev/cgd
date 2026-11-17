@@ -1,7 +1,7 @@
 //$
 //! 67
 //>puro
-funcao soma(x, y) {
+funcao soma(x: qualquer, y: qualquer): qualquer {
     retorne x + y
 }
 

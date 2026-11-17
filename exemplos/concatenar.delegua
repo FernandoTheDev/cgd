@@ -2,7 +2,7 @@
 //! FernandoDev
 
 //>puro
-funcao concatenar(s1, s2) {
+funcao concatenar(s1: qualquer, s2: qualquer): qualquer {
     retorne s1 + s2
 }
 

@@ -1,0 +1,5 @@
+//! verdadeiroação💚\n[1,true,null,"x"]
+var json: qualquer = importar("../../bibliotecas/json.delegua")
+var valor: qualquer = json.analisar('{"ativo":true,"nome":"ação\\uD83D\\uDC9A"}')
+escreva(valor.ativo, valor.nome)
+escreva(json.serializar([1, verdadeiro, nulo, "x"]))

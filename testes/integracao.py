@@ -150,6 +150,8 @@ RUNTIME_ERRORS += MORE_RUNTIME_ERRORS
 
 from casos_compilador import CASES as OPT_CASES, RUNTIME_ERRORS as OPT_ERRORS, STATIC_ERRORS
 
+STATIC_ERRORS = {**STATIC_ERRORS, "privado": "E3014", "protegido": "E3014"}
+
 CASES += OPT_CASES
 RUNTIME_ERRORS += OPT_ERRORS
 
@@ -200,7 +202,7 @@ with tempfile.TemporaryDirectory(prefix="cgd testes ") as directory:
             assert compiled.returncode == 0, (name, opt, compiled.stdout, compiled.stderr)
             result = run([str(output)])
             assert (
-                result.returncode == 1 and "Erro" in result.stderr and str(file) in result.stderr
+                result.returncode == 1 and "R0001" in result.stderr and str(file) in result.stderr
             ), (name, opt, result)
             count += 1
     from casos_linguagem import MODULE_CASES, MODULE_ERRORS

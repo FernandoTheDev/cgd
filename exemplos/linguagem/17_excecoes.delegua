@@ -6,4 +6,9 @@ tente {
 } finalmente {
     escreva("limpeza")
 }
-tente { escreva(1 / 0) } pegue (erro) { escreva(erro) }
+
+tente {
+    escreva(1 / 0)
+} pegue (erro) {
+    escreva(erro)
+}

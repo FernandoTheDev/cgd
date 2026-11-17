@@ -1,9 +1,10 @@
 //! [1][1, 2]\nverdadeiro
-var original = {dados: [1]}
-var copia = clonar(original)
+var original: dicionario = { dados: [1] }
+
+var copia: qualquer = clonar(original)
 copia.dados.adicionar(2)
 escreva(original.dados, copia.dados)
-var ciclo = []
+var ciclo: qualquer[] = []
 ciclo.adicionar(ciclo)
-var clonado = clonar(ciclo)
+var clonado: qualquer = clonar(ciclo)
 escreva(clonado[0] == clonado)

@@ -1,8 +1,9 @@
 //! 10\n3
 // A propagação usa a declaração resolvida, preservando o sombreamento.
-const valor = 2
+const valor: numero = 2
 se verdadeiro {
-    const valor = 9
+    const valor: numero = 9
     escreva(valor + 1)
 }
+
 escreva(valor + 1)

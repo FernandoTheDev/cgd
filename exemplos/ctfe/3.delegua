@@ -1,9 +1,9 @@
 //$
 //! 125
 //>puro
-funcao cubo(x) {
+funcao cubo(x: qualquer): qualquer {
     retorne x * x * x
 }
 
-var n = 4
+var n: numero = 4
 escreva(cubo(n + 1))

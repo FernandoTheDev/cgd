@@ -1,14 +1,14 @@
 //$
 //! 100
 //>puro
-funcao dobro(x) {
+funcao dobro(x: qualquer): qualquer {
     retorne x * 2
 }
 
 //>puro
-funcao quadrado(x) {
+funcao quadrado(x: qualquer): qualquer {
     retorne x * x
 }
 
-var x = 5
+var x: numero = 5
 escreva(quadrado(dobro(x)))

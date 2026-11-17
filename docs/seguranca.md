@@ -27,12 +27,15 @@ vale para variáveis que contêm referências a outras funções.
 
 ## Capacidades ausentes por decisão de segurança
 
-- FFI na sintaxe da linguagem, classes estrangeiras e chamadas a símbolos nativos arbitrários.
+- Ponteiros crus, structs e callbacks arbitrários na ABI C ainda não têm representação na linguagem.
 - Importação de `.so`, `.dll`, pacotes NPM e caminhos calculados em execução.
 - Ponteiros arbitrários, acesso à representação interna dos valores e avaliação dinâmica de código.
 - Ambientes capturados implicitamente por closures/upvalues.
 
-O vendor conserva uma API C de FFI para consumidores nativos confiáveis. Essa
+A revisão 0.4.0 autoriza classes estrangeiras C por pedido explícito do usuário.
+A FFI exige assinatura correta e código nativo confiável; não é sandbox. Veja
+[evolução e ABIs](evolucao-linguagem.md). O contrato anterior de exclusão de FFI
+foi substituído. O vendor também conserva a API C de FFI para consumidores nativos. Essa
 API não é exposta aos programas Delégua compilados pelo CGD.
 
 ## Verificações

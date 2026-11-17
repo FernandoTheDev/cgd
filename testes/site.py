@@ -213,7 +213,9 @@ with tempfile.TemporaryDirectory(prefix="cgd chrome ") as profile:
             ):
                 break
             time.sleep(0.1)
-        assert evaluate("document.querySelectorAll('.guide-chapter').length") == 17
+        assert evaluate("document.querySelectorAll('.guide-chapter').length") == len(
+            json.loads((ROOT / "docs/linguagem.json").read_text())
+        )
         assert evaluate("document.querySelectorAll('#diagnosticos table tbody tr').length") >= 20
         assert evaluate("document.querySelector('#diagnosticos').textContent.includes('E3101')")
         assert evaluate("document.documentElement.scrollWidth <= window.innerWidth")

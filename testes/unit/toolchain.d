@@ -25,7 +25,7 @@ unittest
     toolchain.runtimeObject = "/alvo/runtime.o";
     toolchain.target = "x86_64-w64-windows-gnu";
     toolchain.sysroot = "/sdk";
-    auto args = toolchain.command("arquivo $(literal).c", "programa.exe", true, ["-lgc"]);
+    string[] args = toolchain.command("arquivo $(literal).c", "programa.exe", true, ["-lgc"]);
     assert(args.canFind("--target=x86_64-w64-windows-gnu"));
     assert(args.canFind("--sysroot=/sdk"));
     assert(args.canFind("arquivo $(literal).c"));

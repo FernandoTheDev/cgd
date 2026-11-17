@@ -1,7 +1,7 @@
 //$
 //! Resultado: 67
 //>puro
-funcao soma(a, b, c) {
+funcao soma(a: qualquer, b: qualquer, c: qualquer): qualquer {
     retorne a + b + c
 }
 

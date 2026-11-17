@@ -13,21 +13,26 @@ import core.stdc.stdlib : free;
 class ModuleLoader
 {
     Diagnostics diagnostics;
+    string[string] overlays;
     ModuleUnit[string] cache;
     bool[string] active;
     size_t depth;
     size_t totalBytes;
     string[] importStack;
-    this(Diagnostics diagnostics)
+    this(Diagnostics diagnostics, string[string] overlays = null)
     {
         this.diagnostics = diagnostics;
+        this.overlays = overlays;
     }
 
     string canonical(string path)
     {
+        string absolute = absolutePath(path).asNormalizedPath.to!string;
+        if (absolute in overlays)
+            return absolute;
         version (Posix)
         {
-            auto resolved = realpath(path.toStringz, null);
+            char* resolved = realpath(path.toStringz, null);
             if (resolved is null)
                 throw new Exception("Módulo não encontrado: " ~ path);
             scope (exit)
@@ -36,7 +41,7 @@ class ModuleLoader
         }
         else
         {
-            auto normalized = absolutePath(path).asNormalizedPath.to!string;
+            string normalized = absolutePath(path).asNormalizedPath.to!string;
             if (!exists(normalized) || !isFile(normalized))
                 throw new Exception("Módulo não encontrado: " ~ path);
             // A resolução de junctions/symlinks Windows ainda requer validação nativa.
@@ -49,7 +54,7 @@ class ModuleLoader
 
     void load(Program program, string filename)
     {
-        auto path = canonical(filename);
+        string path = canonical(filename);
         active[path] = true;
         importStack ~= path;
         scope (exit)
@@ -64,15 +69,24 @@ class ModuleLoader
     {
         if (node is null)
             return;
-        if (auto imported = cast(ImportExpr) node)
+        if (ImportExpr imported = cast(ImportExpr) node)
         {
-            auto literal = cast(StringLit) imported.path;
+            StringLit literal = cast(StringLit) imported.path;
             if (literal is null)
             {
                 diagnostics.error(node.pos, "Importação exige caminho literal conhecido na compilação.");
                 return;
             }
-            auto path = literal.value.to!string;
+            string path = literal.value.to!string;
+            if (path == "cgd:json" || path == "cgd:rede" || path == "cgd:colecoes" || path == "cgd:arquivos"
+                    || path == "cgd:matematica" || path == "cgd:nativo" || path == "cgd:textos"
+                    || path == "cgd:estatistica" || path == "cgd:caminhos")
+                path = buildPath(dirName(thisExePath()), "bibliotecas", path[4 .. $] ~ ".delegua");
+            else if (path.startsWith("cgd:"))
+            {
+                diagnostics.error(node.pos, "Biblioteca CGD desconhecida: " ~ path, "E2003");
+                return;
+            }
             if (path.canFind('\0'))
             {
                 diagnostics.error(node.pos, "Caminho de módulo contém byte nulo.");
@@ -86,13 +100,13 @@ class ModuleLoader
             }
             try
             {
-                auto target = canonical(buildPath(dirName(filename), path));
+                string target = canonical(buildPath(dirName(filename), path));
                 if (target in active)
                 {
                     diagnostics.errorCode(node.pos, moduleCycle, importStack.join(" -> ") ~ " -> " ~ target);
                     return;
                 }
-                if (auto cached = target in cache)
+                if (ModuleUnit* cached = target in cache)
                 {
                     imported.target = *cached;
                     return;
@@ -102,7 +116,8 @@ class ModuleLoader
                     diagnostics.error(node.pos, "Limite de profundidade de módulos excedido.");
                     return;
                 }
-                auto bytes = getSize(target);
+                string* buffer = target in overlays;
+                size_t bytes = buffer is null ? getSize(target) : (*buffer).length;
                 if (bytes > 4 * 1024 * 1024 || totalBytes + bytes > 64 * 1024 * 1024 || cache.length >= 1024)
                 {
                     diagnostics.errorCode(node.pos, moduleBudget);
@@ -118,13 +133,14 @@ class ModuleLoader
                     depth--;
                     importStack.length--;
                 }
-                auto tokens = new Lexer(cast(string) std.file.read(target), target, diagnostics).tokenizer();
+                Token[] tokens = new Lexer(buffer is null
+                        ? cast(string) std.file.read(target) : *buffer, target, diagnostics).tokenizer();
                 if (diagnostics.hasErrors())
                     return;
-                auto program = new Parser(tokens, diagnostics).parse();
+                Program program = new Parser(tokens, diagnostics).parse();
                 if (diagnostics.hasErrors())
                     return;
-                auto unit = new ModuleUnit(target, program, node.pos);
+                ModuleUnit unit = new ModuleUnit(target, program, node.pos);
                 cache[target] = unit;
                 imported.target = unit;
                 visit(program, target);
@@ -135,7 +151,7 @@ class ModuleLoader
             }
             return;
         }
-        foreach (child; childNodes(node))
+        foreach (Node child; childNodes(node))
             visit(child, filename);
     }
 }

@@ -1,4 +1,5 @@
 module driver.toolchain;
+import std.typecons : Tuple;
 
 import driver.args;
 import std.algorithm : canFind;
@@ -13,13 +14,13 @@ bool executableAvailable(string command)
 {
     if (command.canFind('/') || command.canFind('\\'))
         return exists(command) && isFile(command);
-    foreach (dir; environment.get("PATH").split(pathSeparator))
+    foreach (string dir; environment.get("PATH").split(pathSeparator))
     {
-        auto path = buildPath(dir.length ? dir : ".", command);
+        string path = buildPath(dir.length ? dir : ".", command);
         if (exists(path) && isFile(path))
             return true;
         version (Windows)
-            foreach (suffix; environment.get("PATHEXT", ".EXE;.CMD;.BAT").split(";"))
+            foreach (string suffix; environment.get("PATHEXT", ".EXE;.CMD;.BAT").split(";"))
                 if (exists(path ~ suffix) && isFile(path ~ suffix))
                     return true;
     }
@@ -34,7 +35,7 @@ string[] splitToolFlags(string text)
     string word;
     char quote = 0;
     bool escaped, started;
-    foreach (ch; text)
+    foreach (char ch; text)
     {
         if (escaped)
         {
@@ -101,7 +102,7 @@ struct CToolchain
         CToolchain toolchain;
         toolchain.compiler = args.cc.length ? args.cc : environment.get("CC");
         if (!toolchain.compiler.length)
-            foreach (candidate; ["clang", "gcc", "tcc"])
+            foreach (string candidate; ["clang", "gcc", "tcc"])
                 if (executableAvailable(candidate))
                 {
                     toolchain.compiler = candidate;
@@ -125,7 +126,7 @@ struct CToolchain
 
     string[] command(string source, string output, bool optimized, string[] libraries)
     {
-        auto result = [
+        string[] result = [
             compiler, "-std=c99", "-Werror=implicit-function-declaration", "-Werror=return-type",
             "-Werror=incompatible-pointer-types"
         ];
@@ -140,7 +141,7 @@ struct CToolchain
         // Bibliotecas do hospedeiro não são injetadas em um alvo explícito.
         if (target.length)
         {
-            auto lower = target.toLower;
+            string lower = target.toLower;
             if (lower.canFind("linux"))
                 result ~= ["-rdynamic", "-ldl", "-lm"];
             else if (lower.canFind("darwin") || lower.canFind("apple"))
@@ -159,7 +160,9 @@ struct CToolchain
 
     string[] gcFlags()
     {
-        auto pkg = execute([pkgConfig, "--cflags", "--libs", "bdw-gc"]);
+        Tuple!(int, "status", string, "output") pkg = execute([
+            pkgConfig, "--cflags", "--libs", "bdw-gc", "libcurl"
+        ]);
         enforce(pkg.status == 0, "Não foi possível localizar bdw-gc: " ~ pkg.output);
         return splitToolFlags(pkg.output);
     }

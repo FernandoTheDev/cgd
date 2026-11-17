@@ -1,22 +1,19 @@
-module ctfe.purity_analysis;
+module frontend.semantic.purity;
 
 import std.algorithm;
 import std.format;
-import std.stdio;
 import std.array;
 
-import frontend.semantic;
 import frontend.parser;
 import errors;
-import ctfe;
+import ctfe.ctfe_flags;
 
-final class PurityAnalysis
+final class PureFunctionAnalysis
 {
 private:
-    CTFEContext ctfe;
-    CTFECompile compiler;
-
-    Context context;
+    FnDecl[] validFunctions;
+    bool[Object] locals;
+    bool[Node] visited;
     Diagnostics err;
 
     bool analysis(FnDecl fn)
@@ -26,22 +23,20 @@ private:
         if (!(fn.ctfe_flags & CTFEFlags.Pure))
             return false;
 
-        foreach (d; fn.decorators)
+        foreach (Decorator d; fn.decorators)
             if (d.envelope !is null)
             {
                 err.error(fn.pos, "Função com envelope de decorador não aceita avaliação //>puro.");
                 return false;
             }
-        bool status = nodeAnalysisBlockStmt(fn.body);
+        locals = null;
+        foreach (FnArg arg; fn.args)
+            locals[arg] = true;
+        collectLocals(fn.body);
+        bool status = !fn.isMethod && nodeAnalysisBlockStmt(fn.body);
         dstring name = fn.fn;
-        // writefln("A função é pura: %d -> '%s'", status, name);
-
-        if (status && name !in ctfe.functions)
-        {
-            // compila a função
-            ctfe.functions[name] = VM(VMContext(), compiler.compile(fn), ctfe);
-            ctfe.symbols[name] = *(cast(SymbolFn*) context.get(name));
-        }
+        if (status)
+            validFunctions ~= fn;
 
         if (!status)
             err.error(fn.pos, format(
@@ -52,6 +47,8 @@ private:
 
     bool nodeAnalysis(Node node)
     {
+        if (node is null)
+            return true;
         final switch (node.kind)
         {
             case NodeKind.TupleLit:
@@ -81,10 +78,22 @@ private:
                         "Esse recurso ainda não é suportado na avaliação em tempo de compilação.");
                 return false;
             case NodeKind.Identifier:
-                if ((cast(Identifier) node).functionRef !is null)
+                Identifier identifier = cast(Identifier) node;
+                if (identifier.variableRef !is null && identifier.variableRef.isEnum)
+                {
+                    err.error(node.pos, "CTFE aceita membros escalares do enum, não o namespace como valor.");
+                    return false;
+                }
+                if (identifier.functionRef !is null)
                 {
                     err.error(node.pos,
                             "Valor de função ainda não é representável na avaliação em tempo de compilação.");
+                    return false;
+                }
+                if ((identifier.variableRef !is null && identifier.variableRef !in locals)
+                        || (identifier.parameterRef !is null && identifier.parameterRef !in locals))
+                {
+                    err.errorCode(node.pos, impureState, identifier.value);
                     return false;
                 }
                 return true;
@@ -120,7 +129,7 @@ private:
 
             case NodeKind.VarDecl:
                 VarDecl var = cast(VarDecl) node;
-                return nodeAnalysis(var.value);
+                return var.isEnum || nodeAnalysis(var.value);
 
             case NodeKind.AssignStmt:
                 AssignStmt ass = cast(AssignStmt) node;
@@ -130,7 +139,7 @@ private:
                 return nodeAnalysisBlockStmt(cast(BlockStmt) node);
 
             case NodeKind.ReturnStmt:
-                auto value = (cast(ReturnStmt) node).val;
+                Node value = (cast(ReturnStmt) node).val;
                 if (value is null)
                 {
                     err.error(node.pos, "Retorno sem valor ainda não é suportado em funções puras.");
@@ -147,10 +156,12 @@ private:
             case NodeKind.WhileStmt:
                 return nodeAnalysisWhileStmt(cast(WhileStmt) node);
 
+            case NodeKind.MemberExpr:
+                if ((cast(MemberExpr) node).enumValue !is null)
+                    return true;
+                goto case NodeKind.ArrayLit;
             case NodeKind.ArrayLit:
             case NodeKind.IndexExpr:
-            case NodeKind.MemberExpr:
-
                 err.error(node.pos, "Essa expressão não é pura.");
                 return false;
         }
@@ -189,25 +200,19 @@ private:
 
     bool nodeAnalysisCallExpr(CallExpr node)
     {
-        auto identifier = cast(Identifier) node.fn;
+        Identifier identifier = cast(Identifier) node.fn;
         if (identifier is null || identifier.functionRef is null)
         {
             err.error(node.pos,
                     "Chamada indireta/método ainda não é suportada na avaliação em tempo de compilação.");
             return false;
         }
-        auto name = identifier.value;
-        auto sym = context.get(name);
-        if (sym is null || !sym.isFn() || (cast(SymbolFn*) sym).node !is identifier.functionRef)
-        {
-            err.error(node.pos, "Identidade da função não disponível na avaliação em tempo de compilação.");
-            return false;
-        }
-        auto symf = cast(SymbolFn*) sym;
-        if (symf.node.ctfe_flags & CTFEFlags.Pure)
+        FnDecl target = identifier.functionRef;
+        dstring name = identifier.value;
+        if (target.ctfe_flags & CTFEFlags.Pure)
         {
             bool valid = true;
-            foreach (arg; node.args)
+            foreach (Node arg; node.args)
                 if (!nodeAnalysis(arg))
                     valid = false;
             return valid;
@@ -215,25 +220,46 @@ private:
 
         err.error(node.pos, format("A função '%s' não é marcada pura.", name));
 
-        if (!symf.isRuntime)
-            err.hint(symf.node.pos, format("A função '%s' foi definida aqui.", name));
+        if (target.pos !is null)
+            err.hint(target.pos, format("A função '%s' foi definida aqui.", name));
 
         return false;
     }
 
-public:
-    this(Context context, Diagnostics err, CTFEContext ctfe)
+    void collectLocals(Node[] body)
     {
-        this.context = context;
-        this.err = err;
-        this.compiler = new CTFECompile;
-        this.ctfe = ctfe;
+        foreach (Node node; body)
+        {
+            if (node is null || cast(FnDecl) node || cast(ClassDecl) node)
+                continue;
+            if (VarDecl variable = cast(VarDecl) node)
+                locals[variable] = true;
+            collectLocals(childNodes(node));
+        }
     }
 
-    void analysis(Program program)
+    void visit(Node node)
     {
-        FnDecl[] functions = cast(FnDecl[]) program.body.filter!(node => node.kind == NodeKind.FnDecl).array;
-        foreach (FnDecl fn; functions)
+        if (node is null || node in visited)
+            return;
+        visited[node] = true;
+        if (FnDecl fn = cast(FnDecl) node)
+        {
             analysis(fn);
+        }
+        foreach (Node child; childNodes(node))
+            visit(child);
+    }
+
+public:
+    this(Diagnostics diagnostics)
+    {
+        err = diagnostics;
+    }
+
+    FnDecl[] analyze(Program program)
+    {
+        visit(program);
+        return validFunctions;
     }
 }

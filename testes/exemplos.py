@@ -4,6 +4,7 @@
 from pathlib import Path
 import argparse
 import os
+import re
 import subprocess
 import tempfile
 
@@ -25,16 +26,17 @@ def escapes(text):
     return "".join(result)
 
 
-def run(args, **kwargs):
-    return subprocess.run(args, cwd=ROOT, capture_output=True, text=True, timeout=40, **kwargs)
+def run(args, *, cwd=ROOT, **kwargs):
+    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=40, **kwargs)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--compiler", type=Path, default=ROOT / "cgd")
     parser.add_argument("--once", action="store_true", help="Usa somente o modo sem -o.")
+    parser.add_argument("--examples-dir", type=Path, default=ROOT / "exemplos")
     args = parser.parse_args()
-    files = sorted((ROOT / "exemplos").rglob("*.delegua"))
+    files = sorted(args.examples_dir.rglob("*.delegua"))
     failures = []
     checks = 0
     with tempfile.TemporaryDirectory(prefix="cgd exemplos ") as tmp:
@@ -61,9 +63,18 @@ def main():
                     )
                     stage = "compilacao"
                     result = compiled
-                    if compiled.returncode == 0:
+                    if compiled.returncode == 0 and options.get("fase") != "compilacao":
                         stage = "execucao"
-                        result = run([str(output)], input=escapes(options.get("entrada", "")))
+                        if options.get("diretorio", "raiz") not in {"raiz", "fonte"}:
+                            raise ValueError("diretorio deve ser raiz ou fonte")
+                        runtime_directory = (
+                            file.parent.resolve() if options.get("diretorio") == "fonte" else ROOT
+                        )
+                        result = run(
+                            [str(output)],
+                            cwd=runtime_directory,
+                            input=escapes(options.get("entrada", "")),
+                        )
                     details = result.stdout + result.stderr
                     valid = result.returncode == expected_status
                     if expected_output is not None:
@@ -76,6 +87,16 @@ def main():
                         valid = valid and stage == options["fase"]
                     if options.get("erro"):
                         valid = valid and options["erro"] in details
+                    if options.get("saida"):
+                        valid = (
+                            valid
+                            and stage == "execucao"
+                            and re.search(options["saida"], result.stdout, re.MULTILINE) is not None
+                        )
+                    if options.get("ausente"):
+                        valid = (
+                            valid and re.search(options["ausente"], details, re.MULTILINE) is None
+                        )
                     if not valid:
                         failures.append(
                             f"{file.relative_to(ROOT)} opt={opt}: fase={stage}, status={result.returncode}, saída={details!r}"

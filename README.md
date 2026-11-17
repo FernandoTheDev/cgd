@@ -18,19 +18,19 @@ interpretador original nem oferece todos os seus ambientes e extensões.
 ## Instalar as dependências
 
 Ambiente validado: **Linux x86_64**. São necessários DMD ou LDC2, DUB, Clang ou
-GCC, pkg-config e Boehm GC com headers. Python 3 é usado nos testes e ferramentas;
-não é necessário para executar o programa gerado.
+GCC, pkg-config, Boehm GC e libcurl >= 7.86 com headers. Python 3 é usado no build
+do runtime, nos testes e ferramentas; não é necessário para executar o programa gerado.
 
 ```sh
 # Debian / Ubuntu
 sudo apt-get update
-sudo apt-get install git build-essential clang pkg-config libgc-dev ldc dub python3
+sudo apt-get install git build-essential clang pkg-config libgc-dev libcurl4-openssl-dev ldc dub python3
 
 # Fedora
-sudo dnf install git gcc clang pkgconf-pkg-config gc-devel ldc dub python3
+sudo dnf install git gcc clang pkgconf-pkg-config gc-devel libcurl-devel ldc dub python3
 
 # Arch Linux
-sudo pacman -S --needed git gcc clang pkgconf gc ldc dub python
+sudo pacman -S --needed git gcc clang pkgconf gc curl ldc dub python
 ```
 
 Alternativas: [DMD](https://dlang.org/download.html),
@@ -103,6 +103,10 @@ dub test --compiler=ldc2 --config=unittest
 python3 testes/driver.py
 python3 testes/integracao.py
 python3 testes/exemplos.py
+python3 testes/lsp.py
+python3 testes/bibliotecas.py
+python3 testes/formatador.py
+python3 scripts/verificar_tipos.py
 python3 scripts/validar.py         # matriz DMD/LDC2 × debug/release × Clang/GCC
 python3 scripts/sanitizadores.py   # ASan/UBSan; restaura o runtime normal
 python3 scripts/formatar.py --check
@@ -122,9 +126,27 @@ antes de atualizar a referência no CGD. Evite versionar executáveis e C gerado
 Mantenha testes com e sem otimização e acrescente regressões para cada mudança
 observável. Rode `git diff --check` nos dois repositórios.
 
-Capturas/upvalues, FFI arbitrária e carregamento dinâmico são exclusões deliberadas.
+Capturas/upvalues e carregamento dinâmico continuam excluídos. A FFI C por classes
+estrangeiras foi introduzida por solicitação explícita; seus contratos e limites
+estão em [Evolução da linguagem](docs/evolucao-linguagem.md).
 Outros limites de implementação são descritos separadamente em
 [Compatibilidade](docs/compatibilidade.md) e [Segurança](docs/seguranca.md).
 
 Licença [Apache-2.0](LICENSE). Autoria e referências ao projeto Delégua devem ser
 preservadas. [Apoie o desenvolvimento](https://www.patreon.com/fernandothedev).
+
+## Editor e bibliotecas
+
+A [extensão VS Code própria](extensao-vscode/README.md) usa o LSP local do CGD,
+com tokens semânticos, navegação, completion contextual e formatação com quatro
+espaços (Ctrl+Shift+I). Compile o CGD uma vez e instale com
+`python3 scripts/instalar_extensao.py --associate`. Não há compilação por edição.
+
+Consulte [bibliotecas e ferramentas](docs/ferramentas.md) para JSON em Delégua puro,
+rede com libcurl gerenciada, coleções, instalação da extensão e limites reais.
+O [registro de continuidade](docs/CONTINUIDADE.md) distingue entregas e pendências.
+
+A [referência web própria](docs/linguagem.html) cobre instalação, linguagem, editor,
+runtime e biblioteca padrão. [Bibliotecas e ferramentas](docs/ferramentas.md)
+detalha APIs e limites. Compatibilidade JS, herança de interfaces e múltiplos
+dialetos são exclusões definitivas do projeto.

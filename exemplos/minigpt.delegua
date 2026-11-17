@@ -1,0 +1,724 @@
+//# 0
+//? fase: compilacao
+// Treinamento completo é uma carga experimental longa; o contrato automático
+// verifica geração e vínculo. Executar o binário realiza as 150 épocas originais.
+// CGD MINI GPT V4 - GERACAO DE TEXTO EM PORTUGUES
+// Transformer autoregressivo por PALAVRAS, com corpus embutido.
+// Derivado do motor V3 de autograd e atencao causal.
+// Sem dependencias externas.
+
+funcao absoluto(x: numero): numero {
+    se (x < 0) retorna - x
+    retorna x
+}
+
+funcao limitar(x: numero, minimo: numero, maximo: numero): numero {
+    se (x < minimo) retorna minimo
+    se (x > maximo) retorna maximo
+    retorna x
+}
+
+funcao raiz(x: numero): numero {
+    se (x <= 0) retorna 0
+    var y: numero = x
+    se (x < 1) y = 1
+    para (var i = 0; i < 25; i++) y =(y + x / y) / 2
+    retorna y
+}
+
+// Aproximacao estavel de exp(x) para x <= 0.
+// A softmax subtrai o maior logit, portanto recebe x <= 0.
+funcao exponencialNegativa(x: numero): numero {
+    se (x < - 30) retorna 0
+    const base = 1 + x / 1024
+    var resultado: numero = base
+    para (var i = 0; i < 10; i++) resultado *= resultado
+    retorna resultado
+}
+
+// Log natural: reducao de escala + serie de atanh.
+funcao logaritmoPositivo(x: numero): numero {
+    se (x <= 0) retorna - 1000
+    var valor: numero = x
+    var ajuste: numero = 0
+    enquanto (valor > 2) {
+        valor /= 2
+        ajuste++
+    }
+
+    enquanto (valor < 0.5) {
+        valor *= 2
+        ajuste--
+    }
+
+    const z =(valor - 1) /(valor + 1)
+    const z2 = z * z
+    var termo: numero = z
+    var soma: numero = 0
+    para (var i = 1; i <= 59; i += 2) {
+        soma += termo / i
+        termo *= z2
+    }
+
+    retorna 2 * soma + ajuste * 0.6931471805599453
+}
+
+funcao tanhAproximada(x: numero): numero {
+    se (x >= 3) retorna 1
+    se (x <= - 3) retorna - 1
+    const x2 = x * x
+    retorna x *(27 + x2) /(27 + 9 * x2)
+}
+
+funcao derivadaTanh(x: numero): numero {
+    se (x >= 3 ou x <= - 3) retorna 0
+    const x2 = x * x
+    retorna(729 - 162 * x2 + 9 * x2 * x2) /
+    ((27 + 9 * x2) *(27 + 9 * x2))
+}
+
+funcao proximoEstado(seed: numero): numero {
+    retorna(seed * 16807) % 2147483647
+}
+
+classe RNG {
+    estado: numero
+
+    construtor(seed: numero) {
+        isto.estado = seed
+    }
+
+    proximo(): numero {
+        isto.estado = proximoEstado(isto.estado)
+        retorna isto.estado / 2147483647
+    }
+
+    intervalo(a: numero, b: numero): numero {
+        retorna a +(b - a) * isto.proximo()
+    }
+}
+
+classe Valor {
+    dado: numero
+    gradiente: numero
+    anterior: qualquer[]
+    operacao: texto
+    estado: numero
+    cursor: numero
+    probabilidades: numero[]
+    alvo: numero
+
+    construtor(dado: numero, anterior: qualquer[] = [], operacao: texto = "") {
+        isto.dado = dado
+        isto.gradiente = 0
+        isto.anterior = anterior
+        isto.operacao = operacao
+        isto.estado = 0
+        isto.cursor = 0
+        isto.probabilidades = []
+        isto.alvo = 0
+    }
+
+    somar(b: Valor): Valor {
+        retorna Valor(isto.dado + b.dado, [isto, b], "+")
+    }
+
+    subtrair(b: Valor): Valor {
+        retorna Valor(isto.dado - b.dado, [isto, b], "-")
+    }
+
+    multiplicar(b: Valor): Valor {
+        retorna Valor(isto.dado * b.dado, [isto, b], "*")
+    }
+
+    ativar(): Valor {
+        retorna Valor(tanhAproximada(isto.dado), [isto], "tanh")
+    }
+
+    topologia(): qualquer[] {
+        var ordem: qualquer[] = []
+        var pilha: qualquer[] = []
+        isto.estado = 1
+        isto.cursor = 0
+        pilha.empilhar(isto)
+        enquanto (pilha.tamanho() > 0) {
+            const atual = pilha[pilha.tamanho() - 1]
+            se (atual.cursor < atual.anterior.tamanho()) {
+                const pai = atual.anterior[atual.cursor]
+                atual.cursor++
+                se (pai.estado == 0) {
+                    pai.estado = 1
+                    pai.cursor = 0
+                    pilha.empilhar(pai)
+                } senão {
+                    se (pai.estado == 1) {
+                        escreva("ERRO: ciclo detectado no grafo")
+                        retorna []
+                    }
+                }
+            } senão {
+                atual.estado = 2
+                ordem.empilhar(atual)
+                pilha.removerUltimo()
+            }
+        }
+        para (var i = 0; i < ordem.tamanho(); i++) {
+            ordem[i].estado = 0
+            ordem[i].cursor = 0
+        }
+        retorna ordem
+    }
+
+    backward() {
+        const ordem = isto.topologia()
+        se (ordem.tamanho() == 0) retorna
+        para (var i = 0; i < ordem.tamanho(); i++) {
+            ordem[i].gradiente = 0
+        }
+        isto.gradiente = 1
+        var indice: numero = ordem.tamanho() - 1
+        enquanto (indice >= 0) {
+            const nodo = ordem[indice]
+            const g = nodo.gradiente
+            se (nodo.operacao == "+") {
+                nodo.anterior[0].gradiente += g
+                nodo.anterior[1].gradiente += g
+            }
+            se (nodo.operacao == "-") {
+                nodo.anterior[0].gradiente += g
+                nodo.anterior[1].gradiente -= g
+            }
+            se (nodo.operacao == "*") {
+                const a = nodo.anterior[0]
+                const b = nodo.anterior[1]
+                a.gradiente += b.dado * g
+                b.gradiente += a.dado * g
+            }
+            se (nodo.operacao == "tanh") {
+                const a = nodo.anterior[0]
+                a.gradiente += derivadaTanh(a.dado) * g
+            }
+            se (nodo.operacao == "softmax") {
+                const indiceSaida = nodo.alvo
+                const probSaida = nodo.probabilidades[indiceSaida]
+                para (var j = 0; j < nodo.anterior.tamanho(); j++) {
+                    var derivada: numero = - probSaida * nodo.probabilidades[j]
+                    se (j == indiceSaida) {
+                        derivada += probSaida
+                    }
+                    nodo.anterior[j].gradiente += derivada * g
+                }
+            }
+            se (nodo.operacao == "cross_entropy") {
+                para (var j = 0; j < nodo.anterior.tamanho(); j++) {
+                    var delta: numero = nodo.probabilidades[j]
+                    se (j == nodo.alvo) delta -= 1
+                    nodo.anterior[j].gradiente += delta * g
+                }
+            }
+            indice--
+        }
+    }
+}
+
+// Retorna probabilidades numericas, sem criar grafo.
+funcao probabilidadesSoftmax(logits: qualquer[]): numero[] {
+    var maior: numero = logits[0].dado
+    para (var i = 1; i < logits.tamanho(); i++) {
+        se (logits[i].dado > maior) maior = logits[i].dado
+    }
+
+    var valores: numero[] = []
+    var soma: numero = 0
+    para (var i = 0; i < logits.tamanho(); i++) {
+        const expo = exponencialNegativa(logits[i].dado - maior)
+        valores.empilhar(expo)
+        soma += expo
+    }
+
+    var resultado: numero[] = []
+    para (var i = 0; i < valores.tamanho(); i++) {
+        resultado.empilhar(valores[i] / soma)
+    }
+
+    retorna resultado
+}
+
+// Operacao fundida: forward numerico e backward analitico.
+// A exponencial aproximada introduz erro numerico pequeno;
+// o gradiente corresponde a softmax-cross-entropy ideal.
+funcao crossEntropy(logits: qualquer[], alvo: numero): Valor {
+    const probs = probabilidadesSoftmax(logits)
+    const probAlvo = probs[alvo]
+    const perda = - logaritmoPositivo(probAlvo)
+    const resultado = Valor(perda, logits, "cross_entropy")
+    resultado.probabilidades = probs
+    resultado.alvo = alvo
+    retorna resultado
+}
+
+funcao somarVetores(a: qualquer[], b: qualquer[]): qualquer[] {
+    var resultado: qualquer[] = []
+    para (var i = 0; i < a.tamanho(); i++) {
+        resultado.empilhar(a[i].somar(b[i]))
+    }
+
+    retorna resultado
+}
+
+funcao produtoEscalar(a: qualquer[], b: qualquer[]): Valor {
+    var soma: Valor = Valor(0)
+    para (var i = 0; i < a.tamanho(); i++) {
+        soma = soma.somar(a[i].multiplicar(b[i]))
+    }
+
+    retorna soma
+}
+
+classe Linear {
+    pesos: qualquer[]
+    bias: qualquer[]
+    entradas: numero
+    saidas: numero
+
+    construtor(entradas: numero, saidas: numero, rng: RNG) {
+        isto.entradas = entradas
+        isto.saidas = saidas
+        isto.pesos = []
+        isto.bias = []
+        const escala = 1 / raiz(entradas)
+        para (var i = 0; i < saidas; i++) {
+            var linha: qualquer[] = []
+            para (var j = 0; j < entradas; j++) {
+                linha.empilhar(Valor(rng.intervalo(- escala, escala)))
+            }
+            isto.pesos.empilhar(linha)
+            isto.bias.empilhar(Valor(0))
+        }
+    }
+
+    frente(entrada: qualquer[]): qualquer[] {
+        var saida: qualquer[] = []
+        para (var i = 0; i < isto.saidas; i++) {
+            var soma: Valor = isto.bias[i]
+            para (var j = 0; j < isto.entradas; j++) {
+                soma = soma.somar(isto.pesos[i][j].multiplicar(entrada[j]))
+            }
+            saida.empilhar(soma)
+        }
+        retorna saida
+    }
+
+    parametros(): qualquer[] {
+        var resultado: qualquer[] = []
+        para (var i = 0; i < isto.saidas; i++) {
+            para (var j = 0; j < isto.entradas; j++) {
+                resultado.empilhar(isto.pesos[i][j])
+            }
+            resultado.empilhar(isto.bias[i])
+        }
+        retorna resultado
+    }
+}
+
+classe Embedding {
+    tabela: qualquer[]
+
+    construtor(vocabulario: numero, dimensao: numero, rng: RNG) {
+        isto.tabela = []
+        para (var i = 0; i < vocabulario; i++) {
+            var linha: qualquer[] = []
+            para (var j = 0; j < dimensao; j++) {
+                linha.empilhar(Valor(rng.intervalo(- 0.2, 0.2)))
+            }
+            isto.tabela.empilhar(linha)
+        }
+    }
+
+    obter(indice: numero): qualquer[] {
+        retorna isto.tabela[indice]
+    }
+
+    parametros(): qualquer[] {
+        var resultado: qualquer[] = []
+        para (var i = 0; i < isto.tabela.tamanho(); i++) {
+            para (var j = 0; j < isto.tabela[i].tamanho(); j++) {
+                resultado.empilhar(isto.tabela[i][j])
+            }
+        }
+        retorna resultado
+    }
+}
+
+classe Atencao {
+    query: Linear
+    key: Linear
+    value: Linear
+    projecao: Linear
+    dimensao: numero
+
+    construtor(dimensao: numero, rng: RNG) {
+        isto.dimensao = dimensao
+        isto.query = Linear(dimensao, dimensao, rng)
+        isto.key = Linear(dimensao, dimensao, rng)
+        isto.value = Linear(dimensao, dimensao, rng)
+        isto.projecao = Linear(dimensao, dimensao, rng)
+    }
+
+    frente(tokens: qualquer[]): qualquer[] {
+        var queries: qualquer[] = []
+        var keys: qualquer[] = []
+        var values: qualquer[] = []
+        para (var i = 0; i < tokens.tamanho(); i++) {
+            queries.empilhar(isto.query.frente(tokens[i]))
+            keys.empilhar(isto.key.frente(tokens[i]))
+            values.empilhar(isto.value.frente(tokens[i]))
+        }
+        var resultado: qualquer[] = []
+        const escala = 1 / raiz(isto.dimensao)
+        para (var i = 0; i < tokens.tamanho(); i++) {
+            var scores: qualquer[] = []
+            para (var j = 0; j <= i; j++) {
+                scores.empilhar(produtoEscalar(queries[i], keys[j]).multiplicar(Valor(escala)))
+            }
+            // Atencao causal com softmax diferenciavel:
+            // exp implementado como operacao do grafo via sigmoid-style
+            // normalizacao; ver funcao softmaxDiferenciavel.
+            const pesos = softmaxDiferenciavel(scores)
+            var contexto: qualquer[] = []
+            para (var d = 0; d < isto.dimensao; d++) {
+                var soma: Valor = Valor(0)
+                para (var j = 0; j <= i; j++) {
+                    soma = soma.somar(pesos[j].multiplicar(values[j][d]))
+                }
+                contexto.empilhar(soma)
+            }
+            resultado.empilhar(isto.projecao.frente(contexto))
+        }
+        retorna resultado
+    }
+
+    parametros(): qualquer[] {
+        var resultado: qualquer[] = []
+        const partes = [isto.query.parametros(), isto.key.parametros(), isto.value.parametros(),
+            isto.projecao.parametros()]
+        para (var i = 0; i < partes.tamanho(); i++) {
+            para (var j = 0; j < partes[i].tamanho(); j++) {
+                resultado.empilhar(partes[i][j])
+            }
+        }
+        retorna resultado
+    }
+}
+
+// Softmax diferenciavel como operacao vetorial fundida.
+// Cada saida tem seus logits como pais; a Jacobiana exata
+// e aplicada durante o backward.
+funcao softmaxDiferenciavel(logits: qualquer[]): qualquer[] {
+    const probs = probabilidadesSoftmax(logits)
+    var resultado: qualquer[] = []
+    para (var i = 0; i < probs.tamanho(); i++) {
+        const saida = Valor(probs[i], logits, "softmax")
+        saida.probabilidades = probs
+        saida.alvo = i
+        resultado.empilhar(saida)
+    }
+
+    retorna resultado
+}
+
+classe BlocoTransformer {
+    atencao: Atencao
+    fc1: Linear
+    fc2: Linear
+
+    construtor(dimensao: numero, rng: RNG) {
+        isto.atencao = Atencao(dimensao, rng)
+        isto.fc1 = Linear(dimensao, dimensao * 2, rng)
+        isto.fc2 = Linear(dimensao * 2, dimensao, rng)
+    }
+
+    frente(tokens: qualquer[]): qualquer[] {
+        const atendidos = isto.atencao.frente(tokens)
+        var resultado: qualquer[] = []
+        para (var i = 0; i < tokens.tamanho(); i++) {
+            const residual = somarVetores(tokens[i], atendidos[i])
+            const intermediario = isto.fc1.frente(residual)
+            var ativados: qualquer[] = []
+            para (var j = 0; j < intermediario.tamanho(); j++) {
+                ativados.empilhar(intermediario[j].ativar())
+            }
+            const ff = isto.fc2.frente(ativados)
+            resultado.empilhar(somarVetores(residual, ff))
+        }
+        retorna resultado
+    }
+
+    parametros(): qualquer[] {
+        var resultado: qualquer[] = []
+        const partes = [isto.atencao.parametros(), isto.fc1.parametros(), isto.fc2.parametros()]
+        para (var i = 0; i < partes.tamanho(); i++) {
+            para (var j = 0; j < partes[i].tamanho(); j++) {
+                resultado.empilhar(partes[i][j])
+            }
+        }
+        retorna resultado
+    }
+}
+
+classe MiniGPT {
+    tokenEmbedding: Embedding
+    posEmbedding: Embedding
+    bloco: BlocoTransformer
+    cabeca: Linear
+    contexto: numero
+    vocabulario: numero
+    dimensao: numero
+
+    construtor(vocabulario: numero, contexto: numero, dimensao: numero, seed: numero) {
+        isto.vocabulario = vocabulario
+        isto.contexto = contexto
+        isto.dimensao = dimensao
+        const rng = RNG(seed)
+        isto.tokenEmbedding = Embedding(vocabulario, dimensao, rng)
+        isto.posEmbedding = Embedding(contexto, dimensao, rng)
+        isto.bloco = BlocoTransformer(dimensao, rng)
+        isto.cabeca = Linear(dimensao, vocabulario, rng)
+    }
+
+    frente(tokens: numero[]): qualquer[] {
+        var vetores: qualquer[] = []
+        para (var i = 0; i < tokens.tamanho(); i++) {
+            const token = isto.tokenEmbedding.obter(tokens[i])
+            const posicao = isto.posEmbedding.obter(i)
+            vetores.empilhar(somarVetores(token, posicao))
+        }
+        const transformados = isto.bloco.frente(vetores)
+        retorna isto.cabeca.frente(transformados[transformados.tamanho() - 1])
+    }
+
+    parametros(): qualquer[] {
+        var resultado: qualquer[] = []
+        const partes = [isto.tokenEmbedding.parametros(), isto.posEmbedding.parametros(),
+            isto.bloco.parametros(), isto.cabeca.parametros()]
+        para (var i = 0; i < partes.tamanho(); i++) {
+            para (var j = 0; j < partes[i].tamanho(); j++) {
+                resultado.empilhar(partes[i][j])
+            }
+        }
+        retorna resultado
+    }
+}
+
+classe Adam {
+    parametros: qualquer[]
+    m: numero[]
+    v: numero[]
+    taxa: numero
+    b1: numero
+    b2: numero
+    p1: numero
+    p2: numero
+
+    construtor(parametros: qualquer[], taxa: numero) {
+        isto.parametros = parametros
+        isto.taxa = taxa
+        isto.b1 = 0.9
+        isto.b2 = 0.999
+        isto.p1 = 1
+        isto.p2 = 1
+        isto.m = []
+        isto.v = []
+        para (var i = 0; i < parametros.tamanho(); i++) {
+            isto.m.empilhar(0)
+            isto.v.empilhar(0)
+        }
+    }
+
+    atualizar() {
+        isto.p1 *= isto.b1
+        isto.p2 *= isto.b2
+        para (var i = 0; i < isto.parametros.tamanho(); i++) {
+            const parametro = isto.parametros[i]
+            const g = limitar(parametro.gradiente, - 1, 1)
+            isto.m[i] = isto.b1 * isto.m[i] +(1 - isto.b1) * g
+            isto.v[i] = isto.b2 * isto.v[i] +(1 - isto.b2) * g * g
+            const mh = isto.m[i] /(1 - isto.p1)
+            const vh = isto.v[i] /(1 - isto.p2)
+            parametro.dado -= isto.taxa * mh /(raiz(vh) + 0.00000001)
+        }
+    }
+}
+
+// ==========================================
+// V4: VOCABULARIO DE PALAVRAS
+// Cada palavra e um token; o ponto final tambem e token.
+// Token 0 = inicio/preenchimento, 1 = fim de frase.
+// ==========================================
+
+classe Corpus {
+    palavras: texto[]
+    frases: qualquer[]
+    entradas: qualquer[]
+    alvos: numero[]
+
+    construtor() {
+        isto.palavras = ["<inicio>", ".", "o", "gato", "cachorro", "dorme", "corre", "come",
+            "na", "casa", "rua", "peixe", "carne", "a", "menina", "menino", "gosta", "do", "brinca",
+            "jardim"]
+        isto.frases = []
+        isto.entradas = []
+        isto.alvos = []
+    }
+
+    adicionar(frase: numero[]) {
+        isto.frases.empilhar(frase)
+        // Contexto fixo de quatro tokens.
+        // Aprende a prever cada token de cada frase.
+        var janela: numero[] = [0, 0, 0, 0]
+        para (var i = 0; i < frase.tamanho(); i++) {
+            isto.entradas.empilhar([janela[0], janela[1], janela[2], janela[3]])
+            isto.alvos.empilhar(frase[i])
+            janela.removerPrimeiro()
+            janela.empilhar(frase[i])
+        }
+    }
+
+    gerar() {
+        // Frases de treinamento. A rede aprende sequencias de palavras.
+        isto.adicionar([2, 3, 5, 8, 9, 1])
+        isto.adicionar([2, 4, 6, 8, 10, 1])
+        isto.adicionar([2, 3, 7, 11, 1])
+        isto.adicionar([2, 4, 7, 12, 1])
+        isto.adicionar([13, 14, 16, 17, 3, 1])
+        isto.adicionar([2, 15, 16, 17, 4, 1])
+        isto.adicionar([2, 3, 18, 8, 19, 1])
+        isto.adicionar([2, 4, 18, 8, 19, 1])
+    }
+
+    palavra(indice: numero): texto {
+        retorna isto.palavras[indice]
+    }
+}
+
+funcao argmax(probs: numero[]): numero {
+    var melhor: numero = 0
+    para (var i = 1; i < probs.tamanho(); i++) {
+        se (probs[i] > probs[melhor]) melhor = i
+    }
+
+    retorna melhor
+}
+
+funcao preverProximo(modelo: MiniGPT, janela: numero[]): numero {
+    const logits = modelo.frente(janela)
+    retorna argmax(probabilidadesSoftmax(logits))
+}
+
+// Amostragem com temperatura.
+// A amostragem usa RNG deterministico para reproduzir resultados.
+funcao amostrar(modelo: MiniGPT, janela: numero[], temperatura: numero, rng: RNG): numero {
+    const logits = modelo.frente(janela)
+    var maior: numero = logits[0].dado
+    para (var i = 1; i < logits.tamanho(); i++) {
+        se (logits[i].dado > maior) maior = logits[i].dado
+    }
+
+    var pesos: numero[] = []
+    var total: numero = 0
+    para (var i = 0; i < logits.tamanho(); i++) {
+        const peso = exponencialNegativa((logits[i].dado - maior) / temperatura)
+        pesos.empilhar(peso)
+        total += peso
+    }
+
+    const sorteio = rng.proximo() * total
+    var acumulado: numero = 0
+    para (var i = 0; i < pesos.tamanho(); i++) {
+        acumulado += pesos[i]
+        se (sorteio <= acumulado) retorna i
+    }
+
+    retorna pesos.tamanho() - 1
+}
+
+funcao avaliarTexto(modelo: MiniGPT, corpus: Corpus) {
+    var perdaTotal: numero = 0
+    var acertos: numero = 0
+    const quantidade = corpus.entradas.tamanho()
+    para (var i = 0; i < quantidade; i++) {
+        const logits = modelo.frente(corpus.entradas[i])
+        perdaTotal += crossEntropy(logits, corpus.alvos[i]).dado
+        se (argmax(probabilidadesSoftmax(logits)) == corpus.alvos[i]) acertos++
+    }
+
+    escreva("Loss=${perdaTotal / quantidade} | acertos=${acertos}/${quantidade} | acuracia=${100 * acertos / quantidade}%")
+}
+
+funcao gerarTexto(modelo: MiniGPT, corpus: Corpus, prompt: numero[], quantidade: numero,
+    temperatura: numero, seed: numero) {
+    var janela: numero[] = [0, 0, 0, 0]
+    var saida: texto = ""
+    para (var i = 0; i < prompt.tamanho(); i++) {
+        const token = prompt[i]
+        janela.removerPrimeiro()
+        janela.empilhar(token)
+        se (token != 0) saida += corpus.palavra(token) + " "
+    }
+
+    const rng = RNG(seed)
+    para (var passo = 0; passo < quantidade; passo++) {
+        const token = amostrar(modelo, janela, temperatura, rng)
+        se (token == 0) sustar
+        se (token == 1) {
+            saida += "."
+            sustar
+        }
+        saida += corpus.palavra(token) + " "
+        janela.removerPrimeiro()
+        janela.empilhar(token)
+    }
+
+    escreva(saida)
+}
+
+funcao treinar() {
+    escreva("CGD MINI GPT V4 - TEXTO EM PORTUGUES")
+    const corpus = Corpus()
+    corpus.gerar()
+    const modelo = MiniGPT(corpus.palavras.tamanho(), 4, 8, 12345)
+    const parametros = modelo.parametros()
+    const adam = Adam(parametros, 0.003)
+    escreva("Vocabulario: ${corpus.palavras.tamanho()} palavras")
+    escreva("Parametros: ${parametros.tamanho()}")
+    escreva("Exemplos: ${corpus.entradas.tamanho()}")
+    escreva("=== TREINAMENTO ===")
+    const quantidade = corpus.entradas.tamanho()
+    para (var epoca = 0; epoca < 150; epoca++) {
+        para (var i = 0; i < quantidade; i++) {
+            const posicao =(i + epoca * 13) % quantidade
+            const logits = modelo.frente(corpus.entradas[posicao])
+            const perda = crossEntropy(logits, corpus.alvos[posicao])
+            perda.backward()
+            adam.atualizar()
+        }
+        se (epoca % 10 == 0) {
+            escreva("Epoca ${epoca}")
+            avaliarTexto(modelo, corpus)
+        }
+    }
+
+    escreva("=== GERACAO (TEMPERATURA 0.7) ===")
+    escreva("Prompt: o gato")
+    gerarTexto(modelo, corpus, [2, 3], 12, 0.7, 2026)
+    escreva("Prompt: o cachorro")
+    gerarTexto(modelo, corpus, [2, 4], 12, 0.7, 2027)
+    escreva("Prompt: a menina")
+    gerarTexto(modelo, corpus, [13, 14], 12, 0.7, 2028)
+    escreva("Prompt: o menino")
+    gerarTexto(modelo, corpus, [2, 15], 12, 0.7, 2029)
+    escreva("=== GERACAO LIVRE ===")
+    gerarTexto(modelo, corpus, [], 12, 0.9, 2030)
+}
+
+treinar()

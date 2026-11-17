@@ -29,6 +29,15 @@ enum TokenKind : ubyte
     Finally,
     Fail,
     Class,
+    Constructor,
+    Destructor,
+    Static,
+    Abstract,
+    Interface,
+    Enum,
+    Foreign,
+    Implements,
+    Arrow,
     Extends,
     This,
     Super,
@@ -102,6 +111,7 @@ enum TokenKind : ubyte
 
     // eof
     Eof,
+    Comment,
 }
 
 union TokenRaw

@@ -19,7 +19,7 @@ struct Timer
     {
         if (!showTime)
             return;
-        auto us = (MonoTime.currTime - time).total!"usecs";
+        long us = (MonoTime.currTime - time).total!"usecs";
         writeln("[", label, "] ", us, " us");
     }
 }

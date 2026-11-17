@@ -1,8 +1,8 @@
 //# 1
 
 funcao principal() {
-    var x = 10
-    var x = 67
+    var x: inteiro = 10
+    var x: inteiro = 67
 
     escreva(x)
 }

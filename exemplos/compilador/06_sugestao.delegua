@@ -1,5 +1,5 @@
 //# 1
 //? fase: compilacao
 //? erro: H3001
-var mensagem = "Olá"
+var mensagem: texto = "Olá"
 escreva(mensage)

@@ -1,0 +1,6 @@
+//! a%20b%2Fc\na b/c\nverdadeiro
+// Não faz requisições externas: introspecção e codificação são locais.
+var rede: qualquer = importar("../../bibliotecas/rede.delegua")
+escreva(rede.escapar("a b/c"))
+escreva(rede.decodificar("a%20b%2Fc"))
+escreva(tamanho(rede.opcoes()) > 100)

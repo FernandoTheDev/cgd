@@ -1,8 +1,14 @@
 //# 1
-//? fase: execucao
-//? erro: privado
+//? fase: compilacao
+//? erro: E3014
 classe Segredo {
-    privado { valor: numero }
-    construtor() { isto.valor = 42 }
+    privado {
+        valor: numero
+    }
+
+    construtor() {
+        isto.valor = 42
+    }
 }
+
 escreva(Segredo().valor)

@@ -1,0 +1,4 @@
+//! 1\n3
+var biblioteca: qualquer = importar("cgd:matematica")
+escreva(biblioteca.Matematica.cosseno(0))
+escreva(biblioteca.Matematica.raizQuadrada(9))

@@ -1,0 +1,22 @@
+//! 7\n4\n[2, 3]
+funcao estado(): inteiro {
+    enum Estado {
+        Inicio, Final = 7
+    }
+
+    var atual: Estado = Estado.Final
+    retorna atual
+}
+
+classe Maquina {
+    enum Estado {
+        Inicio, Final = 4
+    }
+
+    atual: Estado = isto.Estado.Final
+}
+
+var vetor: funcao =(x: inteiro) => [x, x + 1]
+escreva(estado())
+escreva(Maquina.Estado.Final)
+escreva(vetor(2))

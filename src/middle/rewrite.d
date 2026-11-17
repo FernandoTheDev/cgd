@@ -13,139 +13,139 @@ class AstRewriter
         if (node is null || node in visited)
             return node;
         visited[node] = true;
-        foreach (ref decorator; node.decorators)
+        foreach (ref Decorator decorator; node.decorators)
             rewriteBody(decorator.values);
-        if (auto n = cast(Program) node)
+        if (Program n = cast(Program) node)
             rewriteBody(n.body);
-        else if (auto n = cast(ModuleUnit) node)
+        else if (ModuleUnit n = cast(ModuleUnit) node)
             n.program = cast(Program) rewrite(n.program);
-        else if (auto n = cast(ImportExpr) node)
+        else if (ImportExpr n = cast(ImportExpr) node)
         {
             n.path = rewrite(n.path);
             rewrite(n.target);
         }
-        else if (auto n = cast(ClassDecl) node)
+        else if (ClassDecl n = cast(ClassDecl) node)
         {
-            foreach (method; n.methods)
+            foreach (FnDecl method; n.methods)
                 rewrite(method);
-            foreach (ref field; n.fields)
-                foreach (ref decorator; field.decorators)
+            foreach (ref ClassField field; n.fields)
+                foreach (ref Decorator decorator; field.decorators)
                     rewriteBody(decorator.values);
         }
-        else if (auto n = cast(FnDecl) node)
+        else if (FnDecl n = cast(FnDecl) node)
         {
-            foreach (arg; n.args)
+            foreach (FnArg arg; n.args)
                 arg.value = rewrite(arg.value);
             rewriteBody(n.body);
         }
-        else if (auto n = cast(FunctionExpr) node)
+        else if (FunctionExpr n = cast(FunctionExpr) node)
             rewrite(n.declaration);
-        else if (auto n = cast(VarDecl) node)
+        else if (VarDecl n = cast(VarDecl) node)
             n.value = rewrite(n.value);
-        else if (auto n = cast(BinaryExpr) node)
+        else if (BinaryExpr n = cast(BinaryExpr) node)
         {
             n.left = rewrite(n.left);
             n.right = rewrite(n.right);
         }
-        else if (auto n = cast(UnaryExpr) node)
+        else if (UnaryExpr n = cast(UnaryExpr) node)
             n.value = rewrite(n.value);
-        else if (auto n = cast(CallExpr) node)
+        else if (CallExpr n = cast(CallExpr) node)
         {
             n.fn = rewrite(n.fn);
             rewriteBody(n.args);
         }
-        else if (auto n = cast(ReturnStmt) node)
+        else if (ReturnStmt n = cast(ReturnStmt) node)
             n.val = rewrite(n.val);
-        else if (auto n = cast(IfStmt) node)
+        else if (IfStmt n = cast(IfStmt) node)
         {
             n.expr = rewrite(n.expr);
             rewriteBody(n.body);
             n._else = cast(IfStmt) rewrite(n._else);
         }
-        else if (auto n = cast(BlockStmt) node)
+        else if (BlockStmt n = cast(BlockStmt) node)
             rewriteBody(n.body);
-        else if (auto n = cast(SequenceStmt) node)
+        else if (SequenceStmt n = cast(SequenceStmt) node)
             rewriteBody(n.body);
-        else if (auto n = cast(WhileStmt) node)
+        else if (WhileStmt n = cast(WhileStmt) node)
         {
             n.expr = rewrite(n.expr);
             rewriteBody(n.body);
         }
-        else if (auto n = cast(ForStmt) node)
+        else if (ForStmt n = cast(ForStmt) node)
         {
             n.init = rewrite(n.init);
             n.condition = rewrite(n.condition);
             n.step = rewrite(n.step);
             rewriteBody(n.body);
         }
-        else if (auto n = cast(DoStmt) node)
+        else if (DoStmt n = cast(DoStmt) node)
         {
             n.condition = rewrite(n.condition);
             rewriteBody(n.body);
         }
-        else if (auto n = cast(EachStmt) node)
+        else if (EachStmt n = cast(EachStmt) node)
         {
             n.iterable = rewrite(n.iterable);
             rewriteBody(n.body);
         }
-        else if (auto n = cast(ArrayLit) node)
+        else if (ArrayLit n = cast(ArrayLit) node)
             rewriteBody(n.elements);
-        else if (auto n = cast(MapLit) node)
+        else if (MapLit n = cast(MapLit) node)
         {
             rewriteBody(n.keys);
             rewriteBody(n.values);
         }
-        else if (auto n = cast(IndexExpr) node)
+        else if (IndexExpr n = cast(IndexExpr) node)
         {
             n.value = rewrite(n.value);
             n.idx = rewrite(n.idx);
         }
-        else if (auto n = cast(MemberExpr) node)
+        else if (MemberExpr n = cast(MemberExpr) node)
             n.left = rewrite(n.left); // right é nome, não expressão.
-        else if (auto n = cast(AssignStmt) node)
+        else if (AssignStmt n = cast(AssignStmt) node)
         {
             rewriteLvalue(n.left);
             n.value = rewrite(n.value);
         }
-        else if (auto n = cast(TypeOfExpr) node)
+        else if (TypeOfExpr n = cast(TypeOfExpr) node)
             n.value = rewrite(n.value);
-        else if (auto n = cast(ThrowStmt) node)
+        else if (ThrowStmt n = cast(ThrowStmt) node)
             n.value = rewrite(n.value);
-        else if (auto n = cast(TryStmt) node)
+        else if (TryStmt n = cast(TryStmt) node)
         {
             rewriteBody(n.body);
             rewriteBody(n.finalBody);
-            foreach (ref c; n.catches)
+            foreach (ref CatchClause c; n.catches)
                 rewriteBody(c.body);
         }
-        else if (auto n = cast(ConditionalExpr) node)
+        else if (ConditionalExpr n = cast(ConditionalExpr) node)
         {
             n.condition = rewrite(n.condition);
             n.yes = rewrite(n.yes);
             n.no = rewrite(n.no);
         }
-        else if (auto n = cast(SliceExpr) node)
+        else if (SliceExpr n = cast(SliceExpr) node)
         {
             n.value = rewrite(n.value);
             n.start = rewrite(n.start);
             n.end = rewrite(n.end);
             n.step = rewrite(n.step);
         }
-        else if (auto n = cast(SpreadExpr) node)
+        else if (SpreadExpr n = cast(SpreadExpr) node)
             n.value = rewrite(n.value);
-        else if (auto n = cast(Comprehension) node)
+        else if (Comprehension n = cast(Comprehension) node)
         {
             n.value = rewrite(n.value);
             n.iterable = rewrite(n.iterable);
             n.condition = rewrite(n.condition);
         }
-        else if (auto n = cast(LoopExpr) node)
+        else if (LoopExpr n = cast(LoopExpr) node)
             n.loop = rewrite(n.loop);
-        else if (auto n = cast(SwitchStmt) node)
+        else if (SwitchStmt n = cast(SwitchStmt) node)
         {
             n.value = rewrite(n.value);
             rewriteBody(n.fallback);
-            foreach (ref c; n.cases)
+            foreach (ref SwitchCase c; n.cases)
             {
                 rewriteBody(c.values);
                 rewriteBody(c.body);
@@ -156,18 +156,18 @@ class AstRewriter
 
     private void rewriteLvalue(Node node)
     {
-        if (auto n = cast(IndexExpr) node)
+        if (IndexExpr n = cast(IndexExpr) node)
         {
             n.value = rewrite(n.value);
             n.idx = rewrite(n.idx);
         }
-        else if (auto n = cast(MemberExpr) node)
+        else if (MemberExpr n = cast(MemberExpr) node)
             n.left = rewrite(n.left);
     }
 
     final void rewriteBody(ref Node[] body)
     {
-        foreach (ref child; body)
+        foreach (ref Node child; body)
             child = rewrite(child);
     }
 

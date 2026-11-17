@@ -53,12 +53,14 @@ public:
         if (p.match(TokenKind.Each))
         {
             dstring[] names;
+            TypeExpr[] memberTypes;
             Token name;
             if (p.match(TokenKind.LBrace))
             {
                 do
                 {
                     names ~= p.consume(TokenKind.Identifier, "Esperado nome após para cada.").value.s;
+                    memberTypes ~= p.match(TokenKind.Colon) ? p.parseType.parse() : null;
                 }
                 while (p.match(TokenKind.Comma));
                 p.consume(TokenKind.RBrace, "Esperado '}' após nomes.");
@@ -68,11 +70,14 @@ public:
             }
             else
                 name = p.consume(TokenKind.Identifier, "Esperado nome após para cada.");
+            TypeExpr bindingType = p.match(TokenKind.Colon) ? p.parseType.parse() : null;
             if (!p.match(TokenKind.Of))
                 p.consume(TokenKind.In, "Esperado 'de' ou 'em' após variável de iteração.");
-            auto iterable = p.parseExpr.parse();
-            auto loop = new EachStmt(name.value.s, iterable, p.parseBody(true), pos);
+            Node iterable = p.parseExpr.parse();
+            EachStmt loop = new EachStmt(name.value.s, iterable, p.parseBody(true), pos);
+            loop.bindingType = bindingType;
             loop.destructured = names;
+            loop.destructuredTypes = memberTypes;
             return loop;
         }
         bool paren = p.match(TokenKind.LParen);
@@ -92,7 +97,7 @@ public:
 
     Node parseSwitch(Position pos)
     {
-        auto node = new SwitchStmt(p.parseExpr.parse(), pos);
+        SwitchStmt node = new SwitchStmt(p.parseExpr.parse(), pos);
         p.consume(TokenKind.LBrace, "Esperado '{' após escolha.");
         while (!p.isAtEnd() && !p.check(TokenKind.RBrace))
         {
@@ -125,7 +130,7 @@ public:
 
     Node parseTry(Position pos)
     {
-        auto body = p.parseBody();
+        Node[] body = p.parseBody();
         CatchClause[] catches;
         Node[] finalBody;
         while (p.match(TokenKind.Catch))
@@ -157,7 +162,7 @@ public:
             case TokenKind.Switch:
                 return parseSwitch(tk.pos);
             case TokenKind.Assert:
-                auto id = new Identifier("assercao", tk.pos);
+                Identifier id = new Identifier("assercao", tk.pos);
                 if (p.match(TokenKind.LParen))
                     return p.parseExpr.parseCallExpr(id);
                 return new CallExpr(id, [p.parseExpr.parse()], tk.pos);
@@ -172,7 +177,7 @@ public:
             case TokenKind.Continue:
                 return new LoopControl(false, tk.pos);
             case TokenKind.Do:
-                auto body = p.parseBody();
+                Node[] body = p.parseBody();
                 p.consume(TokenKind.While, "Esperado 'enquanto' após fazer.");
                 return new DoStmt(p.parseExpr.parse(), body, tk.pos);
             case TokenKind.If:

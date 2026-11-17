@@ -28,6 +28,8 @@ public:
         {
             case TypeExprKind.Named:
                 TypeExprNamed named = cast(TypeExprNamed) type;
+                if (registry.isEnum(named.name))
+                    named.name = "inteiro";
                 TypeSema* tsema = registry.get(named.name);
 
                 if (tsema is null)
@@ -37,7 +39,7 @@ public:
                     return new TypeSemaBuiltin(TypeSemaBase.Any);
                 }
 
-                if (auto c = cast(TypeSemaClass)*tsema)
+                if (TypeSemaClass c = cast(TypeSemaClass)*tsema)
                     named.classLinkName = c.declaration.signature.linkName;
                 return *tsema;
 

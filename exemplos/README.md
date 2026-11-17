@@ -2,8 +2,8 @@
 
 Cada arquivo possui um contrato de teste na primeira linha. Rode todos com
 `python3 testes/exemplos.py`: cada exemplo é compilado com e sem otimização,
-sem ignorar arquivos. O runner histórico `rdmd testes/unitario.d` também valida
-o catálogo, incluindo a entrada padrão dos exemplos interativos.
+sem ignorar arquivos. Esse runner reconhece os contratos atuais, incluindo a
+entrada padrão dos exemplos interativos e a fase de compilação.
 
 ```sh
 mkdir -p out
@@ -69,8 +69,11 @@ imutabilidade de tuplas e overflow. Não devem encerrar com sucesso.
 
 - `//! texto`: exige compilação bem-sucedida, status 0 e a saída indicada; `\n` representa nova linha.
 - `//# N`: exige o status N na compilação ou execução, para compatibilidade com o catálogo histórico.
-- `//? fase: compilacao` ou `execucao`: fixa a fase da falha nos exemplos novos.
+- `//? fase: compilacao` ou `execucao`: fixa a fase validada. Em `compilacao`, não executa o binário.
 - `//? erro: trecho`: exige que o diagnóstico contenha o trecho.
+- `//? saida: expressão`: valida uma expressão regular multilinha na saída.
+- `//? ausente: expressão`: rejeita uma expressão regular nos diagnósticos e saída.
+- `//? diretorio: fonte`: executa a partir da pasta do exemplo, para fixtures relativas.
 - `//? entrada: Ada\n`: fornece a entrada padrão, preservando testes reproduzíveis.
 - `//$`: marcador histórico de otimização; o runner Python testa os dois modos independentemente dele.
 
@@ -104,3 +107,27 @@ Os exemplos [divisão estática](compilador/12_divisao_estatica.delegua) e
 [índice Unicode](compilador/13_indice_unicode.delegua) falham antes de gerar C,
 com E3101 e E3103. [Falha tratada](compilador/14_falha_tratada.delegua) demonstra
 um aviso W3101 em região com pegue, preservando o tratamento em execução.
+
+Novos contratos de 16/11/2026 (ainda não executados por solicitação do usuário):
+
+- [Destrutores explícitos](linguagem/36_destrutores.delegua)
+- [Métodos de dicionário](linguagem/37_dicionario_obter.delegua)
+- [Navegação de JSON](bibliotecas/json_navegacao.delegua)
+- [Classe Arquivo](bibliotecas/arquivos.delegua)
+
+I/O real e ClienteHTTP/RespostaHTTP têm contratos isolados em `testes/expansao.py`,
+com arquivos temporários e servidor HTTP de loopback.
+
+`perceptron2` exige os 24 checks internos sem falhas; `perceptron3` exige 8/8
+acertos. `minigpt` preserva o treinamento de 150 épocas: a matriz valida apenas
+compilação/vínculo desse experimento longo, sem afirmar validação de seu treino.
+
+## Calculadora e MiniJS
+
+[Calculadora](calculadora.delegua) implementa lexer, parser, compilação para bytecode
+e VM de expressões, com saída exata 90/15/25.
+[MiniJS](minijs/jsvm.delegua) usa [programa.js](minijs/programa.js) como fixture:
+fibonacci, funções, vetores, objetos, laços e escopos têm saída exata verificada.
+É um programa didático em Delégua; não habilita integração JS ou compatibilidade
+ECMAScript no compilador. O contrato `diretorio: fonte` mantém o caminho relativo
+válido também ao testar cópias formatadas.

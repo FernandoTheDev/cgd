@@ -1,4 +1,4 @@
 //! [6, 12]\n[5, 4, 3, 2, 1][1, 3, 5]
-var valores = [1, 2, 3, 4, 5]
-escreva([x * 3 para cada x em valores se x % 2 == 0])
-escreva(valores[::-1], valores[::2])
+var valores: qualquer[] = [1, 2, 3, 4, 5]
+escreva([x * 3 para cada x: inteiro em valores se x % 2 == 0])
+escreva(valores[: : - 1], valores[: : 2])

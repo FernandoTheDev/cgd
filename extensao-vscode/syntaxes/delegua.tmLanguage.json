@@ -1,0 +1,83 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "CGD / Delégua",
+  "scopeName": "source.delegua.cgd",
+  "patterns": [
+    {
+      "name": "entity.name.function.decorator",
+      "match": "@\\s*[\\p{L}_][\\p{L}\\p{M}\\p{N}_]*"
+    },
+    {
+      "name": "comment.line.double-slash.delegua",
+      "begin": "//",
+      "end": "$"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "name": "keyword.control.delegua",
+      "match": "(?<![\\p{L}\\p{M}\\p{N}_])(?:estrangeira|finalmente|construtor|enumeracao|enumeração|implementa|verdadeiro|constante|destrutor|interface|protegido|variavel|variável|enquanto|assercao|asserção|importar|estatico|estático|abstrata|abstrato|continua|escolha|publico|público|privado|retorne|retorna|funcao|função|padrao|padrão|falhar|classe|sustar|contem|contém|const|senao|senão|tente|pegue|herda|super|fazer|falso|fixo|para|caso|enum|isto|cada|nulo|tipo|var|nao|não|se|ou|em|de|e)(?![\\p{L}\\p{M}\\p{N}_])"
+    },
+    {
+      "name": "constant.numeric.delegua",
+      "match": "\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b"
+    },
+    {
+      "name": "storage.type.delegua",
+      "match": "\\b(?:inteiro|numero|número|real|texto|qualquer|vazio|logico|lógico|booleano|tupla|dicionario|dicionário)\\b"
+    },
+    {
+      "name": "entity.name.function.delegua",
+      "match": "\\b[\\p{L}_][\\p{L}\\p{M}\\p{N}_]*(?=\\s*\\()"
+    }
+  ],
+  "repository": {
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.delegua",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.delegua",
+              "match": "\\\\."
+            },
+            {
+              "name": "meta.interpolation.delegua",
+              "begin": "\\$\\{",
+              "end": "\\}",
+              "patterns": [
+                {
+                  "include": "$self"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.delegua",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.delegua",
+              "match": "\\\\."
+            },
+            {
+              "name": "meta.interpolation.delegua",
+              "begin": "\\$\\{",
+              "end": "\\}",
+              "patterns": [
+                {
+                  "include": "$self"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

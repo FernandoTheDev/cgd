@@ -1,0 +1,83 @@
+// Operações não modificam o vetor recebido. Variância populacional por padrão.
+classe Estatistica {
+    estatico soma(valores: numero[]): numero {
+        var resultado: numero = 0
+        para cada valor: numero em valores {
+            resultado += valor
+        }
+        retorna resultado
+    }
+
+    estatico media(valores: numero[]): real {
+        se tamanho(valores) == 0 {
+            falhar "Média exige ao menos um valor"
+        }
+        retorna Estatistica.soma(valores) / tamanho(valores)
+    }
+
+    estatico minimo(valores: numero[]): numero {
+        se tamanho(valores) == 0 {
+            falhar "Mínimo exige ao menos um valor"
+        }
+        var resultado: numero = valores[0]
+        para cada valor: numero em valores {
+            se valor < resultado {
+                resultado = valor
+            }
+        }
+        retorna resultado
+    }
+
+    estatico maximo(valores: numero[]): numero {
+        se tamanho(valores) == 0 {
+            falhar "Máximo exige ao menos um valor"
+        }
+        var resultado: numero = valores[0]
+        para cada valor: numero em valores {
+            se valor > resultado {
+                resultado = valor
+            }
+        }
+        retorna resultado
+    }
+
+    estatico mediana(valores: numero[]): real {
+        se tamanho(valores) == 0 {
+            falhar "Mediana exige ao menos um valor"
+        }
+        var copia: numero[] = clonar(valores)
+        copia.ordenar()
+        var meio: inteiro = tamanho(copia) \ 2
+        se tamanho(copia) % 2 == 1 {
+            retorna copia[meio]
+        }
+        // Evita somar dois valores inteiros extremos antes da divisão.
+        retorna copia[meio - 1] / 2.0 + copia[meio] / 2.0
+    }
+
+    estatico variancia(valores: numero[], amostral: logico = falso): real {
+        var minimo: inteiro = amostral ? 2: 1
+        se tamanho(valores) < minimo {
+            falhar "Amostra insuficiente para variância"
+        }
+        var media: real = 0.0
+        var somaQuadrados: real = 0.0
+        var quantidade: inteiro = 0
+        para cada valor: numero em valores {
+            quantidade += 1
+            var diferenca: real = valor - media
+            media += diferenca / quantidade
+            somaQuadrados += diferenca *(valor - media)
+        }
+        retorna somaQuadrados /(quantidade -(amostral ? 1: 0))
+    }
+
+    estatico desvioPadrao(valores: numero[], amostral: logico = falso): real {
+        var matematica: qualquer = importar("cgd:matematica")
+        retorna matematica.Matematica.raizQuadrada(Estatistica.variancia(valores, amostral))
+    }
+
+    estatico resumo(valores: numero[]): dicionario {
+        retorna { quantidade: tamanho(valores), soma: Estatistica.soma(valores), minimo: Estatistica.minimo(valores), maximo: Estatistica.maximo(valores), media: Estatistica.media(valores), mediana: Estatistica.mediana(valores), variancia: Estatistica.variancia(valores) }
+    }
+}

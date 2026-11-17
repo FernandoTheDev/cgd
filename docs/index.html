@@ -84,8 +84,8 @@
           <span class="eyebrow">// 01 — preparar, compilar, usar</span>
           <h2 id="install-title">Do checkout ao primeiro programa.</h2>
           <p class="section-intro">
-            Você precisa de Git, DUB, DMD ou LDC2, um compilador C99, pkg-config e Boehm GC com
-            headers. Python 3 é usado pelas suítes de testes.
+            Você precisa de Git, DUB, DMD ou LDC2, um compilador C99, pkg-config, Boehm GC e libcurl
+            &gt;=7.86 com headers. Python 3 é usado no build do runtime e nos testes.
           </p>
           <div class="doc-grid">
             <article class="doc-card">
@@ -101,7 +101,7 @@
                 ><button type="button" class="copy-button" data-copy="deps-code">Copiar</button>
               </div>
               <pre><code id="deps-code">sudo apt-get update
-sudo apt-get install git build-essential clang pkg-config libgc-dev ldc dub python3</code></pre>
+sudo apt-get install git build-essential clang pkg-config libgc-dev libcurl4-openssl-dev ldc dub python3</code></pre>
               <p>
                 Para DMD, use os
                 <a href="https://dlang.org/download.html">downloads oficiais de D</a>. Os nomes dos
@@ -217,7 +217,7 @@ cgd ola.delegua -s ola
           </p>
           <p class="section-intro">
             O frontend não vira um interpretador embutido no programa. Ele valida a fonte e gera
-            C99; o compilador C produz o executável ligado ao runtime e ao GC.
+            C99; o compilador C produz o executável ligado ao runtime, ao GC e à libcurl.
           </p>
           <ol class="pipeline">
             <li>
@@ -234,7 +234,7 @@ cgd ola.delegua -s ola
             </li>
             <li>
               <b>04</b><strong>C99 e vínculo</strong
-              ><span>Clang, GCC ou TCC, com runtime e Boehm GC.</span>
+              ><span>Clang, GCC ou TCC, com runtime, Boehm GC e libcurl.</span>
             </li>
           </ol>
           <div class="doc-grid">

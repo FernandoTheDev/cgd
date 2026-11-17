@@ -2,9 +2,10 @@
 
 const dependencyCommands = {
   debian:
-    'sudo apt-get update\nsudo apt-get install git build-essential clang pkg-config libgc-dev ldc dub python3',
-  fedora: 'sudo dnf install git gcc clang pkgconf-pkg-config gc-devel ldc dub python3',
-  arch: 'sudo pacman -S --needed git gcc clang pkgconf gc ldc dub python',
+    'sudo apt-get update\nsudo apt-get install git build-essential clang pkg-config libgc-dev libcurl4-openssl-dev ldc dub python3',
+  fedora:
+    'sudo dnf install git gcc clang pkgconf-pkg-config gc-devel libcurl-devel ldc dub python3',
+  arch: 'sudo pacman -S --needed git gcc clang pkgconf gc curl ldc dub python',
 };
 const distro = document.querySelector('#distro');
 distro.addEventListener('change', () => {

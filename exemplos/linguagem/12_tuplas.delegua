@@ -1,6 +1,6 @@
 //! 1texto\n(2, outro)
 // Tuplas possuem acesso por índice e por propriedades ordinais.
-var tuplaLiteral = [(1, "texto")]
+var tuplaLiteral: tupla = [(1, "texto")]
 var tipada: (numero, texto) = tupla([2, "outro"])
 escreva(tuplaLiteral[0], tuplaLiteral.segundo)
 escreva(tipada)

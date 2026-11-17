@@ -2,7 +2,7 @@
 //# 0
 
 //>puro
-função ateZero(n, s) {
+função ateZero(n: qualquer, s: qualquer): qualquer {
     se n < 1 retorne s
     retorne ateZero(n - 1, s + "A")
 }

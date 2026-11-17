@@ -1,0 +1,144 @@
+// Operações determinísticas; callbacks nativos continuam sem capturas.
+classe Colecoes {
+    estatico unicos(valores: qualquer[]): qualquer[] {
+        var resultado: qualquer[] = []
+        para cada valor: qualquer em valores {
+            se !resultado.inclui(valor) {
+                resultado.adicionar(valor)
+            }
+        }
+        retorna resultado
+    }
+
+    // Intervalo semiaberto com passo positivo ou negativo e limite de alocação.
+    estatico intervalo(inicio: inteiro, fim: inteiro, passo: inteiro = 1): inteiro[] {
+        se passo == 0 {
+            falhar "Passo de intervalo não pode ser zero"
+        }
+        var resultado: inteiro[] = []
+        var atual: inteiro = inicio
+        enquanto (passo > 0 e atual < fim) ou(passo < 0 e atual > fim) {
+            se tamanho(resultado) >= 1000000 {
+                falhar "Intervalo excede um milhão de elementos"
+            }
+            resultado.adicionar(atual)
+            // Se o próximo valor sai de int64, já ultrapassou qualquer fim válido.
+            se passo > 0 {
+                se atual > 9223372036854775807 - passo {
+                    sustar
+                }
+            } senao se atual <(- 9223372036854775807 - 1) - passo {
+                sustar
+            }
+            atual += passo
+        }
+        retorna resultado
+    }
+
+    estatico reduzir(valores: qualquer[], operacao: funcao, inicial: qualquer): qualquer {
+        var acumulado: qualquer = inicial
+        para cada valor: qualquer em valores {
+            acumulado = operacao(acumulado, valor)
+        }
+        retorna acumulado
+    }
+
+    estatico agrupar(valores: qualquer[], classificar: funcao): dicionario {
+        var grupos: dicionario = {}
+        para cada valor: qualquer em valores {
+            var chave: qualquer = classificar(valor)
+            se !(chave em grupos) {
+                grupos[chave] = []
+            }
+            grupos[chave].adicionar(valor)
+        }
+        retorna grupos
+    }
+
+    estatico achatar(valores: qualquer[]): qualquer[] {
+        var resultado: qualquer[] = []
+        para cada valor: qualquer em valores {
+            se tipo de valor == "vetor" ou tipo de valor == "tupla" {
+                para cada elemento: qualquer em valor {
+                    resultado.adicionar(elemento)
+                }
+            } senao {
+                resultado.adicionar(valor)
+            }
+        }
+        retorna resultado
+    }
+
+    estatico primeiro(valores: qualquer[], alternativa: qualquer = nulo): qualquer {
+        retorna tamanho(valores) == 0 ? alternativa: valores[0]
+    }
+
+    estatico ultimo(valores: qualquer[], alternativa: qualquer = nulo): qualquer {
+        retorna tamanho(valores) == 0 ? alternativa: valores[- 1]
+    }
+
+    estatico encontrar(valores: qualquer[], predicado: funcao, alternativa: qualquer = nulo): qualquer {
+        para cada valor: qualquer em valores {
+            se predicado(valor) {
+                retorna valor
+            }
+        }
+        retorna alternativa
+    }
+
+    estatico contar(valores: qualquer[], predicado: funcao): inteiro {
+        var quantidade: inteiro = 0
+        para cada valor: qualquer em valores {
+            se predicado(valor) {
+                quantidade += 1
+            }
+        }
+        retorna quantidade
+    }
+
+    estatico particionar(valores: qualquer[], predicado: funcao): tupla {
+        var aceitos: qualquer[] = []
+        var recusados: qualquer[] = []
+        para cada valor: qualquer em valores {
+            se predicado(valor) {
+                aceitos.adicionar(valor)
+            }
+            senao {
+                recusados.adicionar(valor)
+            }
+        }
+        retorna(aceitos, recusados)
+    }
+
+    estatico combinar(esquerda: qualquer[], direita: qualquer[]): tupla[] {
+        var resultado: tupla[] = []
+        var limite: inteiro = tamanho(esquerda) < tamanho(direita) ? tamanho(esquerda): tamanho(direita)
+        para (var i: inteiro = 0; i < limite; i++) {
+            resultado.adicionar((esquerda[i], direita[i]))
+        }
+        retorna resultado
+    }
+
+    estatico blocos(valores: qualquer[], tamanhoBloco: inteiro): qualquer[][] {
+        se tamanhoBloco <= 0 {
+            falhar "Tamanho do bloco deve ser positivo"
+        }
+        var resultado: qualquer[][] = []
+        var inicio: inteiro = 0
+        enquanto inicio < tamanho(valores) {
+            var restante: inteiro = tamanho(valores) - inicio
+            var quantidade: inteiro = restante < tamanhoBloco ? restante: tamanhoBloco
+            resultado.adicionar(valores.fatiar(inicio, inicio + quantidade))
+            inicio += quantidade
+        }
+        retorna resultado
+    }
+
+    estatico frequencias(valores: qualquer[]): dicionario {
+        var resultado: dicionario = {}
+        para cada valor: qualquer em valores {
+            resultado[valor] = valor em resultado ? resultado[valor] + 1: 1
+        }
+        retorna resultado
+    }
+}
