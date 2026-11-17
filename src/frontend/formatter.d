@@ -67,7 +67,7 @@ string formatDelegua(string source)
             string pair = source[start .. cursor + 1];
             foreach (string operator; [
                 "==", "!=", "<=", ">=", "+=", "-=", "*=", "/=", "%=", "++", "--", "**", "<<", ">>",
-                "<-", "?:"
+                "<-", "?:", "=>"
             ])
                 if (pair == operator)
                 {
@@ -124,13 +124,15 @@ string formatDelegua(string source)
             previous = "";
             continue;
         }
-        if (text == "classe" && previous != "." && (index + 1 == pieces.length || pieces[index + 1].text != ":"))
+        if ((text == "classe" || text == "interface") && previous != "."
+                && (index + 1 == pieces.length || pieces[index + 1].text != ":"))
             awaitingClass = true;
         if (classBodies.length && classBodies[$ - 1] && !parens && !compactDepth && index + 1 < pieces.length)
         {
             string next = pieces[index + 1].text;
-            bool modifier = text == "estatico" || text == "estático";
-            bool method = next == "(" && previous != "@" && previous != "estatico" && previous != "estático";
+            bool modifier = text == "estatico" || text == "estático" || text == "abstrato";
+            bool method = next == "(" && previous != "@" && previous != "estatico"
+                && previous != "estático" && previous != "abstrato";
             bool field = next == ":" && previous != "var" && previous != "const" && previous != ",";
             bool visibility = text == "privado" || text == "protegido" || text == "publico" || text == "público";
             if (modifier || method || field || visibility)
@@ -216,6 +218,11 @@ string formatDelegua(string source)
             else
                 append(" ");
         }
+        else if (text == "=>")
+        {
+            append(text, true);
+            append(" ");
+        }
         else if (text == ".")
             append(text);
         else if (text == ":")
@@ -252,7 +259,7 @@ string formatDelegua(string source)
         else
         {
             bool separator = line.length && previous != "." && previous != "(" && previous != "["
-                && previous != "!" && previous != "~";
+                && previous != "!" && previous != "~" && previous != "@";
             if (text == "++" || text == "--")
                 separator = false;
             // Não separe a parte fracionária de um literal numérico.

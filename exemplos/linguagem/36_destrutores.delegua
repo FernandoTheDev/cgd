@@ -1,0 +1,22 @@
+//! filha\nbase\nfim
+classe Base {
+    destrutor(): vazio {
+        escreva("base")
+    }
+}
+
+classe Filha herda Base {
+    destrutor(): vazio {
+        escreva("filha")
+    }
+}
+
+var recurso: Filha = Filha()
+tente {
+    assercao(verdadeiro)
+} finalmente {
+    destruir(recurso)
+}
+
+destruir(recurso)
+escreva("fim")

@@ -1,3 +1,182 @@
+# Publicação solicitada — 17/11/2026
+
+Solicitação: incluir os novos exemplos nos testes e publicar runtime e CGD em dev.
+
+- Calculadora: contrato de saída exata 90/15/25.
+- MiniJS/jsvm.delegua: contrato de saída exata cobrindo Fibonacci, chamadas,
+  vetores/objetos, laços, escopos, booleanos e resto. programa.js é fixture local.
+- Runner: diretorio: fonte executa a partir da pasta do exemplo, preservando
+  recursos relativos também nas cópias usadas pelo teste do formatador.
+- MiniJS é um programa didático em Delégua; não altera a exclusão definitiva de
+  integração JS/host JavaScript no compilador. Fontes existentes preservados.
+- Validação executada: 120 exemplos/240 verificações com e sem otimização,
+  zero falhas; formatador em 129 arquivos idempotentes e os mesmos 240 contratos
+  passaram. Logs: out/exemplos-publicacao.log e out/formatador-publicacao.log.
+- Política de tipos, referência gerada e git diff --check passaram. Não foi
+  repetida a matriz: as mudanças desta etapa são exemplos/contratos/runner.
+- Runtime publicado primeiro em origin/dev: 7833699 (ampliação das APIs nativas,
+  inicializadores de classe, comparação textual e diagnósticos visuais), incluindo
+  as mudanças validadas na etapa anterior. Sem stashes ou artefatos versionados.
+- CGD: preparado para commit/push com atualização do ponteiro do submódulo;
+  confirmar sincronização com origin/dev ao concluir a publicação.
+
+---
+
+# Implementação e validação — 17/11/2026
+
+- Corrigir @decoradores no formatador; coloração de tipos, metadados e estrangeira.
+- Valores padrão tipados e inicializadores de atributos por instância.
+- Inlay hints de inferência, hover de pureza/comptime, comparação textual e ícone.
+- Referência web própria completa; JS, herança de interfaces e múltiplos dialetos
+  são exclusões definitivas por decisão do usuário, não pendências.
+- O usuário autorizou agora todos os testes necessários. A suspensão anterior
+  está revogada. Preservar alterações existentes e registrar resultados reais.
+
+Continuação ativa: renderer visual do runtime e ampliação substancial da stdlib.
+
+Implementado em 17/11:
+
+- Defaults de variáveis/campos, inicializadores por objeto/base antes da derivada,
+  coleções independentes, contratos e efeitos preservados.
+- Formatador une @nome; lexer reserva estrangeira; tokens de tipos/metadados;
+  inlay hints virtuais; hover com pureza/CTFE; ícone existente da linguagem.
+- Diagnóstico visual R0001 com localização, trecho e marcador, leitura apenas na
+  falha; controles escapados, arquivos ausentes/FIFO tratados sem bloquear.
+- Novos módulos Textos, Estatistica, Caminhos e ampliação de Colecoes, Arquivo,
+  Matematica. Testes públicos com -Wall/-Wextra/-Werror nos dois modos.
+- Referência web própria de 25 capítulos, gerada de linguagem.json e exemplos;
+  exclusões definitivas documentadas. GitHub Pages dev/docs preservado.
+- Contratos dos exemplos novos de perceptron exigem 24 checks sem falhas e 8/8
+  acertos. MiniGPT preserva as 150 épocas; contrato automático é explicitamente
+  compilação/vínculo. Uma execução experimental foi interrompida por timeout de
+  180 segundos; não afirmar validação do treinamento completo.
+
+Resultados reais até agora:
+
+- 9 módulos unitários DMD e LDC2; API C e caminhos de erro passaram.
+- Driver 26, integração 407, bibliotecas 342 e stdlib 98 contratos passaram;
+  expansão e runtime_diagnosticos passaram em ambos os modos onde aplicável.
+- LSP passou com hints, cores, pureza/CTFE, UTF-16 e buffers em memória.
+- Formatador: 126 arquivos idempotentes, 117 exemplos/234 verificações sem falhas.
+- Web: links/âncoras/assets e Chrome desktop/mobile passaram.
+- VS Code real: Extension Host passou com associação/ícones, inferência virtual,
+  hover de pureza, demais providers e edição sem build.
+- Política de tipos explícitos passou.
+
+A matriz DMD/LDC2 × debug/release × Clang/GCC concluiu sem falhas (51 etapas
+registradas em out/validacao.json), com instalações
+isoladas. A solicitação adicional de enums/arrow chegou durante essa execução;
+os casos novos recebem validação incremental posterior, sem atribuir resultados
+anteriores a alterações ainda não testadas.
+
+Continuação adicional autorizada: espaçamento de =>, incluindo => ( e => [;
+enums em funções, métodos, blocos, classes/interfaces e classes estrangeiras.
+Aliases têm escopo lexical; enums de classe usam namespace estático imutável,
+com visibilidade/herança. Membros escalares não capturam o mapa e funcionam em
+CTFE; receptores com efeitos continuam avaliados. O namespace inteiro não ganha
+captura implícita ou representação como mapa na VM. DMD/LDC2 passaram os 9 módulos
+unitários atualizados; enums.py passou com Clang em DMD/debug, e o protocolo LSP
+passou também com completion de enums locais e de classe. Novo exemplo 40.
+
+Validação incremental posterior à solicitação de enums/arrow:
+
+- DMD e LDC2: 9 módulos unitários atualizados passaram, incluindo resultado CTFE
+  de função com enum local e argumento vindo de membro de enum global.
+- LSP: completion de enums locais/de classe e demais checks passaram.
+- ASan/UBSan + NDEBUG: API C/caminhos de erro, integração 407, 118 exemplos/236
+  verificações, bibliotecas 342, expansão, enums (2 modos/9 rejeições), stdlib 114
+  e diagnósticos visuais passaram. Runtime normal restaurado; relatório
+  out/sanitizadores.json. Detecção de leaks desativada para Boehm GC, conforme
+  configuração explícita do script; não declarar validação de leaks.
+- Runtime: alinhamento com linha >=10000 e janela de colunas longas passaram.
+- Web atualizada: Chrome desktop/mobile e política de tipos/formatação passaram.
+
+Conferência final concluída:
+
+- GCC normal/LDC release: enums nos dois modos e 9 casos negativos, stdlib 114,
+  driver 26 e integração 407 passaram; out/gcc-final.json.
+- Formatador atualizado: 127 arquivos idempotentes; 118 exemplos, 236 verificações
+  com/sem otimização, sem falhas. Inclui => antes de parênteses/vetores/blocos e
+  exemplo 40 de enums locais/de classe. out/formatador.log.
+- Extension Host real repetido: todos os 13 checks passaram; out/vscode/extensao.json.
+- Formatação de todos os fontes/documentação e git diff --check (CGD/runtime)
+  passaram. Referência gerada sincronizada e política de tipos verificada.
+- Extensão 0.5.0 instalada e confirmada pelo CLI, associação \*.delegua preservando
+  preferências. out/cgd-0.5.0.vsix inclui o mesmo binário LDC release/runtime normal
+  validados, logo e bibliotecas; conteúdo conferido byte a byte. Recarregar janela
+  do VS Code para substituir o servidor já em execução.
+
+Uma execução de formatador.py coincidiu com o objeto ASan e falhou no vínculo sem
+flags de sanitização. Log mantido em out/formatador-concorrente.log; repetição
+com runtime normal passou integralmente. Isso não foi registrado como sucesso.
+
+Sem publicação ou push. Alterações preexistentes foram preservadas; o submódulo
+continua sendo seu próprio repositório. O treinamento completo de 150 épocas do
+MiniGPT não foi validado (timeout experimental de 180 s); seu contrato automático
+é compilação/vínculo. Recursos da wiki fora do perfil e limitações reais continuam
+explicitados em compatibilidade.md/evolucao-linguagem.md, sem equivalência integral.
+Próxima ação do usuário: recarregar a janela do VS Code. Não repetir a matriz
+sem alterações relevantes; resultados e comandos acima permitem retomada.
+
+---
+
+# Histórico: organização, editor e bibliotecas (16/11/2026)
+
+- Revisar responsabilidades dos passes e unificar a análise usada pela CLI/LSP.
+- Corrigir completion de isto, palavras-chave/construtor, reconhecimento de arquivos
+  e oferecer prévia CTFE no hover sem compilar por edição.
+- Acrescentar destrutores com contrato explícito de ciclo de vida e expandir JSON,
+  rede, arquivos/I/O e métodos de dicionário, preservando APIs anteriores.
+- Melhorar emissão C sem descartar efeitos/inicializadores/contratos.
+- **O usuário proibiu executar testes até nova ordem.** Nenhum teste foi executado
+  nesta solicitação; resultados abaixo pertencem exclusivamente ao trabalho anterior.
+- Alterações preexistentes preservadas: JSON e exemplo, exemplos de dicionários,
+  perceptron, lsp/builtins.d e runtime/src/biblioteca.c. Sem subagentes/publicação.
+
+## Histórico: wiki, FFI e extensão 0.4.0
+
+O usuário autorizou explicitamente FFI e instalação do novo LSP. Essa autorização
+substitui a exclusão anterior de FFI em AGENTS.md; não autoriza testes. Sem
+subagentes, sem publicação. Mudanças preexistentes foram preservadas.
+
+Implementado, com validação funcional pendente:
+
+- Pipeline semântico comum CLI/LSP; declarations/analyzer substituem Sema1/2/3.
+  Fluxo/segurança/pureza e constantes ficam na área semântica; destinos e
+  visibilidade têm regras compartilhadas. Lowering não valida atribuições.
+- Completion de isto/super incompletos, catálogo lexical único, metadados nativos,
+  prévia CTFE sob demanda e sem alterar a AST. VM limita texto/slots/operandos e
+  descarta resultados de comandos. C omite temporários escalares e rótulos sem
+  uso; mantém snapshots de identificadores, inicializadores, efeitos e contratos.
+- Destrutores explícitos, dicionários ampliados, Arquivo, JSON navegável com
+  enumeração resistente a colisões de nomes, ClienteHTTP/RespostaHTTP.
+- Classe abstrata e métodos abstratos; interfaces e implementa com contratos
+  explícitos; enum numérico congelado com alias inteiro; arrows sem captura.
+- FFI com @definicao: ABI C escalar e ABI delegua gerenciada. Libs usam Primitivas
+  de cgd:nativo e pontes.c; aliases antigos continuam para compatibilidade.
+- Matematica/libm e Colecoes.reduzir/agrupar/achatar. Para cada elem: T já existia.
+- Wiki oficial clonada em out/wiki-oficial; docs/evolucao-linguagem.md registra
+  sintaxe, motivos das diferenças e limites. Não declarar cobertura completa:
+  mescla, host JS, herança de interfaces, enums nominais e ABI C composta pendem.
+
+Execução real nesta solicitação: builds de aplicação LDC2 debug e compilação dos
+fontes C do runtime com Clang/C99 e -Werror; formatação com ferramentas próprias.
+DUB_HOME=out/dub contorna cache global somente leitura. Nenhuma suíte, exemplo,
+programa de amostra, Extension Host ou sanitizador foi executado. Falhas de build
+foram corrigidas durante a implementação; isso não valida a linguagem em execução.
+A instalação 0.3.0 foi confirmada pelo instalador e associou \*.delegua ao CGD.
+A 0.4.0 foi instalada e confirmada pelo CLI (fernandothedev.cgd@0.4.0), com
+associação de \*.delegua. O pacote fica em out/cgd-0.4.0.vsix. O usuário precisa
+recarregar a janela para substituir o servidor já aberto. Não houve teste de LSP.
+
+Regressões escritas em testes/unit/expansion.d e testes/expansao.py (incluída na
+matriz/sanitizadores); exemplos 36/37/38 e bibliotecas/arquivos/json_navegacao/
+matematica. Não executar até nova ordem. Quando autorizado: build-runtime,
+dub test em DMD/LDC2, testes/expansao.py, matriz, sanitizadores e Extension Host.
+Não confundir instalação por CLI com teste do comportamento do LSP.
+
+---
+
 # Continuidade: rede, JSON e ferramentas do editor
 
 Solicitação ativa em 14/11/2026. Este arquivo deve ser atualizado durante a

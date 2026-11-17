@@ -1,7 +1,9 @@
 //! {"nome":"CGD","versao":1}\nCGD\n{"nome":"CGD","versao":2}
 var biblioteca: qualquer = importar("../../bibliotecas/json.delegua")
 var dados: qualquer = biblioteca.JSON.analisar('{"nome":"CGD","versao":1}')
+
 escreva(biblioteca.JSON.serializar(dados))
+
 var documento: qualquer = biblioteca.JSON(dados)
 escreva(documento.obter("nome"))
 escreva(documento.definir("versao", 2).texto())

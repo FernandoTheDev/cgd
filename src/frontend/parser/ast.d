@@ -113,7 +113,7 @@ class VarDecl : Node
 {
     dstring name;
     Node value;
-    bool isConst, uninitialized;
+    bool isConst, uninitialized, isEnum;
 
     this(dstring name, Node value, bool isConst, TypeExpr texpr, Position pos)
     {
@@ -347,7 +347,9 @@ class FnDecl : Node
     dstring fn;
     dstring linkName;
     dstring builtinName;
-    bool analyzed, isMethod, isStatic, accessor, anonymous, decoratorEnvelope;
+    dstring foreignSymbol;
+    bool foreignManaged;
+    bool analyzed, isMethod, isStatic, accessor, anonymous, decoratorEnvelope, isAbstract;
     ClassDecl ownerClass, classFactory;
     int access;
     FnArg[] args;
@@ -624,6 +626,9 @@ class WhileStmt : Node
 class MemberExpr : Node
 {
     Node left, right;
+    bool readonly;
+    MapLit enumMembers;
+    IntLit enumValue;
 
     this(Node left, Node right, Position pos)
     {
@@ -724,6 +729,7 @@ class LoopControl : Node
 
 class MapLit : Node
 {
+    bool readonly;
     Node[] keys, values;
     this(Node[] keys, Node[] values, Position pos)
     {
@@ -816,6 +822,9 @@ Node[] childNodes(Node node)
     if (ClassDecl n = cast(ClassDecl) node)
     {
         Node[] nodes;
+        foreach (ClassField field; n.fields)
+            if (field.value !is null && field.initializer is null)
+                nodes ~= field.value;
         foreach (FnDecl m; n.methods)
             nodes ~= m;
         return nodes;
@@ -875,8 +884,9 @@ struct ClassField
     TypeExpr type;
     int access;
     Position pos;
-    bool customAccess, readable, writable;
-    FnDecl getter, setter;
+    bool customAccess, readable, writable, isEnum;
+    FnDecl getter, setter, initializer;
+    Node value;
     Decorator[] decorators;
 }
 
@@ -884,6 +894,10 @@ class ClassDecl : Node
 {
     dstring name, superName;
     ClassDecl superClass;
+    bool isAbstract, isInterface, isForeign;
+    dstring foreignLibrary;
+    dstring[] interfaceNames;
+    ClassDecl[] interfaces;
     ClassField[] fields;
     FnDecl[] methods;
     FnDecl signature;

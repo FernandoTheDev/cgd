@@ -2,10 +2,9 @@ module ctfe.compile;
 
 import std.format;
 import std.exception : enforce;
-import std.stdio;
 
 import frontend.lexer.token : Position, TokenKind;
-import backend.c.utils : formatD;
+import std.conv : to;
 import frontend.parser;
 import frontend.type_expr;
 import ctfe;
@@ -26,7 +25,7 @@ final class CTFECompile
 
     pragma(inline, true) dstring newLabel()
     {
-        dstring name = formatD("_label%d", tmp++);
+        dstring name = "_label"d ~ (tmp++).to!dstring;
         instructions[name] = (VMInstruction[]).init;
         return name;
     }
@@ -47,12 +46,17 @@ final class CTFECompile
 
             case NodeKind.VarDecl:
                 VarDecl var = cast(VarDecl) node;
+                if (var.isEnum)
+                    return;
                 dstring name = var.name;
                 compile(var.value);
                 emitTypeCheck(var.type_expr);
                 fnVars[name] = nextSlot++;
                 return emit(VMInstruction.instr(VMOpCode.Store, fnVars[name]));
 
+            case NodeKind.MemberExpr:
+                enforce((cast(MemberExpr) node).enumValue !is null, "Membro sem constante CTFE.");
+                return compile((cast(MemberExpr) node).enumValue);
             case NodeKind.IntLit:
             case NodeKind.BoolLit:
             case NodeKind.StringLit:
@@ -115,7 +119,7 @@ final class CTFECompile
 
             case NodeKind.CallExpr:
                 CallExpr call = cast(CallExpr) node;
-                dstring name = (cast(Identifier) call.fn).value;
+                dstring name = (cast(Identifier) call.fn).functionRef.linkName;
 
                 size_t[] arguments;
                 foreach (Node child; call.args)
@@ -191,7 +195,8 @@ final class CTFECompile
                     emit(VMInstruction.instr(ops[assignment.op]));
                 }
                 emitTypeCheck(assignment.left.type_expr);
-                return emit(VMInstruction.instr(VMOpCode.Store, fnVars[name]));
+                emit(VMInstruction.instr(VMOpCode.Store, fnVars[name]));
+                return emit(VMInstruction.instr(VMOpCode.Load, fnVars[name]));
 
             default:
                 throw new Exception("Node não suportado para CTFE.");
@@ -244,7 +249,13 @@ final class CTFECompile
         scope (exit)
             fnVars = bindings;
         foreach (Node child; body)
+        {
             compile(child);
+            if (cast(CallExpr) child || cast(BinaryExpr) child || cast(UnaryExpr) child
+                    || cast(Identifier) child || cast(AssignStmt) child || cast(IntLit) child
+                    || cast(DoubleLit) child || cast(StringLit) child || cast(BoolLit) child)
+                emit(VMInstruction.instr(VMOpCode.Drop));
+        }
     }
 
     VMInstruction[] compile(FnDecl fn)
@@ -279,8 +290,6 @@ final class CTFECompile
         foreach (dstring key; labelOrder)
             instrs ~= instructions[key];
 
-        // writeln("fun: ", fn.fn);
-
         foreach (size_t i, ref VMInstruction instr; instrs)
         {
             if (instr.opCode == VMOpCode.Jnz || instr.opCode == VMOpCode.Jz || instr.opCode == VMOpCode.Jmp)
@@ -289,7 +298,6 @@ final class CTFECompile
                 long addr = labels[instr.value.s];
                 instr.param = addr;
             }
-            // writeln(i, " ", instr);
         }
         instrs ~= VMInstruction.instr(VMOpCode.Halt);
 

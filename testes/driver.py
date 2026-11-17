@@ -174,6 +174,16 @@ with tempfile.TemporaryDirectory(prefix="cgd localizacao ") as tmp:
     assert (
         result.returncode == 1 and f"{source}:2:" in result.stderr and "R0001" in result.stderr
     ), result.stderr
+    assert result.stderr.startswith("error[R0001]:"), result.stderr
+    assert "2 |  retorna a/b" in result.stderr and "^" in result.stderr, result.stderr
+    source.unlink()
+    missing = subprocess.run([str(output)], capture_output=True, text=True, timeout=10)
+    assert (
+        missing.returncode == 1
+        and "error[R0001]:" in missing.stderr
+        and str(source) in missing.stderr
+    ), missing
+    assert " | " not in missing.stderr, missing.stderr
     checks += 1
     source.write_text("var primeiro=1;var segundo=2;var terceiro=3")
     result = run(source, "--emitir-c", "-s", str(output))

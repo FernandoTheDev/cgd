@@ -10,7 +10,7 @@ final class CgdDeadCode : AstRewriter
 {
     private Program program;
     size_t changes;
-    this(Program program, Context context)
+    this(Program program)
     {
         this.program = program;
     }

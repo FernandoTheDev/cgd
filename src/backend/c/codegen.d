@@ -5,11 +5,13 @@ import std.format;
 import std.array;
 import std.stdio;
 import std.conv;
+import std.math : isFinite;
 
 import frontend.lexer.token;
 import frontend.type_sema;
 import frontend.type_expr;
 import backend.c.lvalue;
+import backend.c.foreign;
 import frontend.parser;
 import backend.c.utils;
 
@@ -56,6 +58,18 @@ private:
     }
 
     dstring[] continueLabels, breakLabels;
+    bool[dstring] referencedLabels;
+    dstring labelDeclaration(dstring label)
+    {
+        return label in referencedLabels ? label ~ ":;" : "";
+    }
+
+    // Referenciar o endereço marca uso em C99 sem ler um vínculo volatile.
+    dstring acknowledgeBinding(dstring name)
+    {
+        return formatD("(void)&%s;", name);
+    }
+
     size_t[] breakTryDepth;
     struct Collector
     {
@@ -88,7 +102,7 @@ private:
             collectors.length--;
     }
 
-    dstring compileAssignment(AssignStmt assign)
+    dstring compileAssignment(AssignStmt assign, bool resultNeeded = true)
     {
         LValue lv = resolveLValue(assign.left);
         dstring value;
@@ -122,6 +136,8 @@ private:
             dstring rhs = materialize(assign.value);
             value = atSite(formatD("delegua_op_%s(%s,%s)", op, old, rhs), assign.pos);
         }
+        if (!resultNeeded)
+            return atSite(lv.write(checked(value, assign.left.type_expr, assign.pos)), assign.pos) ~ ";";
         dstring result = formatD("cgd_tmp_%s", tmp++);
         emitLocal(formatD("delegua_value %s=%s;", result, checked(value, assign.left.type_expr, assign.pos)));
         emitLocal(atSite(lv.write(result), assign.pos) ~ ";");
@@ -155,7 +171,7 @@ private:
         foreach (Node child; node.fallback)
             result ~= compileStmtOrdered(child);
         result ~= "}";
-        result ~= label ~ ":; }";
+        result ~= labelDeclaration(label) ~ " }";
         breakLabels.length--;
         breakTryDepth.length--;
         return result.join("\n");
@@ -213,7 +229,8 @@ private:
                     inner, cString(c.type.toStr()));
             result ~= formatD("%sif(%s) {", i ? "else "d : ""d, condition);
             if (c.name.length)
-                result ~= formatD("volatile delegua_value %s=%s->error;", cName(c.name), inner);
+                result ~= formatD("volatile delegua_value %s=%s->error;", cName(c.name), inner) ~ acknowledgeBinding(
+                        cName(c.name));
             foreach (Node child; c.body)
                 result ~= compileStmtOrdered(child);
             result ~= "}";
@@ -234,6 +251,10 @@ private:
     public dstring materialize(Node node)
     {
         dstring expr = compileExpr(node);
+        // Construtores escalares são inline, não falham e não leem estado.
+        // Identificadores precisam de snapshot: um argumento posterior pode alterá-los.
+        if (cast(IntLit) node || cast(DoubleLit) node || cast(BoolLit) node || cast(NullLit) node)
+            return expr;
         dstring name = formatD("cgd_tmp_%d", tmp++);
         emitLocal(formatD("%s %s = %s;", VALUE, name, expr));
         return name;
@@ -258,13 +279,13 @@ private:
             result ~= check;
         foreach (Node child; body)
             result ~= compileStmtOrdered(child);
-        result ~= label ~ ":;";
+        result ~= labelDeclaration(label);
         if (step !is null)
             result ~= compileStmtOrdered(step);
         if (post)
             result ~= check;
         result ~= "}";
-        result ~= label ~ "_break:;";
+        result ~= labelDeclaration(label ~ "_break");
         leaveLoop(label);
         return result.join("\n");
     }
@@ -288,8 +309,6 @@ private:
         pendingStack.length -= 1;
         return top;
     }
-
-    const BuiltinFn[dstring] builtinFn = ["escreva": &compileEscreva];
 
     pragma(inline, true) dstring genIndent(uint indent = 0)
     {
@@ -321,21 +340,6 @@ private:
         prototypes ~= genIndent(indent) ~ line;
     }
 
-    void compileDecl(Node node)
-    {
-        if (node is null || node.kind == NodeKind.NaN)
-            return;
-        switch (node.kind)
-        {
-            case NodeKind.FnDecl:
-                return compileFnDecl(cast(FnDecl) node);
-
-            default:
-                writeln("...");
-                return;
-        }
-    }
-
     public dstring compileStmt(Node node)
     {
         if (node is null)
@@ -364,14 +368,15 @@ private:
                     dstring element = formatD("delegua_obter(%s,create_num(%s))", cName(loop.name), i);
                     TypeExpr type = i < loop.destructuredTypes.length ? loop.destructuredTypes[i] : null;
                     body ~= formatD("volatile delegua_value %s=%s;", cName(name),
-                            atSite(checked(element, type), loop.pos));
+                            atSite(checked(element, type), loop.pos)) ~ acknowledgeBinding(cName(name));
                 }
                 foreach (Node child; loop.body)
                     body ~= compileStmtOrdered(child);
                 leaveLoop(label);
-                return formatD("for (sz %s = 0; %s < delegua_tamanho(%s); ++%s) {\n%s %s = delegua_iterar(%s, %s);\n%s\n%s:;\n}\n%s_break:;",
+                return formatD("for (sz %s = 0; %s < delegua_tamanho(%s); ++%s) {\n%s %s = delegua_iterar(%s, %s);\n%s\n%s\n%s\n}\n%s",
                         idx, idx, iterable, idx, "volatile "d ~ VALUE, cName(loop.name), iterable,
-                        idx, body.join("\n"), label, label);
+                        idx, acknowledgeBinding(cName(loop.name)), body.join("\n"),
+                        labelDeclaration(label), labelDeclaration(label ~ "_break"));
             case NodeKind.TryStmt:
                 return compileTry(cast(TryStmt) node);
             case NodeKind.ThrowStmt:
@@ -385,15 +390,17 @@ private:
                 DoStmt loop = cast(DoStmt) node;
                 return loopCode(loop.condition, loop.body, null, true);
             case NodeKind.BreakStmt:
+                referencedLabels[breakLabels[$ - 1]] = true;
                 return cleanupCode(breakTryDepth[$ - 1]) ~ "\ngoto " ~ breakLabels[$ - 1] ~ ";";
             case NodeKind.ContinueStmt:
+                referencedLabels[continueLabels[$ - 1]] = true;
                 return cleanupCode(loopTryDepth[$ - 1]) ~ "\ngoto " ~ continueLabels[$ - 1] ~ ";";
             case NodeKind.VarDecl:
                 VarDecl var = cast(VarDecl) node;
                 dstring initial = var.type_expr !is null && !var.uninitialized
                     && var.type_expr.toStr() != "qualquer" ? materialize(var.value) : compileExpr(var.value);
                 return formatD("volatile %s %s = %s;", VALUE, cName(var.name), checked(initial,
-                        var.uninitialized ? null : var.type_expr, var.pos));
+                        var.uninitialized ? null : var.type_expr, var.pos)) ~ acknowledgeBinding(cName(var.name));
 
             case NodeKind.ReturnStmt:
                 ReturnStmt ret = cast(ReturnStmt) node;
@@ -401,20 +408,30 @@ private:
                 if (ret.collectionReturn)
                 {
                     Collector collector = collectors[$ - 1];
+                    referencedLabels[collector.label] = true;
                     return cleanupCode(collector.depth) ~ formatD("\ndelegua_vetor_adicionar(&%s,%s); goto %s;",
                             collector.output, value, collector.label);
                 }
                 return cleanupCode(0) ~ formatD("\nreturn %s;", checked(value, functionReturn, ret.pos));
 
-            case NodeKind.CallExpr:
             case NodeKind.UnaryExpr:
+                UnaryExpr unary = cast(UnaryExpr) node;
+                if (unary.op == TokenKind.PPlus || unary.op == TokenKind.MMinus)
+                {
+                    LValue target = resolveLValue(unary.value);
+                    dstring updated = atSite(formatD("delegua_op_%s(%s,create_num(1))",
+                            unary.op == TokenKind.PPlus ? "add" : "sub", target.read()), unary.pos);
+                    return atSite(target.write(checked(updated, unary.value.type_expr, unary.pos)), unary.pos) ~ ";";
+                }
+                return "(void)(" ~ compileExpr(node) ~ ");";
+            case NodeKind.CallExpr:
                 return "(void)(" ~ compileExpr(node) ~ ");";
 
             case NodeKind.IfStmt:
                 return compileIfStmt(to!IfStmt(node));
 
             case NodeKind.AssignStmt:
-                return "(void)(" ~ compileExpr(node) ~ ");";
+                return compileAssignment(cast(AssignStmt) node, false);
             case NodeKind.SwitchStmt:
                 return compileSwitch(cast(SwitchStmt) node);
             case NodeKind.NaN:
@@ -438,8 +455,28 @@ private:
             case NodeKind.MemberExpr:
                 return "(void)(" ~ compileExpr(node) ~ ");";
 
+            case NodeKind.ArrayLit:
+            case NodeKind.TupleLit:
+            case NodeKind.MapLit:
+            case NodeKind.IndexExpr:
+            case NodeKind.BinaryExpr:
+            case NodeKind.ConditionalExpr:
+            case NodeKind.SliceExpr:
+            case NodeKind.LoopExpr:
+            case NodeKind.Comprehension:
+            case NodeKind.FunctionExpr:
+            case NodeKind.ImportExpr:
+            case NodeKind.Identifier:
+            case NodeKind.StringLit:
+            case NodeKind.IntLit:
+            case NodeKind.DoubleLit:
+            case NodeKind.BoolLit:
+            case NodeKind.NullLit:
+            case NodeKind.TypeOfExpr:
+            case NodeKind.SuperExpr:
+                return "(void)(" ~ compileExpr(node) ~ ");";
             default:
-                return "/* statement desconhecido. */";
+                throw new Exception("Comando não suportado no backend C.");
         }
     }
 
@@ -574,7 +611,7 @@ private:
                     body = formatD("%s\nif(delegua_is_truthy(%s)){%s}", condSetup, condition, body);
                 emitLocal(formatD("for(sz %s=0;%s<delegua_tamanho(%s);++%s){volatile delegua_value %s=%s;%s}", idx,
                         idx, source, idx, cName(c.name), checked(formatD("delegua_iterar(%s,%s)",
-                        source, idx), c.bindingType, c.pos), body));
+                        source, idx), c.bindingType, c.pos), acknowledgeBinding(cName(c.name)) ~ body));
                 return resultName;
             case NodeKind.Identifier:
                 Identifier id = cast(Identifier) node;
@@ -611,6 +648,8 @@ private:
                     dstring v = materialize(map.values[i]);
                     emitLocal(formatD("delegua_map_setar(%s, %s, %s);", name, k, v));
                 }
+                if (map.readonly)
+                    emitLocal(formatD("delegua_map_congelar(%s);", name));
                 return name;
             case NodeKind.NullLit:
                 return "create_nulo()";
@@ -638,6 +677,8 @@ private:
                 return functionValue((cast(FunctionExpr) node).declaration);
             case NodeKind.MemberExpr:
                 MemberExpr member = cast(MemberExpr) node;
+                if (member.enumValue !is null)
+                    return compileExpr(member.enumValue);
                 dstring receiver = materialize(member.left);
                 return formatD("delegua_propriedade_em(%s, %s, %s)", receiver,
                         cString((cast(Identifier) member.right).value), lexicalClass());
@@ -646,10 +687,17 @@ private:
                 return formatD("create_text_len(%s, %s)", cString(text), text.to!string.length);
 
             case NodeKind.IntLit:
-                return formatD("create_num(%d)", (cast(IntLit) node).value);
+                long integer = (cast(IntLit) node).value;
+                return integer == long.min ? "create_num(INT64_MIN)" : formatD("create_num(%d)", integer);
 
             case NodeKind.DoubleLit:
-                return formatD("create_real(%.17g)", (cast(DoubleLit) node).value);
+                double realValue = (cast(DoubleLit) node).value;
+                if (!isFinite(realValue))
+                    throw new Exception("Literal real não finito no backend C.");
+                dstring realLiteral = formatD("%.17g", realValue);
+                if (!realLiteral.canFind('.') && !realLiteral.canFind('e') && !realLiteral.canFind('E'))
+                    realLiteral ~= ".0";
+                return "create_real(" ~ realLiteral ~ ")";
 
             case NodeKind.BoolLit:
                 return formatD("create_bool(%d)", (cast(BoolLit) node).value);
@@ -746,6 +794,7 @@ private:
         return formatD("delegua_obter(%s, %s)", value, idx);
     }
 
+    bool[FnDecl] functionSlots;
     dstring functionValue(FnDecl node)
     {
         if (node.builtinName.length)
@@ -757,6 +806,11 @@ private:
         dstring maximum = node.args.length && node.args[$ - 1].rest ? "SIZE_MAX"d : node.args.length.to!dstring;
         if (node.anonymous)
             return formatD("create_funcao_intervalo(&%s,%s,%s)", cName(node.linkName), minimum, maximum);
+        if (node !in functionSlots)
+        {
+            emitProto(formatD("static delegua_value %s_slot;", cName(node.linkName)));
+            functionSlots[node] = true;
+        }
         return formatD("delegua_funcao_cache(&%s_slot,&%s,%s,%s)", cName(node.linkName),
                 cName(node.linkName), minimum, maximum);
     }
@@ -765,14 +819,26 @@ private:
     {
         dstring proto = formatD("delegua_value %s(sz argc, delegua_value *argv)", cName(node.linkName));
         emitProto(proto ~ ";");
-        emitProto(formatD("static delegua_value %s_slot;", cName(node.linkName)));
+        if (node.foreignSymbol.length)
+        {
+            dstring[] parameterContracts;
+            foreach (FnArg argument; node.args)
+                parameterContracts ~= descriptor(argument.type_expr);
+            emit(foreignWrapper(node, proto, descriptor(node.type_expr), parameterContracts));
+            return;
+        }
+        if (node.isAbstract)
+        {
+            emit(proto ~ " { (void)argc; (void)argv; delegua_panic(\"Método abstrato.\"); return create_nulo(); }");
+            return;
+        }
         ClassDecl previousClass = currentClass;
         currentClass = node.ownerClass;
         TypeExpr previousReturn = functionReturn;
         functionReturn = node.type_expr;
         emit(proto ~ " {\n(void)argc; (void)argv;");
         if (node.isMethod && !node.isStatic)
-            emit(formatD("volatile delegua_value %s=argv[0];", cName("isto")));
+            emit(formatD("volatile delegua_value %s=argv[0];", cName("isto")) ~ acknowledgeBinding(cName("isto")));
         foreach (size_t i, FnArg arg; node.args)
         {
             dstring binding = formatD("volatile delegua_value %s;", cName(arg.name));
@@ -791,6 +857,8 @@ private:
                         i + (node.isMethod && !node.isStatic ? 1 : 0), setup, cName(arg.name), value));
             }
         }
+        foreach (FnArg arg; node.args)
+            emit(acknowledgeBinding(cName(arg.name)));
         foreach (FnArg arg; node.args)
             if (arg.type_expr !is null)
                 emit(formatD("%s=%s;", cName(arg.name), checked(cName(arg.name), arg.rest
@@ -864,6 +932,8 @@ private:
         emit(formatD("%s=create_classe(%s,%s);", name, cString(c.name), c.superClass is null
                 ? "delegua_classe_objeto()"d : classValue(c.superClass)));
         emit(formatD("delegua_classe_fechada(%s);", name));
+        if (c.isAbstract)
+            emit(formatD("delegua_classe_abstrata(%s);", name));
     }
 
     void initializeClass(ClassDecl c)
@@ -881,14 +951,27 @@ private:
                 emit(formatD("delegua_classe_decoradores_campo(%s,%s,%s);", name,
                         cString(field.name), metadata(field.decorators)));
         foreach (ClassField field; c.fields)
-            emit(formatD("delegua_classe_campo_tipo(%s,%s,%s,%s);", name, cString(field.name),
-                    descriptor(field.type), field.access));
+            if (field.isEnum)
+                emit(formatD("delegua_classe_enum(%s,%s,%s,%s);", name, cString(field.name),
+                        materialize(field.value), field.access));
+            else
+                emit(formatD("delegua_classe_campo_tipo(%s,%s,%s,%s);", name, cString(field.name),
+                        descriptor(field.type), field.access));
+        foreach (ClassField field; c.fields)
+            if (field.initializer !is null)
+                emit(formatD("delegua_classe_inicializador(%s,%s,%s);", name, cString(field.name),
+                        functionValue(field.initializer)));
         foreach (ClassField field; c.fields)
             if (field.customAccess)
                 emit(formatD("delegua_classe_acessor(%s,%s,%s,%s,%s,%s);", name, cString(field.name),
                         field.getter is null ? "create_nulo()"d : functionValue(field.getter),
                         field.setter is null ? "create_nulo()"d : functionValue(field.setter),
                         field.readable ? 1 : 0, field.writable ? 1 : 0));
+        foreach (ClassDecl contract; c.interfaces)
+        {
+            createClassShell(contract);
+            emit(formatD("delegua_classe_interface(%s,%s);", name, classValue(contract)));
+        }
         foreach (FnDecl method; c.methods)
             if (!method.accessor)
                 emit(formatD(method.isStatic

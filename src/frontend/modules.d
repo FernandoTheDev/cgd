@@ -78,7 +78,9 @@ class ModuleLoader
                 return;
             }
             string path = literal.value.to!string;
-            if (path == "cgd:json" || path == "cgd:rede" || path == "cgd:colecoes")
+            if (path == "cgd:json" || path == "cgd:rede" || path == "cgd:colecoes" || path == "cgd:arquivos"
+                    || path == "cgd:matematica" || path == "cgd:nativo" || path == "cgd:textos"
+                    || path == "cgd:estatistica" || path == "cgd:caminhos")
                 path = buildPath(dirName(thisExePath()), "bibliotecas", path[4 .. $] ~ ".delegua");
             else if (path.startsWith("cgd:"))
             {

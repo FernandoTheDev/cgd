@@ -1,6 +1,6 @@
 //# 1
 //? fase: compilacao
-//? erro: segurança
-// Código nativo arbitrário não faz parte do perfil compilado.
+//? erro: FFI C exige @definicao
+// Uma classe estrangeira sem assinatura/biblioteca explícita é inválida.
 classe estrangeira Biblioteca {
 }

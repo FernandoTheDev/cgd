@@ -1,0 +1,83 @@
+// Caminhos POSIX lexicais. Não consulta disco, não resolve links e não é sandbox.
+classe Caminhos {
+    estatico absoluto(caminho: texto): logico {
+        retorna caminho.fatiar(0, 1) == "/"
+    }
+
+    estatico normalizar(caminho: texto): texto {
+        var partes: texto[] = []
+        var raiz: logico = Caminhos.absoluto(caminho)
+        para cada parte: texto em caminho.dividir("/") {
+            se parte != "" e parte != "." {
+                se parte == ".." {
+                    se tamanho(partes) > 0 e partes[- 1] != ".." {
+                        partes.removerUltimo()
+                    }
+                    senao se !raiz {
+                        partes.adicionar("..")
+                    }
+                } senao {
+                    partes.adicionar(parte)
+                }
+            }
+        }
+        var resultado: texto = partes.juntar("/")
+        se raiz {
+            retorna "/" + resultado
+        }
+        retorna resultado == "" ? ".": resultado
+    }
+
+    estatico juntar(partes: texto[]): texto {
+        var resultado: texto = ""
+        para cada parte: texto em partes {
+            se Caminhos.absoluto(parte) {
+                resultado = parte
+            }
+            senao se parte != "" {
+                resultado = resultado == "" ? parte: resultado + "/" + parte
+            }
+        }
+        retorna Caminhos.normalizar(resultado)
+    }
+
+    estatico nome(caminho: texto): texto {
+        var normal: texto = Caminhos.normalizar(caminho)
+        se normal == "/" {
+            retorna "/"
+        }
+        var partes: texto[] = normal.dividir("/")
+        retorna partes[- 1]
+    }
+
+    estatico diretorio(caminho: texto): texto {
+        var normal: texto = Caminhos.normalizar(caminho)
+        se normal == "/" {
+            retorna "/"
+        }
+        var partes: texto[] = normal.dividir("/")
+        partes.removerUltimo()
+        var resultado: texto = partes.juntar("/")
+        se resultado == "" {
+            retorna Caminhos.absoluto(normal) ? "/": "."
+        }
+        retorna resultado
+    }
+
+    estatico extensao(caminho: texto): texto {
+        var nome: texto = Caminhos.nome(caminho)
+        var ultimo: inteiro = - 1
+        para (var i: inteiro = 1; i < tamanho(nome); i++) {
+            se nome[i] == "." {
+                ultimo = i
+            }
+        }
+        retorna ultimo < 0 ? "": nome.fatiar(ultimo, tamanho(nome))
+    }
+
+    estatico semExtensao(caminho: texto): texto {
+        var normal: texto = Caminhos.normalizar(caminho)
+        var extensao: texto = Caminhos.extensao(normal)
+        retorna normal.fatiar(0, tamanho(normal) - tamanho(extensao))
+    }
+}

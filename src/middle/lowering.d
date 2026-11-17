@@ -1,6 +1,5 @@
 module middle.lowering;
 
-import backend.c.utils : formatD;
 import std.stdio;
 
 import frontend.parser;
@@ -127,7 +126,6 @@ private:
 
             case NodeKind.AssignStmt:
                 AssignStmt ass = cast(AssignStmt) node;
-                checkLValue(ass.left);
                 if (MemberExpr member = cast(MemberExpr) ass.left)
                     member.left = loweringExpr(member.left);
                 if (IndexExpr idx = cast(IndexExpr) ass.left)
@@ -187,8 +185,7 @@ private:
                 return loweringUnaryExpr(cast(UnaryExpr) node);
 
             default:
-                err.error(node.pos, "Era esperado uma declaração com efeito.");
-                return node;
+                return loweringExpr(node);
         }
     }
 
@@ -312,7 +309,6 @@ private:
                 return un.value;
             case TokenKind.PPlus:
             case TokenKind.MMinus:
-                checkLValue(un.value);
                 return un;
             default:
                 err.error(un.pos, "Operador unário inválido.");
@@ -346,21 +342,6 @@ private:
         CallExpr call = new CallExpr(new Identifier(name, pos), args, pos);
         call.runtimeCall = true;
         return call;
-    }
-
-    void checkLValue(Node node)
-    {
-        switch (node.kind)
-        {
-            case NodeKind.Identifier:
-            case NodeKind.MemberExpr:
-            case NodeKind.IndexExpr:
-                return;
-
-            default:
-                err.error(node.pos, "Era esperado uma expressão válida para atribuição de valor.");
-                return;
-        }
     }
 
 public:

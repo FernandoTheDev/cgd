@@ -100,3 +100,141 @@ HTTP em loopback e verifica JSON, limites e opções recusadas. `scripts/verific
 impede auto/foreach inferido em D e variáveis sem anotação nas bibliotecas.
 `python3 scripts/testar_extensao.py` abre um Extension Host com perfil temporário
 para testar a integração real, incluindo formatação e ausência de build por edição.
+
+## APIs ampliadas em 16/11/2026
+
+As mudanças desta seção foram incluídas nas suítes autorizadas em 17/11/2026.
+Consulte CONTINUIDADE.md para os resultados efetivamente concluídos.
+
+### JSON e HTTP por classes
+
+```delegua
+var json: qualquer = importar("cgd:json")
+var documento: qualquer = json.JSON.deTexto('{"pessoa":{"nome":"Ana"}}')
+escreva(documento.caminho(["pessoa", "nome"], "sem nome"))
+escreva(documento.obter("ausente", "padrão"))
+```
+
+`JSON.contem` distingue ausência de um valor nulo. `obter` aceita chave ou índice,
+inclusive índice negativo de vetor; `caminho` percorre uma lista de chaves/índices.
+`definir` aceita chave ou índice para escrita. `copiar` cria um documento independente
+por serialização e nova análise JSON.
+`chaves` exige objeto JSON. Chaves como "chaves", "obter" e "itens" não impedem
+a serialização; ela usa a enumeração controlada do runtime, sem despacho de propriedades. As funções soltas e `JSON.analisar/serializar`
+continuam disponíveis. Profundidade: 1..512; orçamento de nós: 1..1.000.000.
+
+```delegua
+var rede: qualquer = importar("cgd:rede")
+var cliente: qualquer = rede.ClienteHTTP("https://exemplo.com")
+cliente.cabecalho("Accept", "application/json")
+var resposta: qualquer = cliente.obter("/dados").exigirSucesso()
+escreva(resposta.status())
+escreva(resposta.json())
+```
+
+`ClienteHTTP` copia cabeçalhos/opções recebidos, oferece obter/enviar/enviarJSON/
+atualizar/remover e cria uma sessão isolada por requisição. `RespostaHTTP`
+oferece status/sucesso/texto/json/cabecalhos/url/erro/dados/exigirSucesso.
+`dados` retorna uma cópia do dicionário. `sucesso` exige libcurl sem erro e status
+200..299; falhas HTTP continuam inspecionáveis até chamar `exigirSucesso`.
+As APIs anteriores de sessão, streaming, multipart e lote permanecem disponíveis.
+
+### Arquivos e dicionários
+
+```delegua
+var arquivos: qualquer = importar("cgd:arquivos")
+var arquivo: qualquer = arquivos.Arquivo("dados.txt")
+arquivo.escrever("primeira linha\n").anexar("segunda linha\n")
+escreva(arquivo.ler())
+```
+
+`Arquivo` oferece caminho/existe/informacoes/tamanho/ler/linhas/escrever/anexar/
+remover. Cada chamada abre e fecha seu descritor; nenhum ponteiro ou descritor é
+exposto. Leitura padrão: 16 MiB, configurável até 64 MiB; escrita: até 64 MiB por
+chamada. Tamanhos/limites contam bytes. Textos de I/O preservam bytes nulos;
+operações Unicode sobre dados que não são UTF-8 continuam sujeitas à validação
+usual do runtime. `linhas` normaliza CRLF e preserva linhas vazias/quebra final.
+`remover` devolve falso se ausente. Diretórios/dispositivos/FIFOs não servem para
+ler/escrever; erros de I/O são exceções tratáveis. Escrita pode ser parcial se o
+sistema falhar; não é transação nem gravação atômica. Implementação POSIX/Linux.
+
+Dicionários oferecem `obter(chave, padrao = nulo)`, `definir(chave, valor)` (retorna
+o valor), `contemChave(chave)`, `itens()` (snapshot de tuplas chave/valor) e
+`limpar()` (muta a mesma coleção e retorna o dicionário). `obter` usa o padrão
+somente quando a chave não existe; nulo armazenado permanece nulo. `itens` faz
+cópia rasa, sem prometer ordem. Uma chave textual com o nome de um método continua
+ocultando esse método; use índices para acessar esses dados.
+
+### Ciclo de vida explícito
+
+```delegua
+classe Recurso {
+    construtor() {}
+    destrutor(): vazio {
+        escreva("liberado")
+    }
+}
+var recurso: Recurso = Recurso()
+tente {
+    escreva("usando")
+} finalmente {
+    destruir(recurso)
+}
+```
+
+`construtor`, `destrutor` e `estatico/estático` são palavras-chave. Destrutores
+são públicos, de instância, sem argumentos e com retorno vazio. Use
+`destruir(instancia)` para acionar a cadeia da classe derivada até as bases, uma
+vez por identidade; reentrada e chamadas repetidas são ignoradas. As bases ainda
+executam se uma classe falhar; a primeira exceção é relançada ao final. A cadeia
+é automática: não chame `super.destrutor()` dentro dela. Chamadas diretas ao método
+não substituem esse protocolo. A memória continua gerenciada pelo GC; não há
+execução de destrutores Delégua pelo coletor nem ao sair de escopos. `Sessao`
+implementa destrutor que fecha sua sessão nativa; `fechar` continua disponível.
+
+### Editor e prévia CTFE
+
+A extensão 0.3.0 inclui gramática lexical para coloração antes de o LSP responder,
+snippets e reconhecimento de executáveis com shebang cgd/delegua. Tokens semânticos
+continuam prevalecendo. Completion usa o catálogo de palavras-chave do lexer e
+membros do receptor respeitando escopo, herança, estáticos e visibilidade;
+`isto.` incompleto preserva o contexto da classe. Não há sugestões de nomes
+aleatórios do arquivo como fallback depois de ponto.
+
+O hover pode exibir o resultado de chamadas puras com argumentos constantes e de
+operações primitivas. A prévia trabalha sobre cópias, apenas sob demanda, com cache
+por revisão, até 100.000 instruções de VM por documento e limites de nós/
+profundidade. Constantes primitivas tipadas são aceitas se seu contrato passar.
+Não executa rede, I/O, funções comuns ou código arbitrário, nem invoca compilador
+C/linker. Falhas e limites omitem a prévia; variáveis mutáveis e recursos fora do
+subconjunto CTFE não recebem valores presumidos. Isso não constitui depuração.
+
+## Biblioteca padrão ampliada e erros visuais (0.5.0)
+
+A referência principal de uso é o [guia web próprio](linguagem.html), do início
+às APIs e decisões de escopo. Ela inclui os capítulos específicos de Textos,
+Estatistica, Caminhos e diagnósticos do runtime, com exemplos e contratos.
+
+`cgd:textos` oferece comecaCom, terminaCom, repetir, preencherInicio/preencherFim,
+linhas, digitos, juntar, inverter e contar. Texto é Unicode; digitos é ASCII
+explícito e inverter usa pontos de código, sem normalizar grafemas.
+
+`cgd:estatistica` oferece soma, media, minimo, maximo, mediana, variancia,
+desvioPadrao e resumo. A mediana copia antes de ordenar; a variância é incremental,
+populacional por padrão, com opção amostral. Entradas insuficientes falham.
+
+`cgd:caminhos` oferece absoluto, normalizar, juntar, nome, diretorio, extensao e
+semExtensao. São operações POSIX lexicais, sem acessar disco ou resolver links.
+Não use normalizar como garantia de confinamento de arquivos.
+
+Colecoes ganhou primeiro, ultimo, encontrar, contar, particionar, combinar,
+blocos e frequencias. Resultados novos preservam referências rasas aos elementos;
+callbacks não capturam ambiente. Arquivo ganhou lerJSON, escreverJSON e
+copiarPara. Matematica expõe funções trigonométricas inversas, logaritmos,
+arredondar/truncar, hipotenusa e resto via libm.
+
+Erros não capturados do runtime mostram `error[R0001]`, arquivo/linha/coluna,
+linha de fonte e marcador `^`. Sem o arquivo, a localização permanece. O trecho
+é lido do disco apenas ao reportar falha e pode divergir se o fonte foi modificado.
+Controles são escapados; leitura/janela são limitadas e FIFO não bloqueia o
+renderer. Exceções capturadas não são impressas automaticamente.

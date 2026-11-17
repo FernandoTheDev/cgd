@@ -10,9 +10,9 @@ private Diagnostics analyze(string source)
     Program program = new Parser(new Lexer(source, "seguranca.delegua", diagnostics).tokenizer(), diagnostics).parse();
     Context context = new Context;
     TypeRegistry registry = new TypeRegistry;
-    new Sema1(context, diagnostics).analyze(program);
-    new Sema2(registry).analyze(program);
-    new Sema3(context, registry, new TypeResolver(registry, diagnostics), diagnostics).analyze(program);
+    new DeclarationAnalysis(context, registry, diagnostics).analyze(program);
+
+    new SemanticAnalyzer(context, registry, new TypeResolver(registry, diagnostics), diagnostics).analyze(program);
     if (!diagnostics.hasErrors())
         new StaticSafety(diagnostics).analyze(program);
     return diagnostics;

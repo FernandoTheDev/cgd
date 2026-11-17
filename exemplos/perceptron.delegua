@@ -7,10 +7,12 @@ var resultadoEsperado: numero = 0
 
 enquanto (erro == 1) {
     se (entrada[0] == 1)
-    se (entrada[1] == 1)
-    resultadoEsperado = 1
-    senão
-    resultadoEsperado = 0
+    se (entrada[1] == 1) {
+        resultadoEsperado = 1
+    }
+    senão {
+        resultadoEsperado = 0
+    }
 
     var somatoria: qualquer = pesos[0] * entrada[0] + pesos[1] * entrada[1]
     var resultado: numero = 0

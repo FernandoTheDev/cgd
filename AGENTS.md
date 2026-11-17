@@ -120,3 +120,25 @@ com depuração. Não compilar/linkar por edição do documento.
 - Métodos estáticos possuem isStatic; não recebem isto. Campos estáticos continuam
   sem suporte. Bibliotecas JSON/rede/coleções e extensão estão em evolução; ler
   docs/CONTINUIDADE.md antes de retomar e registrar testes efetivamente executados.
+
+## Evolução autorizada em 16/11/2026
+
+- O usuário pediu FFI da wiki, revogando a exclusão anterior para assinaturas
+  estrangeiras explícitas. Classes @definicao usam ABI C escalar ou ABI gerenciada
+  delegua; não expor ponteiros/structs/callbacks por conversões presumidas.
+- JSON/rede/arquivos usam cgd:nativo.Primitivas; entradas cgd\* antigas continuam
+  por compatibilidade. Não remover antes de validar migração e API C anterior.
+- Classes abstratas/interfaces, enums numéricos e arrows foram acrescentados.
+  Leia docs/evolucao-linguagem.md para diferenças e pendências reais da wiki.
+- **Não executar testes até ordem explícita do usuário.** Builds/formatação e
+  instalação do LSP foram autorizados, mas não substituem validação funcional.
+
+## Solicitação de 17/11/2026
+
+- O usuário autorizou executar todos os testes necessários; a suspensão anterior
+  foi revogada. Documentar testes e resultados reais em CONTINUIDADE.md.
+- Compatibilidade JS, integração com classes de host JavaScript, herança de
+  interfaces e múltiplos dialetos são exclusões definitivas, não pendências.
+- Defaults tipados e inicializadores de atributos devem criar coleções por
+  instância, respeitar herança, ordem, contratos e efeitos. Não construir classes
+  implicitamente. Tipos inferidos aparecem como dicas virtuais, sem editar fontes.

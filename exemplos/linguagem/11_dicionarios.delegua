@@ -2,6 +2,7 @@
 var original: dicionario = { a: 1 }
 
 var dados: dicionario = { ... original, b: 2 }
+// dados.obter("b")
 
 const { a: qualquer, b: qualquer } = dados
 escreva(a, b)

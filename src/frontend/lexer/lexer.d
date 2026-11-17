@@ -1,12 +1,15 @@
 module frontend.lexer.lexer;
 
 import std.utf : decodeFront, decode;
+import std.uni : unicodeAlpha = isAlpha, isMark;
+import std.math : isFinite;
 import std.exception : enforce;
 import std.format;
 import std.stdio;
 import std.conv;
 
 import frontend.lexer.token;
+import frontend.lexer.keywords;
 import errors;
 
 class Lexer
@@ -19,46 +22,20 @@ private:
     uint offset, l_offset;
     uint line = 1;
 
-    static immutable TokenKind[dstring] keywords = [
-        "var": TokenKind.Var, "variavel": TokenKind.Var, "variável": TokenKind.Var,
-
-        "const": TokenKind.Const, "fixo": TokenKind.Const, "constante": TokenKind.Const,
-
-        "funcao": TokenKind.Fn, "função": TokenKind.Fn, "se": TokenKind.If,
-        "senao": TokenKind.Else, "senão": TokenKind.Else, "enquanto": TokenKind.While,
-        "para": TokenKind.For, "escolha": TokenKind.Switch, "caso": TokenKind.Case,
-        "padrao": TokenKind.Default, "padrão": TokenKind.Default, "assercao": TokenKind.Assert,
-        "asserção": TokenKind.Assert, "importar": TokenKind.Import, "tente": TokenKind.Try,
-        "pegue": TokenKind.Catch, "finalmente": TokenKind.Finally, "falhar": TokenKind.Fail,
-        "classe": TokenKind.Class, "herda": TokenKind.Extends, "isto": TokenKind.This,
-        "super": TokenKind.Super, "publico": TokenKind.Public, "público": TokenKind.Public,
-        "privado": TokenKind.Private, "protegido": TokenKind.Protected, "cada": TokenKind.Each,
-        "fazer": TokenKind.Do, "sustar": TokenKind.Break, "continua": TokenKind.Continue,
-        "e": TokenKind.And, "ou": TokenKind.Or, "em": TokenKind.In, "contem": TokenKind.In,
-        "contém": TokenKind.In, "nao": TokenKind.Bang, "não": TokenKind.Bang,
-
-        "nulo": TokenKind.Null, "verdadeiro": TokenKind.True, "falso": TokenKind.False,
-
-        "tipo": TokenKind.Type, "de": TokenKind.Of, "retorne": TokenKind.Return,
-        "retorna": TokenKind.Return,
-    ];
-
     static immutable TokenKind[dstring] symbols = [
-        "@": TokenKind.At, "?": TokenKind.Question, "**": TokenKind.Pow, "\\": TokenKind.IntDiv,
-        "?:": TokenKind.Coalesce, "<-": TokenKind.Equals, "+=": TokenKind.PlusAssign,
-        "-=": TokenKind.MinusAssign, "*=": TokenKind.MulAssign, "/=": TokenKind.DivAssign,
-        "%=": TokenKind.ModAssign, "+": TokenKind.Plus, "++": TokenKind.PPlus,
-        "-": TokenKind.Minus, "--": TokenKind.MMinus, "/": TokenKind.Slash, "*": TokenKind.Star,
-        "%": TokenKind.Modulo, "=": TokenKind.Equals, "==": TokenKind.EEquals,
-        "!=": TokenKind.NEquals, "(": TokenKind.LParen, ")": TokenKind.RParen,
-
-        "{": TokenKind.LBrace, "}": TokenKind.RBrace, "[": TokenKind.LBracket,
-        "]": TokenKind.RBracket, ":": TokenKind.Colon, ";": TokenKind.Semicolon,
-        "!": TokenKind.Bang, ",": TokenKind.Comma, ".": TokenKind.Dot, "<": TokenKind.LThan,
-        "<=": TokenKind.LEquals, ">": TokenKind.GThan, ">=": TokenKind.GEquals,
-
-        "&": TokenKind.BITAnd, "|": TokenKind.BITOr, "~": TokenKind.BITNot, "^": TokenKind.BITXor,
-        "<<": TokenKind.BITSL, ">>": TokenKind.BITSR,
+        "=>": TokenKind.Arrow, "@": TokenKind.At, "?": TokenKind.Question, "**": TokenKind.Pow,
+        "\\": TokenKind.IntDiv, "?:": TokenKind.Coalesce, "<-": TokenKind.Equals,
+        "+=": TokenKind.PlusAssign, "-=": TokenKind.MinusAssign, "*=": TokenKind.MulAssign,
+        "/=": TokenKind.DivAssign, "%=": TokenKind.ModAssign, "+": TokenKind.Plus,
+        "++": TokenKind.PPlus, "-": TokenKind.Minus, "--": TokenKind.MMinus,
+        "/": TokenKind.Slash, "*": TokenKind.Star, "%": TokenKind.Modulo, "=": TokenKind.Equals,
+        "==": TokenKind.EEquals, "!=": TokenKind.NEquals, "(": TokenKind.LParen,
+        ")": TokenKind.RParen, "{": TokenKind.LBrace, "}": TokenKind.RBrace,
+        "[": TokenKind.LBracket, "]": TokenKind.RBracket, ":": TokenKind.Colon,
+        ";": TokenKind.Semicolon, "!": TokenKind.Bang, ",": TokenKind.Comma, ".": TokenKind.Dot,
+        "<": TokenKind.LThan, "<=": TokenKind.LEquals, ">": TokenKind.GThan,
+        ">=": TokenKind.GEquals, "&": TokenKind.BITAnd, "|": TokenKind.BITOr,
+        "~": TokenKind.BITNot, "^": TokenKind.BITXor, "<<": TokenKind.BITSL, ">>": TokenKind.BITSR,
     ];
 
     static immutable TokenKind[dstring] ctfeKeywords = ["puro": TokenKind.Pure,];
@@ -74,9 +51,7 @@ public:
 
     bool isAlpha(dchar c)
     {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' // validação para caracteres especiais
-         || (c >= 192 && c <= 214)
-            || (c >= 216 && c <= 246) || (c >= 248 && c <= 255);
+        return c == '_' || unicodeAlpha(c);
     }
 
     bool isNumeric(dchar c)
@@ -86,7 +61,7 @@ public:
 
     bool isAlphaNumeric(dchar c)
     {
-        return isNumeric(c) || isAlpha(c);
+        return isNumeric(c) || isAlpha(c) || isMark(c);
     }
 
     bool isAtEnd(uint n = 0)
@@ -131,18 +106,13 @@ public:
         return false;
     }
 
-    dstring lexNumer(dchar ch, uint start, out bool isDouble, out bool dotInvalid, bool d = true)
+    dstring lexNumer(dchar ch, uint start, out bool isDouble, out bool dotInvalid)
     {
         dstring buffer = [ch];
         while (!isAtEnd() && (isNumeric(peek()) || peek() == '.'))
         {
             if (peek() == '.' && !isAtEnd(1) && isAlpha(future(1)))
                 break;
-            if (!d && peek() == '.')
-            {
-                err.error(getPosition(start, line), "Sem permissão para numeros flutuantes.");
-                continue;
-            }
             if (peek() == '.' && isDouble)
             {
                 dotInvalid = true;
@@ -223,13 +193,18 @@ public:
                     {
                         kind = TokenKind.Double;
                         raw.d = to!double(buffer);
+                        if (!isFinite(raw.d))
+                        {
+                            err.errorCode(getPosition(start, line), invalidNumericLiteral);
+                            continue;
+                        }
                     }
                     else
                         raw.i = to!long(buffer);
                 }
                 catch (ConvException)
                 {
-                    err.error(getPosition(start, line), "Literal numérico inválido ou fora do intervalo.");
+                    err.errorCode(getPosition(start, line), invalidNumericLiteral);
                     continue;
                 }
 

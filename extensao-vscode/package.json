@@ -2,7 +2,7 @@
   "name": "cgd",
   "displayName": "CGD — Delégua compilada",
   "description": "LSP local do CGD, tokens semânticos, navegação e compilação explícita de Delégua.",
-  "version": "0.2.0",
+  "version": "0.7.0",
   "publisher": "fernandothedev",
   "license": "Apache-2.0",
   "repository": {
@@ -35,12 +35,19 @@
         "id": "cgd",
         "aliases": [
           "CGD / Delégua",
+          "Delégua",
+          "delegua",
           "cgd"
         ],
         "extensions": [
           ".delegua"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "firstLine": "^#!.*\\b(cgd|delegua)\\b",
+        "icon": {
+          "light": "./images/delegua.png",
+          "dark": "./images/delegua.png"
+        }
       }
     ],
     "commands": [
@@ -104,7 +111,7 @@
         },
         "cgd.inlayHints": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Exibir dicas de tipos fornecidas pelo LSP."
         }
       }
@@ -112,10 +119,11 @@
     "configurationDefaults": {
       "[cgd]": {
         "editor.semanticHighlighting.enabled": true,
-        "editor.inlayHints.enabled": "offUnlessPressed",
+        "editor.inlayHints.enabled": "on",
         "editor.tabSize": 4,
         "editor.insertSpaces": true,
-        "editor.defaultFormatter": "fernandothedev.cgd"
+        "editor.defaultFormatter": "fernandothedev.cgd",
+        "editor.wordBasedSuggestions": "off"
       }
     },
     "semanticTokenScopes": [
@@ -154,6 +162,12 @@
           ],
           "operator": [
             "keyword.operator"
+          ],
+          "type": [
+            "support.type.delegua"
+          ],
+          "decorator": [
+            "entity.name.function.decorator"
           ]
         }
       }
@@ -178,6 +192,19 @@
             "properties": {}
           }
         }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "cgd",
+        "scopeName": "source.delegua.cgd",
+        "path": "./syntaxes/delegua.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "cgd",
+        "path": "./snippets/delegua.json"
       }
     ]
   },

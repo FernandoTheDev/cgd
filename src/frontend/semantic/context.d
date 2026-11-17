@@ -4,6 +4,7 @@ import std.exception : enforce;
 import std.algorithm;
 
 import frontend.semantic;
+import frontend.parser.ast : VarDecl;
 
 class Scope
 {
@@ -121,6 +122,15 @@ public:
         foreach_reverse (Scope sc; scopes[0 .. limit])
             if (Symbol* sym = sc.get(name))
                 return sym.isFn() ? sym : null;
+        return null;
+    }
+
+    /// Só os membros escalares são reutilizados; nunca captura o mapa do enum.
+    VarDecl enumDeclaration(dstring name)
+    {
+        foreach_reverse (Scope scopeEntry; scopes[0 .. cursor + 1])
+            if (Symbol* symbol = scopeEntry.get(name))
+                return symbol.isVar() && (cast(SymbolVar)*symbol).node.isEnum ? (cast(SymbolVar)*symbol).node : null;
         return null;
     }
 

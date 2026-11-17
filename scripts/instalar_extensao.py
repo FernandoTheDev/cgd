@@ -59,6 +59,8 @@ files = [
         "LICENSE",
     )
 ]
+for source_directory in ("syntaxes", "snippets", "images"):
+    files += [path for path in (EXT / source_directory).rglob("*") if path.is_file()]
 files += [path for path in bundle.rglob("*") if path.is_file()]
 queue = list(manifest.get("dependencies", {}))
 included = set()

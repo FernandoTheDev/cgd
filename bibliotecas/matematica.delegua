@@ -1,0 +1,44 @@
+// ABI C real: numero/real corresponde a double, sem ponteiros expostos.
+@definicao(biblioteca = "m", prefixo = "")
+classe estrangeira Matematica {
+    @definicao(simbolo = "cos")
+    cosseno(x: numero): numero;
+    @definicao(simbolo = "sin")
+    seno(x: numero): numero;
+    @definicao(simbolo = "tan")
+    tangente(x: numero): numero;
+    @definicao(simbolo = "sqrt")
+    raizQuadrada(x: numero): numero;
+    @definicao(simbolo = "pow")
+    potencia(base: numero, expoente: numero): numero;
+    @definicao(simbolo = "fabs")
+    absoluto(x: numero): numero;
+    @definicao(simbolo = "floor")
+    piso(x: numero): numero;
+    @definicao(simbolo = "ceil")
+    teto(x: numero): numero;
+    @definicao(simbolo = "log")
+    logaritmo(x: numero): numero;
+    @definicao(simbolo = "exp")
+    exponencial(x: numero): numero;
+    @definicao(simbolo = "asin")
+    arcoSeno(x: numero): numero;
+    @definicao(simbolo = "acos")
+    arcoCosseno(x: numero): numero;
+    @definicao(simbolo = "atan")
+    arcoTangente(x: numero): numero;
+    @definicao(simbolo = "atan2")
+    arcoTangente2(y: numero, x: numero): numero;
+    @definicao(simbolo = "log10")
+    logaritmo10(x: numero): numero;
+    @definicao(simbolo = "log2")
+    logaritmo2(x: numero): numero;
+    @definicao(simbolo = "round")
+    arredondar(x: numero): numero;
+    @definicao(simbolo = "trunc")
+    truncar(x: numero): numero;
+    @definicao(simbolo = "hypot")
+    hipotenusa(x: numero, y: numero): numero;
+    @definicao(simbolo = "fmod")
+    resto(x: numero, divisor: numero): numero;
+}

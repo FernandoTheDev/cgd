@@ -28,8 +28,7 @@ Veja os [exemplos executáveis](../exemplos/README.md) e o
 
 ## Exclusões deliberadas
 
-Upvalues e closures que capturam estado são bloqueados com aviso e erro. FFI,
-classes estrangeiras, ponteiros arbitrários, importação dinâmica, NPM e execução
+Upvalues e closures que capturam estado são bloqueados com aviso e erro. Ponteiros arbitrários, importação dinâmica, NPM e execução
 dinâmica de código não são expostos. Bibliotecas do ambiente `delegua-node` não
 são automaticamente bibliotecas do CGD.
 
@@ -68,7 +67,7 @@ estáticos em pontos falíveis, sem chamadas adicionais a cada linha.
 
 ## Bibliotecas e editor próprios
 
-Os namespaces `cgd:json`, `cgd:rede` e `cgd:colecoes` oferecem bibliotecas Delégua
+Os namespaces `cgd:json`, `cgd:rede`, `cgd:colecoes` e `cgd:arquivos` oferecem bibliotecas Delégua
 tipadas. JSON tem métodos estáticos e instâncias; rede usa libcurl gerenciada
 sem ponteiros/callbacks arbitrários. A API C completa de libcurl não é exposta.
 Métodos estáticos são herdados, mas campos estáticos não estão implementados.
@@ -79,3 +78,23 @@ oferece completion por tipo/escopo/namespace, hover, referências, definição,
 rename, signature help, símbolos e semantic tokens. Não compila por edição; não
 há DAP ou indexação irrestrita do disco. Consulte [Ferramentas](ferramentas.md)
 para APIs, instalação, limites e comandos de teste.
+
+Recursos acrescentados em 16/11/2026: destrutores
+explícitos via `destruir`, novos métodos de dicionário, JSON navegável e classes
+ClienteHTTP/RespostaHTTP/Arquivo. O hover tem prévia CTFE limitada sob demanda.
+Esses recursos e seus contratos estão em [Ferramentas](ferramentas.md); a liberação
+de recursos não depende da execução de código Delégua pelo GC.
+
+A revisão 0.4.0 acrescenta classes abstratas, interfaces, enums numéricos, arrows e
+FFI C/gerenciada. Veja [diferenças e motivos](evolucao-linguagem.md), incluindo
+a lista de recursos da wiki que ainda não estão implementados. A validação atual está registrada em CONTINUIDADE.md.
+
+Em 17/11/2026 o usuário excluiu definitivamente compatibilidade JavaScript, classes
+de host JS, herança de interfaces e múltiplos dialetos. Esses recursos não são
+planos futuros. Os testes da implementação foram autorizados nessa data; resultados
+reais estão em [CONTINUIDADE.md](CONTINUIDADE.md).
+
+A revisão 0.5.0 acrescenta defaults tipados, inicialização de atributos por
+instância, comparação textual ordenada, dicas de inferência e diagnósticos
+visuais do runtime. A stdlib inclui Textos, Estatistica e Caminhos, além das
+expansões de Colecoes, Arquivo e Matematica.

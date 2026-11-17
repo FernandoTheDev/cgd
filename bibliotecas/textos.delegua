@@ -1,0 +1,86 @@
+// Operações Unicode, sem normalizar ou modificar os argumentos.
+classe Textos {
+    estatico comecaCom(valor: texto, prefixo: texto): logico {
+        retorna valor.fatiar(0, tamanho(prefixo)) == prefixo
+    }
+
+    estatico terminaCom(valor: texto, sufixo: texto): logico {
+        se tamanho(sufixo) > tamanho(valor) {
+            retorna falso
+        }
+        retorna valor.fatiar(tamanho(valor) - tamanho(sufixo), tamanho(valor)) == sufixo
+    }
+
+    estatico repetir(valor: texto, vezes: inteiro): texto {
+        se vezes < 0 ou vezes > 1000000 {
+            falhar "Quantidade de repetições inválida"
+        }
+        se tamanho(valor) > 0 e vezes > 1000000 \ tamanho(valor) {
+            falhar "Texto repetido excede um milhão de pontos de código"
+        }
+        var resultado: texto = ""
+        var parte: texto = valor
+        var restante: inteiro = vezes
+        enquanto restante > 0 {
+            se restante % 2 == 1 {
+                resultado += parte
+            }
+            restante = restante \ 2
+            se restante > 0 {
+                parte += parte
+            }
+        }
+        retorna resultado
+    }
+
+    estatico preencherInicio(valor: texto, comprimento: inteiro, preenchimento: texto = " "): texto {
+        se tamanho(preenchimento) != 1 ou comprimento < 0 {
+            falhar "Preenchimento exige um caractere e tamanho não negativo"
+        }
+        se tamanho(valor) >= comprimento {
+            retorna valor
+        }
+        retorna Textos.repetir(preenchimento, comprimento - tamanho(valor)) + valor
+    }
+
+    estatico preencherFim(valor: texto, comprimento: inteiro, preenchimento: texto = " "): texto {
+        se tamanho(preenchimento) != 1 ou comprimento < 0 {
+            falhar "Preenchimento exige um caractere e tamanho não negativo"
+        }
+        se tamanho(valor) >= comprimento {
+            retorna valor
+        }
+        retorna valor + Textos.repetir(preenchimento, comprimento - tamanho(valor))
+    }
+
+    estatico linhas(valor: texto): texto[] {
+        retorna valor.substituir("\r\n", "\n").substituir("\r", "\n").dividir("\n")
+    }
+
+    estatico digitos(valor: texto): logico {
+        se tamanho(valor) == 0 {
+            retorna falso
+        }
+        para cada ch: texto em valor {
+            se ch < "0" ou ch > "9" {
+                retorna falso
+            }
+        }
+        retorna verdadeiro
+    }
+
+    estatico juntar(valores: texto[], separador: texto = ""): texto {
+        retorna valores.juntar(separador)
+    }
+
+    estatico inverter(valor: texto): texto {
+        retorna valor[: : - 1]
+    }
+
+    estatico contar(valor: texto, trecho: texto): inteiro {
+        se tamanho(trecho) == 0 {
+            falhar "Trecho vazio não possui contagem não sobreposta"
+        }
+        retorna tamanho(valor.dividir(trecho)) - 1
+    }
+}

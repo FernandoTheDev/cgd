@@ -1,0 +1,74 @@
+// I/O controlado de arquivos regulares. Cada operação fecha seu descritor nativo.
+classe Arquivo {
+    privado {
+        _caminho: texto
+    }
+
+    construtor(caminho: texto) {
+        isto._caminho = caminho
+    }
+
+    caminho(): texto {
+        retorna isto._caminho
+    }
+
+    existe(): logico {
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        retorna Primitivas.arquivoInfo(isto._caminho).obter("existe")
+    }
+
+    informacoes(): dicionario {
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        retorna Primitivas.arquivoInfo(isto._caminho)
+    }
+
+    tamanho(): inteiro {
+        var info: dicionario = isto.informacoes()
+        se !info.obter("existe") {
+            falhar "Arquivo não encontrado: ${isto._caminho}"
+        }
+        retorna info.obter("tamanho")
+    }
+
+    ler(limite: inteiro = 16777216): texto {
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        retorna Primitivas.arquivoLer(isto._caminho, limite)
+    }
+
+    linhas(limite: inteiro = 16777216): texto[] {
+        // Preserva linhas vazias e a quebra final; normaliza CRLF.
+        retorna isto.ler(limite).substituir("\r\n", "\n").dividir("\n")
+    }
+
+    escrever(conteudo: texto): Arquivo {
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        Primitivas.arquivoEscrever(isto._caminho, conteudo, falso)
+        retorna isto
+    }
+
+    anexar(conteudo: texto): Arquivo {
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        Primitivas.arquivoEscrever(isto._caminho, conteudo, verdadeiro)
+        retorna isto
+    }
+
+    remover(): logico {
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        retorna Primitivas.arquivoRemover(isto._caminho)
+    }
+
+    lerJSON(limite: inteiro = 16777216): qualquer {
+        var json: qualquer = importar("cgd:json")
+        retorna json.analisar(isto.ler(limite))
+    }
+
+    escreverJSON(valor: qualquer): Arquivo {
+        var json: qualquer = importar("cgd:json")
+        retorna isto.escrever(json.serializar(valor))
+    }
+
+    copiarPara(destino: texto, limite: inteiro = 16777216): Arquivo {
+        var dados: texto = isto.ler(limite)
+        retorna Arquivo(destino).escrever(dados)
+    }
+}

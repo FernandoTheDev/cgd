@@ -5,10 +5,12 @@ immutable dstring[] cgdNativeNames = [
     "cgdCurlMultipart"d, "cgdCurlEnviar"d, "cgdCurlReceber"d, "cgdCurlEsperar"d,
     "cgdCurlWsEnviar"d, "cgdCurlWsReceber"d, "cgdCurlInfo"d, "cgdCurlUrl"d, "cgdCurlDetalhes"d,
     "cgdCurlErro"d, "cgdCurlData"d, "cgdCurlManter"d, "cgdCodigoUnicode"d,
-    "cgdCaractereUnicode"d, "cgdNumeroFinito"d, "cgdNumeroTexto"d
+    "cgdCaractereUnicode"d, "cgdNumeroFinito"d, "cgdNumeroTexto"d,
+    "cgdArquivoLer"d, "cgdArquivoEscrever"d,
+    "cgdArquivoInfo"d, "cgdArquivoRemover"d, "destruir"d, "cgdDicionarioItens"d
 ];
 immutable size_t[] cgdNativeArities = [
-    0, 1, 1, 3, 1, 1, 0, 0, 1, 1, 2, 2, 2, 3, 3, 2, 2, 3, 0, 1, 1, 1, 1, 1, 1, 1
+    0, 1, 1, 3, 1, 1, 0, 0, 1, 1, 2, 2, 2, 3, 3, 2, 2, 3, 0, 1, 1, 1, 1, 1, 1, 1, 2, 3, 1, 1, 1, 1
 ];
 static assert(cgdNativeNames.length == cgdNativeArities.length);
 
@@ -17,7 +19,7 @@ immutable dstring[] cgdNativeReturns = [
     "dicionario[]"d, "texto"d, "texto"d,
     "texto"d, "qualquer"d, "dicionario"d, "dicionario"d, "logico"d, "dicionario"d, "dicionario"d,
     "qualquer"d, "texto"d, "dicionario"d, "texto"d, "inteiro"d, "vazio"d, "inteiro"d, "texto"d,
-    "logico"d, "texto"d
+    "logico"d, "texto"d, "texto"d, "inteiro"d, "dicionario"d, "logico"d, "vazio"d, "qualquer[]"d
 ];
 immutable dstring[][] cgdNativeParameters = [
     [], ["sessao:qualquer"d], ["sessao:qualquer"d],
@@ -29,7 +31,9 @@ immutable dstring[][] cgdNativeParameters = [
     ["sessao:qualquer"d, "dados:texto"d, "flags:inteiro"d], ["sessao:qualquer"d, "limite:inteiro"d],
     ["sessao:qualquer"d, "nome:texto"d], ["url:texto"d, "parte:texto"d, "valor:qualquer"d], [],
     ["codigo:inteiro"d], ["data:texto"d], ["sessao:qualquer"d], ["caractere:texto"d],
-    ["codigo:inteiro"d], ["valor:qualquer"d], ["valor:qualquer"d]
+    ["codigo:inteiro"d], ["valor:qualquer"d], ["valor:qualquer"d],
+    ["caminho:texto"d, "limite:inteiro"d], ["caminho:texto"d, "conteudo:texto"d, "anexar:logico"d],
+    ["caminho:texto"d], ["caminho:texto"d], ["objeto:qualquer"d], ["dicionario:dicionario"d]
 ];
 static assert(cgdNativeReturns.length == cgdNativeNames.length);
 static assert(cgdNativeParameters.length == cgdNativeNames.length);

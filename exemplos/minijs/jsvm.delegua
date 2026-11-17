@@ -1,0 +1,1344 @@
+//! MiniJS: Fernando\nFibonacci(10): 55\nQuadrado(9): 81\nArray original: [2,4,6]\nIdade: 18\nArray atualizado: [2,40,6]\nSoma: 48\nContador: 0\nContador: 1\nContador: 2\nSoma local: 999\nSoma global: 48\nBooleano: true\nResto: 2
+//? fase: execucao
+//? diretorio: fonte
+// MiniJS: subconjunto de JavaScript compilado para bytecode.
+// Compilar na raiz: ./cgd exemplos/minijs/jsvm.delegua -s out/minijs
+// Executar: cd exemplos/minijs && ../../out/minijs
+// Sintaxe de entrada: function, let, const, if, else, while, return, console.log.
+// Implementacao em Delegua/CGD; nao e ECMAScript completo.
+
+enum TK {
+    Num, Id, Plus, Minus, Star, Slash, LP, RP, LB, RB,
+    Semi, Comma, Assign, Eq, Ne, Lt, Le, Gt, Ge,
+    Bang, And, Or, Let, Const, Function, Return, If, Else,
+    While, True, False, Print, End, Str, Null, Var, For,
+    Dot, LS, RS, Colon, Percent, Inc, Dec
+}
+
+classe Token {
+    k: TK
+    v: qualquer
+    pos: numero
+
+    construtor(k: TK, v: qualquer, pos: numero) {
+        isto.k = k
+        isto.v = v
+        isto.pos = pos
+    }
+}
+
+classe Lexer {
+    src: texto
+    p: numero
+    chars: dicionario
+    keywords: dicionario
+
+    construtor(src: texto) {
+        isto.src = src
+        isto.p = 0
+        isto.chars = { "+": TK.Plus, "-": TK.Minus, "*": TK.Star, "/": TK.Slash, "(": TK.LP, ")": TK.RP, "{": TK.LB, "}": TK.RB, ";": TK.Semi, ",": TK.Comma, ".": TK.Dot, "[": TK.LS, "]": TK.RS, ":": TK.Colon, "%": TK.Percent }
+        isto.keywords = { "let": TK.Let, "var": TK.Var, "for": TK.For, "null": TK.Null, "const": TK.Const, "function": TK.Function, "return": TK.Return, "if": TK.If, "else": TK.Else, "while": TK.While, "true": TK.True, "false": TK.False, "console.log": TK.Print }
+    }
+
+    fim(): logico {
+        retorna isto.p >= isto.src.tamanho()
+    }
+
+    dig(ch: texto): logico {
+        retorna "0123456789".contem(ch)
+    }
+
+    letra(ch: texto): logico {
+        retorna "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_$".contem(ch)
+    }
+
+    alnum(ch: texto): logico {
+        retorna isto.letra(ch) ou isto.dig(ch)
+    }
+
+    tokenize(): Token[] {
+        var out: Token[] = []
+        enquanto !isto.fim() {
+            const ini = isto.p
+            const c = isto.src[isto.p++]
+            se ([" ", "\n", "\t", "\r"].contem(c)) continua
+            se (c == "/" e !isto.fim() e isto.src[isto.p] == "/") {
+                enquanto !isto.fim() e isto.src[isto.p] != "\n" {
+                    isto.p++
+                }
+                continua
+            }
+            // Strings com escapes comuns. Comentarios // e /* ... */.
+            se (c == "/" e !isto.fim() e isto.src[isto.p] == "*") {
+                isto.p++
+                var closed = falso
+                enquanto !isto.fim() {
+                    se (isto.src[isto.p] == "*" e isto.p + 1 < isto.src.tamanho()) {
+                        se (isto.src[isto.p + 1] == "/") {
+                            isto.p = isto.p + 2
+                            closed = verdadeiro
+                            sustar
+                        }
+                    }
+                    isto.p++
+                }
+                se (!closed) falhar "Comentario nao terminado em ${ini}"
+                continua
+            }
+            se (c == "\"" ou c == "'") {
+                var parts: texto[] = []
+                var closed = falso
+                enquanto !isto.fim() {
+                    const ch = isto.src[isto.p++]
+                    se (ch == c) {
+                        closed = verdadeiro sustar
+                    }
+                    se (ch == "\\") {
+                        se (isto.fim()) falhar "Escape incompleto em ${ini}"
+                        const esc = isto.src[isto.p++]
+                        se (esc == "n") parts.empilhar("\n")
+                        senao se (esc == "r") parts.empilhar("\r")
+                        senao se (esc == "t") parts.empilhar("\t")
+                        senao se (esc == "\\") parts.empilhar("\\")
+                        senao se (esc == "\"") parts.empilhar("\"")
+                        senao se (esc == "'") parts.empilhar("'")
+                        senao falhar "Escape nao suportado em ${ini}: ${esc}"
+                    } senao {
+                        se (ch == "\n" ou ch == "\r") falhar "String nao terminada em ${ini}"
+                        parts.empilhar(ch)
+                    }
+                }
+                se (!closed) falhar "String nao terminada em ${ini}"
+                out.empilhar(Token(TK.Str, parts.juntar(""), ini))
+                continua
+            }
+            se (c == "+" e !isto.fim() e isto.src[isto.p] == "+") {
+                isto.p++
+                out.empilhar(Token(TK.Inc, "++", ini))
+                continua
+            }
+            se (c == "-" e !isto.fim() e isto.src[isto.p] == "-") {
+                isto.p++
+                out.empilhar(Token(TK.Dec, "--", ini))
+                continua
+            }
+            const op = isto.chars.obter(c, nulo)
+            se (op != nulo) {
+                out.empilhar(Token(op, c, ini))
+                continua
+            }
+            se (isto.dig(c)) {
+                enquanto !isto.fim() e isto.dig(isto.src[isto.p]) {
+                    isto.p++
+                }
+                out.empilhar(Token(TK.Num, numero(isto.src[ini: isto.p]), ini))
+                continua
+            }
+            se (isto.letra(c)) {
+                enquanto !isto.fim() e isto.alnum(isto.src[isto.p]) {
+                    isto.p++
+                }
+                var s = isto.src[ini: isto.p]
+                // Reconhece console.log como keyword composta.
+                se (s == "console") {
+                    se (isto.p + 4 <= isto.src.tamanho()) {
+                        se (isto.src[isto.p: isto.p + 4] == ".log") {
+                            isto.p = isto.p + 4
+                            s = "console.log"
+                        }
+                    }
+                }
+                const k = isto.keywords.obter(s, TK.Id)
+                out.empilhar(Token(k, s, ini))
+                continua
+            }
+            se (c == "=") {
+                se (!isto.fim() e isto.src[isto.p] == "=") {
+                    isto.p++
+                    se (!isto.fim() e isto.src[isto.p] == "=") isto.p++
+                    out.empilhar(Token(TK.Eq, "==", ini))
+                } senao {
+                    out.empilhar(Token(TK.Assign, "=", ini))
+                }
+                continua
+            }
+            se (c == "!") {
+                se (!isto.fim() e isto.src[isto.p] == "=") {
+                    isto.p++
+                    se (!isto.fim() e isto.src[isto.p] == "=") isto.p++
+                    out.empilhar(Token(TK.Ne, "!=", ini))
+                } senao {
+                    out.empilhar(Token(TK.Bang, "!", ini))
+                }
+                continua
+            }
+            se (c == "<") {
+                var k = TK.Lt
+                se (!isto.fim() e isto.src[isto.p] == "=") {
+                    isto.p++
+                    k = TK.Le
+                }
+                out.empilhar(Token(k, c, ini))
+                continua
+            }
+            se (c == ">") {
+                var k = TK.Gt
+                se (!isto.fim() e isto.src[isto.p] == "=") {
+                    isto.p++
+                    k = TK.Ge
+                }
+                out.empilhar(Token(k, c, ini))
+                continua
+            }
+            se (c == "&" e !isto.fim() e isto.src[isto.p] == "&") {
+                isto.p++
+                out.empilhar(Token(TK.And, "&&", ini))
+                continua
+            }
+            se (c == "|" e !isto.fim() e isto.src[isto.p] == "|") {
+                isto.p++
+                out.empilhar(Token(TK.Or, "||", ini))
+                continua
+            }
+            falhar "Caractere invalido '${c}' em ${ini}"
+        }
+        out.empilhar(Token(TK.End, nulo, isto.p))
+        retorna out
+    }
+}
+
+enum NK {
+    Num, Bool, Name, Unary, Binary, Call, Declare,
+    Set, Print, Expr, Block, If, While, Function, Return,
+    Str, Null, Array, Object, Access, SetAccess
+}
+
+classe abstrata Node {
+    k: NK
+
+    construtor(k: NK) {
+        isto.k = k
+    }
+}
+
+classe abstrata Expr herda Node {
+    construtor(k: NK) {
+        super(k)
+    }
+}
+
+classe abstrata Stmt herda Node {
+    construtor(k: NK) {
+        super(k)
+    }
+}
+
+classe Literal herda Expr {
+    v: qualquer
+
+    construtor(k: NK, v: qualquer) {
+        super(k) isto.v = v
+    }
+}
+
+classe NameExpr herda Expr {
+    name: texto
+
+    construtor(name: texto) {
+        super(NK.Name) isto.name = name
+    }
+}
+
+classe UnaryExpr herda Expr {
+    op: TK
+    x: Expr
+
+    construtor(op: TK, x: Expr) {
+        super(NK.Unary) isto.op = op isto.x = x
+    }
+}
+
+classe BinaryExpr herda Expr {
+    a: Expr
+    op: TK
+    b: Expr
+
+    construtor(a: Expr, op: TK, b: Expr) {
+        super(NK.Binary)
+        isto.a = a
+        isto.op = op
+        isto.b = b
+    }
+}
+
+classe CallExpr herda Expr {
+    name: texto
+    args: Expr[]
+
+    construtor(name: texto, args: Expr[]) {
+        super(NK.Call)
+        isto.name = name
+        isto.args = args
+    }
+}
+
+classe ArrayExpr herda Expr {
+    items: Expr[]
+
+    construtor(items: Expr[]) {
+        super(NK.Array) isto.items = items
+    }
+}
+
+classe ObjectExpr herda Expr {
+    keys: texto[]
+    values: Expr[]
+
+    construtor(keys: texto[], values: Expr[]) {
+        super(NK.Object)
+        isto.keys = keys
+        isto.values = values
+    }
+}
+
+classe AccessExpr herda Expr {
+    obj: Expr
+    key: Expr
+
+    construtor(obj: Expr, key: Expr) {
+        super(NK.Access)
+        isto.obj = obj
+        isto.key = key
+    }
+}
+
+classe SetAccessStmt herda Stmt {
+    obj: Expr
+    key: Expr
+    value: Expr
+
+    construtor(obj: Expr, key: Expr, value: Expr) {
+        super(NK.SetAccess)
+        isto.obj = obj
+        isto.key = key
+        isto.value = value
+    }
+}
+
+classe DeclareStmt herda Stmt {
+    name: texto
+    value: Expr
+    fixed: logico
+
+    construtor(name: texto, value: Expr, fixed: logico) {
+        super(NK.Declare)
+        isto.name = name
+        isto.value = value
+        isto.fixed = fixed
+    }
+}
+
+classe SetStmt herda Stmt {
+    name: texto
+    value: Expr
+
+    construtor(name: texto, value: Expr) {
+        super(NK.Set)
+        isto.name = name
+        isto.value = value
+    }
+}
+
+classe PrintStmt herda Stmt {
+    args: Expr[]
+
+    construtor(args: Expr[]) {
+        super(NK.Print) isto.args = args
+    }
+}
+
+classe ExprStmt herda Stmt {
+    x: Expr
+
+    construtor(x: Expr) {
+        super(NK.Expr) isto.x = x
+    }
+}
+
+classe BlockStmt herda Stmt {
+    items: Stmt[]
+
+    construtor(items: Stmt[]) {
+        super(NK.Block) isto.items = items
+    }
+}
+
+classe IfStmt herda Stmt {
+    test: Expr
+    yes: Stmt
+    no: qualquer
+
+    construtor(test: Expr, yes: Stmt, no: qualquer) {
+        super(NK.If)
+        isto.test = test
+        isto.yes = yes
+        isto.no = no
+    }
+}
+
+classe WhileStmt herda Stmt {
+    test: Expr
+    body: Stmt
+
+    construtor(test: Expr, body: Stmt) {
+        super(NK.While)
+        isto.test = test
+        isto.body = body
+    }
+}
+
+classe FunctionStmt herda Stmt {
+    name: texto
+    params: texto[]
+    body: BlockStmt
+
+    construtor(name: texto, params: texto[], body: BlockStmt) {
+        super(NK.Function)
+        isto.name = name
+        isto.params = params
+        isto.body = body
+    }
+}
+
+classe ReturnStmt herda Stmt {
+    x: Expr
+
+    construtor(x: Expr) {
+        super(NK.Return) isto.x = x
+    }
+}
+
+classe Parser {
+    ts: Token[]
+    p: numero
+    depth: numero
+
+    construtor(ts: Token[]) {
+        isto.ts = ts isto.p = 0 isto.depth = 0
+    }
+
+    cur(): Token {
+        retorna isto.ts[isto.p]
+    }
+
+    next(): Token {
+        se (isto.p + 1 >= isto.ts.tamanho()) retorna isto.cur()
+        retorna isto.ts[isto.p + 1]
+    }
+
+    is(k: TK): logico {
+        retorna isto.cur().k == k
+    }
+
+    take(): Token {
+        const t = isto.cur()
+        se (t.k != TK.End) isto.p++
+        retorna t
+    }
+
+    need(k: TK): Token {
+        se (!isto.is(k)) falhar "Token inesperado em ${isto.cur().pos}: ${isto.cur().k}"
+        retorna isto.take()
+    }
+
+    primary(): Expr {
+        se (isto.is(TK.Num)) retorna Literal(NK.Num, isto.take().v)
+        se (isto.is(TK.Str)) retorna Literal(NK.Str, isto.take().v)
+        se (isto.is(TK.Null)) {
+            isto.take() retorna Literal(NK.Null, nulo)
+        }
+        se (isto.is(TK.True)) {
+            isto.take() retorna Literal(NK.Bool, verdadeiro)
+        }
+        se (isto.is(TK.False)) {
+            isto.take() retorna Literal(NK.Bool, falso)
+        }
+        se (isto.is(TK.Id)) retorna NameExpr(isto.take().v)
+        se (isto.is(TK.LP)) {
+            isto.take()
+            const er = isto.expr()
+            isto.need(TK.RP)
+            retorna er
+        }
+        se (isto.is(TK.LS)) {
+            isto.take()
+            var items: Expr[] = []
+            se (!isto.is(TK.RS)) {
+                items.empilhar(isto.expr())
+                enquanto isto.is(TK.Comma) {
+                    isto.take()
+                    se (isto.is(TK.RS)) sustar
+                    items.empilhar(isto.expr())
+                }
+            }
+            isto.need(TK.RS)
+            retorna ArrayExpr(items)
+        }
+        se (isto.is(TK.LB)) {
+            isto.take()
+            var keys: texto[] = []
+            var values: Expr[] = []
+            se (!isto.is(TK.RB)) {
+                enquanto verdadeiro {
+                    var key: texto = ""
+                    se (isto.is(TK.Id) ou isto.is(TK.Str)) {
+                        key = isto.take().v
+                    } senao {
+                        falhar "Chave de objeto invalida em ${isto.cur().pos}"
+                    }
+                    isto.need(TK.Colon)
+                    keys.empilhar(key)
+                    values.empilhar(isto.expr())
+                    se (!isto.is(TK.Comma)) sustar
+                    isto.take()
+                    se (isto.is(TK.RB)) sustar
+                }
+            }
+            isto.need(TK.RB)
+            retorna ObjectExpr(keys, values)
+        }
+        falhar "Expressao esperada em ${isto.cur().pos}"
+    }
+
+    postfix(): Expr {
+        var x = isto.primary()
+        enquanto verdadeiro {
+            se (isto.is(TK.Dot)) {
+                isto.take()
+                const key = isto.need(TK.Id).v
+                x = AccessExpr(x, Literal(NK.Str, key))
+                continua
+            }
+            se (isto.is(TK.LS)) {
+                isto.take()
+                const key = isto.expr()
+                isto.need(TK.RS)
+                x = AccessExpr(x, key)
+                continua
+            }
+            se (isto.is(TK.LP)) {
+                // Nesta versao chamadas aceitam identificadores de funcoes globais.
+                se (x.k != NK.Name) falhar "Chamada de metodo/valor nao suportada"
+                isto.take()
+                var args: Expr[] = []
+                se (!isto.is(TK.RP)) {
+                    args.empilhar(isto.expr())
+                    enquanto isto.is(TK.Comma) {
+                        isto.take()
+                        args.empilhar(isto.expr())
+                    }
+                }
+                isto.need(TK.RP)
+                x = CallExpr(x.name, args)
+                continua
+            }
+            sustar
+        }
+        retorna x
+    }
+
+    unary(): Expr {
+        se (isto.is(TK.Minus) ou isto.is(TK.Plus) ou isto.is(TK.Bang)) {
+            const op = isto.take().k
+            retorna UnaryExpr(op, isto.unary())
+        }
+        retorna isto.postfix()
+    }
+
+    mul(): Expr {
+        var x = isto.unary()
+        enquanto isto.is(TK.Star) ou isto.is(TK.Slash) ou isto.is(TK.Percent) {
+            const op = isto.take().k
+            x = BinaryExpr(x, op, isto.unary())
+        }
+        retorna x
+    }
+
+    add(): Expr {
+        var x = isto.mul()
+        enquanto isto.is(TK.Plus) ou isto.is(TK.Minus) {
+            const op = isto.take().k
+            x = BinaryExpr(x, op, isto.mul())
+        }
+        retorna x
+    }
+
+    compare(): Expr {
+        var x = isto.add()
+        enquanto isto.is(TK.Lt) ou isto.is(TK.Le) ou isto.is(TK.Gt) ou isto.is(TK.Ge) {
+            const op = isto.take().k
+            x = BinaryExpr(x, op, isto.add())
+        }
+        retorna x
+    }
+
+    equality(): Expr {
+        var x = isto.compare()
+        enquanto isto.is(TK.Eq) ou isto.is(TK.Ne) {
+            const op = isto.take().k
+            x = BinaryExpr(x, op, isto.compare())
+        }
+        retorna x
+    }
+
+    logicalAnd(): Expr {
+        var x = isto.equality()
+        enquanto isto.is(TK.And) {
+            const op = isto.take().k
+            x = BinaryExpr(x, op, isto.equality())
+        }
+        retorna x
+    }
+
+    logicalOr(): Expr {
+        var x = isto.logicalAnd()
+        enquanto isto.is(TK.Or) {
+            const op = isto.take().k
+            x = BinaryExpr(x, op, isto.logicalAnd())
+        }
+        retorna x
+    }
+
+    expr(): Expr {
+        retorna isto.logicalOr()
+    }
+
+    block(): BlockStmt {
+        isto.need(TK.LB)
+        var items: Stmt[] = []
+        enquanto !isto.is(TK.RB) {
+            se (isto.is(TK.End)) falhar "Bloco nao fechado"
+            items.empilhar(isto.stmt())
+        }
+        isto.need(TK.RB)
+        retorna BlockStmt(items)
+    }
+
+    simpleStatement(terminator: TK): Stmt {
+        const left = isto.expr()
+        se (isto.is(TK.Assign)) {
+            isto.take()
+            const value = isto.expr()
+            isto.need(terminator)
+            se (left.k == NK.Name) retorna SetStmt(left.name, value)
+            se (left.k == NK.Access) retorna SetAccessStmt(left.obj, left.key, value)
+            falhar "Lado esquerdo de atribuicao invalido"
+        }
+        se (isto.is(TK.Inc) ou isto.is(TK.Dec)) {
+            const op = isto.take().k
+            isto.need(terminator)
+            var arithmetic = TK.Plus
+            se (op == TK.Dec) arithmetic = TK.Minus
+            const value = BinaryExpr(left, arithmetic, Literal(NK.Num, 1))
+            se (left.k == NK.Name) retorna SetStmt(left.name, value)
+            se (left.k == NK.Access) retorna SetAccessStmt(left.obj, left.key, value)
+            falhar "Incremento exige variavel ou propriedade"
+        }
+        isto.need(terminator)
+        retorna ExprStmt(left)
+    }
+
+    declaration(terminator: TK): Stmt {
+        const fixed = isto.take().k == TK.Const
+        const name = isto.need(TK.Id).v
+        var value: Expr = Literal(NK.Null, nulo)
+        se (isto.is(TK.Assign)) {
+            isto.take()
+            value = isto.expr()
+        } senao se (fixed) {
+            falhar "const exige inicializador"
+        }
+        isto.need(terminator)
+        retorna DeclareStmt(name, value, fixed)
+    }
+
+    stmt(): Stmt {
+        se (isto.is(TK.LB)) retorna isto.block()
+        se (isto.is(TK.Let) ou isto.is(TK.Const) ou isto.is(TK.Var)) {
+            retorna isto.declaration(TK.Semi)
+        }
+        se (isto.is(TK.For)) {
+            isto.take()
+            isto.need(TK.LP)
+            var init: Stmt = ExprStmt(Literal(NK.Null, nulo))
+            se (isto.is(TK.Semi)) {
+                isto.take()
+            } senao se (isto.is(TK.Let) ou isto.is(TK.Const) ou isto.is(TK.Var)) {
+                init = isto.declaration(TK.Semi)
+            } senao {
+                init = isto.simpleStatement(TK.Semi)
+            }
+            var test: Expr = Literal(NK.Bool, verdadeiro)
+            se (!isto.is(TK.Semi)) test = isto.expr()
+            isto.need(TK.Semi)
+            var step: Stmt = ExprStmt(Literal(NK.Null, nulo))
+            se (!isto.is(TK.RP)) step = isto.simpleStatement(TK.RP)
+            senao isto.take()
+            const body = isto.stmt()
+            retorna BlockStmt([init, WhileStmt(test, BlockStmt([body, step]))])
+        }
+        se (isto.is(TK.Function)) {
+            se (isto.depth != 0) falhar "Funcoes aninhadas nao suportadas"
+            isto.take()
+            const name = isto.need(TK.Id).v
+            isto.need(TK.LP)
+            var params: texto[] = []
+            se (!isto.is(TK.RP)) {
+                params.empilhar(isto.need(TK.Id).v)
+                enquanto isto.is(TK.Comma) {
+                    isto.take()
+                    params.empilhar(isto.need(TK.Id).v)
+                }
+            }
+            isto.need(TK.RP)
+            isto.depth++
+            const body = isto.block()
+            isto.depth--
+            retorna FunctionStmt(name, params, body)
+        }
+        se (isto.is(TK.Return)) {
+            se (isto.depth == 0) falhar "return fora de funcao"
+            isto.take()
+            const x = isto.expr()
+            isto.need(TK.Semi)
+            retorna ReturnStmt(x)
+        }
+        se (isto.is(TK.If)) {
+            isto.take()
+            isto.need(TK.LP)
+            const test = isto.expr()
+            isto.need(TK.RP)
+            const yes = isto.stmt()
+            var no = nulo
+            se (isto.is(TK.Else)) {
+                isto.take() no = isto.stmt()
+            }
+            retorna IfStmt(test, yes, no)
+        }
+        se (isto.is(TK.While)) {
+            isto.take()
+            isto.need(TK.LP)
+            const test = isto.expr()
+            isto.need(TK.RP)
+            retorna WhileStmt(test, isto.stmt())
+        }
+        se (isto.is(TK.Print)) {
+            isto.take()
+            isto.need(TK.LP)
+            var args: Expr[] = []
+            se (!isto.is(TK.RP)) {
+                args.empilhar(isto.expr())
+                enquanto isto.is(TK.Comma) {
+                    isto.take()
+                    args.empilhar(isto.expr())
+                }
+            }
+            isto.need(TK.RP)
+            isto.need(TK.Semi)
+            retorna PrintStmt(args)
+        }
+        retorna isto.simpleStatement(TK.Semi)
+    }
+
+    parse(): BlockStmt {
+        var items: Stmt[] = []
+        enquanto !isto.is(TK.End) {
+            items.empilhar(isto.stmt())
+        }
+        retorna BlockStmt(items)
+    }
+}
+
+enum OP {
+    CONST, GET, DEFINE, SET, ADD, SUB, MUL, DIV, NEG, NOT,
+    EQ, NE, LT, LE, GT, GE, JMP, JFALSE, JTRUE,
+    ENTER, LEAVE, CALL, RET, PRINT, POP, HALT,
+    ARRAY, OBJECT, ACCESS, SET_ACCESS, MOD
+}
+
+classe Ins {
+    op: OP
+    arg: qualquer
+
+    construtor(op: OP, arg: qualquer = nulo) {
+        isto.op = op
+        isto.arg = arg
+    }
+}
+
+classe Chunk {
+    code: Ins[]
+
+    construtor() {
+        isto.code = []
+    }
+
+    emit(op: OP, arg: qualquer = nulo): numero {
+        const pos = isto.code.tamanho()
+        isto.code.empilhar(Ins(op, arg))
+        retorna pos
+    }
+
+    patch(pos: numero, dest: numero) {
+        isto.code[pos].arg = dest
+    }
+
+    size(): numero {
+        retorna isto.code.tamanho()
+    }
+}
+
+classe FuncDef {
+    name: texto
+    params: texto[]
+    chunk: Chunk
+
+    construtor(name: texto, params: texto[], chunk: Chunk) {
+        isto.name = name
+        isto.params = params
+        isto.chunk = chunk
+    }
+}
+
+classe Module {
+    main: Chunk
+    funcs: dicionario
+
+    construtor() {
+        isto.main = Chunk() isto.funcs = {}
+    }
+}
+
+classe Compiler {
+    module: Module
+    chunk: Chunk
+
+    construtor() {
+        isto.module = Module()
+        isto.chunk = isto.module.main
+    }
+
+    expression(x: Expr) {
+        se (x.k == NK.Num ou x.k == NK.Bool ou x.k == NK.Str ou x.k == NK.Null) {
+            isto.chunk.emit(OP.CONST, x.v)
+            retorna
+        }
+        se (x.k == NK.Name) {
+            isto.chunk.emit(OP.GET, x.name)
+            retorna
+        }
+        se (x.k == NK.Array) {
+            para cada item em x.items {
+                isto.expression(item)
+            }
+            isto.chunk.emit(OP.ARRAY, x.items.tamanho())
+            retorna
+        }
+        se (x.k == NK.Object) {
+            var i = 0
+            enquanto i < x.keys.tamanho() {
+                isto.chunk.emit(OP.CONST, x.keys[i])
+                isto.expression(x.values[i])
+                i++
+            }
+            isto.chunk.emit(OP.OBJECT, x.keys.tamanho())
+            retorna
+        }
+        se (x.k == NK.Access) {
+            isto.expression(x.obj)
+            isto.expression(x.key)
+            isto.chunk.emit(OP.ACCESS)
+            retorna
+        }
+        se (x.k == NK.Call) {
+            para cada a em x.args {
+                isto.expression(a)
+            }
+            // Argumento do CALL: nome + aridade
+            isto.chunk.emit(OP.CALL, [x.name, x.args.tamanho()])
+            retorna
+        }
+        se (x.k == NK.Unary) {
+            isto.expression(x.x)
+            se (x.op == TK.Minus) isto.chunk.emit(OP.NEG)
+            se (x.op == TK.Bang) isto.chunk.emit(OP.NOT)
+            retorna
+        }
+        se (x.k == NK.Binary) {
+            // && e || usam salto para preservar curto-circuito.
+            se (x.op == TK.And) {
+                isto.expression(x.a)
+                const j = isto.chunk.emit(OP.JFALSE, - 1)
+                isto.chunk.emit(OP.POP)
+                isto.expression(x.b)
+                isto.chunk.patch(j, isto.chunk.size())
+                retorna
+            }
+            se (x.op == TK.Or) {
+                isto.expression(x.a)
+                const j = isto.chunk.emit(OP.JTRUE, - 1)
+                isto.chunk.emit(OP.POP)
+                isto.expression(x.b)
+                isto.chunk.patch(j, isto.chunk.size())
+                retorna
+            }
+            isto.expression(x.a)
+            isto.expression(x.b)
+            se (x.op == TK.Plus) isto.chunk.emit(OP.ADD)
+            se (x.op == TK.Minus) isto.chunk.emit(OP.SUB)
+            se (x.op == TK.Star) isto.chunk.emit(OP.MUL)
+            se (x.op == TK.Slash) isto.chunk.emit(OP.DIV)
+            se (x.op == TK.Percent) isto.chunk.emit(OP.MOD)
+            se (x.op == TK.Eq) isto.chunk.emit(OP.EQ)
+            se (x.op == TK.Ne) isto.chunk.emit(OP.NE)
+            se (x.op == TK.Lt) isto.chunk.emit(OP.LT)
+            se (x.op == TK.Le) isto.chunk.emit(OP.LE)
+            se (x.op == TK.Gt) isto.chunk.emit(OP.GT)
+            se (x.op == TK.Ge) isto.chunk.emit(OP.GE)
+            retorna
+        }
+        falhar "Expressao desconhecida"
+    }
+
+    statement(s: Stmt) {
+        se (s.k == NK.Block) {
+            isto.chunk.emit(OP.ENTER)
+            para cada item em s.items {
+                isto.statement(item)
+            }
+            isto.chunk.emit(OP.LEAVE)
+            retorna
+        }
+        se (s.k == NK.Declare) {
+            isto.expression(s.value)
+            isto.chunk.emit(OP.DEFINE, [s.name, s.fixed])
+            retorna
+        }
+        se (s.k == NK.Set) {
+            isto.expression(s.value)
+            isto.chunk.emit(OP.SET, s.name)
+            retorna
+        }
+        se (s.k == NK.Print) {
+            para cada a em s.args {
+                isto.expression(a)
+            }
+            isto.chunk.emit(OP.PRINT, s.args.tamanho())
+            retorna
+        }
+        se (s.k == NK.SetAccess) {
+            isto.expression(s.obj)
+            isto.expression(s.key)
+            isto.expression(s.value)
+            isto.chunk.emit(OP.SET_ACCESS)
+            retorna
+        }
+        se (s.k == NK.Expr) {
+            isto.expression(s.x)
+            isto.chunk.emit(OP.POP)
+            retorna
+        }
+        se (s.k == NK.Return) {
+            isto.expression(s.x)
+            isto.chunk.emit(OP.RET)
+            retorna
+        }
+        se (s.k == NK.If) {
+            isto.expression(s.test)
+            const jf = isto.chunk.emit(OP.JFALSE, - 1)
+            isto.chunk.emit(OP.POP)
+            isto.statement(s.yes)
+            const end = isto.chunk.emit(OP.JMP, - 1)
+            isto.chunk.patch(jf, isto.chunk.size())
+            isto.chunk.emit(OP.POP)
+            se (s.no != nulo) isto.statement(s.no)
+            isto.chunk.patch(end, isto.chunk.size())
+            retorna
+        }
+        se (s.k == NK.While) {
+            const begin = isto.chunk.size()
+            isto.expression(s.test)
+            const jf = isto.chunk.emit(OP.JFALSE, - 1)
+            isto.chunk.emit(OP.POP)
+            isto.statement(s.body)
+            isto.chunk.emit(OP.JMP, begin)
+            isto.chunk.patch(jf, isto.chunk.size())
+            isto.chunk.emit(OP.POP)
+            retorna
+        }
+        se (s.k == NK.Function) {
+            // Funcoes globais compiladas em chunks separados.
+            se (isto.module.funcs.obter(s.name, nulo) != nulo) {
+                falhar "Funcao duplicada: ${s.name}"
+            }
+            const old = isto.chunk
+            isto.chunk = Chunk()
+            para cada item em s.body.items {
+                isto.statement(item)
+            }
+            isto.chunk.emit(OP.CONST, nulo)
+            isto.chunk.emit(OP.RET)
+            isto.module.funcs[s.name] = FuncDef(s.name, s.params, isto.chunk)
+            isto.chunk = old
+            retorna
+        }
+        falhar "Instrucao desconhecida"
+    }
+
+    compile(ast: BlockStmt): Module {
+        // Pre-registra funcoes antes de compilar o programa principal.
+        para cada s em ast.items {
+            se (s.k == NK.Function) isto.statement(s)
+        }
+        para cada s em ast.items {
+            se (s.k != NK.Function) isto.statement(s)
+        }
+        isto.chunk.emit(OP.HALT)
+        retorna isto.module
+    }
+}
+
+// Escopos encadeados. Cada variavel tem um slot com valor e flag const.
+classe Slot {
+    value: qualquer
+    fixed: logico
+
+    construtor(value: qualquer, fixed: logico) {
+        isto.value = value
+        isto.fixed = fixed
+    }
+}
+
+classe Scope {
+    parent: qualquer
+    vars: dicionario
+
+    construtor(parent: qualquer = nulo) {
+        isto.parent = parent
+        isto.vars = {}
+    }
+
+    find(name: texto): qualquer {
+        const local = isto.vars.obter(name, nulo)
+        se (local != nulo) retorna local
+        se (isto.parent != nulo) retorna isto.parent.find(name)
+        retorna nulo
+    }
+
+    define(name: texto, value: qualquer, fixed: logico) {
+        se (isto.vars.obter(name, nulo) != nulo) falhar "Redeclaracao: ${name}"
+        isto.vars[name] = Slot(value, fixed)
+    }
+
+    get(name: texto): qualquer {
+        const slot = isto.find(name)
+        se (slot == nulo) falhar "Variavel nao definida: ${name}"
+        retorna slot.value
+    }
+
+    set(name: texto, value: qualquer) {
+        const slot = isto.find(name)
+        se (slot == nulo) falhar "Variavel nao definida: ${name}"
+        se (slot.fixed) falhar "Atribuicao a const: ${name}"
+        slot.value = value
+    }
+}
+
+// Cada chamada possui PC, pilha e escopo independentes.
+// A recursao usa frames nativos do metodo runFrame, mas executa bytecode.
+classe VM {
+    module: Module
+    globals: Scope
+    calls: numero
+    maxCalls: numero
+    steps: numero
+    maxSteps: numero
+
+    construtor(module: Module) {
+        isto.module = module
+        isto.globals = Scope()
+        isto.calls = 0
+        isto.maxCalls = 256
+        isto.steps = 0
+        isto.maxSteps = 2000000
+    }
+
+    truthy(x: qualquer): logico {
+        se (x == nulo) retorna falso
+        se (x == falso) retorna falso
+        se (x == 0) retorna falso
+        se (x == "") retorna falso
+        retorna verdadeiro
+    }
+
+    fmt(x: qualquer): texto {
+        se (x == nulo) retorna "null"
+        const t = tipo de x
+        se (t == "logico") {
+            se (x) retorna "true"
+            retorna "false"
+        }
+        se (t == "vetor" ou t == "tupla" ou t == "dicionario" ou t == "dicionário") {
+            const json: qualquer = importar("cgd:json")
+            retorna json.serializar(x)
+        }
+        retorna "${x}"
+    }
+
+    property(obj: qualquer, key: qualquer): qualquer {
+        se (obj == nulo) falhar "Acesso de propriedade em null"
+        const t = tipo de obj
+        se (t == "dicionario" ou t == "dicionário") {
+            retorna obj.obter("${key}", nulo)
+        }
+        se (t == "vetor" ou t == "tupla" ou t == "texto") {
+            se (key == "length") retorna obj.tamanho()
+            const index = inteiro(key)
+            se (index < 0 ou index >= obj.tamanho()) retorna nulo
+            retorna obj[index]
+        }
+        falhar "Propriedade nao suportada em ${t}"
+    }
+
+    putProperty(obj: qualquer, key: qualquer, value: qualquer) {
+        se (obj == nulo) falhar "Atribuicao de propriedade em null"
+        const t = tipo de obj
+        se (t == "dicionario" ou t == "dicionário") {
+            obj["${key}"] = value
+            retorna
+        }
+        se (t == "vetor") {
+            const index = inteiro(key)
+            se (index < 0 ou index >= obj.tamanho()) falhar "Indice fora do vetor"
+            obj[index] = value
+            retorna
+        }
+        falhar "Propriedade imutavel ou nao suportada: ${t}"
+    }
+
+    invoke(name: texto, args: qualquer[]): qualquer {
+        const fn = isto.module.funcs.obter(name, nulo)
+        se (fn == nulo) falhar "Funcao inexistente: ${name}"
+        se (args.tamanho() != fn.params.tamanho()) {
+            falhar "Aridade incorreta em ${name}"
+        }
+        se (isto.calls >= isto.maxCalls) falhar "Limite de chamadas excedido"
+        const env = Scope(isto.globals)
+        var i = 0
+        enquanto i < fn.params.tamanho() {
+            env.define(fn.params[i], args[i], falso)
+            i++
+        }
+        isto.calls++
+        const result = isto.runFrame(fn.chunk, env)
+        isto.calls--
+        retorna result
+    }
+
+    runFrame(chunk: Chunk, initial: Scope): qualquer {
+        var pc = 0
+        var sp = 0
+        var stack: dicionario = {}
+        var env = initial
+        enquanto pc < chunk.size() {
+            isto.steps++
+            se (isto.steps > isto.maxSteps) falhar "Limite de instrucoes excedido"
+            const ins = chunk.code[pc++]
+            const op = ins.op
+            const arg = ins.arg
+
+            se (op == OP.HALT) retorna nulo
+            se (op == OP.CONST) {
+                stack[sp] = arg
+                sp++
+                continua
+            }
+            se (op == OP.GET) {
+                stack[sp] = env.get(arg)
+                sp++
+                continua
+            }
+            se (op == OP.DEFINE) {
+                se (sp < 1) falhar "Stack underflow"
+                sp--
+                env.define(arg[0], stack[sp], arg[1])
+                continua
+            }
+            se (op == OP.SET) {
+                se (sp < 1) falhar "Stack underflow"
+                sp--
+                env.set(arg, stack[sp])
+                continua
+            }
+            se (op == OP.ENTER) {
+                env = Scope(env) continua
+            }
+            se (op == OP.LEAVE) {
+                se (env.parent == nulo) falhar "Scope underflow"
+                env = env.parent
+                continua
+            }
+            se (op == OP.JMP) {
+                pc = arg continua
+            }
+            se (op == OP.JFALSE) {
+                se (sp < 1) falhar "Stack underflow"
+                se (!isto.truthy(stack[sp - 1])) pc = arg
+                continua
+            }
+            se (op == OP.JTRUE) {
+                se (sp < 1) falhar "Stack underflow"
+                se (isto.truthy(stack[sp - 1])) pc = arg
+                continua
+            }
+            se (op == OP.POP) {
+                se (sp < 1) falhar "Stack underflow"
+                sp--
+                continua
+            }
+            se (op == OP.PRINT) {
+                se (sp < arg) falhar "Stack underflow"
+                var parts: texto[] = []
+                var i = sp - arg
+                enquanto i < sp {
+                    parts.empilhar(isto.fmt(stack[i]))
+                    i++
+                }
+                sp = sp - arg
+                escreva(parts.juntar(" "))
+                continua
+            }
+            se (op == OP.ARRAY) {
+                se (sp < arg) falhar "Stack underflow"
+                var items: qualquer[] = []
+                var i = sp - arg
+                enquanto i < sp {
+                    items.empilhar(stack[i])
+                    i++
+                }
+                sp = sp - arg
+                stack[sp] = items
+                sp++
+                continua
+            }
+            se (op == OP.OBJECT) {
+                se (sp < arg * 2) falhar "Stack underflow"
+                var obj: dicionario = {}
+                var i = sp - arg * 2
+                enquanto i < sp {
+                    obj[stack[i]] = stack[i + 1]
+                    i = i + 2
+                }
+                sp = sp - arg * 2
+                stack[sp] = obj
+                sp++
+                continua
+            }
+            se (op == OP.ACCESS) {
+                se (sp < 2) falhar "Stack underflow"
+                sp--
+                const key = stack[sp]
+                sp--
+                const obj = stack[sp]
+                stack[sp] = isto.property(obj, key)
+                sp++
+                continua
+            }
+            se (op == OP.SET_ACCESS) {
+                se (sp < 3) falhar "Stack underflow"
+                sp--
+                const value = stack[sp]
+                sp--
+                const key = stack[sp]
+                sp--
+                const obj = stack[sp]
+                isto.putProperty(obj, key, value)
+                continua
+            }
+            se (op == OP.RET) {
+                se (sp < 1) falhar "Stack underflow"
+                retorna stack[sp - 1]
+            }
+            se (op == OP.CALL) {
+                const argc = arg[1]
+                se (sp < argc) falhar "Stack underflow"
+                var args: qualquer[] = []
+                var i = sp - argc
+                enquanto i < sp {
+                    args.empilhar(stack[i])
+                    i++
+                }
+                sp = sp - argc
+                const result = isto.invoke(arg[0], args)
+                stack[sp] = result
+                sp++
+                continua
+            }
+            se (op == OP.NEG ou op == OP.NOT) {
+                se (sp < 1) falhar "Stack underflow"
+                se (op == OP.NEG) stack[sp - 1] = - stack[sp - 1]
+                se (op == OP.NOT) stack[sp - 1] = !isto.truthy(stack[sp - 1])
+                continua
+            }
+            se (sp < 2) falhar "Stack underflow"
+            sp--
+            const b = stack[sp]
+            sp--
+            const a = stack[sp]
+            var result: qualquer = nulo
+            se (op == OP.ADD) {
+                se (tipo de a == "texto" ou tipo de b == "texto") {
+                    result = isto.fmt(a) + isto.fmt(b)
+                } senao {
+                    result = a + b
+                }
+            }
+            senao se (op == OP.SUB) result = a - b
+            senao se (op == OP.MUL) result = a * b
+            senao se (op == OP.DIV) {
+                se (b == 0) falhar "Divisao por zero"
+                result = a / b
+            }
+            senao se (op == OP.MOD) {
+                se (b == 0) falhar "Resto por zero"
+                result = inteiro(a) % inteiro(b)
+            }
+            senao se (op == OP.EQ) result = a == b
+            senao se (op == OP.NE) result = a != b
+            senao se (op == OP.LT) result = a < b
+            senao se (op == OP.LE) result = a <= b
+            senao se (op == OP.GT) result = a > b
+            senao se (op == OP.GE) result = a >= b
+            senao falhar "Opcode desconhecido"
+            stack[sp] = result
+            sp++
+        }
+        retorna nulo
+    }
+
+    execute() {
+        isto.runFrame(isto.module.main, isto.globals)
+    }
+}
+
+const arquivos: qualquer = importar("cgd:arquivos")
+const caminho: texto = "programa.js"
+const arquivo: qualquer = arquivos.Arquivo(caminho)
+se (!arquivo.existe())
+falhar "Arquivo JavaScript nao encontrado: ${caminho}"
+
+const codigo: texto = arquivo.ler()
+const tokens = Lexer(codigo).tokenize()
+const ast = Parser(tokens).parse()
+const module = Compiler().compile(ast)
+VM(module).execute()

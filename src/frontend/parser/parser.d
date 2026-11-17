@@ -137,6 +137,18 @@ public:
         throw new ParseException;
     }
 
+    Token consumeMemberName(Position receiver)
+    {
+        if (recoverIncomplete && (isAtEnd() || check(TokenKind.RBrace) || check(TokenKind.RParen)
+                || check(TokenKind.Semicolon)))
+        {
+            Position position = new Position(receiver.filename, receiver.end, receiver.end);
+            err.errorCode(position, expectedToken, "Esperado nome de membro após '.'.");
+            return new Token(TokenKind.Identifier, TokenRaw._s("#incompleto"), position);
+        }
+        return consumeName("Esperado nome de membro após '.'.");
+    }
+
     bool isStmt()
     {
         switch (peek().kind) with (TokenKind)
@@ -158,11 +170,29 @@ public:
         }
     }
 
+    bool arrowParametersAhead()
+    {
+        size_t cursor = offset;
+        size_t depth = 1;
+        while (cursor < tokens.length)
+        {
+            TokenKind kind = tokens[cursor++].kind;
+            if (kind == TokenKind.LParen)
+                depth++;
+            if (kind == TokenKind.RParen && --depth == 0)
+                return cursor < tokens.length && (tokens[cursor].kind == TokenKind.Arrow
+                        || tokens[cursor].kind == TokenKind.Colon);
+        }
+        return false;
+    }
+
     bool isDecl()
     {
         switch (peek().kind) with (TokenKind)
         {
             case Class:
+            case Interface:
+            case Enum:
             case Var:
             case Const:
             case Fn:

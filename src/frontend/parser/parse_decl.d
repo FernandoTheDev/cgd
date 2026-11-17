@@ -92,7 +92,7 @@ public:
         return new SequenceStmt(body, names[0].pos);
     }
 
-    Node parseFnDecl(Token name = null)
+    Node parseFnDecl(Token name = null, bool signatureOnly = false)
     {
         if (name is null)
             name = p.consume(TokenKind.Identifier, "Esperado um identificador pro nome da função.");
@@ -138,26 +138,40 @@ public:
             retType = p.parseType.parse();
 
         // p.consume(TokenKind.LBrace, "Esperado '{' pro corpo da função.");
-        Node[] body = p.parseBody();
+        Node[] body;
+        if (!signatureOnly)
+            body = p.parseBody();
+        else
+            p.match(TokenKind.Semicolon);
         // p.consume(TokenKind.RBrace, "Esperado '}' após o corpo da função.");
 
         return new FnDecl(name.value.s, args, retType, body, p.getAndResetFlags(), name.pos);
     }
 
-    ClassDecl parseClass()
+    ClassDecl parseClass(bool isInterface = false)
     {
-        if (p.check(TokenKind.Identifier) && p.peek().value.s == "estrangeira")
-        {
-            Token unsafeToken = p.advance();
-            p.err.warning(unsafeToken.pos,
-                    "Classe estrangeira/FFI detectada: execução nativa arbitrária desabilitada.");
-            p.err.error(unsafeToken.pos, "FFI não é suportada neste compilador por segurança.");
-        }
+        bool isAbstract = p.match(TokenKind.Abstract) || isInterface;
+        bool isForeign = p.check(TokenKind.Foreign);
+        if (isForeign)
+            p.advance();
         Token name = p.consume(TokenKind.Identifier, "Esperado nome da classe.");
         dstring parent;
         if (p.match(TokenKind.Extends))
             parent = p.consume(TokenKind.Identifier, "Esperado nome da superclasse.").value.s;
         ClassDecl node = new ClassDecl(name.value.s, parent, name.pos);
+        node.isAbstract = isAbstract;
+        node.isInterface = isInterface;
+        node.isForeign = isForeign;
+        if (isInterface && parent.length)
+            p.err.error(name.pos, "Herança de interfaces ainda não é suportada.");
+        if (p.match(TokenKind.Implements))
+        {
+            do
+            {
+                node.interfaceNames ~= p.consume(TokenKind.Identifier, "Esperado nome de interface.").value.s;
+            }
+            while (p.match(TokenKind.Comma));
+        }
         p.consume(TokenKind.LBrace, "Esperado '{' na classe.");
         parseClassMembers(node, 0);
         return node;
@@ -177,13 +191,18 @@ public:
                 parseClassMembers(node, visibility);
                 continue;
             }
-            Decorator[] decorators = p.parseDecorators();
-            bool isStatic;
-            if (p.check(TokenKind.Identifier) && (p.peek().value.s == "estatico" || p.peek().value.s == "estático"))
+            if (p.match(TokenKind.Enum))
             {
-                p.advance();
-                isStatic = true;
+                VarDecl enumeration = cast(VarDecl) parseEnum();
+                ClassField field = ClassField(enumeration.name, enumeration.type_expr, access, enumeration.pos);
+                field.isEnum = true;
+                field.value = enumeration.value;
+                node.fields ~= field;
+                continue;
             }
+            Decorator[] decorators = p.parseDecorators();
+            bool abstractMethod = p.match(TokenKind.Abstract) || node.isInterface;
+            bool isStatic = p.match(TokenKind.Static);
             Token name = p.consumeName("Esperado propriedade ou método.");
             if (p.match(TokenKind.Colon))
             {
@@ -191,6 +210,12 @@ public:
                 if (isStatic)
                     p.err.errorCode(name.pos, unsupportedStaticField);
                 ClassField field = ClassField(name.value.s, type, access, name.pos);
+                if (p.match(TokenKind.Equals))
+                {
+                    field.value = p.parseExpr.parse();
+                    if (node.isInterface || node.isForeign)
+                        p.err.error(name.pos, "Inicializador exige atributo de classe gerenciada.");
+                }
                 if (p.match(TokenKind.LBrace))
                 {
                     field.customAccess = true;
@@ -233,9 +258,26 @@ public:
             }
             else
             {
-                FnDecl method = cast(FnDecl) parseFnDecl(name);
+                // Uma palavra de método ainda sendo digitada não descarta a classe.
+                if (p.recoverIncomplete && !p.check(TokenKind.LParen) && (p.isAtEnd() || p.check(TokenKind.RBrace)))
+                {
+                    p.err.errorCode(name.pos, expectedToken, "Esperado '(' ou ':' após nome do membro.");
+                    continue;
+                }
+                FnDecl method = cast(FnDecl) parseFnDecl(name, abstractMethod || node.isForeign);
+                method.isAbstract = abstractMethod;
+                if (abstractMethod && (!node.isAbstract || access == 1 || isStatic
+                        || name.value.s == "construtor" || name.value.s == "destrutor"))
+                    p.err.error(name.pos, "Método abstrato exige classe abstrata/interface e não pode ser estático ou de ciclo de vida.");
+                if (name.value.s == "destrutor")
+                {
+                    if (method.args.length || isStatic || access != 0
+                            || (method.type_expr.toStr() != "qualquer" && method.type_expr.toStr() != "vazio"))
+                        p.err.errorCode(name.pos, invalidDestructor);
+                    method.type_expr = new TypeExprNamed("vazio", name.pos);
+                }
                 method.isMethod = true;
-                method.isStatic = isStatic;
+                method.isStatic = isStatic || node.isForeign;
                 if (isStatic && name.value.s == "construtor")
                     p.err.errorCode(name.pos, staticConstructor);
                 method.ownerClass = node;
@@ -245,6 +287,42 @@ public:
             }
         }
         p.consume(TokenKind.RBrace, "Esperado '}' após classe/bloco de visibilidade.");
+    }
+
+    Node parseEnum()
+    {
+        Token name = p.consume(TokenKind.Identifier, "Esperado nome de enum.");
+        p.consume(TokenKind.LBrace, "Esperado '{'.");
+        Node[] keys, values;
+        bool[dstring] seen;
+        long next;
+        while (!p.isAtEnd() && !p.check(TokenKind.RBrace))
+        {
+            Token member = p.consumeName("Esperado membro de enum.");
+            if (member.value.s in seen)
+                p.err.error(member.pos, "Membro de enum duplicado.");
+            seen[member.value.s] = true;
+            long value = next;
+            if (p.match(TokenKind.Equals))
+            {
+                bool negative = p.match(TokenKind.Minus);
+                Token number = p.consume(TokenKind.Int, "Enum exige literal inteiro.");
+                value = negative ? -number.value.i : number.value.i;
+            }
+            keys ~= new StringLit(member.value.s, member.pos);
+            values ~= new IntLit(value, member.pos);
+            if (value == long.max && !p.check(TokenKind.RBrace))
+                p.err.error(member.pos, "Enum excede o intervalo inteiro.");
+            next = value == long.max ? value : value + 1;
+            if (!p.match(TokenKind.Comma))
+                break;
+        }
+        p.consume(TokenKind.RBrace, "Esperado '}'.");
+        MapLit members = new MapLit(keys, values, name.pos);
+        members.readonly = true;
+        VarDecl result = new VarDecl(name.value.s, members, true, new TypeExprNamed("dicionario", name.pos), name.pos);
+        result.isEnum = true;
+        return result;
     }
 
     Node parse()
@@ -258,6 +336,10 @@ public:
 
             case TokenKind.Class:
                 return parseClass();
+            case TokenKind.Interface:
+                return parseClass(true);
+            case TokenKind.Enum:
+                return parseEnum();
             case TokenKind.Fn:
                 bool envelope = p.match(TokenKind.Of);
                 if (envelope)

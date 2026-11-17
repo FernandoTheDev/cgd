@@ -1,0 +1,772 @@
+//! 90\n15\n25
+enum TokenKind {
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    LParen,
+    RParen,
+    Equal,
+    Semicolon,
+    Number,
+    Identifier,
+    Var,
+    Print,
+    EOF
+}
+
+// ========================================
+// TOKENS
+// ========================================
+
+classe Token {
+    categoria: TokenKind
+    valor: qualquer
+    offset: numero
+
+    construtor(categoria: TokenKind, valor: qualquer, offset: numero = 0) {
+        isto.categoria = categoria
+        isto.valor = valor
+        isto.offset = offset
+    }
+}
+
+// ========================================
+// LEXER
+// ========================================
+
+classe Lexer {
+    codigo: texto
+    offset: numero
+    operadores: dicionario
+
+    construtor(codigo: texto) {
+        isto.codigo = codigo
+        isto.offset = 0
+
+        isto.operadores = { "+": TokenKind.Plus, "-": TokenKind.Minus, "*": TokenKind.Star, "/": TokenKind.Slash, "(": TokenKind.LParen, ")": TokenKind.RParen, "=": TokenKind.Equal, ";": TokenKind.Semicolon }
+    }
+
+    ehOFim(): logico {
+        retorna isto.offset >= numero(isto.codigo.tamanho())
+    }
+
+    ehDigito(ch: texto): logico {
+        retorna "0123456789".contem(ch)
+    }
+
+    ehLetra(ch: texto): logico {
+        retorna "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contem(ch)
+    }
+
+    ehIdentificador(ch: texto): logico {
+        retorna isto.ehLetra(ch) ou isto.ehDigito(ch)
+    }
+
+    tokenize(): Token[] {
+        var tokens: Token[] = []
+
+        enquanto !isto.ehOFim() {
+            const inicio = isto.offset
+            const ch = isto.codigo[isto.offset++]
+
+            se ([" ", "\n", "\r", "\t"].contem(ch)) {
+                continua
+            }
+
+            const operador = isto.operadores.obter(ch, nulo)
+
+            se (operador != nulo) {
+                tokens.empilhar(Token(operador, ch, inicio))
+                continua
+            }
+
+            se (isto.ehDigito(ch)) {
+                enquanto !isto.ehOFim() e isto.ehDigito(isto.codigo[isto.offset]) {
+                    isto.offset++
+                }
+
+                const valor = numero(isto.codigo[inicio: isto.offset])
+
+                tokens.empilhar(Token(TokenKind.Number, valor, inicio))
+
+                continua
+            }
+
+            se (isto.ehLetra(ch)) {
+                enquanto !isto.ehOFim() e isto.ehIdentificador(isto.codigo[isto.offset]) {
+                    isto.offset++
+                }
+
+                const nome = isto.codigo[inicio: isto.offset]
+
+                se (nome == "var") {
+                    tokens.empilhar(Token(TokenKind.Var, nome, inicio))
+                    continua
+                }
+
+                se (nome == "escreva") {
+                    tokens.empilhar(Token(TokenKind.Print, nome, inicio))
+                    continua
+                }
+
+                tokens.empilhar(Token(TokenKind.Identifier, nome, inicio))
+
+                continua
+            }
+
+            falhar "Caractere desconhecido: '${ch}' na posicao ${inicio}"
+        }
+
+        tokens.empilhar(Token(TokenKind.EOF, nulo, isto.offset))
+
+        retorna tokens
+    }
+}
+
+// ========================================
+// AST
+// ========================================
+
+enum NodeKind {
+    Program,
+    NumberLiteral,
+    Variable,
+    BinaryExpression,
+    UnaryExpression,
+    VariableDeclaration,
+    Assignment,
+    PrintStatement,
+    ExpressionStatement
+}
+
+classe abstrata Node {
+    categoria: NodeKind
+
+    construtor(categoria: NodeKind) {
+        isto.categoria = categoria
+    }
+}
+
+classe abstrata ExpressionNode herda Node {
+    construtor(categoria: NodeKind) {
+        super(categoria)
+    }
+}
+
+classe abstrata StatementNode herda Node {
+    construtor(categoria: NodeKind) {
+        super(categoria)
+    }
+}
+
+classe ProgramNode herda Node {
+    declaracoes: StatementNode[]
+
+    construtor(declaracoes: StatementNode[]) {
+        super(NodeKind.Program)
+        isto.declaracoes = declaracoes
+    }
+}
+
+classe NumberNode herda ExpressionNode {
+    valor: numero
+
+    construtor(valor: numero) {
+        super(NodeKind.NumberLiteral)
+        isto.valor = valor
+    }
+}
+
+classe VariableNode herda ExpressionNode {
+    nome: texto
+
+    construtor(nome: texto) {
+        super(NodeKind.Variable)
+        isto.nome = nome
+    }
+}
+
+classe BinaryNode herda ExpressionNode {
+    esquerda: ExpressionNode
+    operador: TokenKind
+    direita: ExpressionNode
+
+    construtor(esquerda: ExpressionNode, operador: TokenKind, direita: ExpressionNode) {
+        super(NodeKind.BinaryExpression)
+
+        isto.esquerda = esquerda
+        isto.operador = operador
+        isto.direita = direita
+    }
+}
+
+classe UnaryNode herda ExpressionNode {
+    operador: TokenKind
+    operando: ExpressionNode
+
+    construtor(operador: TokenKind, operando: ExpressionNode) {
+        super(NodeKind.UnaryExpression)
+
+        isto.operador = operador
+        isto.operando = operando
+    }
+}
+
+classe VarDeclarationNode herda StatementNode {
+    nome: texto
+    inicializador: ExpressionNode
+
+    construtor(nome: texto, inicializador: ExpressionNode) {
+        super(NodeKind.VariableDeclaration)
+
+        isto.nome = nome
+        isto.inicializador = inicializador
+    }
+}
+
+classe AssignmentNode herda StatementNode {
+    nome: texto
+    valor: ExpressionNode
+
+    construtor(nome: texto, valor: ExpressionNode) {
+        super(NodeKind.Assignment)
+
+        isto.nome = nome
+        isto.valor = valor
+    }
+}
+
+classe PrintNode herda StatementNode {
+    expressao: ExpressionNode
+
+    construtor(expressao: ExpressionNode) {
+        super(NodeKind.PrintStatement)
+        isto.expressao = expressao
+    }
+}
+
+classe ExpressionStatementNode herda StatementNode {
+    expressao: ExpressionNode
+
+    construtor(expressao: ExpressionNode) {
+        super(NodeKind.ExpressionStatement)
+        isto.expressao = expressao
+    }
+}
+
+// ========================================
+// PARSER
+// ========================================
+
+classe Parser {
+    tokens: Token[]
+    offset: numero
+
+    construtor(tokens: Token[]) {
+        isto.tokens = tokens
+        isto.offset = 0
+    }
+
+    atual(): Token {
+        retorna isto.tokens[isto.offset]
+    }
+
+    proximo(): Token {
+        const indice = isto.offset + 1
+
+        se (indice >= numero(isto.tokens.tamanho())) {
+            retorna isto.atual()
+        }
+
+        retorna isto.tokens[indice]
+    }
+
+    verificar(categoria: TokenKind): logico {
+        retorna isto.atual().categoria == categoria
+    }
+
+    avancar(): Token {
+        const token = isto.atual()
+
+        se (token.categoria != TokenKind.EOF) {
+            isto.offset++
+        }
+
+        retorna token
+    }
+
+    consumir(categoria: TokenKind): Token {
+        const token = isto.atual()
+
+        se (token.categoria != categoria) {
+            falhar "Token inesperado na posicao ${token.offset}: ${token.categoria}"
+        }
+
+        retorna isto.avancar()
+    }
+
+    primario(): ExpressionNode {
+        const token = isto.atual()
+
+        se (token.categoria == TokenKind.Number) {
+            isto.avancar()
+            retorna NumberNode(token.valor)
+        }
+
+        se (token.categoria == TokenKind.Identifier) {
+            isto.avancar()
+            retorna VariableNode(token.valor)
+        }
+
+        se (token.categoria == TokenKind.LParen) {
+            isto.avancar()
+
+            const expr = isto.expressao()
+
+            isto.consumir(TokenKind.RParen)
+
+            retorna expr
+        }
+
+        falhar "Expressao invalida na posicao ${token.offset}"
+    }
+
+    unario(): ExpressionNode {
+        const token = isto.atual()
+
+        se (token.categoria == TokenKind.Plus ou token.categoria == TokenKind.Minus) {
+            isto.avancar()
+
+            retorna UnaryNode(token.categoria, isto.unario())
+        }
+
+        retorna isto.primario()
+    }
+
+    multiplicativo(): ExpressionNode {
+        var esquerda = isto.unario()
+
+        enquanto (isto.verificar(TokenKind.Star) ou isto.verificar(TokenKind.Slash)) {
+            const operador = isto.avancar()
+
+            const direita = isto.unario()
+
+            esquerda = BinaryNode(esquerda, operador.categoria, direita)
+        }
+
+        retorna esquerda
+    }
+
+    aditivo(): ExpressionNode {
+        var esquerda = isto.multiplicativo()
+
+        enquanto (isto.verificar(TokenKind.Plus) ou isto.verificar(TokenKind.Minus)) {
+            const operador = isto.avancar()
+
+            const direita = isto.multiplicativo()
+
+            esquerda = BinaryNode(esquerda, operador.categoria, direita)
+        }
+
+        retorna esquerda
+    }
+
+    expressao(): ExpressionNode {
+        retorna isto.aditivo()
+    }
+
+    declaracaoVariavel(): StatementNode {
+        isto.consumir(TokenKind.Var)
+
+        const nome = isto.consumir(TokenKind.Identifier)
+
+        isto.consumir(TokenKind.Equal)
+
+        const inicializador = isto.expressao()
+
+        isto.consumir(TokenKind.Semicolon)
+
+        retorna VarDeclarationNode(nome.valor, inicializador)
+    }
+
+    atribuicao(): StatementNode {
+        const nome = isto.consumir(TokenKind.Identifier)
+
+        isto.consumir(TokenKind.Equal)
+
+        const valor = isto.expressao()
+
+        isto.consumir(TokenKind.Semicolon)
+
+        retorna AssignmentNode(nome.valor, valor)
+    }
+
+    instrucaoPrint(): StatementNode {
+        isto.consumir(TokenKind.Print)
+        isto.consumir(TokenKind.LParen)
+
+        const expr = isto.expressao()
+
+        isto.consumir(TokenKind.RParen)
+        isto.consumir(TokenKind.Semicolon)
+
+        retorna PrintNode(expr)
+    }
+
+    declaracao(): StatementNode {
+        se (isto.verificar(TokenKind.Var)) {
+            retorna isto.declaracaoVariavel()
+        }
+
+        se (isto.verificar(TokenKind.Print)) {
+            retorna isto.instrucaoPrint()
+        }
+
+        se (isto.verificar(TokenKind.Identifier) e isto.proximo().categoria == TokenKind.Equal) {
+            retorna isto.atribuicao()
+        }
+
+        const expr = isto.expressao()
+
+        isto.consumir(TokenKind.Semicolon)
+
+        retorna ExpressionStatementNode(expr)
+    }
+
+    parse(): ProgramNode {
+        var declaracoes: StatementNode[] = []
+
+        enquanto !isto.verificar(TokenKind.EOF) {
+            declaracoes.empilhar(isto.declaracao())
+        }
+
+        retorna ProgramNode(declaracoes)
+    }
+}
+
+// ========================================
+// BYTECODE
+// ========================================
+
+enum OpCode {
+    LOAD_CONST,
+    LOAD_VAR,
+    STORE_VAR,
+    DECLARE_VAR,
+    ADD,
+    SUB,
+    MUL,
+    DIV,
+    NEG,
+    PRINT,
+    POP,
+    HALT
+}
+
+classe Instruction {
+    opcode: OpCode
+    argumento: qualquer
+
+    construtor(opcode: OpCode, argumento: qualquer = nulo) {
+        isto.opcode = opcode
+        isto.argumento = argumento
+    }
+}
+
+classe Bytecode {
+    instrucoes: Instruction[]
+
+    construtor() {
+        isto.instrucoes = []
+    }
+
+    emitir(opcode: OpCode, argumento: qualquer = nulo) {
+        isto.instrucoes.empilhar(Instruction(opcode, argumento))
+    }
+}
+
+// ========================================
+// COMPILADOR
+// ========================================
+
+classe Compiler {
+    bytecode: Bytecode
+
+    construtor() {
+        isto.bytecode = Bytecode()
+    }
+
+    compilarExpressao(node: ExpressionNode) {
+        se (node.categoria == NodeKind.NumberLiteral) {
+            isto.bytecode.emitir(OpCode.LOAD_CONST, node.valor)
+
+            retorna
+        }
+
+        se (node.categoria == NodeKind.Variable) {
+            isto.bytecode.emitir(OpCode.LOAD_VAR, node.nome)
+
+            retorna
+        }
+
+        se (node.categoria == NodeKind.UnaryExpression) {
+            isto.compilarExpressao(node.operando)
+
+            se (node.operador == TokenKind.Minus) {
+                isto.bytecode.emitir(OpCode.NEG)
+                retorna
+            }
+
+            se (node.operador == TokenKind.Plus) {
+                retorna
+            }
+
+            falhar "Operador unario invalido"
+        }
+
+        se (node.categoria == NodeKind.BinaryExpression) {
+            isto.compilarExpressao(node.esquerda)
+            isto.compilarExpressao(node.direita)
+
+            se (node.operador == TokenKind.Plus) {
+                isto.bytecode.emitir(OpCode.ADD)
+                retorna
+            }
+
+            se (node.operador == TokenKind.Minus) {
+                isto.bytecode.emitir(OpCode.SUB)
+                retorna
+            }
+
+            se (node.operador == TokenKind.Star) {
+                isto.bytecode.emitir(OpCode.MUL)
+                retorna
+            }
+
+            se (node.operador == TokenKind.Slash) {
+                isto.bytecode.emitir(OpCode.DIV)
+                retorna
+            }
+
+            falhar "Operador binario invalido"
+        }
+
+        falhar "Expressao desconhecida"
+    }
+
+    compilarInstrucao(node: StatementNode) {
+        se (node.categoria == NodeKind.VariableDeclaration) {
+            isto.compilarExpressao(node.inicializador)
+
+            isto.bytecode.emitir(OpCode.DECLARE_VAR, node.nome)
+
+            retorna
+        }
+
+        se (node.categoria == NodeKind.Assignment) {
+            isto.compilarExpressao(node.valor)
+
+            isto.bytecode.emitir(OpCode.STORE_VAR, node.nome)
+
+            retorna
+        }
+
+        se (node.categoria == NodeKind.PrintStatement) {
+            isto.compilarExpressao(node.expressao)
+
+            isto.bytecode.emitir(OpCode.PRINT)
+
+            retorna
+        }
+
+        se (node.categoria == NodeKind.ExpressionStatement) {
+            isto.compilarExpressao(node.expressao)
+
+            isto.bytecode.emitir(OpCode.POP)
+
+            retorna
+        }
+
+        falhar "Instrucao desconhecida"
+    }
+
+    compilar(programa: ProgramNode): Bytecode {
+        para cada instrucao em programa.declaracoes {
+            isto.compilarInstrucao(instrucao)
+        }
+
+        isto.bytecode.emitir(OpCode.HALT)
+
+        retorna isto.bytecode
+    }
+}
+
+// ========================================
+// MAQUINA VIRTUAL
+// ========================================
+
+classe VM {
+    pc: numero
+    sp: numero
+
+    pilha: dicionario
+    variaveis: dicionario
+
+    bytecode: Bytecode
+
+    construtor(bytecode: Bytecode) {
+        isto.bytecode = bytecode
+
+        isto.pc = 0
+        isto.sp = 0
+
+        isto.pilha = {}
+        isto.variaveis = {}
+    }
+
+    push(valor: numero) {
+        isto.pilha[isto.sp] = valor
+        isto.sp++
+    }
+
+    pop(): numero {
+        se (isto.sp <= 0) {
+            falhar "Stack underflow"
+        }
+
+        isto.sp--
+
+        retorna isto.pilha[isto.sp]
+    }
+
+    executar() {
+        enquanto isto.pc < numero(isto.bytecode.instrucoes.tamanho()) {
+            const instrucao = isto.bytecode.instrucoes[isto.pc++]
+
+            const op = instrucao.opcode
+            const arg = instrucao.argumento
+
+            se (op == OpCode.HALT) {
+                retorna
+            }
+
+            se (op == OpCode.LOAD_CONST) {
+                isto.push(arg)
+                continua
+            }
+
+            se (op == OpCode.LOAD_VAR) {
+                const valor = isto.variaveis.obter(arg, nulo)
+
+                se (valor == nulo) {
+                    falhar "Variavel '${arg}' nao definida"
+                }
+
+                isto.push(valor)
+                continua
+            }
+
+            se (op == OpCode.DECLARE_VAR) {
+                se (isto.variaveis.obter(arg, nulo) != nulo) {
+                    falhar "Variavel '${arg}' ja declarada"
+                }
+
+                isto.variaveis[arg] = isto.pop()
+                continua
+            }
+
+            se (op == OpCode.STORE_VAR) {
+                se (isto.variaveis.obter(arg, nulo) == nulo) {
+                    falhar "Variavel '${arg}' nao definida"
+                }
+
+                isto.variaveis[arg] = isto.pop()
+                continua
+            }
+
+            se (op == OpCode.ADD) {
+                const b = isto.pop()
+                const a = isto.pop()
+
+                isto.push(a + b)
+                continua
+            }
+
+            se (op == OpCode.SUB) {
+                const b = isto.pop()
+                const a = isto.pop()
+
+                isto.push(a - b)
+                continua
+            }
+
+            se (op == OpCode.MUL) {
+                const b = isto.pop()
+                const a = isto.pop()
+
+                isto.push(a * b)
+                continua
+            }
+
+            se (op == OpCode.DIV) {
+                const b = isto.pop()
+                const a = isto.pop()
+
+                se (b == 0) {
+                    falhar "Divisao por zero"
+                }
+
+                isto.push(a / b)
+                continua
+            }
+
+            se (op == OpCode.NEG) {
+                isto.push(- isto.pop())
+                continua
+            }
+
+            se (op == OpCode.PRINT) {
+                escreva(isto.pop())
+                continua
+            }
+
+            se (op == OpCode.POP) {
+                isto.pop()
+                continua
+            }
+
+            falhar "Opcode desconhecido"
+        }
+    }
+}
+
+// ========================================
+// MAIN
+// ========================================
+
+const codigo = "
+    var a = 10;
+    var b = 20;
+
+    var resultado = (a + b) * 3;
+
+    escreva(resultado);
+
+    a = a + 5;
+
+    escreva(a);
+    escreva(-a + b * 2);
+"
+
+const lexer = Lexer(codigo)
+const tokens = lexer.tokenize()
+
+const parser = Parser(tokens)
+const ast = parser.parse()
+
+const compiler = Compiler()
+const bytecode = compiler.compilar(ast)
+
+const vm = VM(bytecode)
+vm.executar()

@@ -1,9 +1,8 @@
-// resolve os simbolos
-module frontend.semantic.sema1;
+// Declara símbolos e nomes de tipos antes de analisar os corpos.
+module frontend.semantic.declarations;
 
 import std.exception;
 import std.format;
-import std.stdio;
 
 import frontend.semantic;
 import frontend.parser;
@@ -12,18 +11,29 @@ import frontend;
 import errors;
 import utils;
 
-class Sema1
+class DeclarationAnalysis
 {
 private:
     Context context;
+    TypeRegistry registry;
     Diagnostics err;
 
     void analyze(Node node)
     {
         switch (node.kind)
         {
+            case NodeKind.VarDecl:
+                VarDecl enumeration = cast(VarDecl) node;
+                if (enumeration.isEnum)
+                {
+                    if (!registry.declareEnum(enumeration.name))
+                        err.error(node.pos, "Nome de enum conflita com tipo existente.");
+                }
+                return;
             case NodeKind.ClassDecl:
                 ClassDecl c = cast(ClassDecl) node;
+                registry.set(c.name, new TypeSemaClass(c));
+                registry.rememberClass(c);
                 foreach (dstring name; [
                     "Objeto"d, "Excecao"d, "texto"d, "numero"d, "número"d, "inteiro"d, "real"d,
                     "decimal"d, "longo"d, "logico"d, "lógico"d, "booleano"d, "binario"d,
@@ -49,7 +59,6 @@ private:
             err.error(node.pos, format("%s '%s' já existe.", ternary(sym.isFn(), "A função", "O simbolo"), name));
             alreadyDeclaredHere(name, getPosFromSymbol(sym), err);
         }
-        // writeln(node.args);
         context.set(name, new SymbolFn(node));
     }
 
@@ -132,9 +141,10 @@ private:
     }
 
 public:
-    this(Context context, Diagnostics err)
+    this(Context context, TypeRegistry registry, Diagnostics err)
     {
         this.context = context;
+        this.registry = registry;
         this.err = err;
     }
 

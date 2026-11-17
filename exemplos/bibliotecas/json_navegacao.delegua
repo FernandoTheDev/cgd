@@ -1,0 +1,9 @@
+//! Ana\n7\nnulo\nfalso
+var json: qualquer = importar("cgd:json")
+var documento: qualquer = json.JSON.deTexto('{"pessoa":{"nome":"Ana"},"valor":null}')
+escreva(documento.caminho(["pessoa", "nome"]))
+escreva(documento.obter("ausente", 7))
+escreva(documento.obter("valor", 7))
+var copia: qualquer = documento.copiar()
+copia.definir("novo", verdadeiro)
+escreva(documento.contem("novo"))

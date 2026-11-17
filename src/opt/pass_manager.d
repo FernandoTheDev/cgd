@@ -13,14 +13,14 @@ struct OptimizationStats
 }
 
 /// Cada execução tem caches locais; o limite é defesa, não a condição usual de parada.
-OptimizationStats optimize(Program program, Context context, CTFEContext ctfe)
+OptimizationStats optimize(Program program, CTFEContext ctfe)
 {
     OptimizationStats stats;
     foreach (int _; 0 .. 8)
     {
-        CgdConstantFolding folding = new CgdConstantFolding(program, context, ctfe);
+        CgdConstantFolding folding = new CgdConstantFolding(program, ctfe);
         folding.opt();
-        CgdDeadCode dead = new CgdDeadCode(program, context);
+        CgdDeadCode dead = new CgdDeadCode(program);
         dead.remove();
         stats.iterations++;
         stats.folded += folding.changes;

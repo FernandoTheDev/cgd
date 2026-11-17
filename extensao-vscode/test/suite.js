@@ -16,11 +16,16 @@ async function run() {
   const extension = vscode.extensions.getExtension('fernandothedev.cgd');
   assert(extension, 'Extensão não encontrada');
   await extension.activate();
+  const language = extension.packageJSON.contributes.languages.find((item) => item.id === 'cgd');
+  assert(language.extensions.includes('.delegua'), 'Associação .delegua ausente');
+  for (const icon of Object.values(language.icon)) {
+    assert(fs.existsSync(path.join(extension.extensionPath, icon)), 'Ícone ausente: ' + icon);
+  }
   const root = vscode.workspace.workspaceFolders[0].uri.fsPath;
   const file = path.join(root, 'teste.delegua');
   fs.writeFileSync(
     file,
-    'funcao dobro(valor:inteiro){retorna valor*2}\nvar resultado=dobro(3)\nescreva(resultado) // comentário\n',
+    'funcao dobro(valor:inteiro):inteiro{retorna valor*2}\nvar resultado=dobro(3)\nescreva(resultado) // comentário\n',
   );
   const uri = vscode.Uri.file(file);
   const document = await vscode.workspace.openTextDocument(uri);
@@ -32,6 +37,25 @@ async function run() {
     return value?.length ? value : null;
   }, 'Hover não respondeu');
   assert(hovers.length > 0);
+  assert(
+    hovers.some((hover) => hover.contents.some((content) => content.value.includes('Pureza'))),
+    'Pureza ausente no hover',
+  );
+  const hints = await vscode.commands.executeCommand(
+    'vscode.executeInlayHintProvider',
+    uri,
+    new vscode.Range(0, 0, document.lineCount, 0),
+  );
+  assert(
+    hints?.some((hint) =>
+      (typeof hint.label === 'string'
+        ? hint.label
+        : hint.label.map((part) => part.value).join('')
+      ).includes(': numero'),
+    ),
+    'Inferência virtual ausente: ' + JSON.stringify(hints),
+  );
+  assert(document.getText().includes('var resultado=dobro(3)'), 'Hint alterou o texto');
   const definitions = await vscode.commands.executeCommand(
     'vscode.executeDefinitionProvider',
     uri,
@@ -102,6 +126,9 @@ async function run() {
     passed: true,
     checks: [
       'activation',
+      'file association and icons',
+      'inferred type hints',
+      'purity hover',
       'hover',
       'definition',
       'completion',

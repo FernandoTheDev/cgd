@@ -21,9 +21,9 @@ private Diagnostics analyzed(string source)
         return diagnostics;
     Context context = new Context;
     TypeRegistry registry = new TypeRegistry;
-    new Sema1(context, diagnostics).analyze(program);
-    new Sema2(registry).analyze(program);
-    new Sema3(context, registry, new TypeResolver(registry, diagnostics), diagnostics).analyze(program);
+    new DeclarationAnalysis(context, registry, diagnostics).analyze(program);
+
+    new SemanticAnalyzer(context, registry, new TypeResolver(registry, diagnostics), diagnostics).analyze(program);
     return diagnostics;
 }
 

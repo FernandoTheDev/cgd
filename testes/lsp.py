@@ -341,7 +341,7 @@ with tempfile.TemporaryDirectory(prefix="cgd lsp ") as directory:
             },
         )["items"]
     }
-    assert labels == {"analisar", "serializar"}, labels
+    assert labels == {"analisar", "serializar", "deTexto"}, labels
     # A private override hides a public base method instead of leaking its suggestion.
     source = "classe Base{agir(): inteiro{retorna 1}} classe Filha herda Base{privado{agir(): inteiro{retorna 2}}} var filha: Filha=Filha()\nfilha."
     client.send(
@@ -398,6 +398,63 @@ with tempfile.TemporaryDirectory(prefix="cgd lsp ") as directory:
         {"textDocument": {"uri": untitled}, "position": {"line": 1, "character": 9}},
     )
     assert definition["uri"] == untitled, definition
+    # Inferred hints, decorator/type tokens and CTFE hover use the current revision.
+    source = '//>puro\nfuncao dobrar(n: inteiro): inteiro { retorna n*2 }\nvar inferido=dobrar(3)\nvar explicito: inteiro=1\n@definicao(biblioteca="m")\nclasse estrangeira M { @definicao(simbolo="cos") cos(x: numero): numero; }'
+    client.send(
+        "textDocument/didChange",
+        {"textDocument": {"uri": uri, "version": 20}, "contentChanges": [{"text": source}]},
+    )
+    hints = client.request(
+        "textDocument/inlayHint",
+        {
+            "textDocument": {"uri": uri},
+            "range": {"start": {"line": 0, "character": 0}, "end": {"line": 6, "character": 0}},
+        },
+    )
+    assert any(
+        hint["position"] == {"line": 2, "character": 12} and hint["label"] == ": numero"
+        for hint in hints
+    ), hints
+    assert not any(hint["position"]["line"] == 3 for hint in hints), hints
+    hover = client.request(
+        "textDocument/hover",
+        {"textDocument": {"uri": uri}, "position": {"line": 2, "character": 15}},
+    )
+    assert (
+        "Pureza: comprovada" in hover["contents"]["value"]
+        and "6" in hover["contents"]["value"]
+        and "-o" in hover["contents"]["value"]
+    ), hover
+    encoded = client.request("textDocument/semanticTokens/full", {"textDocument": {"uri": uri}})[
+        "data"
+    ]
+    legend = capabilities["semanticTokensProvider"]["legend"]["tokenTypes"]
+    decoded = []
+    line = column = 0
+    for offset in range(0, len(encoded), 5):
+        delta_line, delta_column, length, kind, modifiers = encoded[offset : offset + 5]
+        line += delta_line
+        column = delta_column if delta_line else column + delta_column
+        decoded.append((line, column, legend[kind]))
+    assert (1, 17, "type") in decoded, decoded
+    assert (4, 1, "decorator") in decoded, decoded
+    assert (5, 7, "keyword") in decoded, decoded
+    for version, source, line, column in [
+        (21, "classe C { enum E { A, B=4 } }\nC.E.", 1, 4),
+        (22, "funcao f() { enum E { A, B=4 }\nE.\n}", 1, 2),
+    ]:
+        client.send(
+            "textDocument/didChange",
+            {
+                "textDocument": {"uri": uri, "version": version},
+                "contentChanges": [{"text": source}],
+            },
+        )
+        items = client.request(
+            "textDocument/completion",
+            {"textDocument": {"uri": uri}, "position": {"line": line, "character": column}},
+        )["items"]
+        assert {"A", "B"} == {item["label"] for item in items}, items
     client.send("textDocument/didClose", {"textDocument": {"uri": untitled}})
     client.send("textDocument/didClose", {"textDocument": {"uri": uri}})
     client.close()

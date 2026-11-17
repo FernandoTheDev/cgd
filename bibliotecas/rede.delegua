@@ -5,23 +5,31 @@ classe Sessao {
     }
 
     construtor() {
-        isto._nativa = cgdCurlCriar()
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        isto._nativa = Primitivas.curlCriar()
+    }
+
+    destrutor(): vazio {
+        isto.fechar()
     }
 
     opcao(nome: texto, valor: qualquer): Sessao {
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
         se tipo de valor == "logico" {
             valor = valor ? 1: 0
         }
-        cgdCurlOpcao(isto._nativa, nome, valor);
+        Primitivas.curlOpcao(isto._nativa, nome, valor);
         retorna isto
     }
 
     executar(): dicionario {
-        retorna cgdCurlExecutar(isto._nativa)
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        retorna Primitivas.curlExecutar(isto._nativa)
     }
 
     multipart(partes: dicionario[]): Sessao {
-        cgdCurlMultipart(isto._nativa, partes);
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        Primitivas.curlMultipart(isto._nativa, partes);
         retorna isto
     }
 
@@ -32,40 +40,49 @@ classe Sessao {
     }
 
     enviar(dados: texto): dicionario {
-        retorna cgdCurlEnviar(isto._nativa, dados)
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        retorna Primitivas.curlEnviar(isto._nativa, dados)
     }
 
     receber(limite: inteiro = 65536): dicionario {
-        retorna cgdCurlReceber(isto._nativa, limite)
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        retorna Primitivas.curlReceber(isto._nativa, limite)
     }
 
     esperar(milisegundos: inteiro = 1000, escrita: logico = falso): logico {
-        retorna cgdCurlEsperar(isto._nativa, milisegundos, escrita)
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        retorna Primitivas.curlEsperar(isto._nativa, milisegundos, escrita)
     }
 
     enviarWebSocket(dados: texto, flags: inteiro = 1): dicionario {
-        retorna cgdCurlWsEnviar(isto._nativa, dados, flags)
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        retorna Primitivas.curlWsEnviar(isto._nativa, dados, flags)
     }
 
     receberWebSocket(limite: inteiro = 65536): dicionario {
-        retorna cgdCurlWsReceber(isto._nativa, limite)
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        retorna Primitivas.curlWsReceber(isto._nativa, limite)
     }
 
     info(nome: texto): qualquer {
-        retorna cgdCurlInfo(isto._nativa, nome)
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        retorna Primitivas.curlInfo(isto._nativa, nome)
     }
 
     manter(): vazio {
-        cgdCurlManter(isto._nativa)
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        Primitivas.curlManter(isto._nativa)
     }
 
     resetar(): Sessao {
-        cgdCurlResetar(isto._nativa);
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        Primitivas.curlResetar(isto._nativa);
         retorna isto
     }
 
     fechar(): vazio {
-        cgdCurlFechar(isto._nativa)
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        Primitivas.curlFechar(isto._nativa)
     }
 
     nativa(): qualquer {
@@ -74,19 +91,23 @@ classe Sessao {
 }
 
 funcao versao(): texto {
-    retorna cgdCurlVersao()
+    var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+    retorna Primitivas.curlVersao()
 }
 
 funcao opcoes(): dicionario[] {
-    retorna cgdCurlOpcoes()
+    var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+    retorna Primitivas.curlOpcoes()
 }
 
 funcao escapar(valor: texto): texto {
-    retorna cgdCurlEscapar(valor)
+    var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+    retorna Primitivas.curlEscapar(valor)
 }
 
 funcao decodificar(valor: texto): texto {
-    retorna cgdCurlDecodificar(valor)
+    var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+    retorna Primitivas.curlDecodificar(valor)
 }
 
 funcao requisitar(url: texto, metodo: texto = "GET", corpo: qualquer = nulo, cabecalhos: qualquer = [],
@@ -119,30 +140,151 @@ funcao enviar(url: texto, corpo: qualquer, cabecalhos: qualquer = [], opcoes: qu
 }
 
 funcao lote(sessoes: qualquer[]): dicionario[] {
+    var Primitivas: qualquer = importar("cgd:nativo").Primitivas
     var nativas: qualquer[] = []
     para cada sessao: Sessao em sessoes {
         nativas.adicionar(sessao.nativa())
     }
 
-    retorna cgdCurlLote(nativas)
+    retorna Primitivas.curlLote(nativas)
 }
 
 funcao detalhes(): dicionario {
-    retorna cgdCurlDetalhes()
+    var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+    retorna Primitivas.curlDetalhes()
 }
 
 funcao mensagemErro(codigo: inteiro): texto {
-    retorna cgdCurlErro(codigo)
+    var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+    retorna Primitivas.curlErro(codigo)
 }
 
 funcao data(textoData: texto): inteiro {
-    retorna cgdCurlData(textoData)
+    var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+    retorna Primitivas.curlData(textoData)
 }
 
 funcao componenteUrl(url: texto, parte: texto): texto {
-    retorna cgdCurlUrl(url, parte, nulo)
+    var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+    retorna Primitivas.curlUrl(url, parte, nulo)
 }
 
 funcao alterarUrl(url: texto, parte: texto, valor: qualquer): texto {
-    retorna cgdCurlUrl(url, parte, valor)
+    var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+    retorna Primitivas.curlUrl(url, parte, valor)
+}
+
+// Resposta estruturada, preservando o dicionário retornado pela API anterior.
+classe RespostaHTTP {
+    privado {
+        _dados: dicionario
+    }
+
+    construtor(dados: dicionario) {
+        isto._dados = dados
+    }
+
+    status(): inteiro {
+        retorna isto._dados["status"]
+    }
+
+    sucesso(): logico {
+        retorna isto._dados["codigo"] == 0 e isto.status() >= 200 e isto.status() < 300
+    }
+
+    texto(): texto {
+        retorna isto._dados["corpo"]
+    }
+
+    json(limite: inteiro = 128, maxNos: inteiro = 100000): qualquer {
+        var json: qualquer = importar("cgd:json")
+        retorna json.analisar(isto.texto(), limite, maxNos)
+    }
+
+    cabecalhos(): texto {
+        retorna isto._dados["cabecalhos"]
+    }
+
+    url(): texto {
+        retorna isto._dados["url"]
+    }
+
+    erro(): texto {
+        retorna isto._dados["erro"]
+    }
+
+    exigirSucesso(): RespostaHTTP {
+        se !isto.sucesso() {
+            falhar "HTTP ${isto.status()}: ${isto.erro()}"
+        }
+        retorna isto
+    }
+
+    dados(): dicionario {
+        retorna clonar(isto._dados)
+    }
+}
+
+// Configuração do cliente é copiada; cada requisição tem sua própria sessão.
+classe ClienteHTTP {
+    privado {
+        _base: texto
+        _cabecalhos: texto[]
+        _opcoes: dicionario
+    }
+
+    construtor(base: texto = "", cabecalhos: texto[] = [], opcoes: dicionario = {}) {
+        isto._base = base
+        isto._cabecalhos = clonar(cabecalhos)
+        isto._opcoes = clonar(opcoes)
+        se !("TIMEOUT_MS" em isto._opcoes) {
+            isto._opcoes["TIMEOUT_MS"] = 30000
+        }
+    }
+
+    cabecalho(nome: texto, valor: texto): ClienteHTTP {
+        se nome.inclui("\r") ou nome.inclui("\n") ou nome.inclui(":") ou nome == "" ou valor.inclui("\r") ou valor.inclui("\n") {
+            falhar "Cabeçalho HTTP inválido"
+        }
+        isto._cabecalhos.adicionar("${nome}: ${valor}")
+        retorna isto
+    }
+
+    opcao(nome: texto, valor: qualquer): ClienteHTTP {
+        isto._opcoes[nome] = valor
+        retorna isto
+    }
+
+    requisitar(caminho: texto, metodo: texto = "GET", corpo: qualquer = nulo, cabecalhos: texto[] = []): RespostaHTTP {
+        var url: texto = caminho
+        se caminho.fatiar(0, 7) != "http://" e caminho.fatiar(0, 8) != "https://" {
+            url = isto._base + caminho
+        }
+        se url.fatiar(0, 7) != "http://" e url.fatiar(0, 8) != "https://" {
+            falhar "ClienteHTTP exige URL http:// ou https://"
+        }
+        var headers: qualquer[] = isto._cabecalhos.concatenar(cabecalhos)
+        retorna RespostaHTTP(requisitar(url, metodo, corpo, headers, isto._opcoes))
+    }
+
+    obter(caminho: texto = ""): RespostaHTTP {
+        retorna isto.requisitar(caminho)
+    }
+
+    enviar(caminho: texto, corpo: texto): RespostaHTTP {
+        retorna isto.requisitar(caminho, "POST", corpo)
+    }
+
+    enviarJSON(caminho: texto, valor: qualquer): RespostaHTTP {
+        var json: qualquer = importar("cgd:json")
+        retorna isto.requisitar(caminho, "POST", json.serializar(valor), ["Content-Type: application/json"])
+    }
+
+    atualizar(caminho: texto, corpo: texto): RespostaHTTP {
+        retorna isto.requisitar(caminho, "PUT", corpo)
+    }
+
+    remover(caminho: texto): RespostaHTTP {
+        retorna isto.requisitar(caminho, "DELETE")
+    }
 }

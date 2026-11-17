@@ -3,8 +3,7 @@ module frontend.analysis;
 import frontend;
 import frontend.modules;
 import frontend.validation;
-import frontend.static_safety;
-import frontend.flow;
+import frontend.semantic.pipeline;
 import std.algorithm : filter;
 import std.array : array;
 
@@ -14,6 +13,7 @@ struct AnalysisResult
     Token[] tokens;
     Diagnostics diagnostics;
     Context context;
+    FnDecl[] pureFunctions;
 }
 
 /// API sem exit, codegen, processos externos ou avaliação CTFE. Buffers abertos
@@ -45,18 +45,9 @@ AnalysisResult analyzeSource(string source, string filename, string[string] over
         new ModuleLoader(diagnostics, overlays).load(result.program, filename);
         if (diagnostics.hasErrors() || !validateStructure(result.program, diagnostics))
             return result;
-        result.context = new Context;
-        TypeRegistry registry = new TypeRegistry;
-        new Sema1(result.context, diagnostics).analyze(result.program);
-        if (diagnostics.hasErrors())
-            return result;
-        new Sema2(registry).analyze(result.program);
-        new Sema3(result.context, registry, new TypeResolver(registry, diagnostics), diagnostics).analyze(
-                result.program);
-        if (diagnostics.hasErrors())
-            return result;
-        new StaticSafety(diagnostics).analyze(result.program);
-        new FlowAnalysis(diagnostics).analyze(result.program);
+        SemanticResult semantic = analyzeSemantics(result.program, diagnostics);
+        result.context = semantic.context;
+        result.pureFunctions = semantic.pureFunctions;
 
     }
     catch (Exception error)

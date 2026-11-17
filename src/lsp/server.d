@@ -1,9 +1,12 @@
 module lsp.server;
 
 import lsp.model;
+import env : VERSION;
+import lsp.evaluation;
 import lsp.builtins : builtinMethods, builtinMethod;
 import frontend;
 import frontend.analysis;
+import lsp.completion;
 import std.json;
 import std.stdio;
 import std.string : strip, startsWith, indexOf, lastIndexOf, splitLines;
@@ -17,7 +20,7 @@ import std.utf : validate;
 
 immutable string[] tokenTypes = [
     "namespace", "type", "class", "parameter", "variable", "property", "function", "method",
-    "keyword", "comment", "string", "number", "operator"
+    "keyword", "comment", "string", "number", "operator", "decorator"
 ];
 immutable string[] tokenModifiers = ["declaration", "readonly", "defaultLibrary"];
 
@@ -80,6 +83,8 @@ class LanguageServer
         doc.visited = null;
         doc.dependencies = null;
         doc.expressionEnds = null;
+        doc.expressions = null;
+        doc.constantPreview = null;
         doc.expressionClasses = null;
         doc.expressionFunctions = null;
         doc.functions = null;
@@ -181,7 +186,7 @@ class LanguageServer
         ]);
         return JSONValue([
             "capabilities": JSONValue(capabilities),
-            "serverInfo": JSONValue(["name": JSONValue("CGD LSP"), "version": JSONValue("0.1.0")])
+            "serverInfo": JSONValue(["name": JSONValue("CGD LSP"), "version": JSONValue(VERSION)])
         ]);
     }
 
@@ -189,7 +194,19 @@ class LanguageServer
     {
         uint[] data;
         uint previousLine, previousColumn;
-        foreach (Token token; doc.analysis.tokens)
+        bool afterAt, metadata;
+        size_t metadataParens;
+        bool[string] typeNames;
+        foreach (string name; [
+            "numero", "número", "inteiro", "longo", "real", "decimal", "texto", "logico",
+            "lógico", "booleano", "binario", "binário", "qualquer", "vazio", "nulo", "tupla",
+            "dicionario", "dicionário", "funcao", "função", "Objeto", "Excecao"
+        ])
+            typeNames[name] = true;
+        foreach (SymbolEntry symbol; doc.symbols)
+            if (symbol.declaration && symbol.kind == "class")
+                typeNames[symbol.name] = true;
+        foreach (size_t tokenIndex, Token token; doc.analysis.tokens)
         {
             if (token.pos is null)
                 continue;
@@ -230,6 +247,34 @@ class LanguageServer
                         modifiers |= 1;
                 }
 
+            if (token.kind == TokenKind.Identifier)
+            {
+                if (token.value.s.to!string in typeNames)
+                    if (Document.offsetKey(token.pos.start.line, token.pos.start.offset) !in doc.symbolOffsets)
+                        category = "type";
+                if (afterAt)
+                {
+                    category = "decorator";
+                    afterAt = false;
+                    metadata = true;
+                }
+                else if (metadata && metadataParens && tokenIndex + 1 < doc.analysis.tokens.length
+                        && doc.analysis.tokens[tokenIndex + 1].kind == TokenKind.Equals)
+                    category = "property";
+            }
+            if (token.kind == TokenKind.At)
+                afterAt = true;
+            else if (metadata && token.kind == TokenKind.LParen)
+                metadataParens++;
+            else if (metadata && token.kind == TokenKind.RParen)
+            {
+                if (metadataParens)
+                    metadataParens--;
+                if (!metadataParens)
+                    metadata = false;
+            }
+            else if (metadata && !metadataParens && token.kind != TokenKind.Identifier)
+                metadata = false;
             uint typeIndex = 4;
             foreach (size_t i, immutable(string) name; tokenTypes)
                 if (name == category)
@@ -256,167 +301,6 @@ class LanguageServer
         foreach (uint n; data)
             result ~= JSONValue(n);
         return JSONValue(["data": arrayJSON(result), "resultId": JSONValue(doc.revision.to!string)]);
-    }
-
-    JSONValue completionItem(string name, string kind, string detail)
-    {
-        return JSONValue([
-            "label": JSONValue(name),
-            "kind": JSONValue(kind == "class" ? 7 : kind == "method" ? 2 : kind == "function" ? 3 : kind == "property"
-                    ? 5 : 6),
-            "detail": JSONValue(detail)
-        ]);
-    }
-
-    JSONValue completions(Document doc, JSONValue params)
-    {
-        JSONValue[] items;
-        bool[string] names;
-        JSONValue position = get(params, "position");
-        size_t offset = doc.byteOffset(cast(uint) integer(position, "line"), cast(uint) integer(position, "character"));
-        string prefix = doc.text[0 .. offset];
-        long dot = prefix.lastIndexOf('.');
-        bool member = dot >= 0;
-        if (member)
-            foreach (dchar ch; prefix[dot + 1 .. $])
-                if (!(ch == '_' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9'
-                        || ch >= 128))
-                    member = false;
-        if (member)
-        {
-            uint line = 1, column = 1;
-            foreach (dchar ch; prefix[0 .. dot])
-            {
-                if (ch == '\n')
-                {
-                    line++;
-                    column = 1;
-                }
-                else
-                    column++;
-            }
-            Node node;
-            if (Node* receiver = Document.offsetKey(line, column) in doc.expressionEnds)
-                node = *receiver;
-            if (node is null)
-                foreach (Token token; doc.analysis.tokens)
-                    if (token.kind == TokenKind.Identifier && token.pos.end.line == line
-                            && token.pos.end.offset == column)
-                        if (VarDecl* declaration = token.value.s.to!string in doc.variableDeclarations)
-                        {
-                            Identifier id = new Identifier(token.value.s, token.pos);
-                            id.variableRef = *declaration;
-                            node = id;
-                            break;
-                        }
-            if (node !is null)
-            {
-                if (Identifier id = cast(Identifier) node)
-                    if (id.variableRef !is null)
-                        if (ImportExpr imported = cast(ImportExpr) id.variableRef.value)
-                            if (imported.target !is null)
-                            {
-                                foreach (Node exported; imported.target.program.body)
-                                {
-                                    if (FnDecl fn = cast(FnDecl) exported)
-                                        items ~= completionItem(fn.fn.to!string, "function", doc.signature(fn));
-                                    else if (ClassDecl cls = cast(ClassDecl) exported)
-                                        items ~= completionItem(cls.name.to!string, "class",
-                                                "classe " ~ cls.name.to!string);
-                                    else if (VarDecl variable = cast(VarDecl) exported)
-                                        if (!variable.name.to!string.startsWith("#"))
-                                            items ~= completionItem(variable.name.to!string,
-                                                    "variable", "exportação");
-                                }
-                                return JSONValue([
-                                    "isIncomplete": JSONValue(false),
-                                    "items": arrayJSON(items)
-                                ]);
-                            }
-                if (ClassDecl cls = doc.instanceClass(node))
-                {
-                    bool classReceiver = (node in doc.expressionClasses) !is null;
-                    bool internal;
-                    if (Identifier receiver = cast(Identifier) node)
-                    {
-                        classReceiver = classReceiver || receiver.classRef !is null;
-                        internal = receiver.value == "isto" && receiver.lexicalClass !is null;
-                    }
-                    bool[ClassDecl] seen;
-                    for (ClassDecl current = cls; current !is null && current !in seen; current = current.superClass)
-                    {
-                        seen[current] = true;
-                        foreach (FnDecl method; current.methods)
-                        {
-                            string name = method.fn.to!string;
-                            if (name in names)
-                                continue;
-                            names[name] = true;
-                            if ((!classReceiver || method.isStatic) && (method.access == 0
-                                    || internal && (method.access == 2 || current is cls))
-                                    && method.fn != "construtor" && !name.startsWith("#"))
-                                items ~= completionItem(name, "method", doc.signature(method));
-                        }
-                        foreach (ClassField field; current.fields)
-                        {
-                            string name = field.name.to!string;
-                            if (name in names)
-                                continue;
-                            names[name] = true;
-                            if (!classReceiver && (field.access == 0 || internal && (field.access == 2 || current is cls)))
-                                items ~= completionItem(name, "property",
-                                        "campo " ~ name ~ ": " ~ field.type.toStr().to!string);
-                        }
-                    }
-                    return JSONValue(["isIncomplete": JSONValue(false), "items": arrayJSON(items)]);
-                }
-            }
-            TypeSema receiverType = doc.expressionType(node);
-            Token literal;
-            foreach (Token token; doc.analysis.tokens)
-                if (token.pos.end.line == line && token.pos.end.offset == column)
-                    literal = token;
-            if (receiverType is null && literal !is null)
-            {
-                if (literal.kind == TokenKind.String)
-                    receiverType = new TypeSemaBuiltin(TypeSemaBase.String);
-                else if (literal.kind == TokenKind.Int)
-                    receiverType = new TypeSemaBuiltin(TypeSemaBase.Int);
-                else if (literal.kind == TokenKind.Double)
-                    receiverType = new TypeSemaBuiltin(TypeSemaBase.Double);
-            }
-            foreach (string name; builtinMethods(receiverType))
-                items ~= completionItem(name, "method", doc.signature(builtinMethod(receiverType, name)));
-            return JSONValue(["isIncomplete": JSONValue(false), "items": arrayJSON(items)]);
-        }
-        foreach_reverse (SymbolEntry symbol; doc.symbols)
-            if (symbol.declaration && symbol.position.filename == doc.path && doc.visible(symbol,
-                    position) && symbol.name !in names)
-            {
-                names[symbol.name] = true;
-                items ~= completionItem(symbol.name, symbol.kind, symbol.detail);
-            }
-        Context context = new Context;
-        Diagnostics diagnostics = new Diagnostics;
-        new Sema1(context, diagnostics).analyze(new Program([]));
-        foreach (Scope scopeEntry; context.scopes)
-            foreach (dstring name; scopeEntry.names())
-                if (name.to!string !in names)
-                {
-                    Symbol* sym = scopeEntry.get(name);
-                    if (sym !is null && sym.isFn())
-                    {
-                        FnDecl fn = (cast(SymbolFn*) sym).node;
-                        items ~= completionItem(name.to!string, "function", doc.signature(fn));
-                    }
-                }
-        foreach (string name; [
-            "se", "senao", "enquanto", "para", "retorna", "var", "const", "funcao", "classe",
-            "tente", "pegue", "finalmente", "falhar", "importar", "verdadeiro", "falso", "nulo",
-            "isto", "super"
-        ])
-            items ~= completionItem(name, "keyword", "palavra-chave");
-        return JSONValue(["isIncomplete": JSONValue(false), "items": arrayJSON(items)]);
     }
 
     JSONValue request(string method, JSONValue params)
@@ -479,16 +363,47 @@ class LanguageServer
             return completions(doc, params);
         if (method == "textDocument/hover")
         {
-            if (selected is null)
+            string content = selected is null ? "" : "```delegua\n" ~ selected.detail ~ "\n```";
+            JSONValue hoverRange = selected is null ? JSONValue.init
+                : doc.positionRange(selected.position, selected.name.to!dstring.length);
+            FnDecl target;
+            if (selected !is null && (selected.kind == "function" || selected.kind == "method"))
+                if (FnDecl* functionNode = selected.key in doc.functions)
+                    target = *functionNode;
+            if (target !is null && target.classFactory is null)
+            {
+                bool proven;
+                foreach (FnDecl pureFunction; doc.analysis.pureFunctions)
+                    proven = proven || pureFunction is target;
+                content ~= proven ? "\n\nPureza: comprovada para CTFE."
+                    : "\n\nPureza: não comprovada para CTFE (sem anotação aprovada ou recurso não suportado).";
+                content ~= "\n\nComptime: exige função aprovada, argumentos constantes e otimização `-o`; sem `-o`, a chamada executa em runtime.";
+            }
+            bool computed;
+            if (!doc.analysis.diagnostics.hasErrors())
+                if (Node expression = doc.previewAt(get(params, "position")))
+                {
+                    if (doc.constantPreview is null)
+                        doc.constantPreview = new ConstantPreview(doc.analysis.pureFunctions);
+                    if (Node value = doc.constantPreview.evaluate(expression))
+                    {
+                        computed = true;
+                        content ~= "\n\nResultado em tempo de compilação:\n\n```delegua\n" ~ previewText(value)
+                            ~ "\n```\n\nComptime: pré-computação comprovada; substituição habilitada com `-o`.";
+                        hoverRange = doc.positionRange(expression.pos);
+                    }
+                }
+            if (!computed && cast(CallExpr) doc.previewAt(position))
+                content ~= "\n\nComptime nesta chamada: não pré-computada (sem prova de pureza, argumentos dinâmicos, falha ou limite da avaliação).";
+            if (!content.length)
                 return JSONValue.init;
             return JSONValue([
-                "contents": JSONValue([
-                    "kind": JSONValue("markdown"),
-                    "value": JSONValue("```delegua\n" ~ selected.detail ~ "\n```")
-                ]),
-                "range": doc.positionRange(selected.position, selected.name.to!dstring.length)
+                "contents": JSONValue(["kind": JSONValue("markdown"),
+                    "value": JSONValue(content)]),
+                "range": hoverRange
             ]);
         }
+
         if (method == "textDocument/definition")
         {
             if (selected is null || !selected.key.length)
@@ -761,7 +676,7 @@ class LanguageServer
             foreach (SymbolEntry symbol; doc.symbols)
                 if (symbol.declaration && symbol.kind == "variable" && symbol.position.filename == doc.path)
                 {
-                    if (VarDecl* declaration = symbol.name in doc.variableDeclarations)
+                    if (VarDecl* declaration = symbol.key in doc.variableDeclarations)
                         if ((*declaration).type_expr !is null)
                             continue;
                     JSONValue range = doc.positionRange(symbol.position, symbol.name.to!dstring.length);
@@ -771,6 +686,8 @@ class LanguageServer
                         "position": get(range, "end"),
                         "label": JSONValue(": " ~ symbol.detail[colon + 2 .. $]),
                         "kind": JSONValue(1),
+                        "tooltip": JSONValue(
+                                "Tipo inferido pelo compilador. Dica virtual: o arquivo não é alterado."),
                         "paddingLeft": JSONValue(false)
                     ]);
                 }

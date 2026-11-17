@@ -40,6 +40,39 @@ public:
         this.p = p;
     }
 
+    Node parseArrow(Token start, bool parenthesized)
+    {
+        FnArg[] arguments;
+        TypeExpr result = new TypeExprNamed("qualquer", start.pos);
+        if (parenthesized)
+        {
+            bool optionalSeen;
+            while (!p.check(TokenKind.RParen))
+            {
+                Token name = p.consume(TokenKind.Identifier, "Esperado parâmetro de arrow function.");
+                TypeExpr type = p.match(TokenKind.Colon) ? p.parseType.parse() : new TypeExprNamed("qualquer", name.pos);
+                Node defaultValue = p.match(TokenKind.Equals) ? parse(Precedence.Assign) : null;
+                if (defaultValue !is null)
+                    optionalSeen = true;
+                else if (optionalSeen)
+                    p.err.error(name.pos, "Parâmetro obrigatório após opcional.");
+                arguments ~= new FnArg(name.value.s, type, defaultValue, name.pos);
+                if (!p.check(TokenKind.RParen))
+                    p.consume(TokenKind.Comma, "Esperado ','.");
+            }
+            p.consume(TokenKind.RParen, "Esperado ')'.");
+            if (p.match(TokenKind.Colon))
+                result = p.parseType.parse();
+            p.consume(TokenKind.Arrow, "Esperado '=>'.");
+        }
+        else
+            arguments ~= new FnArg(start.value.s, new TypeExprNamed("qualquer", start.pos), null, start.pos);
+        Node[] body = p.check(TokenKind.LBrace) ? p.parseBody() : [
+            cast(Node) new ReturnStmt(parse(), start.pos)
+        ];
+        return new FunctionExpr(new FnDecl("anonima", arguments, result, body, 0, start.pos));
+    }
+
     Node parseText(Token tk)
     {
         import std.algorithm : canFind;
@@ -160,7 +193,7 @@ public:
             case TokenKind.Super:
                 dstring name = "construtor";
                 if (p.match(TokenKind.Dot))
-                    name = p.consume(TokenKind.Identifier, "Esperado método após super.").value.s;
+                    name = p.consumeMemberName(tk.pos).value.s;
                 return new SuperExpr(name, tk.pos);
             case TokenKind.Fn:
                 Token name = new Token(TokenKind.Identifier, TokenRaw._s("anonima"), tk.pos);
@@ -172,6 +205,8 @@ public:
                 return parseText(tk);
 
             case TokenKind.Identifier:
+                if (p.match(TokenKind.Arrow))
+                    return parseArrow(tk, false);
                 return new Identifier(tk.value.s, tk.pos);
 
             case TokenKind.Int:
@@ -185,6 +220,8 @@ public:
                 return new BoolLit(tk.kind == TokenKind.True, tk.pos);
 
             case TokenKind.LParen:
+                if (p.arrowParametersAhead())
+                    return parseArrow(tk, true);
                 Node node = parse();
                 if (p.match(TokenKind.Comma))
                 {
@@ -305,15 +342,7 @@ public:
 
     Node parseMemberExpr(Node left)
     {
-        Token name;
-        if (p.recoverIncomplete && p.isAtEnd())
-        {
-            name = new Token(TokenKind.Identifier, TokenRaw._s("#incompleto"),
-                    new Position(left.pos.filename, left.pos.end, left.pos.end));
-            p.err.error(name.pos, "Esperado nome de propriedade após '.'.", "E1001");
-        }
-        else
-            name = p.consumeName("Esperado nome de propriedade após '.'.");
+        Token name = p.consumeMemberName(left.pos);
         Node right = new Identifier(name.value.s, name.pos);
         return new MemberExpr(left, right, p.getPos(left.pos, right.pos));
     }

@@ -126,7 +126,9 @@ antes de atualizar a referência no CGD. Evite versionar executáveis e C gerado
 Mantenha testes com e sem otimização e acrescente regressões para cada mudança
 observável. Rode `git diff --check` nos dois repositórios.
 
-Capturas/upvalues, FFI arbitrária e carregamento dinâmico são exclusões deliberadas.
+Capturas/upvalues e carregamento dinâmico continuam excluídos. A FFI C por classes
+estrangeiras foi introduzida por solicitação explícita; seus contratos e limites
+estão em [Evolução da linguagem](docs/evolucao-linguagem.md).
 Outros limites de implementação são descritos separadamente em
 [Compatibilidade](docs/compatibilidade.md) e [Segurança](docs/seguranca.md).
 
@@ -143,3 +145,8 @@ espaços (Ctrl+Shift+I). Compile o CGD uma vez e instale com
 Consulte [bibliotecas e ferramentas](docs/ferramentas.md) para JSON em Delégua puro,
 rede com libcurl gerenciada, coleções, instalação da extensão e limites reais.
 O [registro de continuidade](docs/CONTINUIDADE.md) distingue entregas e pendências.
+
+A [referência web própria](docs/linguagem.html) cobre instalação, linguagem, editor,
+runtime e biblioteca padrão. [Bibliotecas e ferramentas](docs/ferramentas.md)
+detalha APIs e limites. Compatibilidade JS, herança de interfaces e múltiplos
+dialetos são exclusões definitivas do projeto.

@@ -34,6 +34,9 @@ classe LeitorJSON {
     _maxNos: inteiro
 
     construtor(fonte: texto, limite: inteiro = 128, maxNos: inteiro = 100000) {
+        se limite < 1 ou limite > 512 ou maxNos < 1 ou maxNos > 1000000 {
+            falhar "Limites JSON inválidos: profundidade 1..512 e nós 1..1000000"
+        }
         isto._fonte = fonte
         isto._tamanho = tamanho(fonte)
         se isto._tamanho > 1048576 {
@@ -97,6 +100,7 @@ classe LeitorJSON {
     }
 
     texto(): texto {
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
         isto.exigir('"')
         var partes: qualquer[] = []
         enquanto isto._pos < isto._tamanho {
@@ -115,10 +119,10 @@ classe LeitorJSON {
                     partes.adicionar(escape)
                 }
                 senao se escape == 'b' {
-                    partes.adicionar(cgdCaractereUnicode(8))
+                    partes.adicionar(Primitivas.caractereUnicode(8))
                 }
                 senao se escape == 'f' {
-                    partes.adicionar(cgdCaractereUnicode(12))
+                    partes.adicionar(Primitivas.caractereUnicode(12))
                 }
                 senao se escape == 'n' {
                     partes.adicionar("\n")
@@ -142,12 +146,12 @@ classe LeitorJSON {
                     } senao se codigo >= 56320 e codigo <= 57343 {
                         isto.erro("Substituto Unicode isolado")
                     }
-                    partes.adicionar(cgdCaractereUnicode(codigo))
+                    partes.adicionar(Primitivas.caractereUnicode(codigo))
                 } senao {
                     isto.erro("Escape desconhecido")
                 }
             } senao {
-                se cgdCodigoUnicode(ch) < 32 {
+                se Primitivas.codigoUnicode(ch) < 32 {
                     isto.erro("Controle não escapado em texto")
                 }
                 partes.adicionar(ch)
@@ -243,7 +247,7 @@ classe LeitorJSON {
         se ch == '-' ou isto.digito() {
             retorna isto.numero()
         }
-        se ch == '[' {
+        se ch == "[" {
             isto._prof += 1
             isto._pos += 1
             var itens: qualquer[] = []
@@ -318,10 +322,11 @@ funcao analisar(fonte: texto, limite: inteiro = 128, maxNos: inteiro = 100000): 
 }
 
 funcao escaparTexto(valor: qualquer): texto {
+    var Primitivas: qualquer = importar("cgd:nativo").Primitivas
     var partes: qualquer = ['"']
     var hex: texto = "0123456789abcdef"
     para cada ch: texto em valor.dividir("") {
-        var codigo: qualquer = cgdCodigoUnicode(ch)
+        var codigo: qualquer = Primitivas.codigoUnicode(ch)
         se ch == '"' {
             partes.adicionar('\\"')
         }
@@ -340,6 +345,7 @@ funcao escaparTexto(valor: qualquer): texto {
 }
 
 funcao emitir(valor: qualquer, ancestrais: qualquer, profundidade: inteiro): texto {
+    var Primitivas: qualquer = importar("cgd:nativo").Primitivas
     se profundidade >= 128 {
         falhar "Limite de profundidade na serialização JSON"
     }
@@ -358,10 +364,10 @@ funcao emitir(valor: qualquer, ancestrais: qualquer, profundidade: inteiro): tex
     }
 
     se categoria == "numero" ou categoria == "real" {
-        se !cgdNumeroFinito(valor) {
+        se !Primitivas.numeroFinito(valor) {
             falhar "JSON não representa números não finitos"
         }
-        retorna cgdNumeroTexto(valor)
+        retorna Primitivas.numeroTexto(valor)
     }
 
     se categoria == "NumeroJSON" e valor.eInstanciaDe(NumeroJSON) {
@@ -382,12 +388,12 @@ funcao emitir(valor: qualquer, ancestrais: qualquer, profundidade: inteiro): tex
             retorna '[' + partes.juntar(',') + ']'
         }
         se categoria == "dicionário" ou categoria == "dicionario" {
-            para cada chave: texto em valor.chaves() {
+            para cada par: qualquer em Primitivas.dicionarioItens(valor) {
+                var chave: qualquer = par[0]
                 se tipo de chave != "texto" {
                     falhar "JSON exige chaves de texto"
                 }
-                partes.adicionar(escaparTexto(chave) + ':' + emitir(valor[chave], ancestrais,
-                    profundidade + 1))
+                partes.adicionar(escaparTexto(chave) + ':' + emitir(par[1], ancestrais, profundidade + 1))
             }
             retorna '{' + partes.juntar(',') + '}'
         }
@@ -423,11 +429,55 @@ classe JSON {
         retorna isto._valor
     }
 
-    obter(chave: texto): qualquer {
-        retorna isto._valor[chave]
+    estatico deTexto(fonte: texto, limite: inteiro = 128, maxNos: inteiro = 100000): JSON {
+        retorna JSON(analisar(fonte, limite, maxNos))
     }
 
-    definir(chave: texto, valor: qualquer): JSON {
+    contem(chave: qualquer): logico {
+        var categoria: texto = tipo de isto._valor
+        se categoria == "dicionário" ou categoria == "dicionario" {
+            retorna chave em isto._valor
+        }
+        se categoria == "vetor" ou categoria == "tupla" {
+            retorna tipo de chave == "numero" e chave >= - tamanho(isto._valor) e chave < tamanho(isto._valor)
+        }
+        retorna falso
+    }
+
+    obter(chave: qualquer, _padrao: qualquer = nulo): qualquer {
+        retorna isto.contem(chave) ? isto._valor[chave]: _padrao
+    }
+
+    caminho(partes: qualquer[], _padrao: qualquer = nulo): qualquer {
+        var atual: JSON = isto
+        para cada parte: qualquer em partes {
+            se !atual.contem(parte) {
+                retorna _padrao
+            }
+            atual = JSON(atual.obter(parte))
+        }
+        retorna atual.valor()
+    }
+
+    // Cópia independente de estruturas mutáveis; o valor original não é reescrito.
+    copiar(): JSON {
+        retorna JSON(analisar(serializar(isto._valor)))
+    }
+
+    chaves(): qualquer[] {
+        var Primitivas: qualquer = importar("cgd:nativo").Primitivas
+        var categoria: texto = tipo de isto._valor
+        se categoria != "dicionário" e categoria != "dicionario" {
+            falhar "chaves() exige um objeto JSON"
+        }
+        var resultado: qualquer[] = []
+        para cada par: qualquer em Primitivas.dicionarioItens(isto._valor) {
+            resultado.adicionar(par[0])
+        }
+        retorna resultado
+    }
+
+    definir(chave: qualquer, valor: qualquer): JSON {
         isto._valor[chave] = valor
         retorna isto
     }

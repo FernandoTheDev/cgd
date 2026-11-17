@@ -7,8 +7,8 @@ IA, não envia o código para servidores e não compila programas enquanto você
 ## Uso
 
 Abra um `.delegua` com o modo **CGD / Delégua**. A coloração vem dos tokens
-semânticos produzidos pelo lexer e pelo índice do compilador, sem gramática
-TextMate/regex. Hover, definição, referências, rename, símbolos, completion,
+semânticos produzidos pelo lexer e pelo índice do compilador. Uma gramática
+TextMate lexical mantém a coloração durante a inicialização do servidor. Hover, definição, referências, rename, símbolos, completion,
 assinaturas, folding, seleção, dicas de tipos e diagnósticos são locais.
 
 - Botão ▶ ou **CGD: Compilar e executar arquivo**: compila o arquivo salvo e executa
@@ -33,7 +33,7 @@ python3 scripts/instalar_extensao.py --associate
 ```
 
 O instalador não recompila o CGD. Ele copia o binário existente e seus recursos,
-empacota `out/cgd-0.2.0.vsix`, instala pelo CLI do VS Code e confirma a versão.
+empacota `out/cgd-0.5.0.vsix`, instala pelo CLI do VS Code e confirma a versão.
 `--associate` altera apenas a associação de `*.delegua`, preservando o restante
 do settings.json com JSONC. A extensão oficial de Delégua não é removida.
 
@@ -45,9 +45,26 @@ O uso da extensão instalada é offline; npm só é necessário para preparar o 
 Não há depurador/DAP ou indexação irrestrita de todo o disco.
 Ctrl+Shift+I e Format Document usam o formatador nativo com quatro espaços.
 A análise considera documentos abertos e seus módulos estáticos. Recursos fora
-desse conjunto têm navegação limitada. Análise não executa CTFE nem código do
-programa. Alguns diagnósticos de módulos podem ser menos precisos durante erros
+desse conjunto têm navegação limitada. Análise não executa o programa. O hover pode avaliar expressões primitivas e
+chamadas puras constantes em VM limitada, sob demanda e com cache por revisão. Alguns diagnósticos de módulos podem ser menos precisos durante erros
 sintáticos. Linux x86_64 é a plataforma validada do binário incluído.
 
 Delégua original: https://github.com/DesignLiquido/delegua.
 CGD: https://github.com/FernandoTheDev/cgd. Licença Apache-2.0.
+
+A revisão 0.3.0 inclui snippets de construtor/destrutor/classes/CTFE/bibliotecas,
+completion de palavras-chave a partir do lexer e recuperação de `isto.` durante
+a edição de métodos. A visibilidade considera o contexto lexical da classe.
+Executáveis com shebang cgd/delegua também são reconhecidos.
+A instalação precisa ser refeita após mudanças no binário; alterar o manifest
+não atualiza a extensão já instalada.
+
+A revisão 0.4.0 acrescenta palavras-chave/snippets de contratos, enums e arrows,
+além das classes estrangeiras C. Consulte [evolução da linguagem](../docs/evolucao-linguagem.md)
+para as diferenças em relação à wiki e limites da ABI. Nenhuma suíte foi executada.
+
+Na 0.5.0, @definicao fica unido ao @, tipos/decoradores e argumentos de
+metadados têm cores próprias, hints de inferência ficam habilitados por padrão e
+o hover explica a prova de pureza e a elegibilidade com -o. A logo identifica
+arquivos .delegua quando o tema de ícones respeita ícones de linguagem. Temas
+externos podem substituí-la; a extensão não troca o tema global.

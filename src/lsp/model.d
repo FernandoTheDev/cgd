@@ -3,6 +3,7 @@ module lsp.model;
 import frontend;
 import frontend.analysis;
 import lsp.builtins : builtinMethod;
+import lsp.evaluation;
 import std.json;
 import std.conv : to;
 import std.algorithm : sort, startsWith;
@@ -88,6 +89,8 @@ class Document
     bool[string] dependencies;
     bool isOpen;
     Node[ulong] expressionEnds;
+    Node[] expressions;
+    ConstantPreview constantPreview;
     ClassDecl[Node] expressionClasses;
     FnDecl[Node] expressionFunctions;
     FnDecl[string] functions;
@@ -370,11 +373,76 @@ class Document
         return null;
     }
 
+    /// Função mais interna por delimitadores, mesmo com um membro incompleto.
+    FnDecl functionAt(JSONValue position)
+    {
+        ulong cursor = offsetKey(cast(uint) integer(position, "line") + 1,
+                codepoints(cast(uint) integer(position, "line"), cast(uint) integer(position, "character")) + 1);
+        FnDecl found;
+        ulong latest;
+        foreach (FnDecl fn; functions)
+        {
+            if (fn is null || fn.classFactory !is null || fn.pos is null || fn.pos.filename != path)
+                continue;
+            ulong start = offsetKey(fn.pos.start.line, fn.pos.start.offset);
+            size_t parens;
+            bool parameters;
+            foreach (Token token; analysis.tokens)
+            {
+                ulong at = offsetKey(token.pos.start.line, token.pos.start.offset);
+                if (at < start)
+                    continue;
+                if (token.kind == TokenKind.LParen)
+                {
+                    parameters = true;
+                    parens++;
+                }
+                if (token.kind == TokenKind.RParen && parens)
+                    parens--;
+                if (parameters && !parens && token.kind == TokenKind.LBrace)
+                {
+                    size_t scopeIndex = scopeAt(at);
+                    if (cursor >= at && cursor < lexicalScopes[scopeIndex].end && start >= latest)
+                    {
+                        latest = start;
+                        found = fn;
+                    }
+                    break;
+                }
+            }
+        }
+        return found;
+    }
+
+    Node previewAt(JSONValue position)
+    {
+        ulong cursor = offsetKey(cast(uint) integer(position, "line") + 1,
+                codepoints(cast(uint) integer(position, "line"), cast(uint) integer(position, "character")) + 1);
+        Node found;
+        ulong span = ulong.max;
+        foreach (Node expression; expressions)
+        {
+            if (!cast(CallExpr) expression && !cast(BinaryExpr) expression
+                    && !cast(UnaryExpr) expression && !cast(ConditionalExpr) expression)
+                continue;
+            ulong start = offsetKey(expression.pos.start.line, expression.pos.start.offset);
+            ulong end = offsetKey(expression.pos.end.line, expression.pos.end.offset);
+            if (cursor >= start && cursor < end && end - start < span)
+            {
+                found = expression;
+                span = end - start;
+            }
+        }
+        return found;
+    }
+
     void index(Node node)
     {
         if (node is null || node in visited)
             return;
         visited[node] = true;
+        if (node.pos !is null && node.pos.filename == path)
+            expressions ~= node;
         if (node.pos !is null && node.pos.filename == path && (cast(Identifier) node
                 || cast(CallExpr) node || cast(MemberExpr) node || cast(StringLit) node
                 || cast(IntLit) node || cast(DoubleLit) node || cast(ArrayLit) node || cast(MapLit) node))
@@ -392,7 +460,7 @@ class Document
         }
         if (VarDecl variable = cast(VarDecl) node)
             if (variable.pos !is null && variable.pos.filename == path)
-                variableDeclarations[variable.name.to!string] = variable;
+                variableDeclarations[identity(variable.pos)] = variable;
         if (VarDecl variable = cast(VarDecl) node)
             add(variable.name.to!string, "variable", variable.pos, variable.pos,
                     (variable.isConst ? "const " : "var ") ~ variable.name.to!string ~ ": " ~ (variable.type_sema is null

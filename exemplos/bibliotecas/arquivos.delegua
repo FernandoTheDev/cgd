@@ -1,0 +1,5 @@
+//! dados.txt
+var arquivos: qualquer = importar("cgd:arquivos")
+var arquivo: qualquer = arquivos.Arquivo("dados.txt")
+// Instanciar não abre nem modifica o arquivo. I/O só acontece por chamada explícita.
+escreva(arquivo.caminho())

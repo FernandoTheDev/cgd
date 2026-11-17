@@ -1,0 +1,10 @@
+//! 42\nnulo\nverdadeiro\n2\n0
+var dados: dicionario = { "presente": nulo }
+escreva(dados.obter("ausente", 42))
+escreva(dados.obter("presente", 42))
+escreva(dados.contemChave("presente"))
+dados.definir("nome", "CGD")
+var itens: qualquer[] = dados.itens()
+dados.limpar()
+escreva(tamanho(itens))
+escreva(tamanho(dados))

@@ -1,0 +1,90 @@
+{
+  "Construtor": {
+    "prefix": "construtor",
+    "body": ["construtor(${1}) {", "    ${0}", "}"],
+    "description": "Inicializar uma instância da classe"
+  },
+  "Destrutor": {
+    "prefix": "destrutor",
+    "body": ["destrutor(): vazio {", "    ${0}", "}"],
+    "description": "Liberar recursos ao chamar destruir(instancia)"
+  },
+  "Classe": {
+    "prefix": "classe",
+    "body": ["classe ${1:Nome} {", "    construtor(${2}) {", "        ${0}", "    }", "}"],
+    "description": "Classe com construtor"
+  },
+  "Método": {
+    "prefix": "metodo",
+    "body": ["${1:nome}(${2}): ${3:vazio} {", "    ${0}", "}"],
+    "description": "Método com retorno explícito"
+  },
+  "CTFE": {
+    "prefix": "puro",
+    "body": [
+      "//>puro",
+      "funcao ${1:nome}(${2:valor: inteiro}): ${3:inteiro} {",
+      "    retorna ${0:valor}",
+      "}"
+    ],
+    "description": "Função pura com prévia no hover para argumentos constantes"
+  },
+  "Arquivo": {
+    "prefix": "cgdArquivo",
+    "body": [
+      "var ${1:arquivos}: qualquer = importar(\"cgd:arquivos\")",
+      "var ${2:arquivo}: qualquer = ${1}.Arquivo(${3:\"dados.txt\"})",
+      "${0}"
+    ],
+    "description": "Instanciar Arquivo para I/O controlado"
+  },
+  "Cliente HTTP": {
+    "prefix": "cgdHTTP",
+    "body": [
+      "var ${1:rede}: qualquer = importar(\"cgd:rede\")",
+      "var ${2:cliente}: qualquer = ${1}.ClienteHTTP(${3:\"https://exemplo.com\"})",
+      "${0}"
+    ],
+    "description": "Instanciar ClienteHTTP"
+  },
+  "Documento JSON": {
+    "prefix": "cgdJSON",
+    "body": [
+      "var ${1:json}: qualquer = importar(\"cgd:json\")",
+      "var ${2:documento}: qualquer = ${1}.JSON.deTexto(${3:\"{}\"})",
+      "${0}"
+    ],
+    "description": "Analisar um documento JSON"
+  },
+  "Interface": {
+    "prefix": "interface",
+    "body": ["interface ${1:Nome} {", "    ${2:metodo}(${3}): ${4:vazio};", "}"],
+    "description": "Contrato de membros públicos"
+  },
+  "Classe abstrata": {
+    "prefix": "abstrata",
+    "body": ["classe abstrata ${1:Nome} {", "    abstrato ${2:metodo}(${3}): ${4:vazio};", "}"],
+    "description": "Classe não instanciável"
+  },
+  "Enum": {
+    "prefix": "enum",
+    "body": ["enum ${1:Estado} { ${2:Inicial}, ${3:Final} }"],
+    "description": "Namespace de constantes inteiras"
+  },
+  "Arrow": {
+    "prefix": "arrow",
+    "body": ["(${1:valor: inteiro}): ${2:inteiro} => ${0:valor}"],
+    "description": "Função sem captura"
+  },
+  "FFI C": {
+    "prefix": "ffi",
+    "body": [
+      "@definicao(biblioteca=\"${1:m}\", prefixo=\"\")",
+      "classe estrangeira ${2:LibM} {",
+      "    @definicao(simbolo=\"${3:cos}\")",
+      "    ${4:cosseno}(x: numero): numero;",
+      "}"
+    ],
+    "description": "Ligação explícita com ABI C"
+  }
+}

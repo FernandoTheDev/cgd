@@ -1,24 +1,27 @@
-// resolve todos os nodes
-module frontend.semantic.sema3;
+// Resolve expressões, escopos e contratos após a declaração dos símbolos.
+module frontend.semantic.analyzer;
 import catalog = diagnostics.catalog;
 
 import std.algorithm;
 import std.exception;
 import std.format;
 import std.array;
-import std.stdio;
+import std.conv : to;
 
-import backend.c.codegen;
 import frontend.semantic;
+import frontend.semantic.members;
+import frontend.semantic.contracts;
+import frontend.semantic.defaults;
+import frontend.semantic.foreign;
+import frontend.semantic.assignments;
+import frontend.semantic.native_methods;
 import frontend.parser;
-import backend.c.utils;
-import ctfe.ctfe_flags;
 import frontend.lexer;
 import frontend;
 import errors;
 import utils;
 
-class Sema3
+class SemanticAnalyzer
 {
 private:
     Context context;
@@ -27,7 +30,7 @@ private:
     Diagnostics err;
     size_t loopDepth, functionDepth, switchDepth, collectionDepth;
     TypeSema[] returnTypes;
-    ClassDecl methodOwner;
+    ClassDecl methodOwner, lexicalOwner;
 
     TypeSema anyType()
     {
@@ -102,7 +105,12 @@ private:
     void predeclare(Node[] body)
     {
         foreach (Node child; body)
-            if (FnDecl fn = cast(FnDecl) child)
+            if (VarDecl enumeration = cast(VarDecl) child)
+            {
+                if (enumeration.isEnum && !registry.declareEnum(enumeration.name))
+                    err.error(enumeration.pos, "Nome de enum conflita com tipo existente neste escopo.");
+            }
+            else if (FnDecl fn = cast(FnDecl) child)
             {
                 if (!context.set(fn.fn, new SymbolFn(fn)))
                     err.error(fn.pos, "Função duplicada neste escopo.");
@@ -112,9 +120,11 @@ private:
     void analyzeBody(ref Node[] body)
     {
         context.push();
+        registry.pushEnumScope();
         predeclare(body);
         foreach (ref Node child; body)
             child = analyze(child);
+        registry.popEnumScope();
         context.pop();
     }
 
@@ -156,11 +166,13 @@ private:
                 Comprehension c = cast(Comprehension) node;
                 c.iterable = analyze(c.iterable);
                 context.push();
+                registry.pushEnumScope();
                 VarDecl v = new VarDecl(c.name, null, false, c.bindingType, c.pos);
                 v.type_sema = c.bindingType is null ? anyType() : resolver.resolver(c.bindingType);
                 context.set(c.name, new SymbolVar(v));
                 c.value = analyze(c.value);
                 c.condition = analyze(c.condition);
+                registry.popEnumScope();
                 context.pop();
                 node.type_sema = new TypeSemaArray(anyType());
                 return node;
@@ -192,9 +204,9 @@ private:
                     unit.analyzed = true;
                     Context ctx = new Context;
                     TypeRegistry types = new TypeRegistry;
-                    new Sema1(ctx, err).analyze(unit.program);
-                    new Sema2(types).analyze(unit.program);
-                    new Sema3(ctx, types, new TypeResolver(types, err), err).analyze(unit.program);
+                    new DeclarationAnalysis(ctx, types, err).analyze(unit.program);
+
+                    new SemanticAnalyzer(ctx, types, new TypeResolver(types, err), err).analyze(unit.program);
                 }
                 node.type_sema = anyType();
                 return node;
@@ -208,6 +220,7 @@ private:
                 foreach (ref CatchClause c; t.catches)
                 {
                     context.push();
+                    registry.pushEnumScope();
                     if (c.type !is null)
                         resolver.resolver(c.type);
                     if (c.name.length)
@@ -216,8 +229,10 @@ private:
                         v.type_sema = anyType();
                         context.set(c.name, new SymbolVar(v, true));
                     }
+                    predeclare(c.body);
                     foreach (ref Node child; c.body)
                         child = analyze(child);
+                    registry.popEnumScope();
                     context.pop();
                 }
                 analyzeBody(t.finalBody);
@@ -240,6 +255,7 @@ private:
                 EachStmt loop = cast(EachStmt) node;
                 loop.iterable = analyze(loop.iterable);
                 context.push();
+                registry.pushEnumScope();
                 VarDecl variable = new VarDecl(loop.name, null, false, loop.bindingType, loop.pos);
                 variable.type_sema = loop.bindingType is null ? anyType() : resolver.resolver(loop.bindingType);
                 context.set(loop.name, new SymbolVar(variable));
@@ -254,6 +270,7 @@ private:
                 loopDepth++;
                 analyzeBody(loop.body);
                 loopDepth--;
+                registry.popEnumScope();
                 context.pop();
                 return node;
             case NodeKind.MapLit:
@@ -280,12 +297,14 @@ private:
             case NodeKind.ForStmt:
                 ForStmt loop = as!ForStmt(node);
                 context.push();
+                registry.pushEnumScope();
                 loop.init = analyze(loop.init);
                 loop.condition = analyze(loop.condition);
                 loop.step = analyze(loop.step);
                 loopDepth++;
                 analyzeBody(loop.body);
                 loopDepth--;
+                registry.popEnumScope();
                 context.pop();
                 return node;
             case NodeKind.DoStmt:
@@ -372,7 +391,37 @@ private:
             return node;
         }
         classesActive[node] = true;
+        foreach (dstring name; node.interfaceNames)
+        {
+            Symbol* symbol = context.get(name);
+            if (symbol is null || !symbol.isFn() || (cast(SymbolFn*) symbol)
+                    .node.classFactory is null || !(cast(SymbolFn*) symbol).node.classFactory.isInterface)
+                err.error(node.pos, "Interface não encontrada: " ~ name.to!string);
+            else
+            {
+                ClassDecl contract = (cast(SymbolFn*) symbol).node.classFactory;
+                analyzeClass(contract);
+                node.interfaces ~= contract;
+            }
+        }
+        bool[dstring][] previousEnums = registry.enterClassScope(node);
+        scope (exit)
+            registry.leaveClassScope(previousEnums);
+        foreach (ClassField field; node.fields)
+            if (field.isEnum && !registry.declareEnum(field.name))
+                err.error(field.pos, "Nome de enum conflita com tipo existente neste escopo.");
         analyzeDecorators(node.decorators, node.pos);
+        if (node.isForeign)
+        {
+            foreach (FnDecl method; node.methods)
+            {
+                resolver.resolver(method.type_expr);
+                foreach (FnArg argument; method.args)
+                    resolver.resolver(argument.type_expr);
+            }
+            resolveForeignClass(node, err);
+            node.isAbstract = true;
+        }
         if (node.superName.length)
         {
             Symbol* sym = context.get(node.superName);
@@ -388,7 +437,23 @@ private:
         foreach (ref ClassField field; node.fields)
         {
             analyzeDecorators(field.decorators, field.pos);
-            resolver.resolver(field.type);
+            TypeSema fieldType = resolver.resolver(field.type);
+            if (field.isEnum)
+                field.value = analyze(field.value);
+            else if (!node.isInterface && !node.isForeign)
+            {
+                Node initial = field.value is null ? defaultValue(fieldType, field.pos) : field.value;
+                if (initial !is null)
+                {
+                    FnDecl initializer = new FnDecl("#init_"d ~ field.name, [], field.type,
+                            [cast(Node) new ReturnStmt(initial, field.pos)], 0, field.pos);
+                    initializer.isMethod = true;
+                    initializer.accessor = true;
+                    initializer.ownerClass = node;
+                    field.initializer = initializer;
+                    node.methods ~= initializer;
+                }
+            }
             for (ClassDecl parent = node.superClass; parent !is null; parent = parent.superClass)
             {
                 foreach (ClassField inherited; parent.fields)
@@ -427,6 +492,8 @@ private:
         }
         node.signature.args = constructor !is null ? constructor.args : node.superClass !is null
             ? node.superClass.signature.args : [];
+        if (!node.isInterface)
+            validateClassContracts(node, err);
         classesActive.remove(node);
         classesAnalyzed[node] = true;
         return node;
@@ -434,7 +501,37 @@ private:
 
     Node analyzeMemberExpr(MemberExpr node)
     {
-        node.left = analyze(node.left);
+        MapLit members;
+        if (Identifier receiver = cast(Identifier) node.left)
+            if (VarDecl enumeration = context.enumDeclaration(receiver.value))
+            {
+                receiver.variableRef = enumeration;
+                receiver.type_sema = new TypeSemaBuiltin(TypeSemaBase.Map);
+                members = cast(MapLit) enumeration.value;
+            }
+        if (members is null)
+            node.left = analyze(node.left);
+        if (MemberExpr receiver = cast(MemberExpr) node.left)
+            if (Identifier klass = cast(Identifier) receiver.left)
+                if (klass.classRef !is null)
+                    members = receiver.enumMembers;
+        if (members !is null)
+            if (Identifier name = cast(Identifier) node.right)
+                if (name.value != "#incompleto")
+                {
+                    foreach (size_t index, Node key; members.keys)
+                        if ((cast(StringLit) key).value == name.value)
+                        {
+                            node.enumValue = new IntLit((cast(IntLit) members.values[index]).value, node.pos);
+                            node.enumValue.type_sema = new TypeSemaBuiltin(TypeSemaBase.Int);
+                            node.type_sema = node.enumValue.type_sema;
+                            node.readonly = true;
+                            return node;
+                        }
+                    err.error(name.pos, "Membro de enum não encontrado.");
+                    node.type_sema = anyType();
+                    return node;
+                }
         if (cast(Identifier) node.right is null)
             err.error(node.pos, "Nome de propriedade inválido.");
         node.type_sema = anyType();
@@ -449,23 +546,40 @@ private:
                 declaration = receiver.lexicalClass;
         }
         Identifier name = cast(Identifier) node.right;
-        if (name !is null)
-            for (ClassDecl current = declaration; current !is null; current = current.superClass)
+        if (name is null || name.value == "#incompleto")
+            return node;
+        if (declaration !is null)
+        {
+            ClassMember member = resolveClassMember(declaration, name.value);
+            if (member.owner !is null)
             {
-                foreach (FnDecl method; current.methods)
-                    if (method.fn == name.value)
-                    {
-                        name.functionRef = method;
-                        node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Function);
-                        return node;
-                    }
-                foreach (ClassField field; current.fields)
-                    if (field.name == name.value)
-                    {
-                        node.type_expr = field.type;
-                        node.type_sema = resolver.resolver(field.type);
-                        return node;
-                    }
+                if (!member.visibleFrom(lexicalOwner))
+                    err.errorCode(name.pos, inaccessibleMember, name.value);
+                Identifier receiver = cast(Identifier) node.left;
+                if (receiver !is null && receiver.classRef !is null && (member.method is null
+                        ? !member.field.isEnum : !member.method.isStatic))
+                    err.errorCode(name.pos, instanceMember, name.value);
+                if (member.method !is null)
+                {
+                    name.functionRef = member.method;
+                    node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Function);
+                }
+                else
+                {
+                    node.readonly = member.field.isEnum;
+                    node.enumMembers = member.field.isEnum ? cast(MapLit) member.field.value : null;
+                    node.type_expr = member.field.type;
+                    node.type_sema = resolver.resolver(member.field.type);
+                }
+                return node;
+            }
+        }
+        TypeSemaBuiltin receiverType = cast(TypeSemaBuiltin) node.left.type_sema;
+        if (declaration is null && (receiverType is null || receiverType.base != TypeSemaBase.Map))
+            if (FnDecl builtin = builtinMethod(node.left.type_sema, name.value.to!string))
+            {
+                name.functionRef = builtin;
+                node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Function);
             }
         return node;
     }
@@ -483,13 +597,7 @@ private:
             node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Bool);
         if (node.op == TokenKind.PPlus || node.op == TokenKind.MMinus)
         {
-            Identifier id = cast(Identifier) node.value;
-            if (id is null && node.value.kind != NodeKind.IndexExpr)
-                err.error(node.pos, "Incremento exige uma variável ou índice modificável.");
-            if (id !is null)
-                if (Symbol* sym = context.get(id.value))
-                    if (sym.isVar() && (cast(SymbolVar*) sym).isConstant)
-                        err.error(node.pos, "Não é possível incrementar uma constante.");
+            validateAssignmentTarget(node.value, err);
         }
 
         bool[TokenKind] opsNums = [TokenKind.PPlus: false, TokenKind.MMinus: false,];
@@ -561,70 +669,16 @@ private:
         return node;
     }
 
-    Node analyzeAssignStmtIdx(AssignStmt node)
-    {
-        // val[idx] = 42
-        node.left = analyze(node.left); // val[idx]
-        node.value = analyze(node.value); // 42
-        // Contratos de campos passam por StaticSafety: em pegue, a falha provada
-        // permanece observável em execução e gera W31xx em vez de impedir o build.
-        if (cast(MemberExpr) node.left is null)
-            checkTypes(node.pos, node.left.type_sema, node.value.type_sema);
-
-        return node;
-    }
-
     Node analyzeAssignStmt(AssignStmt node)
     {
-        if (node.left.kind == NodeKind.MemberExpr)
-            return analyzeAssignStmtIdx(node);
-        if (node.left.kind == NodeKind.IndexExpr)
-            return analyzeAssignStmtIdx(node);
-
-        if (node.left.kind != NodeKind.Identifier)
-        {
-            err.error(node.pos, "Atribuição inválida: o lado esquerdo da operação deve ser uma variável.");
-            return node;
-        }
-
-        Identifier var = as!Identifier(node.left);
-        dstring name = var.value;
-
-        Symbol* sym = context.get(name);
-        if (sym is null)
-        {
-            missingSymbol(var);
-            return node;
-        }
-        if (sym.isFn())
-        {
-            err.error(var.pos, "Não é possível atribuir a uma função.");
-            return node;
-        }
-        if (sym.isParam())
-        {
-            var.parameterRef = (cast(SymbolParam*) sym).node;
-            var.type_expr = (cast(SymbolParam*) sym).node.type_expr;
-            node.value = analyze(node.value);
-            checkTypes(node.pos, (cast(SymbolParam*) sym).node.type_sema, node.value.type_sema);
-            return node;
-        }
-        SymbolVar* symv = cast(SymbolVar*) sym;
-        var.variableRef = symv.node;
-        var.type_expr = symv.node.type_expr;
-
-        if (symv.isConstant)
-        {
-            err.error(var.pos, format("A variavel '%s' não pode ser reatribuída pois é uma constante.", name));
-            alreadyDeclaredHere(name, symv.node.pos, err);
-            return node;
-        }
-
+        node.left = analyze(node.left);
         node.value = analyze(node.value);
-
-        if (!checkTypes(node.pos, symv.node.type_sema, node.value.type_sema))
-            alreadyDeclaredHere(name, symv.node.pos, err);
-
+        node.type_sema = node.left.type_sema;
+        if (!validateAssignmentTarget(node.left, err))
+            return node;
+        // Campos passam pela segurança estática: falhas tratadas em pegue são W31xx.
+        if (cast(MemberExpr) node.left is null)
+            checkTypes(node.pos, node.left.type_sema, node.value.type_sema);
         return node;
     }
 
@@ -659,9 +713,15 @@ private:
             sym.uses++;
 
         if (sym.isVar())
+        {
             node.variableRef = (cast(SymbolVar*) sym).node;
+            node.type_expr = node.variableRef.type_expr;
+        }
         if (sym.isParam())
+        {
             node.parameterRef = (cast(SymbolParam*) sym).node;
+            node.type_expr = node.parameterRef.type_expr;
+        }
         if (node.value == "isto")
             node.lexicalClass = methodOwner;
         node.type_sema = sym.isParam() ? (cast(SymbolParam*) sym).node.type_sema : (cast(SymbolVar*) sym)
@@ -701,28 +761,18 @@ private:
             id.functionRef = fn;
             id.classRef = fn.classFactory;
             if (fn.classFactory !is null)
+            {
                 analyzeClass(fn.classFactory);
+                if (fn.classFactory.isAbstract)
+                    err.error(node.pos, "Classe abstrata/interface não pode ser instanciada.");
+            }
             node.builtinCall = (cast(SymbolFn*) sym).isRuntime;
             node.type_sema = fn.classFactory is null ? resolver.resolver(
                     fn.type_expr) : new TypeSemaClass(fn.classFactory);
-            bool spread = node.args.any!((Node a) => a.kind == NodeKind.SpreadExpr);
-            bool rest = fn.args.length && fn.args[$ - 1].rest;
-            if (id.value != "escreva" && !spread)
-            {
-                size_t minimum;
-                foreach (FnArg arg; fn.args)
-                    if (arg.value is null && !arg.rest)
-                        minimum++;
-                if (node.args.length < minimum || (!rest && node.args.length > fn.args.length))
-                    err.error(node.pos, format("A função '%s' espera entre %s e %s argumentos; recebeu %s.",
-                            id.value, minimum, fn.args.length, node.args.length));
-            }
-            foreach (size_t i, ref Node arg; node.args)
-            {
+            foreach (ref Node arg; node.args)
                 arg = analyze(arg);
-                if (i < fn.args.length && !fn.args[i].rest && arg.kind != NodeKind.SpreadExpr)
-                    checkTypes(arg.pos, resolver.resolver(fn.args[i].type_expr), arg.type_sema);
-            }
+            if (id.value != "escreva")
+                validateArguments(fn, node);
             return node;
         }
         node.fn = analyze(node.fn);
@@ -732,11 +782,31 @@ private:
         if (MemberExpr member = cast(MemberExpr) node.fn)
             if (Identifier name = cast(Identifier) member.right)
                 if (name.functionRef !is null)
-                    node.type_sema = resolver.resolver(name.functionRef.type_expr);
+                {
+                    FnDecl target = name.functionRef;
+                    node.type_sema = target.type_sema is null ? resolver.resolver(target.type_expr) : target.type_sema;
+                    validateArguments(target, node);
+                }
         if (node.fn.type_sema !is null && !node.fn.type_sema.isAny()
                 && node.fn.type_sema.toStr() != TypeSemaBase.Function)
             err.error(node.pos, "O valor chamado não é uma função.");
         return node;
+    }
+
+    void validateArguments(FnDecl target, CallExpr call)
+    {
+        if (call.args.any!((Node argument) => argument.kind == NodeKind.SpreadExpr))
+            return;
+        size_t minimum;
+        bool rest = target.args.length && target.args[$ - 1].rest;
+        foreach (FnArg argument; target.args)
+            if (argument.value is null && !argument.rest)
+                minimum++;
+        if (call.args.length < minimum || (!rest && call.args.length > target.args.length))
+            err.errorCode(call.pos, invalidArity, target.fn, minimum, target.args.length, call.args.length);
+        foreach (size_t i, Node argument; call.args)
+            if (i < target.args.length && !target.args[i].rest)
+                checkTypes(argument.pos, resolver.resolver(target.args[i].type_expr), argument.type_sema);
     }
 
     Node analyzeReturnStmt(ReturnStmt node)
@@ -779,7 +849,10 @@ private:
         collectionDepth = 0;
         functionDepth++;
         context.pushFunction();
+        registry.pushEnumScope();
         ClassDecl previousOwner = methodOwner;
+        ClassDecl previousLexicalOwner = lexicalOwner;
+        lexicalOwner = node.ownerClass;
         methodOwner = node.isMethod && !node.isStatic ? node.ownerClass : null;
         if (node.isMethod && !node.isStatic)
         {
@@ -789,9 +862,6 @@ private:
         }
         node.type_sema = resolver.resolver(node.type_expr);
         returnTypes ~= node.type_sema;
-
-        // if (node.ctfe_flags & CTFEFlags.Pure)
-        //     writefln("Função pura detectada: %s", node.fn);
 
         for (uint i; i < node.args.length; i++)
         {
@@ -810,6 +880,8 @@ private:
             node.body[i] = analyze(node.body[i]);
 
         methodOwner = previousOwner;
+        lexicalOwner = previousLexicalOwner;
+        registry.popEnumScope();
         context.popFunction();
         returnTypes.length--;
         functionDepth--;
@@ -867,6 +939,15 @@ private:
 
     Node analyzeVarDecl(VarDecl node)
     {
+        if (node.uninitialized && node.type_expr !is null)
+        {
+            Node initial = defaultValue(resolver.resolver(node.type_expr), node.pos);
+            if (initial !is null)
+            {
+                node.value = initial;
+                node.uninitialized = false;
+            }
+        }
         node.value = analyze(node.value);
 
         dstring name = node.name;
@@ -877,8 +958,6 @@ private:
         }
 
         TypeSema valueType = node.value.type_sema;
-        // writeln(name, ": ", valueType.toStr());
-        // writeln(node.type_sema, "\n");
 
         if (node.type_expr !is null)
         {

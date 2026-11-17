@@ -189,8 +189,13 @@ class TypeSemaClass : TypeSema
             return true;
         if (TypeSemaClass c = cast(TypeSemaClass) other)
             for (ClassDecl node = c.declaration; node !is null; node = node.superClass)
+            {
                 if (node is declaration)
                     return true;
+                foreach (ClassDecl contract; node.interfaces)
+                    if (contract is declaration)
+                        return true;
+            }
         return false;
     }
 

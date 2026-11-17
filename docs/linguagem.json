@@ -1,5 +1,85 @@
 [
   {
+    "id": "inicio",
+    "title": "Comece aqui: instalar, escrever e executar",
+    "status": "parcial",
+    "description": "CGD compila um perfil próprio de Delégua para C99 e usa memória gerenciada. Esta documentação descreve o compilador, suas bibliotecas e ferramentas; o interpretador original não é uma dependência de execução.",
+    "topics": [
+      {
+        "title": "Ambiente e construção",
+        "paragraphs": [
+          "O alvo validado é Linux x86_64. Instale DMD ou LDC2, DUB, Clang ou GCC, pkg-config, Python 3, headers do Boehm GC e libcurl >= 7.86. O runtime é um submódulo Git e deve acompanhar a revisão do compilador."
+        ],
+        "code": "git submodule update --init --recursive\n./build-runtime\ndub build --compiler=ldc2 --build=release\n./instalar"
+      },
+      {
+        "title": "Seu primeiro programa",
+        "paragraphs": [
+          "Salve como ola.delegua. A extensão do arquivo é parte do contrato da CLI. escreva termina com quebra de linha; vários argumentos são escritos em sequência, sem espaço implícito."
+        ],
+        "code": "var nome = \"Ana\"\nescreva(\"Olá, ${nome}!\")"
+      },
+      {
+        "title": "Verificar, compilar e otimizar",
+        "paragraphs": [
+          "--verificar executa o frontend sem chamar compilador C. -s escolhe o executável de saída. -o habilita otimização e CTFE; não escolhe o caminho de saída. --emitir-c preserva o C intermediário sem executar o linker."
+        ],
+        "code": "./cgd ola.delegua --verificar\n./cgd ola.delegua -s out/ola\n./out/ola\n./cgd ola.delegua -o -s out/ola-otimizado\n./cgd ola.delegua --emitir-c -s out/ola"
+      },
+      {
+        "title": "Por que um perfil próprio?",
+        "paragraphs": [
+          "A geração C99 e o runtime gerenciado dão um executável independente do interpretador. Os contratos precisam preservar efeitos, erros, tipos e aliases nos dois modos. Não se aceita código apenas porque outro ambiente Delégua o executa; os limites estão explícitos aqui."
+        ]
+      }
+    ],
+    "examples": [],
+    "notes": ""
+  },
+  {
+    "id": "editor",
+    "title": "Editor: arquivos, cores, inferência e hover",
+    "status": "parcial",
+    "description": "A extensão VS Code usa um LSP local persistente. A edição não dispara build, linker, rede ou execução do programa.",
+    "topics": [
+      {
+        "title": "Instalação e identidade visual",
+        "paragraphs": [
+          "Com CGD e runtime construídos, prepare as dependências da extensão e use o instalador. A logo do projeto identifica arquivos .delegua nos temas que respeitam ícones de linguagem. Temas de ícones de terceiros podem sobrescrever esse ícone; não alteramos o tema global."
+        ],
+        "code": "npm ci --prefix extensao-vscode --ignore-scripts\npython3 scripts/instalar_extensao.py --associate"
+      },
+      {
+        "title": "Coloração e formatação",
+        "paragraphs": [
+          "Palavras-chave, tipos, atributos, métodos e decoradores recebem categorias semânticas. @definicao é formatado junto ao @; biblioteca, prefixo, simbolo e abi são argumentos de metadados. Strings e comentários não são reescritos. Ctrl+Shift+I usa o mesmo formatador da CLI, com quatro espaços."
+        ],
+        "code": "@definicao(biblioteca=\"m\", prefixo=\"\")\nclasse estrangeira LibM {\n    @definicao(simbolo=\"cos\")\n    cosseno(x: numero): numero;\n}"
+      },
+      {
+        "title": "Tipos inferidos são dicas virtuais",
+        "paragraphs": [
+          "Em var quantidade = 3 o editor apresenta : numero após quantidade, sem gravar a anotação no arquivo. Variáveis já anotadas não recebem dica redundante. As dicas vêm do tipo resolvido, respeitam a revisão em memória e podem ser desligadas em cgd.inlayHints. A posição usa UTF-16 do protocolo LSP."
+        ],
+        "code": "var quantidade = 3\nvar nome = \"Ana\"\nvar explicito: inteiro = 3"
+      },
+      {
+        "title": "Pureza não é promessa de otimização",
+        "paragraphs": [
+          "O hover informa se a função tem prova de pureza aprovada para CTFE. Uma chamada com resultado comprovado mostra a prévia. A substituição exige -o; sem otimização ela continua executando em runtime. Métodos, FFI, argumentos dinâmicos ou orçamento esgotado não recebem resultado inventado. Sem prova, a mensagem diz não comprovada, em vez de afirmar que todo código sem anotação tem efeitos."
+        ]
+      },
+      {
+        "title": "Comandos explícitos",
+        "paragraphs": [
+          "CGD: Verificar arquivo analisa o fonte; Compilar e executar faz build e abre um terminal. F5 é execução, não depuração. Depois de atualizar o VSIX, recarregue a janela. cgd.executable permite selecionar outro binário já construído; a extensão não baixa nem constrói um compilador ao abrir arquivos."
+        ]
+      }
+    ],
+    "examples": [],
+    "notes": ""
+  },
+  {
     "id": "valores",
     "title": "Valores, tipos e variáveis",
     "status": "parcial",
@@ -9,7 +89,45 @@
       "linguagem/03_atribuicoes.delegua",
       "linguagem/25_escopos.delegua"
     ],
-    "notes": "Constante impede reatribuir o vínculo; coleções continuam tendo sua mutabilidade própria. Inteiros/longo têm 64 bits e reais/decimal usam ponto flutuante de 64 bits. Não há bigint."
+    "notes": "Constante impede reatribuir o vínculo; coleções continuam tendo sua mutabilidade própria. Inteiros/longo têm 64 bits e reais/decimal usam ponto flutuante de 64 bits. Não há bigint.",
+    "topics": [
+      {
+        "title": "Declarações e inferência",
+        "paragraphs": [
+          "var permite reatribuir; const exige um inicializador e impede reatribuir o vínculo. Uma coleção em const continua mutável, salvo um namespace de enum congelado. Anote com dois-pontos ou deixe o tipo ser inferido do inicializador."
+        ],
+        "code": "var contador: inteiro = 0\nvar titulo = \"CGD\"\nconst limite: inteiro = 10"
+      },
+      {
+        "title": "Tipos e limites",
+        "paragraphs": [],
+        "rows": [
+          ["numero / número", "Contrato numérico: aceita inteiro e real; inicializa com 0."],
+          [
+            "inteiro / longo",
+            "Inteiro assinado de 64 bits. Overflow é falha tratável; longo não é bigint."
+          ],
+          [
+            "real / decimal",
+            "Ponto flutuante de 64 bits; default 0.0. Não há precisão decimal financeira."
+          ],
+          ["logico / booleano / binario", "Lógico; default falso."],
+          ["texto", "UTF-8; default texto vazio. Índices contam pontos de código."],
+          ["T[]", "Vetor com contrato de elemento; default vetor novo vazio."],
+          ["dicionario / dicionário", "Mapa de chaves primitivas; default mapa novo vazio."],
+          [
+            "qualquer, classe, interface, funcao, tupla",
+            "Sem instanciação implícita: ausência de inicializador permanece nulo. Tipos explícitos são conferidos nas atribuições/chamadas correspondentes."
+          ]
+        ]
+      },
+      {
+        "title": "Decisão: defaults previsíveis",
+        "paragraphs": [
+          "Valores primitivos e coleções têm um estado inicial útil sem depender do construtor. Objetos e funções não são construídos automaticamente: isso poderia executar código, falhar ou criar dependências inesperadas. Inicializadores explícitos sempre prevalecem."
+        ]
+      }
+    ]
   },
   {
     "id": "operadores",
@@ -17,7 +135,22 @@
     "status": "suportado",
     "description": "Aritmética, potência, divisão inteira, bits, comparações, pertencimento, atribuições compostas e incremento. Os argumentos e índices são avaliados na ordem da fonte.",
     "examples": ["linguagem/02_operadores.delegua", "linguagem/35_bits_e_atribuicoes.delegua"],
-    "notes": "e/ou retornam o valor selecionado. 0, texto vazio e coleções vazias são verdadeiros; falso e nulo são falsos. ?: troca somente nulo. Overflow e divisão por zero lançam exceção."
+    "notes": "e/ou retornam o valor selecionado. 0, texto vazio e coleções vazias são verdadeiros; falso e nulo são falsos. ?: troca somente nulo. Overflow e divisão por zero lançam exceção.",
+    "topics": [
+      {
+        "title": "Comparações textuais",
+        "paragraphs": [
+          "<, <=, > e >= entre textos usam ordem lexicográfica dos pontos de código Unicode em UTF-8 válido, incluindo textos com zero interno. Prefixo mais curto vem antes. Não há ordenação por idioma, normalização ou comparação sem acentos. Runtime, dobras de literais e CTFE compartilham o resultado."
+        ],
+        "code": "var ch: texto = '5'\nse ch >= '0' e ch <= '9' { escreva('dígito ASCII') }\nescreva('ação' > 'a')"
+      },
+      {
+        "title": "Efeitos e precedência",
+        "paragraphs": [
+          "Operandos, receptor e argumentos mantêm a ordem da fonte. e/ou/?: avaliam apenas o lado necessário. Atribuições compostas e incrementos avaliam o destino uma vez. Comparações misturando texto e número não fazem conversão textual silenciosa. Use parênteses quando a intenção de precedência não ficar clara."
+        ]
+      }
+    ]
   },
   {
     "id": "controle",
@@ -29,7 +162,22 @@
       "linguagem/05_lacos.delegua",
       "linguagem/34_lacos_variantes.delegua"
     ],
-    "notes": ""
+    "notes": "",
+    "topics": [
+      {
+        "title": "Blocos e desvios",
+        "paragraphs": [
+          "Blocos usam chaves. se/senao e escolha/caso selecionam comandos. sustar sai do laço/escolha; continua passa à próxima iteração. finalmente ainda executa em transferências de controle. Um comando depois de retorno ou falha pode gerar aviso de código inalcançável."
+        ]
+      },
+      {
+        "title": "Iteração com tipo",
+        "paragraphs": [
+          "para cada elem: T em coleção valida o vínculo a cada iteração. Vetores produzem elementos; texto produz caracteres por ponto de código; dicionários produzem pares chave/valor. Desestruturações e compreensões também aceitam tipos. Não se promete snapshot quando a coleção é alterada durante a própria iteração."
+        ],
+        "code": "var valores: inteiro[] = [1, 2, 3]\npara cada valor: inteiro em valores { escreva(valor) }"
+      }
+    ]
   },
   {
     "id": "coletores",
@@ -37,7 +185,22 @@
     "status": "suportado",
     "description": "Um laço usado como expressão constrói um vetor. retorna dentro do coletor contribui um valor ao resultado; o compilador distingue esse retorno do retorno da função.",
     "examples": ["linguagem/06_lacos_resultado.delegua"],
-    "notes": ""
+    "notes": "",
+    "topics": [
+      {
+        "title": "Construir um vetor com um laço",
+        "paragraphs": [
+          "Laços usados como expressão acumulam valores. retorna dentro do corpo coletor acrescenta ao resultado, em vez de sair da função externa. Condições, efeitos e finalmente continuam em ordem; sustar encerra a coleta e continua passa à próxima iteração."
+        ],
+        "code": "var quadrados = para (var i: inteiro = 0; i < 4; i++) { retorna i*i }\nescreva(quadrados)"
+      },
+      {
+        "title": "Coleta não é execução antecipada",
+        "paragraphs": [
+          "Uma expressão de laço é executada no programa, a menos que um passe especificamente prove uma simplificação segura. Capturas não são necessárias para construir o resultado e o código não é executado pelo editor."
+        ]
+      }
+    ]
   },
   {
     "id": "funcoes",
@@ -45,7 +208,22 @@
     "status": "suportado",
     "description": "Declare funções nomeadas ou anônimas; passe funções como argumentos, retorne funções sem captura e use métodos ligados. Valores padrão são avaliados no chamado e podem usar parâmetros anteriores. ... recebe argumentos variáveis.",
     "examples": ["linguagem/07_funcoes.delegua", "linguagem/08_funcoes_valores.delegua"],
-    "notes": "Capturas de variáveis externas são bloqueadas. Passe o estado explicitamente por parâmetros; um método ligado mantém apenas seu receptor gerenciado."
+    "notes": "Capturas de variáveis externas são bloqueadas. Passe o estado explicitamente por parâmetros; um método ligado mantém apenas seu receptor gerenciado.",
+    "topics": [
+      {
+        "title": "Parâmetros e retornos",
+        "paragraphs": [
+          "Use funcao/função, argumentos tipados opcionais e retorno após dois-pontos. Parâmetros opcionais devem vir depois dos obrigatórios; o espalhamento deve ser o último. Um parâmetro padrão pode usar parâmetros anteriores. Sem retorna, o valor final é nulo, não a última expressão."
+        ],
+        "code": "funcao somar(a: inteiro, b: inteiro = 1): inteiro {\n    retorna a + b\n}\nvar duplicar: funcao = (x: inteiro): inteiro => x * 2"
+      },
+      {
+        "title": "Sem captura implícita",
+        "paragraphs": [
+          "Funções e arrows podem ser valores e callbacks. Não carregam variáveis do ambiente externo: passe os dados por parâmetros. Capturas geram aviso e erro. Métodos ligados mantêm seu receptor explicitamente gerenciado. Esta decisão evita introduzir um ambiente de closures com semântica parcial."
+        ]
+      }
+    ]
   },
   {
     "id": "vetores",
@@ -58,7 +236,22 @@
       "linguagem/22_contratos_aliases.delegua",
       "linguagem/30_metodos_vetor.delegua"
     ],
-    "notes": "Métodos: adicionar, empilhar, tamanho, inclui/contem/contém, fatiar, mapear, filtrarPor, remover, removerPrimeiro, removerUltimo, inverter, somar, juntar, concatenar, encaixar e ordenar. Restrições por aliases são monotônicas; modificar durante a iteração não cria snapshot. filtrar global recebe vetor e função; não existe método reduzir neste perfil."
+    "notes": "Métodos: adicionar, empilhar, tamanho, inclui/contem/contém, fatiar, mapear, filtrarPor, remover, removerPrimeiro, removerUltimo, inverter, somar, juntar, concatenar, encaixar e ordenar. Restrições por aliases são monotônicas; modificar durante a iteração não cria snapshot. filtrar global recebe vetor e função; não existe método reduzir neste perfil.",
+    "topics": [
+      {
+        "title": "Literais, spread e compreensão",
+        "paragraphs": [
+          "Use [a, b] para vetor; ... espalha elementos. Compreensão filtra e transforma em um novo vetor, sem mudar a coleção original. O vínculo de iteração pode ter anotação."
+        ],
+        "code": "var original: inteiro[] = [1, 2, 3]\nvar copia: inteiro[] = [...original, 4]\nvar pares = [x*2 para cada x: inteiro em original se x > 1]"
+      },
+      {
+        "title": "Fatias e métodos",
+        "paragraphs": [
+          "v[inicio:fim:passo] usa fim exclusivo. Início/fim podem ser omitidos, passo pode ser negativo e zero é inválido. Métodos incluem adicionar/empilhar, remover, removerPrimeiro/removerUltimo, inverter, somar, juntar, concatenar, encaixar, ordenar, mapear e filtrarPor. As operações que mutam atuam sobre aliases da mesma coleção; fatiar e concatenar produzem resultados próprios. Callbacks são funções sem captura."
+        ]
+      }
+    ]
   },
   {
     "id": "dicionarios",
@@ -69,9 +262,25 @@
       "linguagem/11_dicionarios.delegua",
       "linguagem/12_tuplas.delegua",
       "linguagem/20_clonagem.delegua",
-      "linguagem/31_metodos_dicionario.delegua"
+      "linguagem/31_metodos_dicionario.delegua",
+      "linguagem/37_dicionario_obter.delegua"
     ],
-    "notes": "Dicionários: chaves, valores, tamanho, remover e inclui/contem/contém. Tuplas: tamanho, inclui/contem/contém e fatiar, além das propriedades ordinais demonstradas. A iteração de dicionários não garante ordem de inserção."
+    "notes": "Dicionários: chaves, valores, tamanho, remover e inclui/contem/contém. Tuplas: tamanho, inclui/contem/contém e fatiar, além das propriedades ordinais demonstradas. A iteração de dicionários não garante ordem de inserção. Dicionários também oferecem obter(chave, padrão), definir, contemChave, itens e limpar. Nulo armazenado não é ausência. ",
+    "topics": [
+      {
+        "title": "Chaves, pares e presença",
+        "paragraphs": [
+          "Dicionários usam chaves nulas, lógicas, numéricas ou textuais. A chave 1 e a chave 1.0 identificam a mesma entrada; verdadeiro é uma chave diferente. Chaves numéricas não finitas são rejeitadas. A ordem de iteração não é ordem de inserção prometida."
+        ],
+        "code": "var dados: dicionario = { nome: \"Ana\", ativo: nulo }\nescreva(dados.obter(\"nome\", \"sem nome\"))\nescreva(dados.contemChave(\"ativo\"))\npara cada par: qualquer em dados { escreva(par[0], par[1]) }"
+      },
+      {
+        "title": "Tuplas, desestruturação e cópia",
+        "paragraphs": [
+          "Literais como (1, \"a\") criam tuplas imutáveis; tupla(vetor) converte coleções de 2 a 10 elementos. Propriedades ordinais como primeiro e segundo dão acesso aos membros. Desestruturação const { nome: texto } = dados cria um vínculo, sem copiar profundamente o objeto. clonar suporta ciclos e mantém identidades compartilhadas dentro da cópia; não clona código de função nem abre outro recurso nativo."
+        ]
+      }
+    ]
   },
   {
     "id": "texto",
@@ -79,7 +288,28 @@
     "status": "suportado",
     "description": "Textos usam UTF-8. Tamanho, índices e fatias contam pontos de código. Interpole expressões com ${...} e use escapes; mudanças de caixa seguem as tabelas Unicode do runtime.",
     "examples": ["linguagem/13_texto_unicode.delegua", "linguagem/28_metodos_texto.delegua"],
-    "notes": "Métodos: tamanho, inclui/contem/contém, fatiar/subtexto, aparar, apararInicio, apararFim, maiusculo/tudoMaiusculo, minusculo/tudoMinusculo, encontrar, dividir, substituir e concatenar. Pontos de código não equivalem a grafemas visuais."
+    "notes": "Métodos: tamanho, inclui/contem/contém, fatiar/subtexto, aparar, apararInicio, apararFim, maiusculo/tudoMaiusculo, minusculo/tudoMinusculo, encontrar, dividir, substituir e concatenar. Pontos de código não equivalem a grafemas visuais.",
+    "topics": [
+      {
+        "title": "Unicode e índices",
+        "paragraphs": [
+          "Textos preservam UTF-8 e indexam pontos de código, não bytes nem grafemas. A letra com acento combinante pode ocupar mais de um índice. tamanho conta pontos de código; I/O mede limites em bytes. Não há normalização Unicode automática: preservar os dados evita modificar identificadores, mensagens e conteúdo externo."
+        ]
+      },
+      {
+        "title": "Interpolação e escapes",
+        "paragraphs": [
+          "${expressao} insere o valor textual da expressão e preserva a ordem de avaliação. Aspas simples e duplas delimitam texto. Escapes incluem quebra de linha, tabulação, barra e zero interno. O formatador conserva o literal exatamente."
+        ],
+        "code": "var nome: texto = \"Ana\"\nescreva(\"Olá, ${nome}\\n\")\nescreva(\"ação\"[1])"
+      },
+      {
+        "title": "Métodos de texto",
+        "paragraphs": [
+          "tamanho, inclui/contem/contém, fatiar/subtexto, aparar/apararInicio/apararFim, maiusculo/minusculo, tudoMaiusculo/tudoMinusculo, encontrar, dividir, substituir e concatenar compõem a API textual. Operações de caixa usam Unicode. Encontrar retorna posição por pontos de código. As comparações são lexicográficas; para ordens por idioma use uma biblioteca explicitamente adequada."
+        ]
+      }
+    ]
   },
   {
     "id": "classes",
@@ -90,9 +320,32 @@
       "linguagem/14_classes.delegua",
       "linguagem/15_heranca.delegua",
       "linguagem/16_privacidade_acessores.delegua",
-      "linguagem/32_objeto_e_metodos.delegua"
+      "linguagem/32_objeto_e_metodos.delegua",
+      "linguagem/36_destrutores.delegua",
+      "linguagem/39_inicializacao.delegua"
     ],
-    "notes": "Classes devem estar no nível do módulo. Campos são declarados; não há injeção arbitrária de campos. Herança por alias dinâmico de classe importada e tipos locais não têm resolução completa."
+    "notes": "Classes devem estar no nível do módulo. Campos são declarados; não há injeção arbitrária de campos. Herança por alias dinâmico de classe importada e tipos locais não têm resolução completa. Destrutores explícitos via destruir(instancia), da derivada às bases; idempotência por identidade, sem chamadas pelo GC ou ao sair do escopo. ",
+    "topics": [
+      {
+        "title": "Atributos e inicializadores",
+        "paragraphs": [
+          "Atributos têm tipo e podem ter valor na própria classe. Cada instância recebe seus próprios defaults e coleções; a expressão explícita é reavaliada para cada objeto. Primeiro são inicializados os campos da base, depois os da derivada, em ordem de declaração; em seguida executa o construtor selecionado. isto permite ler membros já inicializados. O inicializador escreve o armazenamento inicial diretamente, sem disparar um setter customizado."
+        ],
+        "code": "classe Contador {\n    valor: inteiro = 1\n    historico: inteiro[]\n    incrementar(): vazio { isto.valor++ }\n}\nvar a: Contador = Contador()\nvar b: Contador = Contador()\na.historico.adicionar(3) // b.historico continua vazio"
+      },
+      {
+        "title": "Herança e ciclo de vida",
+        "paragraphs": [
+          "herda aceita uma classe base. Métodos públicos/protegidos são resolvidos com sua visibilidade; privado pertence à classe declaradora. super chama a implementação da base. O construtor da base deve ser chamado explicitamente quando necessário. destruir(objeto) percorre destrutores da derivada às bases uma vez por identidade, mesmo se houver exceção; o primeiro erro é relançado. O GC gerencia memória, mas não executa destrutores Delégua."
+        ]
+      },
+      {
+        "title": "Por que esses limites?",
+        "paragraphs": [
+          "Campos estáticos não são suportados; métodos estáticos não recebem isto. Classes só existem no módulo. O compilador preserva acesso, contratos e aliases em C. Não se inventa um construtor ao ler um campo tipado sem inicializador de objeto: ele começa nulo."
+        ]
+      }
+    ]
   },
   {
     "id": "excecoes",
@@ -104,7 +357,22 @@
       "linguagem/18_finalmente_retorno.delegua",
       "linguagem/19_excecoes_tipadas.delegua"
     ],
-    "notes": "Falhas do runtime são tratáveis. Sem tratador, o processo termina com status 1. Há localização, mas ainda não uma pilha completa de chamadas Delégua. A localização usa descritores estáticos apenas nas operações falíveis; literais e declarações simples não recebem chamadas de localização. R0001 é o código genérico atual de falha dinâmica."
+    "notes": "Falhas do runtime são tratáveis. Sem tratador, o processo termina com status 1. Há localização, mas ainda não uma pilha completa de chamadas Delégua. A localização usa descritores estáticos apenas nas operações falíveis; literais e declarações simples não recebem chamadas de localização. R0001 é o código genérico atual de falha dinâmica.",
+    "topics": [
+      {
+        "title": "Lançar, capturar e limpar",
+        "paragraphs": [
+          "falhar aceita um erro ou valor convertido em Excecao. pegue pode ter vínculo e tipo; finalmente roda também em retorno, sustar, continua e nova falha. O caminho que propaga o erro conserva o valor de exceção; a localização vem da operação falível."
+        ],
+        "code": "tente {\n    falhar \"entrada inválida\"\n} pegue (erro: Excecao) {\n    escreva(erro.mensagem)\n} finalmente {\n    escreva(\"limpeza\")\n}"
+      },
+      {
+        "title": "Decisão: falha observável",
+        "paragraphs": [
+          "Otimizações não apagam exceções nem executam um lado descartado de curto-circuito. Falha constante em região deliberadamente capturada recebe aviso estático quando suportado. R0001 agrupa erros dinâmicos; ainda não há uma pilha Delégua completa. Recursos externos devem ser fechados explicitamente ou em finalmente, sem depender do GC."
+        ]
+      }
+    ]
   },
   {
     "id": "modulos",
@@ -112,7 +380,22 @@
     "status": "suportado",
     "description": "importar recebe caminho literal .delegua, relativo ao módulo que importa. O loader canonicaliza, reutiliza unidades, mostra a cadeia de ciclos e impõe limites de recursos.",
     "examples": ["modulos/01_importacao.delegua", "compilador/08_otimizacao_modulos.delegua"],
-    "notes": "Inicialização é única; se falhar, permite nova tentativa. Exportações não podem ser substituídas. Importação dinâmica, NPM e código estrangeiro são excluídos."
+    "notes": "Inicialização é única; se falhar, permite nova tentativa. Exportações não podem ser substituídas. Importação dinâmica, NPM e código estrangeiro são excluídos.",
+    "topics": [
+      {
+        "title": "Importação literal e namespace",
+        "paragraphs": [
+          "importar recebe um caminho literal .delegua relativo ao módulo importador, ou um alias de biblioteca cgd:. A unidade é carregada na compilação, inicializada uma vez na execução e acessada como namespace. Não são importados pacotes NPM, código baixado ou nomes computados."
+        ],
+        "code": "var biblioteca: qualquer = importar(\"cgd:json\")\nvar documento: qualquer = biblioteca.JSON.deTexto(\"{}\")"
+      },
+      {
+        "title": "Identidade, ciclos e visibilidade",
+        "paragraphs": [
+          "O carregador canonicaliza caminhos, aplica orçamento e detecta ciclos com cadeia de importação. Arquivos abertos em memória prevalecem sobre disco no LSP. Tipos de classes possuem identidade de declaração; um nome igual em outro módulo não é o mesmo tipo. Herança por alias dinâmico de classe importada não é resolvida. A ausência de busca irrestrita no disco torna o trabalho do editor limitado e previsível."
+        ]
+      }
+    ]
   },
   {
     "id": "biblioteca",
@@ -125,7 +408,22 @@
       "linguagem/29_metodos_numero.delegua",
       "linguagem/33_aleatoriedade.delegua"
     ],
-    "notes": "Números: absoluto, arredondarParaBaixo, arredondarParaCima e formatar. As bibliotecas de delegua-node não são automaticamente módulos do CGD. leia usa stdin; o catálogo inclui entrada de teste reproduzível."
+    "notes": "Números: absoluto, arredondarParaBaixo, arredondarParaCima e formatar. As bibliotecas de delegua-node não são automaticamente módulos do CGD. leia usa stdin; o catálogo inclui entrada de teste reproduzível.",
+    "topics": [
+      {
+        "title": "Entrada e saída básicas",
+        "paragraphs": [
+          "escreva formata valores e termina a linha; leia lê uma linha da entrada padrão, com mensagem opcional. texto, inteiro, real e numero são conversões explícitas e podem falhar. Para arquivos e HTTP, use as classes de biblioteca documentadas, não uma função global inventada."
+        ],
+        "code": "var entrada: texto = leia(\"Idade: \")\ntente { escreva(inteiro(entrada)) } pegue { escreva(\"inteiro inválido\") }"
+      },
+      {
+        "title": "Operações gerais",
+        "paragraphs": [
+          "tamanho consulta coleções/texto; clonar copia dados; mapear, filtrar, paraCada, todosEmCondicao e ordenar recebem callbacks sem captura. aleatorio produz real em [0, 1); aleatorioEntre usa limite superior exclusivo. decoradores devolve cópia dos metadados. tipo de é uma expressão para consultar a categoria do valor. Métodos nativos são sugeridos pelo tipo do receptor, nunca por uma lista global após ponto."
+        ]
+      }
+    ]
   },
   {
     "id": "metadados",
@@ -133,7 +431,29 @@
     "status": "parcial",
     "description": "Decoradores registram metadados; decoradores(valor) devolve cópias desses dados. Envelopes de funções livres podem trocar a função, desde que não capturem ambiente. Asserções lançam exceções tratáveis.",
     "examples": ["linguagem/23_decoradores.delegua", "linguagem/24_assercoes.delegua"],
-    "notes": "Envelopes em métodos ainda são rejeitados. Metadados em métodos, classes e campos são suportados. Asserções não são removidas por -o."
+    "notes": "Envelopes em métodos ainda são rejeitados. Metadados em métodos, classes e campos são suportados. Asserções não são removidas por -o.",
+    "topics": [
+      {
+        "title": "Metadados declarativos",
+        "paragraphs": [
+          "@nome ou @nome(chave=valor) associa dados a funções/classes/campos/métodos. Argumentos precisam ser constantes, sem executar chamadas. @definicao tem significado adicional nas classes estrangeiras e declara a fronteira ABI; seus argumentos não são uma expressão de carregamento dinâmico."
+        ],
+        "code": "@descricao(nome=\"Exemplo\")\nclasse Exemplo { valor: inteiro = 1 }\nescreva(decoradores(Exemplo))"
+      },
+      {
+        "title": "Envelopes e asserções",
+        "paragraphs": [
+          "Envelopes de funções livres podem substituir a função sem capturar o ambiente. Envelopes em métodos não são suportados; metadados em métodos são aceitos. assercao/asserção verifica uma condição e lança erro tratável com mensagem opcional."
+        ],
+        "code": "assercao(2+2 == 4, \"contrato aritmético\")"
+      },
+      {
+        "title": "Decisão: metadados não são eval",
+        "paragraphs": [
+          "O formato dos decoradores é analisável estaticamente e preserva autoria/posição. Código do programa não pode ser executado no frontend só para obter argumentos ou descobrir tipos. Asserções também não desaparecem apenas porque a otimização está habilitada."
+        ]
+      }
+    ]
   },
   {
     "id": "otimizacoes",
@@ -151,7 +471,22 @@
       "compilador/10_ctfe_excecao.delegua",
       "compilador/11_ctfe_contrato.delegua"
     ],
-    "notes": "A VM preserva senão, escopos, parâmetros mutáveis e a ordem dos argumentos, além de validar contratos primitivos de parâmetros, locais e retorno. Limites, falhas e valores não representáveis mantêm a chamada nativa. Há diagnóstico para recursos fora do subconjunto CTFE. Não há backend próprio LLVM/assembly."
+    "notes": "A VM preserva senão, escopos, parâmetros mutáveis e a ordem dos argumentos, além de validar contratos primitivos de parâmetros, locais e retorno. Limites, falhas e valores não representáveis mantêm a chamada nativa. Há diagnóstico para recursos fora do subconjunto CTFE. Não há backend próprio LLVM/assembly.",
+    "topics": [
+      {
+        "title": "Optar por CTFE",
+        "paragraphs": [
+          "//>puro marca uma função livre para análise de pureza e de representabilidade na VM. Argumentos precisam ter representação constante; resultados passam por contratos. A VM limita instruções, recursão, operandos, slots e tamanho de texto. Falhas não são suprimidas: uma chamada não dobrável continua em runtime, permitindo o tratamento de exceções."
+        ],
+        "code": "//>puro\nfuncao quadrado(x: inteiro): inteiro { retorna x*x }\nvar resultado = quadrado(7)"
+      },
+      {
+        "title": "Correção antes de simplificação",
+        "paragraphs": [
+          "-o busca ponto fixo medindo mudanças. Não descarta inicializadores ou escritas só porque seu resultado não aparece depois. Identidades como f()*0 não podem apagar f(). O hover é uma prévia limitada e não executa FFI, rede ou I/O. Métodos ainda não têm avaliação CTFE suportada."
+        ]
+      }
+    ]
   },
   {
     "id": "diagnosticos",
@@ -165,20 +500,49 @@
       "compilador/13_indice_unicode.delegua",
       "compilador/14_falha_tratada.delegua"
     ],
-    "notes": "O parser recupera erros independentes. A verificação estática antecipa divisão por zero, overflow, índices e contratos literais. Em regiões com pegue, falhas conhecidas geram avisos W31xx e continuam tratáveis. Dados dinâmicos, aliases e retornos de funções ainda exigem validação em execução. Diagnósticos legados usam E0001/W0001/H0001; LSP e fix-its não existem."
+    "notes": "O parser recupera erros independentes. A verificação estática antecipa divisão por zero, overflow, índices e contratos literais. Em regiões com pegue, falhas conhecidas geram avisos W31xx e continuam tratáveis. Dados dinâmicos, aliases e retornos de funções ainda exigem validação em execução. Diagnósticos legados usam E0001/W0001/H0001; LSP e fix-its não existem.",
+    "topics": [
+      {
+        "title": "Encontrar a causa",
+        "paragraphs": [
+          "Diagnósticos incluem severidade, código, arquivo e intervalo. --diagnosticos=json serve ferramentas; --explicar CODIGO explica o catálogo. Falhas comprovadas em região protegida por pegue recebem avisos W31xx para preservar o tratamento deliberado. Dados externos continuam validados no runtime. R0001 é a categoria dinâmica genérica, não uma pilha completa de chamadas."
+        ],
+        "code": "./cgd programa.delegua --verificar --diagnosticos=json\n./cgd --explicar E3101"
+      },
+      {
+        "title": "Recuperação e limites",
+        "paragraphs": [
+          "O parser tenta reportar erros independentes e o LSP tolera edições incompletas. Fontes, nós, profundidade e módulos têm orçamentos defensivos. Erros de tipos/escopo não são adiados até C para parecer que a análise passou. Avisos não equivalem a uma prova global de segurança."
+        ]
+      }
+    ]
   },
   {
     "id": "exclusoes",
     "title": "Exclusões de segurança",
     "status": "excluido",
-    "description": "Upvalues/capturas de estado externo, FFI arbitrária, ponteiros crus, eval, carregamento dinâmico e NPM não são expostos. Esses exemplos devem falhar e fazem parte dos testes.",
+    "description": "Upvalues/capturas de estado externo, ponteiros crus, eval, carregamento dinâmico e NPM não são expostos. Esses exemplos devem falhar e fazem parte dos testes.",
     "examples": [
       "seguranca/01_captura_local.delegua",
       "seguranca/02_captura_global.delegua",
       "seguranca/03_ffi.delegua",
       "seguranca/04_importacao_dinamica.delegua"
     ],
-    "notes": "Uma função que retorna outra função sem captura é válida. Receptor explícito de método ligado é suportado. Ausência de implementação não é motivo para chamar um recurso de inseguro."
+    "notes": "Uma função que retorna outra função sem captura é válida. Receptor explícito de método ligado é suportado. Ausência de implementação não é motivo para chamar um recurso de inseguro.",
+    "topics": [
+      {
+        "title": "Capturas e execução dinâmica",
+        "paragraphs": [
+          "Capturas/upvalues, eval, NPM, importação dinâmica e ponteiros crus não fazem parte do perfil. Uma função anônima sem captura é válida; uma função que usa estado da função externa recebe aviso e erro. Não substitua isso por uma closure silenciosamente incompleta."
+        ]
+      },
+      {
+        "title": "FFI é uma fronteira explícita",
+        "paragraphs": [
+          "A exclusão anterior de FFI foi revogada pelo usuário para assinaturas declaradas. ABI C e ABI gerenciada têm contratos próprios. Isso permite bibliotecas nativas confiáveis e não concede isolamento ao código C. Compatibilidade JavaScript, dialetos e herança de interfaces têm exclusão definitiva no capítulo de decisões."
+        ]
+      }
+    ]
   },
   {
     "id": "plataformas",
@@ -186,26 +550,254 @@
     "status": "parcial",
     "description": "Linux x86_64 é a plataforma validada com DMD e LDC2, Clang e GCC. A CLI permite configurar target, sysroot, compilador e runtime separadamente para preparar builds cruzados.",
     "examples": [],
-    "notes": "Windows/macOS e executáveis cruzados ainda não foram validados. Instaladores são shell/Linux. Não há bigint, dialetos extras, threads da linguagem, debugger ou bibliotecas Node. Consulte o guia de desenvolvimento para configurar a toolchain."
+    "notes": "Windows/macOS e executáveis cruzados ainda não foram validados. Instaladores são shell/Linux. Não há bigint, dialetos extras, threads da linguagem, debugger ou bibliotecas Node. Consulte o guia de desenvolvimento para configurar a toolchain.",
+    "topics": [
+      {
+        "title": "Alvo validado e configuração",
+        "paragraphs": [
+          "Linux x86_64 é a plataforma coberta pelos testes. --cc, --target, --sysroot, --runtime-object, --runtime-root, --pkg-config, --cflag e --ldflag separam compilador C, alvo e dependências. Um runtime construído para o mesmo alvo é obrigatório. Não se anuncia Windows/macOS ou cross apenas porque uma opção foi aceita."
+        ]
+      },
+      {
+        "title": "Por que não múltiplos backends/dialetos?",
+        "paragraphs": [
+          "O foco é uma linguagem com contratos consistentes, saída C99 e toolchains externas conhecidas. Não há backend próprio LLVM/assembly ou emulação de dialetos. Projetar limites claros reduz combinações de semântica que não poderiam ser validadas de forma confiável."
+        ]
+      }
+    ]
   },
   {
     "id": "bibliotecas-cgd",
-    "title": "JSON, rede e coleções do CGD",
+    "title": "JSON, rede, arquivos e coleções do CGD",
     "status": "parcial",
-    "description": "Importe cgd:json, cgd:rede ou cgd:colecoes como namespaces. JSON possui métodos estáticos analisar/serializar e instâncias com obter, definir e texto. Rede usa sessões gerenciadas libcurl; Colecoes oferece unicos e intervalo.",
+    "description": "Namespaces cgd:json, cgd:rede, cgd:arquivos, cgd:colecoes, cgd:matematica, cgd:textos, cgd:estatistica e cgd:caminhos fornecem classes de biblioteca. cgd:nativo é a ponte de implementação.",
     "examples": [
       "bibliotecas/json_classe.delegua",
       "bibliotecas/rede.delegua",
-      "bibliotecas/colecoes.delegua"
+      "bibliotecas/colecoes.delegua",
+      "bibliotecas/json_navegacao.delegua",
+      "bibliotecas/arquivos.delegua"
     ],
-    "notes": "JSON em Delégua puro, limite de profundidade e preservação de números além da representação nativa. Rede exige libcurl >=7.86; opções com ponteiros/callbacks arbitrários são recusadas. WebSocket depende da libcurl instalada, não validado neste ambiente."
+    "notes": "JSON em Delégua puro, limite de profundidade e preservação de números além da representação nativa. Rede exige libcurl >=7.86; opções com ponteiros/callbacks arbitrários são recusadas. WebSocket depende da libcurl instalada, não validado neste ambiente. I/O usa arquivos regulares, fecha descritores por chamada e limita leituras/escritas a 64 MiB.",
+    "topics": [
+      {
+        "title": "Escolher uma biblioteca",
+        "paragraphs": [],
+        "rows": [
+          [
+            "cgd:json",
+            "JSON.deTexto, analisar/serializar, obter/contem/caminho/definir/copiar/chaves. Profundidade, nós, Unicode, números grandes e ciclos têm contratos explícitos."
+          ],
+          [
+            "cgd:rede",
+            "Sessao de libcurl; ClienteHTTP e RespostaHTTP com obter/enviar/enviarJSON/atualizar/remover. Rede só acontece quando o programa pede."
+          ],
+          [
+            "cgd:arquivos",
+            "Arquivo(caminho): ler/linhas/escrever/anexar/informacoes/tamanho/remover. Cada chamada fecha seu descritor; leitura padrão 16 MiB, teto 64 MiB."
+          ],
+          [
+            "cgd:matematica",
+            "Matematica sobre libm: seno/cosseno/tangente/raizQuadrada/potencia/absoluto/piso/teto/logaritmo/exponencial."
+          ],
+          [
+            "cgd:colecoes",
+            "Colecoes.unicos/intervalo/reduzir/agrupar/achatar. Callbacks não capturam ambiente."
+          ],
+          [
+            "cgd:nativo",
+            "Primitivas da ABI gerenciada para implementar bibliotecas; prefira as classes públicas acima nos programas."
+          ]
+        ]
+      },
+      {
+        "title": "I/O e respostas com erros",
+        "paragraphs": [
+          "Arquivo preserva bytes, inclusive zero interno; operações Unicode ainda exigem UTF-8 válido. Escrita pode ser parcial se o sistema falhar: não é transação. ClienteHTTP usa sessão isolada por requisição; sucesso exige transporte sem erro e status 200..299. exigirSucesso transforma uma resposta inspecionável em exceção tratável. Nunca há rede automática no editor."
+        ]
+      }
+    ]
   },
   {
     "id": "metodos-estaticos",
     "title": "Métodos estáticos e ferramentas do editor",
     "status": "parcial",
-    "description": "estatico declara método sem isto, herdado e acessível pela classe ou instância. O LSP local oferece completion por tipo, signature help e formatador com quatro espaços. Ctrl+Shift+I formata no VS Code; --formatar formata pela CLI.",
+    "description": "estatico declara método sem isto, herdado e acessível pela classe ou instância. O LSP local oferece completion por tipo, signature help e formatador com quatro espaços. Ctrl+Shift+I formata no VS Code; --formatar formata pela CLI. Construtor/destrutor/estatico são palavras-chave. Hover oferece prévia CTFE limitada para expressões constantes e chamadas puras, sem compilar por edição.",
     "examples": ["estaticos.delegua"],
-    "notes": "Campos estáticos e depurador/DAP não estão implementados. O editor analisa sem compilar/linkar por edição. Literais longos não são divididos pelo formatador."
+    "notes": "Campos estáticos e depurador/DAP não estão implementados. O editor analisa sem compilar/linkar por edição. Literais longos não são divididos pelo formatador. A prévia usa cópias e orçamento por revisão; falhas deixam o valor para execução. ",
+    "topics": [
+      {
+        "title": "Receptor e visibilidade",
+        "paragraphs": [
+          "estatico/estático declara método sem isto. Ele pode ser herdado e acessado pela classe ou por instância. Campos estáticos não são suportados. Membros públicos/protegidos/privados conservam visibilidade no frontend e no runtime; um privado derivado oculta o homônimo herdado, sem vazar a sugestão pública antiga."
+        ],
+        "code": "classe Fabrica {\n    estatico resposta(): inteiro { retorna 42 }\n}\nescreva(Fabrica.resposta())"
+      },
+      {
+        "title": "Editor como consumidor do frontend",
+        "paragraphs": [
+          "O LSP usa a mesma sequência de análise da CLI, mantém documentos em memória e respeita revisões. Navegação, completion, tipos, formatação e diagnósticos não fazem build por edição. Receptores desconhecidos não recebem sugestões de outros escopos. Resultado CTFE é uma informação limitada de hover, não execução ou depuração do programa."
+        ]
+      }
+    ]
+  },
+  {
+    "id": "evolucao-04",
+    "title": "Contratos, arrows e FFI C",
+    "status": "parcial",
+    "description": "Classes abstratas, interfaces explícitas, enums numéricos e arrow functions sem captura. Classes estrangeiras usam @definicao com ABI C escalar ou gerenciada.",
+    "examples": [
+      "linguagem/38_contratos.delegua",
+      "bibliotecas/matematica.delegua",
+      "linguagem/40_enums_escopos.delegua"
+    ],
+    "notes": "Enums são namespaces congelados e alias inteiro; interfaces exigem assinaturas explícitas. FFI exige código nativo confiável. Composição mescla permanece fora desta versão; integração JS é excluída; consulte docs/evolucao-linguagem.md.",
+    "topics": [
+      {
+        "title": "Contratos explícitos",
+        "paragraphs": [
+          "Interfaces descrevem campos e métodos públicos; classes usam implementa para satisfazer o contrato, inclusive com membros herdados. Implementações mantêm assinatura explícita. Classe abstrata não pode ser instanciada e pode declarar métodos abstratos. Não há herança entre interfaces: foi excluída por decisão de escopo, não adiada."
+        ],
+        "code": "interface Nomeavel { nome(): texto; }\nclasse Pessoa implementa Nomeavel {\n    nome(): texto { retorna \"Ana\" }\n}\nenum Estado { Inicial, Final = 7 }"
+      },
+      {
+        "title": "Enums e arrows",
+        "paragraphs": [
+          "Enum é um namespace congelado de inteiros com incremento implícito e diagnóstico de duplicatas/overflow. Seu nome como tipo é alias de inteiro; não há enum nominal ou união algébrica. Arrows reutilizam funções anônimas sem captura. São escolhas do perfil CGD, não uma declaração de equivalência com todos os ambientes Delégua."
+        ]
+      },
+      {
+        "title": "FFI e fronteira de confiança",
+        "paragraphs": [
+          "@definicao declara biblioteca, prefixo e símbolo; a ABI C escalar usa numero/real como double, inteiro/longo como int64_t, logico como bool e texto como const char*. Não presuma int C de 32 bits quando o contrato diz inteiro de 64 bits. Textos com zero interno são recusados nessa ABI. A ABI gerenciada delegua passa delegua_value e valida contratos. Assinaturas erradas e código nativo podem corromper o processo: FFI não é sandbox. Callbacks/structs/variádicos arbitrários não são representados por conversões presumidas."
+        ]
+      },
+      {
+        "title": "Enums em escopos locais e classes",
+        "paragraphs": [
+          "Enums são açúcar para constantes inteiras agrupadas num namespace imutável. Podem ser declarados em módulos, funções, métodos, blocos de controle, callbacks e corpos de classe/interface; não exigem um contexto global. O alias numérico tem escopo lexical e não vaza ao sair do bloco. Nomes locais podem reaparecer em blocos independentes.",
+          "Dentro de classes, Classe.Enum e isto.Enum acessam o mesmo namespace, inclusive por herança, respeitando privado/protegido. O enum não ocupa um campo de cada instância nem habilita campos estáticos mutáveis. Dentro do corpo da classe o nome serve como alias inteiro; fora dele, anote valores como inteiro. Interfaces podem conter constantes sem exigir sua redeclaração na implementação.",
+          "Acesso conhecido a um membro resolve para o inteiro, inclusive em funções sem captura e em CTFE. Capturar um namespace local inteiro como valor continua sujeito às regras de captura; CTFE representa os membros escalares, não mapas. Receptores com efeitos, como criar().Estado.Fim, continuam sendo avaliados uma vez. Os enums continuam numéricos, sem identidade nominal ou restrição aos membros declarados."
+        ],
+        "code": "funcao estado(): inteiro {\n    enum Estado { Inicio, Final=7 }\n    var atual: Estado = Estado.Final\n    retorna atual\n}\nclasse Maquina {\n    enum Estado { Inicio, Final=4 }\n    atual: Estado = isto.Estado.Final\n}\nescreva(Maquina.Estado.Final)"
+      }
+    ]
+  },
+  {
+    "id": "decisoes",
+    "title": "Decisões de escopo: o que não fará parte da linguagem",
+    "status": "parcial",
+    "description": "O CGD é uma linguagem compilada para C99 com referência em Delégua. Estas decisões são parte de seu contrato, não promessas para uma versão futura.",
+    "topics": [
+      {
+        "title": "Exclusões definitivas",
+        "paragraphs": [],
+        "rows": [
+          [
+            "Compatibilidade com JavaScript e classes de host JS",
+            "Não será implementada. Evita depender de VM, coerções e ciclo de vida de um ambiente JavaScript. FFI C tipada é a integração nativa."
+          ],
+          [
+            "Múltiplos dialetos",
+            "Não serão implementados. Há uma gramática e um conjunto de contratos a manter, testar e documentar."
+          ],
+          [
+            "Herança de interfaces",
+            "Não será implementada. Classes podem implementar vários contratos diretamente; não há grafo de interfaces herdadas para resolver."
+          ],
+          [
+            "NPM, eval e importação dinâmica",
+            "Não fazem parte do perfil. Módulos fonte são conhecidos na compilação, e código do programa não é executado pela edição."
+          ]
+        ]
+      },
+      {
+        "title": "Limitação não é sinônimo de insegurança",
+        "paragraphs": [
+          "Composição mescla, enums nominais, campos estáticos e ABIs C compostas não estão disponíveis. Isso não é uma classificação automática de insegurança e não constitui compromisso de implementação. DAP continua adiado; executar não é depurar. Outros alvos precisam de toolchain e runtime validados antes de serem anunciados."
+        ]
+      },
+      {
+        "title": "Origem e autoria",
+        "paragraphs": [
+          "Delégua original é um projeto da Design Líquido. O CGD preserva as referências e a licença Apache-2.0; sua documentação explica o perfil próprio em vez de sugerir compatibilidade total com o interpretador, Node ou JavaScript."
+        ]
+      }
+    ],
+    "examples": [],
+    "notes": ""
+  },
+  {
+    "id": "runtime-erros",
+    "title": "Erros do programa: apresentação e localização",
+    "status": "suportado",
+    "description": "Falhas não capturadas usam a mesma estrutura visual dos diagnósticos do compilador, sem formatação adicional no caminho de sucesso.",
+    "examples": [],
+    "notes": "O código dinâmico permanece R0001. O formato humano não substitui um protocolo de depuração.",
+    "topics": [
+      {
+        "title": "Ler um diagnóstico",
+        "paragraphs": [
+          "O cabeçalho identifica a categoria, seguido por arquivo, linha e coluna. Quando o fonte está acessível, a linha e um marcador ^ mostram a operação falível. Tabs são expandidas; o arquivo é tratado como texto UTF-8 e controles são escapados para não inserir sequências de terminal."
+        ],
+        "code": "error[R0001]: Divisão por zero.\n --> { programa.delegua:2:10 }\n   2 | retorna a / b\n     |          ^"
+      },
+      {
+        "title": "Custo e limites",
+        "paragraphs": [
+          "O C gerado mantém descritores estáticos e atribui um ponteiro antes de operações que podem falhar. Não há leitura de arquivo ou formatação por nó no caminho normal. Somente uma exceção sem tratador é renderizada; pegue continua recebendo o valor sem impressão automática. A API C antiga de localização é preservada.",
+          "A linha é lida do disco na falha, não embutida no executável. Se o arquivo mudou, o trecho pode divergir do fonte compilado. Fonte ausente, inválido, muito longo ou fora do orçamento nunca apaga o código e a localização conhecidos. A leitura é limitada e só aceita arquivo regular; FIFO/dispositivo não bloqueia o diagnóstico. A janela mostrada é limitada e pode indicar posição fora do trecho."
+        ]
+      }
+    ]
+  },
+  {
+    "id": "stdlib-ampliada",
+    "title": "Biblioteca padrão: textos, estatística, caminhos e coleções",
+    "status": "suportado",
+    "description": "Classes próprias agrupam operações úteis, com tipos explícitos, limites e comportamento definido para entradas vazias. As importações são estáticas e nenhum método é executado pelo editor.",
+    "examples": [],
+    "notes": "APIs matemáticas seguem libm: domínios inválidos podem produzir valores não finitos. Caminhos são POSIX lexicais, sem resolução de links.",
+    "topics": [
+      {
+        "title": "Textos — cgd:textos",
+        "paragraphs": [
+          "Textos.comecaCom/terminaCom aceitam prefixo/sufixo vazio. repetir exige quantidade entre 0 e 1.000.000 e resultado de até um milhão de pontos de código. preencherInicio/preencherFim exigem exatamente um caractere Unicode de preenchimento; não truncam texto maior que o comprimento pedido.",
+          "linhas normaliza CRLF e CR e preserva linhas vazias e a quebra final. digitos aceita somente uma sequência não vazia de dígitos ASCII. juntar combina texto[]; inverter inverte pontos de código, não grafemas; contar conta ocorrências não sobrepostas e rejeita trecho vazio."
+        ],
+        "code": "var textos: qualquer = importar(\"cgd:textos\").Textos\nescreva(textos.preencherInicio(\"7\", 3, \"0\"))\nescreva(textos.digitos(\"0123\"))"
+      },
+      {
+        "title": "Estatistica — cgd:estatistica",
+        "paragraphs": [
+          "Estatistica oferece soma, media, minimo, maximo, mediana, variancia, desvioPadrao e resumo. soma([]) é zero; média, mínimo, máximo e mediana rejeitam vazio. Mediana ordena uma cópia e preserva o vetor recebido.",
+          "Variância usa atualização incremental, exige um elemento na versão populacional e dois na amostral. O segundo argumento amostral é falso por padrão. Não há arredondamento decimal implícito; cálculos usam números do runtime. resumo reúne quantidade, soma, mínimo, máximo, média, mediana e variância."
+        ],
+        "code": "var estatistica: qualquer = importar(\"cgd:estatistica\").Estatistica\nescreva(estatistica.mediana([4, 1, 2, 3]))\nescreva(estatistica.variancia([1, 2, 3], verdadeiro))"
+      },
+      {
+        "title": "Caminhos — cgd:caminhos",
+        "paragraphs": [
+          "Caminhos.absoluto consulta o prefixo /. normalizar remove componentes vazios e ., resolve .. lexicalmente e preserva .. que não podem ser resolvidos em caminho relativo. Vazio vira .; não se sobe acima de /.",
+          "juntar recebe texto[]; um componente absoluto reinicia o caminho acumulado. nome, diretorio, extensao e semExtensao operam no caminho normalizado. A extensão inclui o ponto; .perfil não possui extensão. Nenhuma operação consulta disco, resolve symlinks, cria diretórios ou garante confinamento: normalização lexical não é uma sandbox."
+        ],
+        "code": "var caminhos: qualquer = importar(\"cgd:caminhos\").Caminhos\nescreva(caminhos.juntar([\"dados\", \"..\", \"saida\", \"a.json\"]))\nescreva(caminhos.extensao(\"a.tar.gz\"))"
+      },
+      {
+        "title": "Colecoes — resultados e compartilhamento",
+        "paragraphs": [
+          "Além de unicos/intervalo/reduzir/agrupar/achatar, a classe oferece primeiro/ultimo com alternativa para vazio, encontrar com predicado, contar, particionar, combinar, blocos e frequencias. particionar devolve tupla (aceitos, recusados). combinar para no menor vetor. blocos exige tamanho positivo e conserva o último bloco incompleto.",
+          "Os resultados são coleções novas, mas seus elementos são referências rasas aos dados de entrada. frequencias e agrupar exigem chaves aceitas pelo dicionário. Callbacks são avaliados em ordem e não podem capturar ambiente; seus efeitos e exceções permanecem observáveis.",
+          "intervalo é semiaberto, recusa passo zero e limita o resultado a um milhão de elementos. Se o próximo passo sair de int64, a iteração termina: esse valor já ultrapassou qualquer limite final representável, sem provocar overflow artificial."
+        ]
+      },
+      {
+        "title": "Arquivos e matemática",
+        "paragraphs": [
+          "Arquivo.lerJSON combina leitura limitada e parser JSON; escreverJSON serializa antes de abrir o destino. copiarPara lê antes de escrever, inclusive se origem e destino coincidirem. Não é uma cópia em streaming nem uma transação; respeita o limite de leitura.",
+          "Matematica acrescenta arcoSeno/arcoCosseno/arcoTangente/arcoTangente2, logaritmo10/logaritmo2, arredondar, truncar, hipotenusa e resto. arredondar segue round de C (metades para longe de zero); resto usa fmod, distinto do operador inteiro %. A ABI permanece explícita e validada."
+        ]
+      }
+    ]
   }
 ]

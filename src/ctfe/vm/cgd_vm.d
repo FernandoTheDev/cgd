@@ -5,7 +5,6 @@ import core.checkedint : adds, subs, muls, negs;
 import std.exception;
 import std.stdio;
 
-import backend.c.utils : formatD;
 import ctfe.context;
 
 enum CGDTypeKind : ubyte
@@ -73,6 +72,7 @@ enum VMOpCode : ubyte
     Ret,
 
     Halt,
+    Drop,
 }
 
 struct VMInstruction
@@ -94,7 +94,7 @@ struct VMInstruction
 struct VMContext
 {
     CGDValue[] params;
-    CGDValue[] vars = new CGDValue[256];
+    CGDValue[] vars;
     CGDValue[1] ret;
 }
 
@@ -112,12 +112,17 @@ struct VM
     {
         enforce(stack.length > 0, "Stack underflow.");
         CGDValue value = stack[stack.length - 1UL];
+        stack[$ - 1] = CGDValue.init;
         stack.length--;
         return value;
     }
 
-    pragma(inline, true) void push(CGDValue value) nothrow
+    pragma(inline, true) void push(CGDValue value)
     {
+        if (stack.length >= 16_384)
+            throw new CTFELimitException("Limite de operandos na avaliação em tempo de compilação.");
+        if (value.type == CGDTypeKind.Texto && value.s.length > 1_048_576)
+            throw new CTFELimitException("Limite de texto na avaliação em tempo de compilação.");
         stack ~= value;
     }
 }
@@ -129,11 +134,17 @@ const VMHandleFn[OpCodes.length] handlers = [
     &vmLoadParam, &vmLoad, &vmStore, &vmValidate, &vmPush, &vmJmp, &vmJz, &vmJnz, &vmAdd,
     &vmSub, &vmMul, &vmDiv, &vmIDiv, &vmLe, &vmLt, &vmMod, &vmGt, &vmGe, &vmEq, &vmNeq,
     &vmBAnd, &vmBOr, &vmBXor, &vmShl, &vmShr, &vmNeg, &vmNot, &vmBNot, &vmCall, &vmRet, &vmHalt,
+    &vmDrop,
 ];
 
 // validação
 static foreach (size_t i, VMOpCode op; OpCodes)
     static assert(handlers[i]!is null, "Handler ausente para o opcode: " ~ op.stringof);
+
+void vmDrop(VMInstruction* instr, VM* vm)
+{
+    vm.pop();
+}
 
 void vmValidate(VMInstruction* instr, VM* vm)
 {
@@ -257,6 +268,10 @@ void vmAdd(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
+            if (left.s.length > 1_048_576
+                    || right.s.length > 1_048_576 - left.s.length)
+                throw new CTFELimitException(
+                        "Limite de texto na avaliação em tempo de compilação.");
             vm.push(CGDValue.texto(left.s ~ right.s));
             break;
 
@@ -414,7 +429,8 @@ void vmLt(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            throw new Exception("operador < nao suportado para Texto");
+            vm.push(CGDValue.logico(left.s < right.s));
+            break;
 
         case CGDTypeKind.Logico:
             throw new Exception("operador < nao suportado para Logico");
@@ -439,7 +455,8 @@ void vmLe(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            throw new Exception("operador <= nao suportado para Texto");
+            vm.push(CGDValue.logico(left.s <= right.s));
+            break;
 
         case CGDTypeKind.Logico:
             throw new Exception("operador <= nao suportado para Logico");
@@ -464,7 +481,8 @@ void vmGt(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            throw new Exception("operador > nao suportado para Texto");
+            vm.push(CGDValue.logico(left.s > right.s));
+            break;
 
         case CGDTypeKind.Logico:
             throw new Exception("operador > nao suportado para Logico");
@@ -489,7 +507,8 @@ void vmGe(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            throw new Exception("operador >= nao suportado para Texto");
+            vm.push(CGDValue.logico(left.s >= right.s));
+            break;
 
         case CGDTypeKind.Logico:
             throw new Exception("operador >= nao suportado para Logico");

@@ -1,5 +1,6 @@
-//! a-b[1, 2]\nverdadeiroverdadeiro1
+//! a-b[1, 2]\nverdadeiroverdadeiro1\nnulo
 var d: dicionario = { b: 2, a: 1 }
 
 escreva(d.chaves().ordenar().juntar("-"), d.valores().ordenar())
 escreva(d.contém("a"), d.remover("a"), d.tamanho())
+escreva(d.obter("a"))

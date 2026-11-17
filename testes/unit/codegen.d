@@ -40,12 +40,23 @@ unittest
             "origem.delegua", diagnostics).tokenizer(), diagnostics).parse();
     Context context = new Context;
     TypeRegistry registry = new TypeRegistry;
-    new Sema1(context, diagnostics).analyze(program);
-    new Sema2(registry).analyze(program);
-    new Sema3(context, registry, new TypeResolver(registry, diagnostics), diagnostics).analyze(program);
+    new DeclarationAnalysis(context, registry, diagnostics).analyze(program);
+
+    new SemanticAnalyzer(context, registry, new TypeResolver(registry, diagnostics), diagnostics).analyze(program);
     new CgdLowering(diagnostics).lowering(program);
     string code = new BackendC().compile(program).to!string;
     assert(code.indexOf("delegua_localizar(") < 0);
     assert(code.indexOf("static const delegua_local cgd_source_sites[]") >= 0);
     assert(code.indexOf("delegua_local_atual=&cgd_source_sites[") >= 0);
+}
+
+unittest
+{
+    import frontend.parser;
+    import backend.c.codegen;
+
+    BackendC generator = new BackendC;
+    assert(generator.compileExpr(new IntLit(long.min, null)) == "create_num(INT64_MIN)");
+    assert(generator.compileExpr(new DoubleLit(-0.0, null)) == "create_real(-0.0)");
+    assert(generator.materialize(new IntLit(1, null)) == "create_num(1)");
 }

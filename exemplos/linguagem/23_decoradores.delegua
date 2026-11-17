@@ -1,5 +1,5 @@
 //! minimo\n9
-@ minimo(valor = 0)
+@minimo(valor = 0)
 classe Medida {
     lado: numero
 }
@@ -13,7 +13,7 @@ funcao de decorador trocar(original: qualquer): qualquer {
     retorna alternativa
 }
 
-@ trocar
+@trocar
 funcao obter(): qualquer {
     retorna 1
 }

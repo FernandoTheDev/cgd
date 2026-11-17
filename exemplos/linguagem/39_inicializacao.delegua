@@ -1,0 +1,21 @@
+//! 0falso\n7\n01\nverdadeiroverdadeiro
+var n: numero
+var texto: texto
+var logico: logico
+escreva(n, texto, logico)
+classe Base {
+    valor: inteiro = 7
+    itens: inteiro[]
+}
+
+classe Filha herda Base {
+    copia: inteiro = isto.valor
+}
+
+var primeira: Filha = Filha()
+var segunda: Filha = Filha()
+primeira.itens.adicionar(1)
+escreva(primeira.copia)
+escreva(tamanho(segunda.itens), tamanho(primeira.itens))
+var ch: texto = "5"
+escreva(ch >= '0' e ch <= '9', "ação" > "a")

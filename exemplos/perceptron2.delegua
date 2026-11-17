@@ -1,0 +1,702 @@
+//# 0
+//? fase: execucao
+//? saida: ^Testes: 24\nFalhas: 0\nTODOS OS TESTES PASSARAM$
+//? ausente: \[FALHA\]|EXISTEM FALHAS
+
+//
+// CGD EXTREME AUTOGRAD TEST V2
+//
+// Reverse-mode automatic differentiation
+// DAG topological sorting
+// Gradient checking
+// MLP + Adam
+// CTFE + Stress tests
+//
+
+// ============================================
+// FUNCOES PURAS / CTFE
+// ============================================
+
+funcao quadrado(x: numero): numero {
+    retorna x * x
+}
+
+funcao cubo(x: numero): numero {
+    retorna x * x * x
+}
+
+funcao polinomio(x: numero): numero {
+    retorna cubo(x) + 2 * quadrado(x) + 3 * x + 1
+}
+
+funcao absoluto(x: numero): numero {
+    se (x < 0) retorna - x
+    retorna x
+}
+
+funcao limitar(x: numero, minimo: numero, maximo: numero): numero {
+    se (x < minimo) retorna minimo
+    se (x > maximo) retorna maximo
+    retorna x
+}
+
+funcao raiz(x: numero): numero {
+    se (x <= 0) retorna 0
+
+    var y: numero = x
+    se (x < 1) y = 1
+
+    para (var i = 0; i < 24; i++) {
+        y =(y + x / y) / 2
+    }
+
+    retorna y
+}
+
+funcao potenciaInteira(base: numero, expoente: numero): numero {
+    var resultado: numero = 1
+
+    para (var i = 0; i < expoente; i++) {
+        resultado *= base
+    }
+
+    retorna resultado
+}
+
+funcao tanhAproximada(x: numero): numero {
+    se (x >= 3) retorna 1
+    se (x <= - 3) retorna - 1
+
+    const x2 = x * x
+    retorna x *(27 + x2) /(27 + 9 * x2)
+}
+
+funcao derivadaTanh(x: numero): numero {
+    se (x >= 3 ou x <= - 3) retorna 0
+
+    const x2 = x * x
+    const x4 = x2 * x2
+
+    retorna(729 - 162 * x2 + 9 * x4) /
+    quadrado(27 + 9 * x2)
+}
+
+funcao proximoEstado(seed: numero): numero {
+    retorna(seed * 16807) % 2147483647
+}
+
+funcao paridade2(a: numero, b: numero): numero {
+    retorna(a + b) % 2
+}
+
+// ============================================
+// TESTADOR
+// ============================================
+
+classe Testador {
+    testes: numero
+    falhas: numero
+
+    construtor() {
+        isto.testes = 0
+        isto.falhas = 0
+    }
+
+    verificar(nome: texto, obtido: numero, esperado: numero, tolerancia: numero) {
+        isto.testes++
+
+        const diferenca = absoluto(obtido - esperado)
+
+        se (diferenca <= tolerancia) {
+            escreva("[OK] ${nome}")
+        } senão {
+            isto.falhas++
+
+            escreva("[FALHA] ${nome}" + " | obtido=${obtido}" + " | esperado=${esperado}" + " | diferenca=${diferenca}")
+        }
+    }
+
+    resumo() {
+        escreva("\n=== RESUMO ===")
+        escreva("Testes: ${isto.testes}")
+        escreva("Falhas: ${isto.falhas}")
+
+        se (isto.falhas == 0) {
+            escreva("TODOS OS TESTES PASSARAM")
+        } senão {
+            escreva("EXISTEM FALHAS")
+        }
+    }
+}
+
+// ============================================
+// RNG
+// ============================================
+
+classe RNG {
+    estado: numero
+
+    construtor(seed: numero) {
+        isto.estado = seed
+    }
+
+    proximo(): numero {
+        isto.estado = proximoEstado(isto.estado)
+        retorna isto.estado / 2147483647
+    }
+
+    intervalo(a: numero, b: numero): numero {
+        retorna a +(b - a) * isto.proximo()
+    }
+}
+
+// ============================================
+// AUTOGRAD VALUE
+// ============================================
+
+classe Valor {
+    dado: numero
+    gradiente: numero
+
+    anterior: qualquer[]
+    operacao: texto
+
+    estado: numero
+    cursor: numero
+
+    construtor(dado: numero, anterior: qualquer[] = [], operacao: texto = "") {
+        isto.dado = dado
+        isto.gradiente = 0
+        isto.anterior = anterior
+        isto.operacao = operacao
+
+        isto.estado = 0
+        isto.cursor = 0
+    }
+
+    somar(outro: Valor): Valor {
+        retorna Valor(isto.dado + outro.dado, [isto, outro], "+")
+    }
+
+    subtrair(outro: Valor): Valor {
+        retorna Valor(isto.dado - outro.dado, [isto, outro], "-")
+    }
+
+    multiplicar(outro: Valor): Valor {
+        retorna Valor(isto.dado * outro.dado, [isto, outro], "*")
+    }
+
+    ativar(): Valor {
+        retorna Valor(tanhAproximada(isto.dado), [isto], "tanh")
+    }
+
+    // DFS iterativa com pos-ordem.
+    // Cada nodo e finalizado apenas depois
+    // de todos os seus predecessores.
+    topologia(): qualquer[] {
+        var ordem: qualquer[] = []
+        var pilha: qualquer[] = []
+
+        isto.estado = 1
+        isto.cursor = 0
+        pilha.empilhar(isto)
+
+        enquanto (pilha.tamanho() > 0) {
+            const topo = pilha.tamanho() - 1
+            const atual = pilha[topo]
+
+            se (atual.cursor < atual.anterior.tamanho()) {
+                const pai = atual.anterior[atual.cursor]
+                atual.cursor++
+
+                se (pai.estado == 0) {
+                    pai.estado = 1
+                    pai.cursor = 0
+                    pilha.empilhar(pai)
+                } senão {
+                    // Estado 1 indica ciclo.
+                    // Grafos criados pelas operacoes
+                    // normais nao devem conter ciclos.
+                    se (pai.estado == 1) {
+                        escreva("[ERRO] Ciclo detectado no grafo")
+                        retorna []
+                    }
+                }
+            } senão {
+                atual.estado = 2
+                ordem.empilhar(atual)
+                pilha.removerUltimo()
+            }
+        }
+
+        // Restaura os estados.
+        para (var i = 0; i < ordem.tamanho(); i++) {
+            ordem[i].estado = 0
+            ordem[i].cursor = 0
+        }
+
+        retorna ordem
+    }
+
+    backward() {
+        const ordem = isto.topologia()
+
+        para (var i = 0; i < ordem.tamanho(); i++) {
+            ordem[i].gradiente = 0
+        }
+
+        isto.gradiente = 1
+
+        var indice = ordem.tamanho() - 1
+
+        enquanto (indice >= 0) {
+            const nodo = ordem[indice]
+            const g = nodo.gradiente
+
+            se (nodo.operacao == "+") {
+                nodo.anterior[0].gradiente += g
+                nodo.anterior[1].gradiente += g
+            }
+
+            se (nodo.operacao == "-") {
+                nodo.anterior[0].gradiente += g
+                nodo.anterior[1].gradiente -= g
+            }
+
+            se (nodo.operacao == "*") {
+                const a = nodo.anterior[0]
+                const b = nodo.anterior[1]
+
+                a.gradiente += b.dado * g
+                b.gradiente += a.dado * g
+            }
+
+            se (nodo.operacao == "tanh") {
+                const a = nodo.anterior[0]
+                a.gradiente += derivadaTanh(a.dado) * g
+            }
+
+            indice--
+        }
+    }
+}
+
+// ============================================
+// TESTES DE AUTOGRAD
+// ============================================
+
+funcao testarAutograd(testador: Testador) {
+    escreva("\n=== AUTOGRAD ===")
+
+    const a = Valor(3)
+    const b = Valor(4)
+
+    const c = a.multiplicar(b)
+    const d = c.somar(a)
+
+    d.backward()
+
+    testador.verificar("forward", d.dado, 15, 0.000001)
+    testador.verificar("df/da", a.gradiente, 5, 0.000001)
+    testador.verificar("df/db", b.gradiente, 3, 0.000001)
+
+    // Mesmo nodo aparece duas vezes.
+    const x = Valor(5)
+    const y = x.multiplicar(x).somar(x)
+
+    y.backward()
+
+    testador.verificar("shared forward", y.dado, 30, 0.000001)
+    testador.verificar("shared backward", x.gradiente, 11, 0.000001)
+
+    // Diamante: dois caminhos para o mesmo nodo.
+    const p = Valor(2)
+    const q = p.multiplicar(Valor(3))
+    const r = q.somar(q)
+    const s = r.multiplicar(q)
+
+    // q = 6, r = 12, s = 72.
+    // s = 2 * (3p)^2 = 18p^2
+    // ds/dp = 36p = 72.
+    s.backward()
+
+    testador.verificar("diamond forward", s.dado, 72, 0.000001)
+    testador.verificar("diamond backward", p.gradiente, 72, 0.000001)
+
+    // Grafo profundo.
+    const profundo = Valor(1)
+    var atual: Valor = profundo
+
+    para (var i = 0; i < 1000; i++) {
+        atual = atual.somar(Valor(1))
+    }
+
+    atual.backward()
+
+    testador.verificar("deep forward", atual.dado, 1001, 0.000001)
+
+    testador.verificar("deep backward", profundo.gradiente, 1, 0.000001)
+
+    // Repeticao do backward.
+    d.backward()
+
+    testador.verificar("backward repetido", a.gradiente, 5, 0.000001)
+}
+
+// ============================================
+// GRADIENT CHECKING
+// ============================================
+
+funcao referencia(x: numero): numero {
+    retorna quadrado(tanhAproximada(x * 2 + 1))
+}
+
+funcao testarGradientes(testador: Testador) {
+    escreva("\n=== GRADIENT CHECKING ===")
+
+    const epsilon = 0.00001
+
+    para (var i = - 4; i <= 4; i++) {
+        const entrada = i * 0.25
+
+        const x = Valor(entrada)
+
+        const y = x
+        .multiplicar(Valor(2))
+        .somar(Valor(1))
+        .ativar()
+
+        const perda = y.multiplicar(y)
+
+        perda.backward()
+
+        const numerico =
+        (referencia(entrada + epsilon) - referencia(entrada - epsilon)) /
+        (2 * epsilon)
+
+        testador.verificar("gradiente x=${entrada}", x.gradiente, numerico, 0.0001)
+    }
+}
+
+// ============================================
+// NEURONIO
+// ============================================
+
+classe Neuronio {
+    pesos: qualquer[]
+    bias: Valor
+
+    construtor(entradas: numero, rng: RNG) {
+        isto.pesos = []
+
+        const escala = 1 / raiz(entradas)
+
+        para (var i = 0; i < entradas; i++) {
+            isto.pesos.empilhar(Valor(rng.intervalo(- escala, escala)))
+        }
+
+        isto.bias = Valor(0)
+    }
+
+    frente(entrada: qualquer[]): Valor {
+        var soma: Valor = isto.bias
+
+        para (var i = 0; i < isto.pesos.tamanho(); i++) {
+            const produto = isto.pesos[i].multiplicar(entrada[i])
+            soma = soma.somar(produto)
+        }
+
+        retorna soma.ativar()
+    }
+
+    parametros(): qualquer[] {
+        var resultado: qualquer[] = []
+
+        para (var i = 0; i < isto.pesos.tamanho(); i++) {
+            resultado.empilhar(isto.pesos[i])
+        }
+
+        resultado.empilhar(isto.bias)
+
+        retorna resultado
+    }
+}
+
+// ============================================
+// CAMADA
+// ============================================
+
+classe Camada {
+    neuronios: qualquer[]
+
+    construtor(entradas: numero, saidas: numero, rng: RNG) {
+        isto.neuronios = []
+
+        para (var i = 0; i < saidas; i++) {
+            isto.neuronios.empilhar(Neuronio(entradas, rng))
+        }
+    }
+
+    frente(entrada: qualquer[]): qualquer[] {
+        var resultado: qualquer[] = []
+
+        para (var i = 0; i < isto.neuronios.tamanho(); i++) {
+            resultado.empilhar(isto.neuronios[i].frente(entrada))
+        }
+
+        retorna resultado
+    }
+
+    parametros(): qualquer[] {
+        var resultado: qualquer[] = []
+
+        para (var i = 0; i < isto.neuronios.tamanho(); i++) {
+            const params = isto.neuronios[i].parametros()
+
+            para (var j = 0; j < params.tamanho(); j++) {
+                resultado.empilhar(params[j])
+            }
+        }
+
+        retorna resultado
+    }
+}
+
+// ============================================
+// MLP
+// ============================================
+
+classe MLP {
+    camadas: qualquer[]
+
+    construtor(arquitetura: numero[], seed: numero) {
+        isto.camadas = []
+
+        const rng = RNG(seed)
+
+        para (var i = 1; i < arquitetura.tamanho(); i++) {
+            isto.camadas.empilhar(Camada(arquitetura[i - 1], arquitetura[i], rng))
+        }
+    }
+
+    frente(entrada: numero[]): Valor {
+        var atual: qualquer[] = []
+
+        para (var i = 0; i < entrada.tamanho(); i++) {
+            atual.empilhar(Valor(entrada[i]))
+        }
+
+        para (var i = 0; i < isto.camadas.tamanho(); i++) {
+            atual = isto.camadas[i].frente(atual)
+        }
+
+        retorna atual[0]
+    }
+
+    parametros(): qualquer[] {
+        var resultado: qualquer[] = []
+
+        para (var i = 0; i < isto.camadas.tamanho(); i++) {
+            const params = isto.camadas[i].parametros()
+
+            para (var j = 0; j < params.tamanho(); j++) {
+                resultado.empilhar(params[j])
+            }
+        }
+
+        retorna resultado
+    }
+}
+
+// ============================================
+// DATASET
+// ============================================
+
+classe Dataset {
+    entradas: qualquer[]
+    alvos: numero[]
+
+    construtor() {
+        isto.entradas = []
+        isto.alvos = []
+    }
+
+    gerarXOR() {
+        para (var a = 0; a <= 1; a++) {
+            para (var b = 0; b <= 1; b++) {
+                isto.entradas.empilhar([a, b])
+                isto.alvos.empilhar(paridade2(a, b))
+            }
+        }
+    }
+}
+
+// ============================================
+// OTIMIZADOR ADAM
+// ============================================
+
+classe Adam {
+    parametros: qualquer[]
+    momentos: numero[]
+    variancias: numero[]
+
+    taxa: numero
+    beta1: numero
+    beta2: numero
+    epsilon: numero
+
+    passo: numero
+    potenciaBeta1: numero
+    potenciaBeta2: numero
+
+    construtor(parametros: qualquer[], taxa: numero) {
+        isto.parametros = parametros
+
+        isto.momentos = []
+        isto.variancias = []
+
+        isto.taxa = taxa
+        isto.beta1 = 0.9
+        isto.beta2 = 0.999
+        isto.epsilon = 0.00000001
+
+        isto.passo = 0
+        isto.potenciaBeta1 = 1
+        isto.potenciaBeta2 = 1
+
+        para (var i = 0; i < parametros.tamanho(); i++) {
+            isto.momentos.empilhar(0)
+            isto.variancias.empilhar(0)
+        }
+    }
+
+    atualizar(batch: numero) {
+        isto.passo++
+
+        isto.potenciaBeta1 *= isto.beta1
+        isto.potenciaBeta2 *= isto.beta2
+
+        const correcao1 = 1 - isto.potenciaBeta1
+        const correcao2 = 1 - isto.potenciaBeta2
+
+        para (var i = 0; i < isto.parametros.tamanho(); i++) {
+            const parametro = isto.parametros[i]
+
+            const gradiente = limitar(parametro.gradiente / batch, - 5, 5)
+
+            isto.momentos[i] =
+            isto.beta1 * isto.momentos[i] +
+            (1 - isto.beta1) * gradiente
+
+            isto.variancias[i] =
+            isto.beta2 * isto.variancias[i] +
+            (1 - isto.beta2) * quadrado(gradiente)
+
+            const m = isto.momentos[i] / correcao1
+            const v = isto.variancias[i] / correcao2
+
+            parametro.dado -=
+            isto.taxa * m /(raiz(v) + isto.epsilon)
+        }
+    }
+}
+
+// ============================================
+// TREINAMENTO
+// ============================================
+
+funcao treinarRede(testador: Testador) {
+    escreva("\n=== TREINAMENTO AUTOGRAD ===")
+
+    const dataset = Dataset()
+    dataset.gerarXOR()
+
+    const rede = MLP([2, 6, 6, 1], 12345)
+    const parametros = rede.parametros()
+
+    const otimizador = Adam(parametros, 0.01)
+
+    escreva("Parametros: ${parametros.tamanho()}")
+
+    para (var epoca = 0; epoca < 3000; epoca++) {
+        var total: Valor = Valor(0)
+
+        para (var i = 0; i < dataset.entradas.tamanho(); i++) {
+            const saida = rede.frente(dataset.entradas[i])
+
+            const normalizada = saida
+            .somar(Valor(1))
+            .multiplicar(Valor(0.5))
+
+            const esperado = Valor(dataset.alvos[i])
+            const erro = normalizada.subtrair(esperado)
+
+            total = total.somar(erro.multiplicar(erro))
+        }
+
+        const mse = total.dado / dataset.entradas.tamanho()
+
+        total.backward()
+        otimizador.atualizar(dataset.entradas.tamanho())
+
+        se (epoca % 100 == 0) {
+            escreva("Epoca ${epoca} | MSE: ${mse}")
+        }
+
+        se (mse < 0.001) {
+            escreva("Convergiu na epoca ${epoca}")
+            sustar
+        }
+    }
+
+    escreva("\n=== RESULTADOS XOR ===")
+
+    var acertos: numero = 0
+
+    para (var i = 0; i < dataset.entradas.tamanho(); i++) {
+        const saida = rede.frente(dataset.entradas[i])
+        const probabilidade =(saida.dado + 1) / 2
+
+        var predicao: numero = 0
+        se (probabilidade >= 0.5) predicao = 1
+
+        se (predicao == dataset.alvos[i]) acertos++
+
+        escreva("${dataset.entradas[i]}" + " -> ${predicao}" + " | esperado=${dataset.alvos[i]}" + " | probabilidade=${probabilidade}")
+    }
+
+    testador.verificar("XOR acertos", acertos, 4, 0)
+}
+
+// ============================================
+// CTFE
+// ============================================
+
+funcao testarCTFE(testador: Testador) {
+    escreva("\n=== CTFE ===")
+
+    const a = polinomio(5)
+    const b = quadrado(12)
+    const c = cubo(7)
+    const d = potenciaInteira(2, 10)
+
+    testador.verificar("polinomio", a, 191, 0)
+    testador.verificar("quadrado", b, 144, 0)
+    testador.verificar("cubo", c, 343, 0)
+    testador.verificar("potencia", d, 1024, 0)
+}
+
+// ============================================
+// MAIN
+// ============================================
+
+const testador = Testador()
+
+escreva("CGD EXTREME AUTOGRAD TEST V2")
+
+testarCTFE(testador)
+testarAutograd(testador)
+testarGradientes(testador)
+treinarRede(testador)
+
+testador.resumo()

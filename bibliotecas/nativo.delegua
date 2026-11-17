@@ -1,0 +1,66 @@
+// Ponte gerenciada para bibliotecas C do CGD. ABI explícita, sem ponteiros crus.
+@definicao(biblioteca = "cgd-runtime", abi = "delegua")
+classe estrangeira Primitivas {
+    @definicao(simbolo = "delegua_ffi_cgdCurlCriar")
+    curlCriar(): qualquer;
+    @definicao(simbolo = "delegua_ffi_cgdCurlFechar")
+    curlFechar(sessao: qualquer): vazio;
+    @definicao(simbolo = "delegua_ffi_cgdCurlResetar")
+    curlResetar(sessao: qualquer): qualquer;
+    @definicao(simbolo = "delegua_ffi_cgdCurlOpcao")
+    curlOpcao(sessao: qualquer, nome: texto, valor: qualquer): qualquer;
+    @definicao(simbolo = "delegua_ffi_cgdCurlExecutar")
+    curlExecutar(sessao: qualquer): dicionario;
+    @definicao(simbolo = "delegua_ffi_cgdCurlLote")
+    curlLote(sessoes: qualquer[]): dicionario[];
+    @definicao(simbolo = "delegua_ffi_cgdCurlOpcoes")
+    curlOpcoes(): dicionario[];
+    @definicao(simbolo = "delegua_ffi_cgdCurlVersao")
+    curlVersao(): texto;
+    @definicao(simbolo = "delegua_ffi_cgdCurlEscapar")
+    curlEscapar(valor: texto): texto;
+    @definicao(simbolo = "delegua_ffi_cgdCurlDecodificar")
+    curlDecodificar(valor: texto): texto;
+    @definicao(simbolo = "delegua_ffi_cgdCurlMultipart")
+    curlMultipart(sessao: qualquer, partes: dicionario[]): qualquer;
+    @definicao(simbolo = "delegua_ffi_cgdCurlEnviar")
+    curlEnviar(sessao: qualquer, dados: texto): dicionario;
+    @definicao(simbolo = "delegua_ffi_cgdCurlReceber")
+    curlReceber(sessao: qualquer, limite: inteiro): dicionario;
+    @definicao(simbolo = "delegua_ffi_cgdCurlEsperar")
+    curlEsperar(sessao: qualquer, milisegundos: inteiro, escrita: logico): logico;
+    @definicao(simbolo = "delegua_ffi_cgdCurlWsEnviar")
+    curlWsEnviar(sessao: qualquer, dados: texto, flags: inteiro): dicionario;
+    @definicao(simbolo = "delegua_ffi_cgdCurlWsReceber")
+    curlWsReceber(sessao: qualquer, limite: inteiro): dicionario;
+    @definicao(simbolo = "delegua_ffi_cgdCurlInfo")
+    curlInfo(sessao: qualquer, nome: texto): qualquer;
+    @definicao(simbolo = "delegua_ffi_cgdCurlUrl")
+    curlUrl(url: texto, parte: texto, valor: qualquer): texto;
+    @definicao(simbolo = "delegua_ffi_cgdCurlDetalhes")
+    curlDetalhes(): dicionario;
+    @definicao(simbolo = "delegua_ffi_cgdCurlErro")
+    curlErro(codigo: inteiro): texto;
+    @definicao(simbolo = "delegua_ffi_cgdCurlData")
+    curlData(data: texto): inteiro;
+    @definicao(simbolo = "delegua_ffi_cgdCurlManter")
+    curlManter(sessao: qualquer): vazio;
+    @definicao(simbolo = "delegua_ffi_cgdCodigoUnicode")
+    codigoUnicode(caractere: texto): inteiro;
+    @definicao(simbolo = "delegua_ffi_cgdCaractereUnicode")
+    caractereUnicode(codigo: inteiro): texto;
+    @definicao(simbolo = "delegua_ffi_cgdNumeroFinito")
+    numeroFinito(valor: qualquer): logico;
+    @definicao(simbolo = "delegua_ffi_cgdNumeroTexto")
+    numeroTexto(valor: qualquer): texto;
+    @definicao(simbolo = "delegua_ffi_cgdArquivoLer")
+    arquivoLer(caminho: texto, limite: inteiro): texto;
+    @definicao(simbolo = "delegua_ffi_cgdArquivoEscrever")
+    arquivoEscrever(caminho: texto, conteudo: texto, anexar: logico): inteiro;
+    @definicao(simbolo = "delegua_ffi_cgdArquivoInfo")
+    arquivoInfo(caminho: texto): dicionario;
+    @definicao(simbolo = "delegua_ffi_cgdArquivoRemover")
+    arquivoRemover(caminho: texto): logico;
+    @definicao(simbolo = "delegua_ffi_cgdDicionarioItens")
+    dicionarioItens(dicionario: dicionario): qualquer[];
+}

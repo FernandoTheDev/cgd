@@ -28,6 +28,8 @@ public:
         {
             case TypeExprKind.Named:
                 TypeExprNamed named = cast(TypeExprNamed) type;
+                if (registry.isEnum(named.name))
+                    named.name = "inteiro";
                 TypeSema* tsema = registry.get(named.name);
 
                 if (tsema is null)
