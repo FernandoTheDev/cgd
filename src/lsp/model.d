@@ -298,8 +298,76 @@ class Document
             return *known;
         if (node.type_sema !is null && !node.type_sema.isAny())
             return node.type_sema;
+        if (RoutineExpr routine = cast(RoutineExpr) node)
+        {
+            if (routine.target !is null && routine.target.type_sema !is null)
+                return new TypeSemaTask(routine.target.type_sema);
+            return new TypeSemaTask(new TypeSemaBuiltin(TypeSemaBase.Any));
+        }
+        if (AwaitExpr awaited = cast(AwaitExpr) node)
+        {
+            TypeSema inner = expressionType(awaited.value, depth + 1);
+            if (TypeSemaPromise promise = cast(TypeSemaPromise) inner)
+                return promise.result;
+            if (TypeSemaTask task = cast(TypeSemaTask) inner)
+                return task.result;
+        }
+        if (ArrayLit arr = cast(ArrayLit) node)
+        {
+            if (arr.elements.length)
+            {
+                TypeSema first = expressionType(arr.elements[0], depth + 1);
+                if (first !is null && !first.isAny())
+                {
+                    bool uniform = true;
+                    foreach (Node elem; arr.elements[1 .. $])
+                    {
+                        TypeSema et = expressionType(elem, depth + 1);
+                        if (et is null || et.toStr() != first.toStr())
+                        {
+                            uniform = false;
+                            break;
+                        }
+                    }
+                    if (uniform)
+                        return new TypeSemaArray(first);
+                }
+            }
+            return new TypeSemaArray(new TypeSemaBuiltin(TypeSemaBase.Any));
+        }
+        if (IndexExpr idx = cast(IndexExpr) node)
+        {
+            TypeSema container = expressionType(idx.value, depth + 1);
+            if (TypeSemaArray arrType = cast(TypeSemaArray) container)
+                return arrType.base;
+            if (TypeSemaBuiltin builtin = cast(TypeSemaBuiltin) container)
+                if (builtin.base == TypeSemaBase.String)
+                    return builtin;
+        }
+        if (ConditionalExpr cond = cast(ConditionalExpr) node)
+        {
+            TypeSema yesType = expressionType(cond.yes, depth + 1);
+            TypeSema noType = expressionType(cond.no, depth + 1);
+            if (yesType !is null && noType !is null && !yesType.isAny() && yesType.toStr() == noType.toStr())
+                return yesType;
+        }
+        if (BinaryExpr bin = cast(BinaryExpr) node)
+        {
+            if (bin.op == TokenKind.EEquals || bin.op == TokenKind.NEquals
+                    || bin.op == TokenKind.LThan || bin.op == TokenKind.GThan
+                    || bin.op == TokenKind.LEquals || bin.op == TokenKind.GEquals || bin.op == TokenKind.In)
+                return new TypeSemaBuiltin(TypeSemaBase.Bool);
+            TypeSema lt = expressionType(bin.left, depth + 1);
+            TypeSema rt = expressionType(bin.right, depth + 1);
+            if (bin.op == TokenKind.Coalesce && rt !is null && !rt.isAny())
+                return lt !is null && !lt.isAny() && lt.toStr() == rt.toStr() ? lt : rt;
+            if (lt !is null && rt !is null && !lt.isAny() && !rt.isAny())
+                return lt.promote(rt);
+        }
         if (Identifier id = cast(Identifier) node)
         {
+            if (id.classRef !is null)
+                return new TypeSemaClass(id.classRef);
             if (id.variableRef !is null)
             {
                 if (id.variableRef.type_sema !is null && !id.variableRef.type_sema.isAny())
@@ -312,16 +380,38 @@ class Document
         if (CallExpr call = cast(CallExpr) node)
         {
             if (FnDecl* method = call.fn in expressionFunctions)
+            {
+                if ((*method).classFactory !is null)
+                    return new TypeSemaClass((*method).classFactory);
                 return (*method).isAsync && (*method).type_sema !is null
                     ? new TypeSemaPromise((*method).type_sema) : (*method).type_sema;
+            }
+            if (ClassDecl* cls = call.fn in expressionClasses)
+                return new TypeSemaClass(*cls);
             if (Identifier id = cast(Identifier) call.fn)
+            {
+                if (id.classRef !is null)
+                    return new TypeSemaClass(id.classRef);
                 if (id.functionRef !is null)
+                {
+                    if (id.functionRef.classFactory !is null)
+                        return new TypeSemaClass(id.functionRef.classFactory);
                     return id.functionRef.isAsync
                         ? new TypeSemaPromise(id.functionRef.type_sema) : id.functionRef.type_sema;
+                }
+            }
             if (MemberExpr member = cast(MemberExpr) call.fn)
                 if (Identifier name = cast(Identifier) member.right)
                 {
+                    if (name.classRef !is null)
+                        return new TypeSemaClass(name.classRef);
+                    if (name.functionRef !is null)
+                        return name.functionRef.isAsync
+                            ? new TypeSemaPromise(name.functionRef.type_sema) : name.functionRef.type_sema;
                     TypeSema receiver = expressionType(member.left, depth + 1);
+                    if (FnDecl builtin = builtinMethod(receiver, name.value.to!string))
+                        if (builtin.type_sema !is null && !builtin.type_sema.isAny())
+                            return builtin.type_sema;
                     if (TypeSemaBuiltin builtin = cast(TypeSemaBuiltin) receiver)
                         if (builtin.base == TypeSemaBase.String)
                         {
@@ -356,6 +446,14 @@ class Document
                 return id.classRef;
             if (id.variableRef !is null)
             {
+                if (MemberExpr m = cast(MemberExpr) id.variableRef.value)
+                {
+                    if (ClassDecl* cls = m in expressionClasses)
+                        return *cls;
+                    if (Identifier right = cast(Identifier) m.right)
+                        if (right.classRef !is null)
+                            return right.classRef;
+                }
                 CallExpr call = cast(CallExpr) id.variableRef.value;
                 if (call !is null)
                 {
@@ -363,6 +461,8 @@ class Document
                         return target.classRef;
                     if (ClassDecl* cls = call.fn in expressionClasses)
                         return *cls;
+                    if (TypeSemaClass retCls = cast(TypeSemaClass) expressionType(call))
+                        return retCls.declaration;
                 }
             }
         }
@@ -372,6 +472,8 @@ class Document
                 return id.classRef;
             if (ClassDecl* cls = call.fn in expressionClasses)
                 return *cls;
+            if (TypeSemaClass retCls = cast(TypeSemaClass) expressionType(call))
+                return retCls.declaration;
         }
         return null;
     }
@@ -465,9 +567,13 @@ class Document
             if (variable.pos !is null && variable.pos.filename == path)
                 variableDeclarations[identity(variable.pos)] = variable;
         if (VarDecl variable = cast(VarDecl) node)
+        {
+            TypeSema inferred = (variable.type_sema !is null && !variable.type_sema.isAny()) ? variable.type_sema
+                : expressionType(variable.value);
+            string typeName = inferred is null ? "qualquer" : inferred.toStr().to!string;
             add(variable.name.to!string, "variable", variable.pos, variable.pos,
-                    (variable.isConst ? "const " : "var ") ~ variable.name.to!string ~ ": " ~ (variable.type_sema is null
-                        ? "qualquer" : variable.type_sema.toStr().to!string), true);
+                    (variable.isConst ? "const " : "var ") ~ variable.name.to!string ~ ": " ~ typeName, true);
+        }
         if (ClassDecl cls = cast(ClassDecl) node)
         {
             functions[identity(cls.pos)] = cls.signature;
@@ -486,56 +592,59 @@ class Document
                 return;
             if (ClassDecl cls = instanceClass(member.left))
             {
-                bool[ClassDecl] seen;
-                for (ClassDecl current = cls; current !is null && current !in seen; current = current.superClass)
+                import frontend.semantic.members : resolveClassMember, ClassMember;
+
+                ClassMember resolved = resolveClassMember(cls, name.value);
+                if (resolved.owner !is null)
                 {
-                    seen[current] = true;
-                    foreach (FnDecl method; current.methods)
-                        if (method.fn == name.value)
+                    if (resolved.method !is null)
+                    {
+                        expressionFunctions[member] = resolved.method;
+                        add(name.value.to!string, "method", name.pos, resolved.method.pos, signature(resolved.method));
+                        return;
+                    }
+                    if (resolved.field !is null)
+                    {
+                        add(name.value.to!string, "property", name.pos, resolved.field.pos,
+                                "campo " ~ name.value.to!string ~ ": " ~ resolved.field.type.toStr().to!string);
+                        return;
+                    }
+                }
+            }
+            ModuleUnit importedMod;
+            if (ImportExpr directImport = cast(ImportExpr) member.left)
+                importedMod = directImport.target;
+            else if (Identifier left = cast(Identifier) member.left)
+                if (left.variableRef !is null)
+                    if (ImportExpr imported = cast(ImportExpr) left.variableRef.value)
+                        importedMod = imported.target;
+            if (importedMod !is null && importedMod.program !is null)
+            {
+                foreach (Node exported; importedMod.program.body)
+                {
+                    if (FnDecl fn = cast(FnDecl) exported)
+                        if (fn.fn == name.value)
                         {
-                            expressionFunctions[member] = method;
-                            add(name.value.to!string, "method", name.pos, method.pos, signature(method));
+                            expressionFunctions[member] = fn;
+                            add(name.value.to!string, "function", name.pos, fn.pos, signature(fn));
                             return;
                         }
-                    foreach (ClassField field; current.fields)
-                        if (field.name == name.value)
+                    if (VarDecl variable = cast(VarDecl) exported)
+                        if (variable.name == name.value)
                         {
-                            add(name.value.to!string, "property", name.pos, field.pos,
-                                    "campo " ~ name.value.to!string);
+                            add(name.value.to!string, "variable", name.pos, variable.pos,
+                                    "exportação " ~ name.value.to!string);
+                            return;
+                        }
+                    if (ClassDecl cls = cast(ClassDecl) exported)
+                        if (cls.name == name.value)
+                        {
+                            expressionClasses[member] = cls;
+                            add(name.value.to!string, "class", name.pos, cls.pos, signature(cls.signature));
                             return;
                         }
                 }
             }
-            if (Identifier left = cast(Identifier) member.left)
-                if (left.variableRef !is null)
-                    if (ImportExpr imported = cast(ImportExpr) left.variableRef.value)
-                        if (imported.target !is null)
-                        {
-                            foreach (Node exported; imported.target.program.body)
-                            {
-                                if (FnDecl fn = cast(FnDecl) exported)
-                                    if (fn.fn == name.value)
-                                    {
-                                        add(name.value.to!string, "function", name.pos, fn.pos, signature(fn));
-                                        return;
-                                    }
-                                if (VarDecl variable = cast(VarDecl) exported)
-                                    if (variable.name == name.value)
-                                    {
-                                        add(name.value.to!string, "variable", name.pos,
-                                                variable.pos, "exportação " ~ name.value.to!string);
-                                        return;
-                                    }
-                                if (ClassDecl cls = cast(ClassDecl) exported)
-                                    if (cls.name == name.value)
-                                    {
-                                        expressionClasses[member] = cls;
-                                        add(name.value.to!string, "class", name.pos, cls.pos,
-                                                signature(cls.signature));
-                                        return;
-                                    }
-                            }
-                        }
             if (FnDecl builtin = builtinMethod(expressionType(member.left), name.value.to!string))
             {
                 expressionFunctions[member] = builtin;

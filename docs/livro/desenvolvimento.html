@@ -286,8 +286,10 @@ edite os fontes e regenere com <code>python3 scripts/gerar_referencia.py</code>.
 sem <code>-o</code>. Ele avalia expressões literais e constantes imutáveis, sem executar
 funções ou presumir o conteúdo de vetores compartilhados. Divisão/módulo por
 zero, overflow de 64 bits, índices de literais, passos zero, deslocamentos,
-conversões textuais e contratos primitivos demonstravelmente incompatíveis
-recebem E3101–E3108. Anotações de vetores/tuplas também verificam literais.</p>
+conversões textuais, contratos primitivos demonstravelmente incompatíveis,
+membros inexistentes em tipos/classes/módulos conhecidos, mutação de coleções
+imutáveis, operações sobre nulo e chamadas de valores não invocáveis recebem
+E3101–E3112. Anotações de vetores/tuplas também verificam literais e inserções.</p>
 <p>Ramos constantes descartados por se, ternário, curto-circuito e laços falsos
 não recebem falsos erros dessa etapa. Em um corpo protegido por pegue, a falha
 conhecida gera W31xx: o tratamento deliberado de exceções é preservado. Isso não

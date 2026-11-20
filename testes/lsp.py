@@ -495,6 +495,45 @@ with tempfile.TemporaryDirectory(prefix="cgd lsp ") as directory:
     )["items"]
     labels = {item["label"] for item in items}
     assert {"entao", "capturar"} <= labels and "adicionar" not in labels, items
+    # Enhanced inference: rotina -> Tarefa<T>, uniform arrays, index, ternary, coalesce, mixins.
+    inferred_source = (
+        "funcao somar(a: inteiro, b: inteiro): inteiro { retorna a + b }\n"
+        "classe Mix { saudar(): texto { retorna 'oi' } }\n"
+        "classe Pessoa mescla Mix { nome: texto }\n"
+        "assincrona funcao rodar(): vazio {\n"
+        "    const t = rotina somar(1, 2)\n"
+        "    const r = aguardar t\n"
+        "    const lista = [1, 2, 3]\n"
+        "    const primeiro = lista[0]\n"
+        "    const p = Pessoa()\n"
+        "    escreva(r, primeiro, p.saudar())\n"
+        "}\n"
+    )
+    client.send(
+        "textDocument/didChange",
+        {
+            "textDocument": {"uri": uri, "version": 25},
+            "contentChanges": [{"text": inferred_source}],
+        },
+    )
+    hints = client.request(
+        "textDocument/inlayHint",
+        {
+            "textDocument": {"uri": uri},
+            "range": {"start": {"line": 0, "character": 0}, "end": {"line": 11, "character": 0}},
+        },
+    )
+    hint_map = {h["position"]["line"]: h["label"] for h in hints}
+    assert hint_map.get(4) in (": Tarefa<inteiro>", ": Tarefa<numero>"), hint_map
+    assert hint_map.get(5) in (": inteiro", ": numero"), hint_map
+    assert hint_map.get(6) in (": inteiro[]", ": numero[]"), hint_map
+    assert hint_map.get(7) in (": inteiro", ": numero"), hint_map
+    assert hint_map.get(8) == ": Pessoa", hint_map
+    hover_mix = client.request(
+        "textDocument/hover",
+        {"textDocument": {"uri": uri}, "position": {"line": 9, "character": 28}},
+    )
+    assert hover_mix and "saudar" in hover_mix["contents"]["value"], hover_mix
     client.send("textDocument/didClose", {"textDocument": {"uri": untitled}})
     client.send("textDocument/didClose", {"textDocument": {"uri": uri}})
     client.close()

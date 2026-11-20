@@ -79,6 +79,14 @@ enum MessageSpec invalidShift = MessageSpec("E3107", "Deslocamento constante for
             "A quantidade de bits precisa estar dentro dos limites de 64 bits.");
 enum MessageSpec invalidSlice = MessageSpec("E3108", "O passo constante de uma fatia não pode ser zero.",
             "Use um passo positivo ou negativo diferente de zero.");
+enum MessageSpec unknownMember = MessageSpec("E3109", "Membro '%s' não existe em '%s'.",
+            "Verifique o nome do método, campo ou exportação disponível para este tipo.");
+enum MessageSpec immutableMutation = MessageSpec("E3110", "Não é possível modificar elemento de '%s' imutável.",
+            "Textos e tuplas são imutáveis; crie um novo valor ou utilize um vetor.");
+enum MessageSpec nullOperation = MessageSpec("E3111", "Operação '%s' inválida sobre valor comprovadamente nulo.",
+            "Verifique se o valor não é nulo antes de acessar membros, indexar ou chamar.");
+enum MessageSpec notCallable = MessageSpec("E3112", "O valor do tipo '%s' não pode ser chamado como função.",
+            "Apenas funções, métodos e classes construtíveis podem ser invocados.");
 
 enum MessageSpec inaccessibleMember = MessageSpec("E3014", "Membro '%s' não é acessível neste contexto.",
             "Respeite a visibilidade público, protegido ou privado da declaração que oculta as herdadas.");
@@ -128,8 +136,9 @@ immutable MessageSpec[] messages = [
     invalidUTF8, syntaxDepth, invalidNumericLiteral, astLimit, missingSymbol,
     unsupportedStaticField, staticConstructor, suggestion, unreachable,
     implicitReturn, zeroDivision, integerOverflow, invalidIndex, typeContract, invalidOperation,
-    invalidConversion, invalidShift, invalidSlice, impureState, invalidDestructor,
-    inaccessibleMember, instanceMember, invalidArity, invalidAssignment
+    invalidConversion, invalidShift, invalidSlice, unknownMember, immutableMutation, nullOperation,
+    notCallable, impureState, invalidDestructor, inaccessibleMember, instanceMember, invalidArity,
+    invalidAssignment
 ];
 
 const(MessageSpec)* lookupMessage(string code)

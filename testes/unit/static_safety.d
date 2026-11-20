@@ -93,3 +93,40 @@ unittest
     assert(!analyze("tente{para cada valor:inteiro em ['x']{escreva(valor)}}pegue(erro){escreva(erro)}").hasErrors());
     assert(!analyze("const {nome:texto}={nome:'CGD'};escreva(nome)").hasErrors());
 }
+
+unittest
+{
+    // E3109: membro inexistente em tipo primitivo, classe exata e polimorfismo seguro
+    assert(analyze("var s:texto='oi'; escreva(s.naoExiste())").entries.any!((const(Diagnostic) d) => d.code == "E3109"));
+    assert(analyze("classe A{x:inteiro} var a=A(); escreva(a.y)")
+            .entries.any!((const(Diagnostic) d) => d.code == "E3109"));
+    // Subclasse define campo acessado via referência à base: permitido
+    assert(!analyze("classe Base{k:inteiro} classe Sub herda Base{valor:inteiro} funcao ler(b:Base){retorna b.valor}")
+            .hasErrors());
+    // Instância exata da base NÃO possui campo exclusivo de subclasse: E3109
+    assert(analyze("classe Base{k:inteiro} classe Sub herda Base{valor:inteiro} var b=Base(); escreva(b.valor)")
+            .entries.any!((const(Diagnostic) d) => d.code == "E3109"));
+    // Membro inexistente na base e em todas as subclasses: E3109
+    assert(analyze("classe Base{k:inteiro} classe Sub herda Base{valor:inteiro} funcao ler(b:Base){retorna b.ausente}")
+            .entries.any!((const(Diagnostic) d) => d.code == "E3109"));
+    // E3110: mutação de texto/tupla imutável
+    assert(analyze("var s:texto='abc'; s[0]='z'").entries.any!((const(Diagnostic) d) => d.code == "E3110"));
+    assert(analyze("var t:tupla=tupla([1,2]); t[0]=9").entries.any!((const(Diagnostic) d) => d.code == "E3110"));
+    // E3111: operação sobre nulo
+    assert(analyze("const n=nulo; escreva(n.tamanho())").entries.any!((const(Diagnostic) d) => d.code == "E3111"));
+    assert(analyze("var n=nulo; escreva(n[0])").entries.any!((const(Diagnostic) d) => d.code == "E3111"));
+    assert(analyze("var n=nulo; n()").entries.any!((const(Diagnostic) d) => d.code == "E3111"));
+    // E3112: valor não invocável (estático e dinâmico constante)
+    assert(analyze("const x=42; x()").entries.any!((const(Diagnostic) d) => d.code == "E3112"));
+    assert(analyze("var x:qualquer=42; x()").entries.any!((const(Diagnostic) d) => d.code == "E3112"));
+    // Contrato de vetor tipado em .adicionar e atribuição por índice
+    assert(analyze("var v:inteiro[]=[]; v.adicionar('x')").entries.any!((const(Diagnostic) d) => d.code == "E3104"));
+    assert(analyze("var v:inteiro[]=[1]; v[0]='x'").entries.any!((const(Diagnostic) d) => d.code == "E3002"));
+    assert(analyze("var v:inteiro[]=[1]; v[0]=2.5").entries.any!((const(Diagnostic) d) => d.code == "E3104"));
+    assert(analyze("var v:inteiro[]=[1]; var s:qualquer='x'; v[0]=s")
+            .entries.any!((const(Diagnostic) d) => d.code == "E3104"));
+    // Aviso W31xx em região protegida por pegue
+    Diagnostics guarded = analyze("tente{var x:qualquer=42; x()}pegue(erro){escreva(erro)}");
+    assert(!guarded.hasErrors() && guarded.entries.any!((const(Diagnostic) d) => d.code == "W3112"));
+    assert(lookupMessage("W3109") !is null && lookupMessage("W3112") !is null);
+}

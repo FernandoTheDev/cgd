@@ -166,7 +166,11 @@ private:
                 c.condition = analyze(c.condition);
                 c.yes = analyze(c.yes);
                 c.no = analyze(c.no);
-                node.type_sema = anyType();
+                if (c.yes.type_sema !is null && c.no.type_sema !is null && !c.yes.type_sema.isAny()
+                        && !c.no.type_sema.isAny() && c.yes.type_sema.toStr() == c.no.type_sema.toStr())
+                    node.type_sema = c.yes.type_sema;
+                else
+                    node.type_sema = anyType();
                 return node;
             case NodeKind.SpreadExpr:
                 SpreadExpr s = cast(SpreadExpr) node;
@@ -276,7 +280,14 @@ private:
                 context.push();
                 registry.pushEnumScope();
                 VarDecl variable = new VarDecl(loop.name, null, false, loop.bindingType, loop.pos);
-                variable.type_sema = loop.bindingType is null ? anyType() : resolver.resolver(loop.bindingType);
+                if (loop.bindingType !is null)
+                    variable.type_sema = resolver.resolver(loop.bindingType);
+                else if (TypeSemaArray arrType = cast(TypeSemaArray) loop.iterable.type_sema)
+                    variable.type_sema = arrType.base;
+                else if (TypeSemaBuiltin strType = cast(TypeSemaBuiltin) loop.iterable.type_sema)
+                    variable.type_sema = strType.base == TypeSemaBase.String ? strType : anyType();
+                else
+                    variable.type_sema = anyType();
                 context.set(loop.name, new SymbolVar(variable));
                 foreach (size_t i, dstring name; loop.destructured)
                 {
@@ -478,6 +489,7 @@ private:
         {
             analyzeDecorators(field.decorators, field.pos);
             TypeSema fieldType = resolver.resolver(field.type);
+            field.type_sema = fieldType;
             if (field.isEnum)
                 field.value = analyze(field.value);
             else if (field.isStatic)
@@ -584,18 +596,73 @@ private:
             err.error(node.pos, "Nome de propriedade inválido.");
         node.type_sema = anyType();
         ClassDecl declaration;
+        bool isClassReceiver = false;
         if (TypeSemaClass type = cast(TypeSemaClass) node.left.type_sema)
             declaration = type.declaration;
         if (Identifier receiver = cast(Identifier) node.left)
         {
             if (receiver.classRef !is null)
+            {
                 declaration = receiver.classRef;
+                isClassReceiver = true;
+            }
             else if (receiver.lexicalClass !is null)
                 declaration = receiver.lexicalClass;
+            else if (receiver.variableRef !is null && receiver.variableRef.isConst)
+            {
+                if (MemberExpr initMember = cast(MemberExpr) receiver.variableRef.value)
+                    if (Identifier initRight = cast(Identifier) initMember.right)
+                        if (initRight.classRef !is null)
+                        {
+                            declaration = initRight.classRef;
+                            isClassReceiver = true;
+                        }
+            }
         }
+        else if (MemberExpr leftMember = cast(MemberExpr) node.left)
+            if (Identifier leftRight = cast(Identifier) leftMember.right)
+                if (leftRight.classRef !is null)
+                {
+                    declaration = leftRight.classRef;
+                    isClassReceiver = true;
+                }
         Identifier name = cast(Identifier) node.right;
         if (name is null || name.value == "#incompleto")
             return node;
+        ModuleUnit importedModule;
+        if (ImportExpr directImport = cast(ImportExpr) node.left)
+            importedModule = directImport.target;
+        else if (Identifier leftId = cast(Identifier) node.left)
+            if (leftId.variableRef !is null)
+                if (ImportExpr varImport = cast(ImportExpr) leftId.variableRef.value)
+                    importedModule = varImport.target;
+        if (importedModule !is null && importedModule.program !is null)
+        {
+            foreach (Node exported; importedModule.program.body)
+            {
+                if (ClassDecl cls = cast(ClassDecl) exported)
+                    if (cls.name == name.value)
+                    {
+                        name.classRef = cls;
+                        node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Function);
+                        return node;
+                    }
+                if (FnDecl fn = cast(FnDecl) exported)
+                    if (fn.fn == name.value)
+                    {
+                        name.functionRef = fn;
+                        node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Function);
+                        return node;
+                    }
+                if (VarDecl varDecl = cast(VarDecl) exported)
+                    if (varDecl.name == name.value)
+                    {
+                        name.variableRef = varDecl;
+                        node.type_sema = varDecl.type_sema is null ? anyType() : varDecl.type_sema;
+                        return node;
+                    }
+            }
+        }
         if (declaration !is null)
         {
             ClassMember member = resolveClassMember(declaration, name.value);
@@ -603,9 +670,8 @@ private:
             {
                 if (!member.visibleFrom(lexicalOwner))
                     err.errorCode(name.pos, inaccessibleMember, name.value);
-                Identifier receiver = cast(Identifier) node.left;
-                if (receiver !is null && receiver.classRef !is null && (member.method is null
-                        ? (!member.field.isEnum && !member.field.isStatic) : !member.method.isStatic))
+                if (isClassReceiver && (member.method is null ? (!member.field.isEnum
+                        && !member.field.isStatic) : !member.method.isStatic))
                     err.errorCode(name.pos, instanceMember, name.value);
                 if (member.method !is null)
                 {
@@ -617,7 +683,8 @@ private:
                     node.readonly = member.field.isEnum;
                     node.enumMembers = member.field.isEnum ? cast(MapLit) member.field.value : null;
                     node.type_expr = member.field.type;
-                    node.type_sema = resolver.resolver(member.field.type);
+                    node.type_sema = member.field.type_sema !is null ? member.field.type_sema
+                        : resolver.resolver(member.field.type);
                 }
                 return node;
             }
@@ -794,7 +861,8 @@ private:
 
     TypeSema callResult(FnDecl declaration)
     {
-        TypeSema result = resolver.resolver(declaration.type_expr);
+        TypeSema result = declaration.type_sema !is null ? declaration.type_sema
+            : resolver.resolver(declaration.type_expr);
         return declaration.isAsync ? new TypeSemaPromise(result) : result;
     }
 
@@ -852,23 +920,51 @@ private:
         foreach (ref Node arg; node.args)
             arg = analyze(arg);
         node.type_sema = anyType();
+        bool isClassFactoryCall = false;
         if (MemberExpr member = cast(MemberExpr) node.fn)
             if (Identifier name = cast(Identifier) member.right)
+            {
                 if (name.functionRef !is null)
                 {
                     FnDecl target = name.functionRef;
                     node.type_sema = callResult(target);
                     validateArguments(target, node);
                 }
+                else if (name.classRef !is null)
+                {
+                    isClassFactoryCall = true;
+                    ClassDecl cls = name.classRef;
+                    if (cls.isAbstract)
+                        err.error(node.pos, "Classe abstrata/interface não pode ser instanciada.");
+                    node.type_sema = new TypeSemaClass(cls);
+                    if (cls.signature !is null)
+                        validateArguments(cls.signature, node);
+                }
+            }
+        if (!isClassFactoryCall)
+            if (Identifier fnId = cast(Identifier) node.fn)
+                if (fnId.variableRef !is null && fnId.variableRef.isConst)
+                    if (MemberExpr initMember = cast(MemberExpr) fnId.variableRef.value)
+                        if (Identifier initRight = cast(Identifier) initMember.right)
+                            if (initRight.classRef !is null)
+                            {
+                                isClassFactoryCall = true;
+                                ClassDecl cls = initRight.classRef;
+                                if (cls.isAbstract)
+                                    err.error(node.pos, "Classe abstrata/interface não pode ser instanciada.");
+                                node.type_sema = new TypeSemaClass(cls);
+                                if (cls.signature !is null)
+                                    validateArguments(cls.signature, node);
+                            }
         FnDecl known = knownCallable(node.fn);
         if (known !is null && (known.isAsync || cast(TypeExprPromise) known.type_expr) && !cast(MemberExpr) node.fn)
         {
             node.type_sema = callResult(known);
             validateArguments(known, node);
         }
-        if (node.fn.type_sema !is null && !node.fn.type_sema.isAny()
+        if (!isClassFactoryCall && node.fn.type_sema !is null && !node.fn.type_sema.isAny()
                 && node.fn.type_sema.toStr() != TypeSemaBase.Function)
-            err.error(node.pos, "O valor chamado não é uma função.");
+            err.errorCode(node.pos, notCallable, node.fn.type_sema.toStr());
         return node;
     }
 
@@ -908,12 +1004,13 @@ private:
                 err.errorCode(arg.pos, catalog.routineTransfer, arg.type_sema.toStr());
             else if (i < target.args.length)
             {
-                TypeSema paramType = resolver.resolver(target.args[i].type_expr);
+                TypeSema paramType = target.args[i].type_sema !is null ? target.args[i].type_sema
+                    : resolver.resolver(target.args[i].type_expr);
                 if (!isTransferableType(paramType))
                     err.errorCode(arg.pos, catalog.routineTransfer, paramType.toStr());
             }
         }
-        TypeSema retType = resolver.resolver(target.type_expr);
+        TypeSema retType = target.type_sema !is null ? target.type_sema : resolver.resolver(target.type_expr);
         if (!isTransferableType(retType))
             err.errorCode(node.pos, catalog.routineTransfer, retType.toStr());
         node.target = target;
@@ -935,7 +1032,11 @@ private:
             err.errorCode(call.pos, invalidArity, target.fn, minimum, target.args.length, call.args.length);
         foreach (size_t i, Node argument; call.args)
             if (i < target.args.length && !target.args[i].rest)
-                checkTypes(argument.pos, resolver.resolver(target.args[i].type_expr), argument.type_sema);
+            {
+                TypeSema expected = target.args[i].type_sema !is null ? target.args[i].type_sema
+                    : resolver.resolver(target.args[i].type_expr);
+                checkTypes(argument.pos, expected, argument.type_sema);
+            }
     }
 
     Node analyzeReturnStmt(ReturnStmt node)

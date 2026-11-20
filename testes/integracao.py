@@ -150,7 +150,14 @@ RUNTIME_ERRORS += MORE_RUNTIME_ERRORS
 
 from casos_compilador import CASES as OPT_CASES, RUNTIME_ERRORS as OPT_ERRORS, STATIC_ERRORS
 
-STATIC_ERRORS = {**STATIC_ERRORS, "privado": "E3014", "protegido": "E3014"}
+STATIC_ERRORS = {
+    **STATIC_ERRORS,
+    "privado": "E3014",
+    "protegido": "E3014",
+    "tupla_imutavel": "E3110",
+    "campo_nao_declarado": "E3109",
+    "tuple_method": "E3109",
+}
 
 CASES += OPT_CASES
 RUNTIME_ERRORS += OPT_ERRORS

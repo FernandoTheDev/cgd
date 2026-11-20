@@ -895,6 +895,7 @@ struct ClassField
     FnDecl getter, setter, initializer;
     Node value;
     Decorator[] decorators;
+    TypeSema type_sema;
 }
 
 class ClassDecl : Node

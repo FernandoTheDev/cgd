@@ -37,7 +37,7 @@ rows = "".join(
     f"<tr><td><code>{escape(code)}</code></td><td>{escape(message)}</td><td>{escape(explanation)}</td></tr>"
     for code, message, explanation in sorted(message_specs)
 )
-message_table = f'<h3>Catálogo de diagnósticos</h3><p>Gerado do catálogo central do compilador. Consulte também <code>cgd --explicar E3101</code>. Os códigos W3101–W3108 são as versões em aviso das respectivas falhas E31xx em regiões com tratador.</p><div class="table-wrap"><table><thead><tr><th>Código</th><th>Mensagem / modelo</th><th>Referência</th></tr></thead><tbody>{rows}</tbody></table></div>'
+message_table = f'<h3>Catálogo de diagnósticos</h3><p>Gerado do catálogo central do compilador. Consulte também <code>cgd --explicar E3101</code>. Os códigos W3101–W3112 são as versões em aviso das respectivas falhas E31xx em regiões com tratador.</p><div class="table-wrap"><table><thead><tr><th>Código</th><th>Mensagem / modelo</th><th>Referência</th></tr></thead><tbody>{rows}</tbody></table></div>'
 
 
 def narrative(section):

@@ -1,3 +1,58 @@
+# Segurança estática ampliada (E3109–E3112) e inferência no LSP — 20/11/2026
+
+Solicitação ativa: continuidade da revisão 0.9.0 após reinicialização do sistema,
+concluindo as melhorias de segurança estática e inferência do LSP, validação,
+commit/publicação em `dev` e reinstalação do binário CGD e da extensão VS Code.
+
+## Implementação entregue
+
+- **Diagnósticos estáticos `E3109`–`E3112` (e `W3109`–`W3112` em `pegue`)**:
+  - `src/diagnostics/catalog.d`: adicionados `E3109` (membro inexistente),
+    `E3110` (mutação de coleção imutável), `E3111` (operação sobre valor
+    comprovadamente nulo) e `E3112` (valor não invocável).
+  - `src/frontend/semantic/analyzer.d` e `src/frontend/parser/ast.d`:
+    inferência em ternário e `para cada`, `ClassField.type_sema`, resolução de
+    exportações de módulos (`classe`/`função`/`variável`), construtores
+    qualificados por módulo e aliases `const`, emissão de `E3112` em chamadas
+    tipadas não invocáveis.
+  - `src/frontend/semantic/static_safety.d`: rastreamento de variáveis não
+    mutadas e mapa de subclasses/implementadores do programa; verificação de
+    membros em módulos, classes gerenciadas (preservando acesso polimórfico a
+    membros de subclasses quando o receptor não é classe nem instância exata),
+    primitivos/vetores/tuplas/`Promessa`/`Tarefa` com sugestões por distância de
+    Levenshtein (`H3001`); verificação de mutação em `texto`/`tupla` (`E3110`),
+    operações sobre `nulo` (`E3111`), chamadas não invocáveis (`E3112`) e
+    contratos de elementos em vetores tipados (`adicionar`/`empilhar` e
+    atribuição por índice preservando `TypeExpr` exato como `inteiro[]`).
+- **Inferência e navegação no LSP (`src/lsp/model.d`)**:
+  - Inferência de tipos para `rotina` (`Tarefa<T>`), `aguardar`, vetores
+    literais homogêneos, indexação, ternário, binários/coalescência, fábricas
+    de classes qualificadas por módulo e membros via `resolveClassMember`
+    (incluindo `mescla` e herança).
+- **Documentação e contratos**:
+  - `exemplos/seguranca/07_tupla_imutavel.delegua` atualizado para `fase: compilacao`
+    / `E3110`; `docs/desenvolvimento.md`, `scripts/gerar_referencia.py`,
+    `docs/linguagem.html` e `docs/livro` regenerados e sincronizados.
+
+## Testes realmente executados
+
+- Unitários D: DMD e LDC2 (10 módulos cada, incluindo novas regressões em
+  `testes/unit/static_safety.d` para `E3109`–`E3112`, polimorfismo vs instância
+  exata, contratos de `inteiro[]` e `W3112`).
+- Build release: `dub build --compiler=ldc2 --build=release`.
+- Integração e linguagem: `integracao.py` (409 verificações com Clang e GCC),
+  `lsp.py` (incluindo inlay hints de `Tarefa<T>`, `aguardar`, vetor homogêneo,
+  indexação e hover em `mescla`), `exemplos.py` (136 exemplos / 272
+  verificações, 0 falhas), `formatador.py` (160 arquivos idempotentes / 272
+  verificações preservadas), `driver.py` (26), `bibliotecas.py` (342),
+  `linguagem_nova.py` (8), `rotinas.py` (15), `stdlib_avancada.py` (11),
+  `async_linguagem.py` (30), `validar_instalacao.py`.
+- Documentação e estilo: `gerar_referencia.py --check`, `gerar_livro.py --check`,
+  `testes/livro.py` (39 páginas), `testes/site.py --static-only`,
+  `scripts/verificar_tipos.py` e `scripts/formatar.py --check`.
+
+---
+
 # Revisão 0.9.0 — Rotinas paralelas, linguagem, stdlib avançada e refatoração — 20/11/2026
 
 Solicitação ativa: melhorar o compilador e implementar os recursos pendentes

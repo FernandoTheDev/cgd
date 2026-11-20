@@ -382,9 +382,20 @@ MODULE_CASES += [
         {
             "a.delegua": "classe P{}funcao aceitar(p:P){retorna 1}",
             "b.delegua": "classe P{}",
-            "main.delegua": "var a=importar('a.delegua');var b=importar('b.delegua');tente{a.aceitar(b.P())}pegue(erro){escreva('bloqueado')}",
+            "main.delegua": "var a=importar('a.delegua');var b=importar('b.delegua');var x:qualquer=b.P();tente{a.aceitar(x)}pegue(erro){escreva('bloqueado')}",
         },
         "bloqueado",
+    ),
+]
+MODULE_ERRORS += [
+    (
+        "modulos_identidade_nominal_estatica",
+        {
+            "a.delegua": "classe P{}funcao aceitar(p:P){retorna 1}",
+            "b.delegua": "classe P{}",
+            "main.delegua": "var a=importar('a.delegua');var b=importar('b.delegua');a.aceitar(b.P())",
+        },
+        "E3002",
     ),
 ]
 CASES += [

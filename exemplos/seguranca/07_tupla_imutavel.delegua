@@ -1,5 +1,5 @@
 //# 1
-//? fase: execucao
-//? erro: imutável
+//? fase: compilacao
+//? erro: E3110
 var t: tupla = tupla([1, 2])
 t[0] = 3
