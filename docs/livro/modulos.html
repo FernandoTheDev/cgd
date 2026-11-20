@@ -1,9 +1,9 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Módulos estáticos - O livro do CGD</title>
+        <title>Módulos estáticos e ~/.delegua/cgd - O livro do CGD</title>
 
 
         <!-- Custom HTML head -->
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -179,29 +179,32 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="módulos-estáticos"><a class="header" href="#módulos-estáticos">Módulos estáticos</a></h1>
-<p>Quando o programa crescer, divida o código em arquivos. A importação usa caminhos conhecidos na compilação e resolve cada caminho a partir do arquivo que o declara.</p>
-<h2 id="importação-literal-e-namespace"><a class="header" href="#importação-literal-e-namespace">Importação literal e namespace</a></h2>
-<p>importar recebe um caminho literal .delegua relativo ao módulo importador, ou um alias de biblioteca cgd:. A unidade é carregada na compilação, inicializada uma vez na execução e acessada como namespace. Não são importados pacotes NPM, código baixado ou nomes computados.</p>
-<pre><code class="language-delegua">var biblioteca: qualquer = importar("cgd:json")
-var documento: qualquer = biblioteca.JSON.deTexto("{}")
+                        <h1 id="módulos-estáticos-e-deleguacgd"><a class="header" href="#módulos-estáticos-e-deleguacgd">Módulos estáticos e ~/.delegua/cgd</a></h1>
+<p>Divida projetos maiores em vários arquivos .delegua ou importe bibliotecas prontas com importar("cgd:nome"). Tudo é resolvido estaticamente na compilação, com detecção de ciclos e cache automático.</p>
+<h2 id="módulos-locais-e-bibliotecas-em-deleguacgd"><a class="header" href="#módulos-locais-e-bibliotecas-em-deleguacgd">Módulos locais e bibliotecas em ~/.delegua/cgd</a></h2>
+<p>Para importar um arquivo do seu projeto, passe o caminho relativo terminado em .delegua: importar("util.delegua").</p>
+<p>Para bibliotecas cgd:, o CGD NÃO usa uma lista fixa no compilador: ele procura diretamente <nome>.delegua dentro de ~/.delegua/cgd (ou na pasta definida pela variável de ambiente CGD_LIBS_DIR), usando bibliotecas/ ao lado do executável apenas como fallback. Se você salvar ~/.delegua/cgd/minhalib.delegua, importar("cgd:minhalib") funciona na hora — e já aparece no autocomplete do VS Code!</p>
+<pre><code class="language-delegua">const JSON: qualquer = importar("cgd:json").JSON
+const util: qualquer = importar("./util.delegua")
 </code></pre>
-<h2 id="identidade-ciclos-e-visibilidade"><a class="header" href="#identidade-ciclos-e-visibilidade">Identidade, ciclos e visibilidade</a></h2>
-<p>O carregador canonicaliza caminhos, aplica orçamento e detecta ciclos com cadeia de importação. Arquivos abertos em memória prevalecem sobre disco no LSP. Tipos de classes possuem identidade de declaração; um nome igual em outro módulo não é o mesmo tipo. Herança por alias dinâmico de classe importada não é resolvida. A ausência de busca irrestrita no disco torna o trabalho do editor limitado e previsível.</p>
+<h2 id="namespaces-ciclos-e-identidade-de-classes"><a class="header" href="#namespaces-ciclos-e-identidade-de-classes">Namespaces, ciclos e identidade de classes</a></h2>
+<p>Cada módulo é inicializado uma única vez e expõe suas funções, variáveis e classes como namespace. O compilador detecta ciclos (E2001), verifica se o membro importado realmente existe (E3109) e garante que duas classes com o mesmo nome em módulos diferentes nunca sejam confundidas.</p>
 <h2 id="experimente-01_importacao"><a class="header" href="#experimente-01_importacao">Experimente: 01_importacao</a></h2>
 <pre><code class="language-delegua">var calculos: qualquer = importar("lib/calculos.delegua")
 var outraReferencia: qualquer = importar("./lib/calculos.delegua")
 escreva(calculos.soma(3), outraReferencia.versao, calculos.Valor(4).dado)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/modulos/01_importacao.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/modulos/01_importacao.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-08_otimizacao_modulos"><a class="header" href="#experimente-08_otimizacao_modulos">Experimente: 08_otimizacao_modulos</a></h2>
 <pre><code class="language-delegua">// As duas importações compartilham o módulo, sem repetir inicialização.
 var primeiro: qualquer = importar("biblioteca.delegua")
 var segundo: qualquer = importar("biblioteca.delegua")
 escreva(primeiro.dobro(2 + 2))
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/08_otimizacao_modulos.delegua">Ver exemplo completo e teste</a></p>
-<p>Inicialização é única; se falhar, permite nova tentativa. Exportações não podem ser substituídas. Importação dinâmica, NPM e código estrangeiro são excluídos.</p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/08_otimizacao_modulos.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>Caminhos em importar() precisam ser literais conhecidos na compilação. Tentativas de travessia em cgd: (como cgd:../segredo) são bloqueadas com E2003.</p>
+</blockquote>
 
                     </main>
 

@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 300" width="1120" height="300" role="img" aria-label="Pipeline de compilação do CGD: de arquivo .delegua até executável nativo">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#090912"/>
+      <stop offset="100%" stop-color="#050507"/>
+    </linearGradient>
+    <linearGradient id="violetGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5500fe"/>
+      <stop offset="100%" stop-color="#7c4dff"/>
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#4da8da"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#7c4dff"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#4da8da"/>
+    </marker>
+  </defs>
+  <rect width="1120" height="300" rx="16" fill="url(#bgGrad)" stroke="#231f3a" stroke-width="1.5"/>
+  <!-- Subtle grid dots -->
+  <g opacity="0.18" fill="#7c4dff">
+    <circle cx="40" cy="30" r="1.2"/><circle cx="140" cy="30" r="1.2"/><circle cx="240" cy="30" r="1.2"/><circle cx="340" cy="30" r="1.2"/>
+    <circle cx="440" cy="30" r="1.2"/><circle cx="540" cy="30" r="1.2"/><circle cx="640" cy="30" r="1.2"/><circle cx="740" cy="30" r="1.2"/>
+    <circle cx="840" cy="30" r="1.2"/><circle cx="940" cy="30" r="1.2"/><circle cx="1040" cy="30" r="1.2"/>
+  </g>
+  <text x="32" y="42" fill="#a78bfa" font-family="JetBrains Mono, monospace" font-size="13" font-weight="700" letter-spacing="1.2">// COMO SEU CÓDIGO VIRA UM BINÁRIO NATIVO</text>
+
+  <!-- Step 1: Fonte -->
+  <rect x="28" y="72" width="180" height="118" rx="12" fill="#0f0f1a" stroke="#4da8da" stroke-width="1.5"/>
+  <rect x="44" y="88" width="66" height="22" rx="6" fill="#4da8da" fill-opacity="0.16"/>
+  <text x="54" y="103" fill="#7dd3fc" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700">ENTRADA</text>
+  <text x="44" y="134" fill="#f3f4f8" font-family="Inter, sans-serif" font-size="16" font-weight="700">ola.delegua</text>
+  <text x="44" y="156" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12">+ módulos locais</text>
+  <text x="44" y="173" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12">+ ~/.delegua/cgd</text>
+
+  <line x1="208" y1="131" x2="242" y2="131" stroke="#4da8da" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+  <!-- Step 2: Frontend D -->
+  <rect x="248" y="72" width="212" height="118" rx="12" fill="#0f0f1a" stroke="#7c4dff" stroke-width="1.5"/>
+  <rect x="264" y="88" width="94" height="22" rx="6" fill="#5500fe" fill-opacity="0.28"/>
+  <text x="274" y="103" fill="#c4b5fd" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700">FRONTEND D</text>
+  <text x="264" y="134" fill="#f3f4f8" font-family="Inter, sans-serif" font-size="16" font-weight="700">Análise e Segurança</text>
+  <text x="264" y="156" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12">Lexer, AST, tipos e módulos</text>
+  <text x="264" y="173" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12">Checagem E3101–E3112</text>
+
+  <line x1="460" y1="131" x2="494" y2="131" stroke="#7c4dff" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 3: CTFE & Lowering -->
+  <rect x="500" y="72" width="194" height="118" rx="12" fill="#0f0f1a" stroke="#7c4dff" stroke-width="1.5"/>
+  <rect x="516" y="88" width="110" height="22" rx="6" fill="#5500fe" fill-opacity="0.28"/>
+  <text x="526" y="103" fill="#c4b5fd" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700">OTIMIZAÇÃO -o</text>
+  <text x="516" y="134" fill="#f3f4f8" font-family="Inter, sans-serif" font-size="16" font-weight="700">CTFE e Lowering</text>
+  <text x="516" y="156" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12">VM //&gt;puro, dobra e IR</text>
+  <text x="516" y="173" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12">Máquina stackless async</text>
+
+  <line x1="694" y1="131" x2="728" y2="131" stroke="#7c4dff" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Step 4: Backend C99 -->
+  <rect x="734" y="72" width="174" height="118" rx="12" fill="#0f0f1a" stroke="#7c4dff" stroke-width="1.5"/>
+  <rect x="750" y="88" width="90" height="22" rx="6" fill="#5500fe" fill-opacity="0.28"/>
+  <text x="760" y="103" fill="#c4b5fd" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700">BACKEND C</text>
+  <text x="750" y="134" fill="#f3f4f8" font-family="Inter, sans-serif" font-size="16" font-weight="700">Código C99</text>
+  <text x="750" y="156" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12">Clang / GCC / TCC</text>
+  <text x="750" y="173" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12">+ delegua-runtime</text>
+
+  <line x1="908" y1="131" x2="940" y2="131" stroke="#4da8da" stroke-width="2" marker-end="url(#arrowBlue)"/>
+
+  <!-- Step 5: Executable -->
+  <rect x="946" y="72" width="146" height="118" rx="12" fill="url(#violetGrad)"/>
+  <rect x="960" y="88" width="76" height="22" rx="6" fill="#050507" fill-opacity="0.32"/>
+  <text x="970" y="103" fill="#ffffff" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700">SAÍDA</text>
+  <text x="960" y="136" fill="#ffffff" font-family="Inter, sans-serif" font-size="16" font-weight="800">./ola</text>
+  <text x="960" y="157" fill="#e9e4ff" font-family="Inter, sans-serif" font-size="12">Binário nativo</text>
+  <text x="960" y="174" fill="#e9e4ff" font-family="Inter, sans-serif" font-size="12">Linux x86_64</text>
+
+  <!-- Bottom Runtime & Tools Bar -->
+  <rect x="28" y="216" width="510" height="58" rx="10" fill="#0c0c16" stroke="#252240" stroke-width="1"/>
+  <text x="46" y="240" fill="#7dd3fc" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700">MODO FERRAMENTA (sem gerar C nem binário)</text>
+  <text x="46" y="260" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12">cgd --verificar · cgd --formatar · cgd --explicar · cgd --lsp (VS Code)</text>
+
+  <rect x="556" y="216" width="536" height="58" rx="10" fill="#0c0c16" stroke="#252240" stroke-width="1"/>
+  <text x="574" y="240" fill="#c4b5fd" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700">RUNTIME NATIVO EM C (vendor/delegua-runtime)</text>
+  <text x="574" y="260" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12">Boehm GC · epoll async · pool de rotinas · TLS por thread · libcurl · SQLite · OpenSSL</text>
+</svg>

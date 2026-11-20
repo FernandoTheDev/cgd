@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -180,16 +180,15 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="dicionários-tuplas-e-clonagem"><a class="header" href="#dicionários-tuplas-e-clonagem">Dicionários, tuplas e clonagem</a></h1>
-<p>Use um dicionário para procurar um valor pela chave, e uma tupla para reunir valores sem mudar sua estrutura. Neste capítulo, você também verá como copiar coleções sem perder suas relações.</p>
-<h2 id="chaves-pares-e-presença"><a class="header" href="#chaves-pares-e-presença">Chaves, pares e presença</a></h2>
-<p>Dicionários usam chaves nulas, lógicas, numéricas ou textuais. A chave 1 e a chave 1.0 identificam a mesma entrada; verdadeiro é uma chave diferente. Chaves numéricas não finitas são rejeitadas. A ordem de iteração não é ordem de inserção prometida.</p>
-<pre><code class="language-delegua">var dados: dicionario = { nome: "Ana", ativo: nulo }
-escreva(dados.obter("nome", "sem nome"))
-escreva(dados.contemChave("ativo"))
-para cada par: qualquer em dados { escreva(par[0], par[1]) }
+<p>Dicionários associam chaves a valores; tuplas agrupam valores fixos que não podem ser alterados depois de criados. E quando você precisar de uma cópia independente, existe clonar().</p>
+<h2 id="trabalhando-com-dicionários"><a class="header" href="#trabalhando-com-dicionários">Trabalhando com dicionários</a></h2>
+<p>Chaves podem ser texto, número, lógico ou nulo. Use .obter(chave, padrao) para ler com segurança e .contemChave(chave) para saber se a chave existe (mesmo quando o valor guardado for nulo). Outros métodos úteis: definir, remover, chaves, valores, itens, tamanho e limpar.</p>
+<pre><code class="language-delegua">var perfil: dicionario = { nome: "Ana", pontos: 10 }
+escreva(perfil.obter("nome", "Visitante"))
+escreva(perfil.contemChave("pontos"))
 </code></pre>
-<h2 id="tuplas-desestruturação-e-cópia"><a class="header" href="#tuplas-desestruturação-e-cópia">Tuplas, desestruturação e cópia</a></h2>
-<p>Literais como (1, "a") criam tuplas imutáveis; tupla(vetor) converte coleções de 2 a 10 elementos. Propriedades ordinais como primeiro e segundo dão acesso aos membros. Desestruturação const { nome: texto } = dados cria um vínculo, sem copiar profundamente o objeto. clonar suporta ciclos e mantém identidades compartilhadas dentro da cópia; não clona código de função nem abre outro recurso nativo.</p>
+<h2 id="tuplas-imutáveis-e-clonagem-profunda"><a class="header" href="#tuplas-imutáveis-e-clonagem-profunda">Tuplas imutáveis e clonagem profunda</a></h2>
+<p>Crie tuplas com (1, "a") ou tupla(vetor) (de 2 a 10 itens). Além do índice [0], tuplas aceitam propriedades ordinais como .primeiro, .segundo até .decimo. Para copiar coleções aninhadas (inclusive com ciclos) sem compartilhar referências, use clonar(valor).</p>
 <h2 id="experimente-11_dicionarios"><a class="header" href="#experimente-11_dicionarios">Experimente: 11_dicionarios</a></h2>
 <pre><code class="language-delegua">var original: dicionario = { a: 1 }
 
@@ -205,7 +204,7 @@ para cada { chave: texto, valor: inteiro } em { x: 7 } {
 
 escreva("a" em dados)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/11_dicionarios.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/11_dicionarios.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-12_tuplas"><a class="header" href="#experimente-12_tuplas">Experimente: 12_tuplas</a></h2>
 <pre><code class="language-delegua">// Tuplas possuem acesso por índice e por propriedades ordinais.
 var tuplaLiteral: tupla = [(1, "texto")]
@@ -213,7 +212,7 @@ var tipada: (numero, texto) = tupla([2, "outro"])
 escreva(tuplaLiteral[0], tuplaLiteral.segundo)
 escreva(tipada)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/12_tuplas.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/12_tuplas.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-20_clonagem"><a class="header" href="#experimente-20_clonagem">Experimente: 20_clonagem</a></h2>
 <pre><code class="language-delegua">var original: dicionario = { dados: [1] }
 
@@ -225,7 +224,7 @@ ciclo.adicionar(ciclo)
 var clonado: qualquer = clonar(ciclo)
 escreva(clonado[0] == clonado)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/20_clonagem.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/20_clonagem.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-31_metodos_dicionario"><a class="header" href="#experimente-31_metodos_dicionario">Experimente: 31_metodos_dicionario</a></h2>
 <pre><code class="language-delegua">var d: dicionario = { b: 2, a: 1 }
 
@@ -233,7 +232,7 @@ escreva(d.chaves().ordenar().juntar("-"), d.valores().ordenar())
 escreva(d.contém("a"), d.remover("a"), d.tamanho())
 escreva(d.obter("a"))
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/31_metodos_dicionario.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/31_metodos_dicionario.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-37_dicionario_obter"><a class="header" href="#experimente-37_dicionario_obter">Experimente: 37_dicionario_obter</a></h2>
 <pre><code class="language-delegua">var dados: dicionario = { "presente": nulo }
 escreva(dados.obter("ausente", 42))
@@ -245,8 +244,10 @@ dados.limpar()
 escreva(tamanho(itens))
 escreva(tamanho(dados))
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/37_dicionario_obter.delegua">Ver exemplo completo e teste</a></p>
-<p>Dicionários: chaves, valores, tamanho, remover e inclui/contem/contém. Tuplas: tamanho, inclui/contem/contém e fatiar, além das propriedades ordinais demonstradas. A iteração de dicionários não garante ordem de inserção. Dicionários também oferecem obter(chave, padrão), definir, contemChave, itens e limpar. Nulo armazenado não é ausência.</p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/37_dicionario_obter.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>Dicionários não garantem ordem de inserção ao iterar. Tentar modificar um item de uma tupla (t[0] = 3) agora é pego em tempo de compilação com o erro E3110.</p>
+</blockquote>
 
                     </main>
 

@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -180,13 +180,18 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="condições-escolha-e-laços"><a class="header" href="#condições-escolha-e-laços">Condições, escolha e laços</a></h1>
-<p>Seu programa precisa escolher caminhos e repetir tarefas. Comece com se e enquanto; depois experimente escolha, para cada e as formas de encerrar uma repetição.</p>
-<h2 id="blocos-e-desvios"><a class="header" href="#blocos-e-desvios">Blocos e desvios</a></h2>
-<p>Blocos usam chaves. se/senao e escolha/caso selecionam comandos. sustar sai do laço/escolha; continua passa à próxima iteração. finalmente ainda executa em transferências de controle. Um comando depois de retorno ou falha pode gerar aviso de código inalcançável.</p>
-<h2 id="iteração-com-tipo"><a class="header" href="#iteração-com-tipo">Iteração com tipo</a></h2>
-<p>para cada elem: T em coleção valida o vínculo a cada iteração. Vetores produzem elementos; texto produz caracteres por ponto de código; dicionários produzem pares chave/valor. Desestruturações e compreensões também aceitam tipos. Não se promete snapshot quando a coleção é alterada durante a própria iteração.</p>
-<pre><code class="language-delegua">var valores: inteiro[] = [1, 2, 3]
-para cada valor: inteiro em valores { escreva(valor) }
+<p>Para tomar decisões no seu programa, use se/senao, ternário ? : ou escolha/caso. Para repetir tarefas, use enquanto, faca/enquanto, para ou para cada.</p>
+<h2 id="decisões-limpas-com-se-ternário-e-escolha"><a class="header" href="#decisões-limpas-com-se-ternário-e-escolha">Decisões limpas com se, ternário e escolha</a></h2>
+<p>Blocos sempre usam chaves { }. No se e no enquanto, os parênteses em volta da condição são opcionais. No escolha, você pode empilhar vários casos que executam o mesmo bloco e usar padrao para o resto.</p>
+<pre><code class="language-delegua">var idade: inteiro = 20
+escreva(idade &gt;= 18 ? "adulto" : "menor")
+</code></pre>
+<h2 id="percorrendo-coleções-com-para-cada"><a class="header" href="#percorrendo-coleções-com-para-cada">Percorrendo coleções com para cada</a></h2>
+<p>O para cada percorre vetores (elemento por elemento), textos (caractere Unicode por caractere) e dicionários (pares chave/valor). Você pode anotar o tipo do elemento direto no laço — e se não anotar, o compilador infere automaticamente quando conhece o tipo da coleção.</p>
+<pre><code class="language-delegua">var numeros: inteiro[] = [10, 20, 30]
+para cada n: inteiro em numeros {
+    escreva(n)
+}
 </code></pre>
 <h2 id="experimente-04_condicionais"><a class="header" href="#experimente-04_condicionais">Experimente: 04_condicionais</a></h2>
 <pre><code class="language-delegua">var idade: numero = 20
@@ -198,7 +203,7 @@ escolha 2 {
     padrao: escreva("outro")
 }
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/04_condicionais.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/04_condicionais.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-05_lacos"><a class="header" href="#experimente-05_lacos">Experimente: 05_lacos</a></h2>
 <pre><code class="language-delegua">para (var i: numero = 0; i &lt; 4; i++) {
     se i == 1 {
@@ -224,7 +229,7 @@ para cada item: inteiro em [1, 2, 3] {
 
 escreva(soma)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/05_lacos.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/05_lacos.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-34_lacos_variantes"><a class="header" href="#experimente-34_lacos_variantes">Experimente: 34_lacos_variantes</a></h2>
 <pre><code class="language-delegua">var i: numero = 0
 var primeiro: qualquer[] = fazer {
@@ -245,7 +250,10 @@ escreva(primeiro)
 escreva(segundo)
 escreva(terceiro)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/34_lacos_variantes.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/34_lacos_variantes.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>sustar sai do laço ou do escolha; continua pula para a próxima volta. Mesmo quando você usa sustar, continua ou retorna, qualquer bloco finalmente no caminho continua sendo executado.</p>
+</blockquote>
 
                     </main>
 

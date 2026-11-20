@@ -1,9 +1,9 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Decisões de escopo: o que não fará parte da linguagem - O livro do CGD</title>
+        <title>Decisões de escopo: o que não vai entrar no CGD - O livro do CGD</title>
 
 
         <!-- Custom HTML head -->
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -179,20 +179,21 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="decisões-de-escopo-o-que-não-fará-parte-da-linguagem"><a class="header" href="#decisões-de-escopo-o-que-não-fará-parte-da-linguagem">Decisões de escopo: o que não fará parte da linguagem</a></h1>
-<p>Por que esta linguagem funciona assim? Estas escolhas explicam o recorte do CGD, incluindo os recursos que não serão adicionados e as diferenças em relação ao interpretador Delégua.</p>
+                        <h1 id="decisões-de-escopo-o-que-não-vai-entrar-no-cgd"><a class="header" href="#decisões-de-escopo-o-que-não-vai-entrar-no-cgd">Decisões de escopo: o que não vai entrar no CGD</a></h1>
+<p>Dizer 'não' a certas coisas é o que permite manter o compilador rápido, consistente e testável. Aqui estão as escolhas definitivas do projeto.</p>
 <h2 id="exclusões-definitivas"><a class="header" href="#exclusões-definitivas">Exclusões definitivas</a></h2>
 <div class="table-wrapper"><table><thead><tr><th>Recurso</th><th>Como funciona</th></tr></thead><tbody>
-<tr><td>Compatibilidade com JavaScript e classes de host JS</td><td>Não será implementada. Evita depender de VM, coerções e ciclo de vida de um ambiente JavaScript. FFI C tipada é a integração nativa.</td></tr>
-<tr><td>Múltiplos dialetos</td><td>Não serão implementados. Há uma gramática e um conjunto de contratos a manter, testar e documentar.</td></tr>
-<tr><td>Herança de interfaces</td><td>Não será implementada. Classes podem implementar vários contratos diretamente; não há grafo de interfaces herdadas para resolver.</td></tr>
-<tr><td>NPM, eval e importação dinâmica</td><td>Não fazem parte do perfil. Módulos fonte são conhecidos na compilação, e código do programa não é executado pela edição.</td></tr>
+<tr><td>Compatibilidade com JavaScript e classes de host JS</td><td>O CGD é compilado para C99 e não depende de Node.js nem de motor JS. Para conversar com bibliotecas externas, use FFI C tipada.</td></tr>
+<tr><td>Múltiplos dialetos</td><td>Mantemos uma única sintaxe Delégua clara e bem testada, em vez de emular vários dialetos diferentes.</td></tr>
+<tr><td>Herança entre interfaces</td><td>Classes podem implementar quantas interfaces quiserem diretamente, mantendo a resolução de contratos simples e previsível.</td></tr>
+<tr><td>NPM, eval e importação dinâmica</td><td>Todo código compilado é conhecido antes de gerar o executável; bibliotecas compartilhadas vivem em ~/.delegua/cgd.</td></tr>
 </tbody></table>
 </div>
-<h2 id="limitação-não-é-sinônimo-de-insegurança"><a class="header" href="#limitação-não-é-sinônimo-de-insegurança">Limitação não é sinônimo de insegurança</a></h2>
-<p>Composição mescla, enums nominais, campos estáticos e ABIs C compostas não estão disponíveis. Isso não é uma classificação automática de insegurança e não constitui compromisso de implementação. DAP continua adiado; executar não é depurar. Outros alvos precisam de toolchain e runtime validados antes de serem anunciados.</p>
-<h2 id="origem-e-autoria"><a class="header" href="#origem-e-autoria">Origem e autoria</a></h2>
-<p>Delégua original é um projeto da Design Líquido. O CGD preserva as referências e a licença Apache-2.0; sua documentação explica o perfil próprio em vez de sugerir compatibilidade total com o interpretador, Node ou JavaScript.</p>
+<h2 id="o-que-ainda-pode-chegar-no-futuro"><a class="header" href="#o-que-ainda-pode-chegar-no-futuro">O que ainda pode chegar no futuro</a></h2>
+<p>Enums nominais (distintos de inteiro), structs/callbacks compostos na ABI C, suporte a classes locais dentro de funções assincrona, novos alvos (Windows/macOS validados) e depurador passo a passo (DAP) são itens em aberto — não exclusões definitivas.</p>
+<blockquote>
+<p>Delégua original pertence à Design Líquido (licença Apache-2.0). O CGD honra essa origem e documenta com transparência tudo o que estende ou altera.</p>
+</blockquote>
 
                     </main>
 

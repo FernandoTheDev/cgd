@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -180,19 +180,19 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="decoradores-e-asserções"><a class="header" href="#decoradores-e-asserções">Decoradores e asserções</a></h1>
-<p>Metadados descrevem uma declaração; asserções verificam uma condição durante a execução. Conheça as duas ferramentas antes de usar os decoradores mais avançados.</p>
-<h2 id="metadados-declarativos"><a class="header" href="#metadados-declarativos">Metadados declarativos</a></h2>
-<p>@nome ou @nome(chave=valor) associa dados a funções/classes/campos/métodos. Argumentos precisam ser constantes, sem executar chamadas. @definicao tem significado adicional nas classes estrangeiras e declara a fronteira ABI; seus argumentos não são uma expressão de carregamento dinâmico.</p>
-<pre><code class="language-delegua">@descricao(nome="Exemplo")
-classe Exemplo { valor: inteiro = 1 }
-escreva(decoradores(Exemplo))
+<p>Use @decoradores para anexar metadados ou envolver funções e métodos com comportamento extra (como logs ou validações), e assercao() para checar condições importantes em execução.</p>
+<h2 id="metadados-declarativos-e-envelopes"><a class="header" href="#metadados-declarativos-e-envelopes">Metadados declarativos e envelopes</a></h2>
+<p>Um decorador simples como @rota(caminho="/usuarios") guarda dados constantes que podem ser consultados com decoradores(alvo). Se você declarar uma funcao de decorador, ela envolve automaticamente a função ou método decorado — recebendo a função original e devolvendo a nova versão.</p>
+<pre><code class="language-delegua">funcao de decorador dobrarResultado(original: funcao): funcao {
+    retorna funcao(alvo: qualquer, x: inteiro): inteiro {
+        retorna original(alvo, x) * 2
+    }
+}
 </code></pre>
-<h2 id="envelopes-e-asserções"><a class="header" href="#envelopes-e-asserções">Envelopes e asserções</a></h2>
-<p>Envelopes de funções livres podem substituir a função sem capturar o ambiente. Envelopes em métodos não são suportados; metadados em métodos são aceitos. assercao/asserção verifica uma condição e lança erro tratável com mensagem opcional.</p>
-<pre><code class="language-delegua">assercao(2+2 == 4, "contrato aritmético")
+<h2 id="asserções-em-runtime"><a class="header" href="#asserções-em-runtime">Asserções em runtime</a></h2>
+<p>assercao(condicao, "mensagem opcional") verifica uma garantia do seu código e lança uma exceção tratável caso falhe.</p>
+<pre><code class="language-delegua">assercao(2 + 2 == 4, "a aritmética falhou")
 </code></pre>
-<h2 id="decisão-metadados-não-são-eval"><a class="header" href="#decisão-metadados-não-são-eval">Decisão: metadados não são eval</a></h2>
-<p>O formato dos decoradores é analisável estaticamente e preserva autoria/posição. Código do programa não pode ser executado no frontend só para obter argumentos ou descobrir tipos. Asserções também não desaparecem apenas porque a otimização está habilitada.</p>
 <h2 id="experimente-23_decoradores"><a class="header" href="#experimente-23_decoradores">Experimente: 23_decoradores</a></h2>
 <pre><code class="language-delegua">@minimo(valor = 0)
 classe Medida {
@@ -215,7 +215,7 @@ funcao obter(): qualquer {
 
 escreva(obter())
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/23_decoradores.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/23_decoradores.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-24_assercoes"><a class="header" href="#experimente-24_assercoes">Experimente: 24_assercoes</a></h2>
 <pre><code class="language-delegua">assercao 2 + 2 == 4
 escreva("validado")
@@ -226,8 +226,48 @@ pegue (erro) {
     escreva(erro)
 }
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/24_assercoes.delegua">Ver exemplo completo e teste</a></p>
-<p>Envelopes em métodos ainda são rejeitados. Metadados em métodos, classes e campos são suportados. Asserções não são removidas por -o.</p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/24_assercoes.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<h2 id="experimente-43_estaticos_mescla"><a class="header" href="#experimente-43_estaticos_mescla">Experimente: 43_estaticos_mescla</a></h2>
+<pre><code class="language-delegua">funcao de decorador triplicar(original: funcao): funcao {
+    retorna funcao(alvo: qualquer, x: inteiro): inteiro {
+        retorna x * 3
+    }
+}
+
+classe Etiquetavel {
+    prefixo: texto = "Etiqueta:"
+
+    rotulo(nome: texto): texto {
+        retorna isto.prefixo + nome
+    }
+}
+
+classe Registro mescla Etiquetavel {
+    estatico criados: inteiro = 0
+    nome: texto
+
+    construtor(nome: texto) {
+        isto.nome = nome
+        Registro.criados = Registro.criados + 1
+    }
+
+    @triplicar
+    escalar(x: inteiro): inteiro {
+        retorna x
+    }
+}
+
+const a: Registro = Registro("Ana")
+const b: Registro = Registro("Bia")
+escreva(Registro.criados)
+escreva(a.rotulo(a.nome))
+escreva(b.eInstanciaDe(Etiquetavel))
+escreva(a.escalar(10))
+</code></pre>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/43_estaticos_mescla.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>Envelopes de decoradores funcionam em funções livres, métodos de instância e métodos estáticos (sem captura de ambiente). Asserções nunca são apagadas pelo -o.</p>
+</blockquote>
 
                     </main>
 

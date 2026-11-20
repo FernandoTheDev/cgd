@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -180,14 +180,14 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="laços-como-expressões"><a class="header" href="#laços-como-expressões">Laços como expressões</a></h1>
-<p>Às vezes o resultado de um laço é justamente a lista que ele produz. Um coletor permite escrever essa transformação sem montar o vetor à mão.</p>
-<h2 id="construir-um-vetor-com-um-laço"><a class="header" href="#construir-um-vetor-com-um-laço">Construir um vetor com um laço</a></h2>
-<p>Laços usados como expressão acumulam valores. retorna dentro do corpo coletor acrescenta ao resultado, em vez de sair da função externa. Condições, efeitos e finalmente continuam em ordem; sustar encerra a coleta e continua passa à próxima iteração.</p>
-<pre><code class="language-delegua">var quadrados = para (var i: inteiro = 0; i &lt; 4; i++) { retorna i*i }
-escreva(quadrados)
+<p>Em vez de criar um vetor vazio antes e ficar chamando .adicionar() dentro de um laço, você pode usar o próprio laço como expressão para montar o resultado.</p>
+<h2 id="montando-vetores-direto-no-laço"><a class="header" href="#montando-vetores-direto-no-laço">Montando vetores direto no laço</a></h2>
+<p>Qualquer laço (para, enquanto, para cada) pode devolver um vetor se for usado do lado direito de uma atribuição ou dentro de uma expressão. Cada retorna dentro do corpo empurra mais um valor para o vetor final.</p>
+<pre><code class="language-delegua">var quadrados = para (var i: inteiro = 0; i &lt; 4; i++) {
+    retorna i * i
+}
+escreva(quadrados) // [0, 1, 4, 9]
 </code></pre>
-<h2 id="coleta-não-é-execução-antecipada"><a class="header" href="#coleta-não-é-execução-antecipada">Coleta não é execução antecipada</a></h2>
-<p>Uma expressão de laço é executada no programa, a menos que um passe especificamente prove uma simplificação segura. Capturas não são necessárias para construir o resultado e o código não é executado pelo editor.</p>
 <h2 id="experimente-06_lacos_resultado"><a class="header" href="#experimente-06_lacos_resultado">Experimente: 06_lacos_resultado</a></h2>
 <pre><code class="language-delegua">// Retornos dentro de uma expressão de laço acumulam os valores.
 var quadrados: qualquer[] = para (var i: numero = 0; i &lt; 4; i++) {
@@ -203,7 +203,10 @@ var pares: qualquer[] = enquanto i &lt; 3 {
 escreva(quadrados)
 escreva(pares)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/06_lacos_resultado.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/06_lacos_resultado.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>Dentro de um laço usado como expressão, retorna adiciona um item ao vetor resultante em vez de encerrar a função externa.</p>
+</blockquote>
 
                     </main>
 

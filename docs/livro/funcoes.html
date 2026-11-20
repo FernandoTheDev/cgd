@@ -1,9 +1,9 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Funções e parâmetros - O livro do CGD</title>
+        <title>Funções, assincronismo e rotinas paralelas - O livro do CGD</title>
 
 
         <!-- Custom HTML head -->
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -179,20 +179,31 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="funções-e-parâmetros"><a class="header" href="#funções-e-parâmetros">Funções e parâmetros</a></h1>
-<p>Dê nome a uma operação para usá-la de novo. Depois, passe funções como argumentos e experimente valores padrão, argumentos variáveis e callbacks sem captura.</p>
-<h2 id="parâmetros-e-retornos"><a class="header" href="#parâmetros-e-retornos">Parâmetros e retornos</a></h2>
-<p>Use funcao/função, argumentos tipados opcionais e retorno após dois-pontos. Parâmetros opcionais devem vir depois dos obrigatórios; o espalhamento deve ser o último. Um parâmetro padrão pode usar parâmetros anteriores. Sem retorna, o valor final é nulo, não a última expressão.</p>
+                        <h1 id="funções-assincronismo-e-rotinas-paralelas"><a class="header" href="#funções-assincronismo-e-rotinas-paralelas">Funções, assincronismo e rotinas paralelas</a></h1>
+<p>Funções organizam e reaproveitam lógica. No CGD você escreve funções normais, funções seta (=&gt;), funções assíncronas (assincrona/aguardar) e tarefas paralelas em threads (rotina).</p>
+<h2 id="funções-normais-valores-padrão-e-arrows-"><a class="header" href="#funções-normais-valores-padrão-e-arrows-">Funções normais, valores padrão e arrows (=&gt;)</a></h2>
+<p>Declare funções com funcao (ou função), parâmetros opcionais com = valor e argumentos variáveis no final com ...nome. Se uma função terminar sem retorna, ela devolve nulo. Funções anônimas e arrows (=&gt;) funcionam como callbacks sem captura.</p>
 <pre><code class="language-delegua">funcao somar(a: inteiro, b: inteiro = 1): inteiro {
     retorna a + b
 }
-var duplicar: funcao = (x: inteiro): inteiro =&gt; x * 2
+const dobrar: funcao = (x: inteiro): inteiro =&gt; x * 2
 </code></pre>
-<h2 id="sem-captura-implícita"><a class="header" href="#sem-captura-implícita">Sem captura implícita</a></h2>
-<p>Funções e arrows podem ser valores e callbacks. Não carregam variáveis do ambiente externo: passe os dados por parâmetros. Capturas geram aviso e erro. Métodos ligados mantêm seu receptor explicitamente gerenciado. Esta decisão evita introduzir um ambiente de closures com semântica parcial.</p>
-<h2 id="assincronismo-experimental-do-cgd"><a class="header" href="#assincronismo-experimental-do-cgd">Assincronismo experimental do CGD</a></h2>
-<p>assincrona funcao f(): T inicia imediatamente e devolve Promessa<T>. aguardar suspende apenas o corpo assíncrono atual e retoma por uma microtask, inclusive para resultados prontos. O runtime drena essas continuações depois da raiz síncrona. Não há threads paralelas.</p>
-<p>Funções e métodos assíncronos aceitam tente/pegue/finalmente, laços, escolha, compreensões e spread. Classes locais em corpos assíncronos recebem E3305. Promessa oferece combinadores e cancelamento cooperativo. O módulo cgd:assincrono fornece temporizadores, cliente HTTP e TCP sobre o reactor Linux. As bibliotecas Tempo, Rede e Processo mantêm suas operações síncronas. Os contratos e limites experimentais estão em docs/assincronismo.md.</p>
+<h2 id="funções-assíncronas-assincrona-aguardar-e-promessa"><a class="header" href="#funções-assíncronas-assincrona-aguardar-e-promessa">Funções assíncronas: assincrona, aguardar e Promessa<T></a></h2>
+<p>Uma funcao marcada como assincrona devolve automaticamente uma Promessa<T>. Dentro dela, você usa aguardar para esperar temporizadores, requisições HTTP, sockets TCP ou outras promessas sem travar o resto do programa — tudo coordenado por um reactor epoll no runtime C.</p>
+<p>Promessa também traz combinadores estáticos prontos: Promessa.resolvida, Promessa.rejeitada, Promessa.todas, Promessa.corrida, Promessa.qualquer e Promessa.todasResolvidas, além de cancelamento cooperativo (.cancelar()).</p>
+<pre><code class="language-delegua">assincrona funcao buscarDados(): texto {
+    const Tempo: qualquer = importar("cgd:assincrono").Tempo
+    aguardar Tempo.dormir(10)
+    retorna "pronto"
+}
+</code></pre>
+<h2 id="paralelismo-real-rotina-tarefa-e-canal"><a class="header" href="#paralelismo-real-rotina-tarefa-e-canal">Paralelismo real: rotina, Tarefa<T> e Canal</a></h2>
+<p>Quando você quer fazer trabalho pesado de CPU em paralelo em outro núcleo, use rotina minhaFuncao(args). Ela dispara a função num pool de threads nativo e devolve uma Tarefa<T>, que você espera com aguardar.</p>
+<p>Para evitar condições de corrida e bugs difíceis de rastrear, o compilador audita a função em tempo de compilação (E3401–E3404): rotinas só aceitam argumentos e retornos transferíveis (nulo, lógico, inteiro, real ou texto copiado) e não podem mexer em estado global mutável. Para trocar mensagens entre tarefas, use Canal e GrupoTarefas em cgd:assincrono.</p>
+<pre><code class="language-delegua">const t1: Tarefa&lt;inteiro&gt; = rotina fib(12)
+const t2: Tarefa&lt;inteiro&gt; = rotina fib(14)
+escreva(aguardar t1, aguardar t2)
+</code></pre>
 <h2 id="experimente-07_funcoes"><a class="header" href="#experimente-07_funcoes">Experimente: 07_funcoes</a></h2>
 <pre><code class="language-delegua">funcao soma(a: inteiro, b: inteiro = a + 2): inteiro {
     retorna a + b
@@ -205,7 +216,7 @@ funcao reunir(primeiro: qualquer, ...resto: qualquer): qualquer {
 escreva(soma(3))
 escreva(reunir(1, ...[2, 3]))
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/07_funcoes.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/07_funcoes.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-08_funcoes_valores"><a class="header" href="#experimente-08_funcoes_valores">Experimente: 08_funcoes_valores</a></h2>
 <pre><code class="language-delegua">funcao dobro(x: qualquer): qualquer {
     retorna x * 2
@@ -225,7 +236,7 @@ escreva(mapear([1, 2, 3], funcao(x: qualquer): qualquer {
     retorna x * 3
 }))
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/08_funcoes_valores.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/08_funcoes_valores.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-41_assincronismo"><a class="header" href="#experimente-41_assincronismo">Experimente: 41_assincronismo</a></h2>
 <pre><code class="language-delegua">assincrona funcao maisUm(valor: inteiro): inteiro {
     retorna valor + 1
@@ -242,8 +253,53 @@ escreva("raiz")
 mostrar()
 escreva("continua")
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/41_assincronismo.delegua">Ver exemplo completo e teste</a></p>
-<p>Capturas de variáveis externas são bloqueadas. Passe o estado explicitamente por parâmetros; um método ligado mantém apenas seu receptor gerenciado.</p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/41_assincronismo.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<h2 id="experimente-42_rotinas"><a class="header" href="#experimente-42_rotinas">Experimente: 42_rotinas</a></h2>
+<pre><code class="language-delegua">funcao fib(n: inteiro): inteiro {
+    se n &lt;= 1 {
+        retorna n
+    }
+
+    retorna fib(n - 1) + fib(n - 2)
+}
+
+assincrona funcao produtor(canal: qualquer): vazio {
+    para var i: inteiro = 1; i &lt;= 5; i++ {
+        aguardar canal.enviar(i * 10)
+    }
+
+    canal.fechar()
+}
+
+assincrona funcao principal(): vazio {
+    const Async: qualquer = importar("cgd:assincrono")
+    const t1: Tarefa&lt;inteiro&gt; = rotina fib(10)
+    const t2: Tarefa&lt;inteiro&gt; = rotina fib(12)
+    escreva(aguardar t1)
+    escreva(aguardar t2)
+
+    const ch: qualquer = Async.Canal(2)
+    const envio: Promessa&lt;vazio&gt; = produtor(ch)
+    var soma: inteiro = 0
+    enquanto verdadeiro {
+        tente {
+            soma = soma + aguardar ch.receber()
+        } pegue (erro: Excecao) {
+            sustar
+        }
+    }
+
+    aguardar envio
+    escreva(soma)
+    escreva(ch.fechado())
+}
+
+principal()
+</code></pre>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/42_rotinas.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>No CGD, funções nunca capturam variáveis externas (upvalues). Passe tudo por parâmetro ou use métodos de classe. Assincronismo e rotinas são recursos nativos do CGD, distintos da wiki base da Delégua.</p>
+</blockquote>
 
                     </main>
 

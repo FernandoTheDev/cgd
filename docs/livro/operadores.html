@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -180,21 +180,22 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="operadores-e-ordem-de-avaliação"><a class="header" href="#operadores-e-ordem-de-avaliação">Operadores e ordem de avaliação</a></h1>
-<p>Some, compare e combine valores. Além da conta em si, importa a ordem: argumentos e índices são avaliados na ordem em que aparecem no código.</p>
-<h2 id="comparações-textuais"><a class="header" href="#comparações-textuais">Comparações textuais</a></h2>
-<p>&lt;, &lt;=, &gt; e &gt;= entre textos usam ordem lexicográfica dos pontos de código Unicode em UTF-8 válido, incluindo textos com zero interno. Prefixo mais curto vem antes. Não há ordenação por idioma, normalização ou comparação sem acentos. Runtime, dobras de literais e CTFE compartilham o resultado.</p>
-<pre><code class="language-delegua">var ch: texto = '5'
-se ch &gt;= '0' e ch &lt;= '9' { escreva('dígito ASCII') }
-escreva('ação' &gt; 'a')
+<p>Contas matemáticas, comparações, lógica e operadores bit a bit funcionam do jeito que você espera — e sempre avaliam da esquerda para a direita, sem surpresas quando você ativa otimizações.</p>
+<h2 id="comparando-textos"><a class="header" href="#comparando-textos">Comparando textos</a></h2>
+<p>Os operadores &lt;, &lt;=, &gt; e &gt;= funcionam também com textos, comparando pela ordem dos pontos de código Unicode em UTF-8. Textos menores que são prefixo vêm primeiro ("a" &lt; "ab"). Misturar texto com número em comparações não faz conversão mágica escondida.</p>
+<pre><code class="language-delegua">var letra: texto = '5'
+se letra &gt;= '0' e letra &lt;= '9' {
+    escreva('É um dígito')
+}
 </code></pre>
-<h2 id="efeitos-e-precedência"><a class="header" href="#efeitos-e-precedência">Efeitos e precedência</a></h2>
-<p>Operandos, receptor e argumentos mantêm a ordem da fonte. e/ou/?: avaliam apenas o lado necessário. Atribuições compostas e incrementos avaliam o destino uma vez. Comparações misturando texto e número não fazem conversão textual silenciosa. Use parênteses quando a intenção de precedência não ficar clara.</p>
+<h2 id="curto-circuito-e-efeitos-previsíveis"><a class="header" href="#curto-circuito-e-efeitos-previsíveis">Curto-circuito e efeitos previsíveis</a></h2>
+<p>e, ou e ?: só avaliam o lado direito quando realmente precisam, e retornam o próprio valor escolhido. Atribuições compostas (+=, -=, *=, /=, %=) e incrementos (++ / --) avaliam o destino uma única vez.</p>
 <h2 id="experimente-02_operadores"><a class="header" href="#experimente-02_operadores">Experimente: 02_operadores</a></h2>
 <pre><code class="language-delegua">// Potência, divisão inteira, bits, comparação e curto-circuito.
 escreva(2 ** 5, 100 \ 3, 5 &amp; 3, 1 &lt;&lt; 0)
 escreva(3 != 4, falso e (1 / 0), nulo ?: 10)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/02_operadores.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/02_operadores.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-35_bits_e_atribuicoes"><a class="header" href="#experimente-35_bits_e_atribuicoes">Experimente: 35_bits_e_atribuicoes</a></h2>
 <pre><code class="language-delegua">var n: numero = 8
 escreva(n | 1, n &gt;&gt; 3)
@@ -206,8 +207,10 @@ a /= 4
 a %= 3
 escreva(++a + 1)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/35_bits_e_atribuicoes.delegua">Ver exemplo completo e teste</a></p>
-<p>e/ou retornam o valor selecionado. 0, texto vazio e coleções vazias são verdadeiros; falso e nulo são falsos. ?: troca somente nulo. Overflow e divisão por zero lançam exceção.</p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/35_bits_e_atribuicoes.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>No CGD, apenas falso e nulo contam como falsos em condições; 0, "" e [] contam como verdadeiros. O operador ?: substitui apenas nulo. Divisão por zero e overflow lançam exceção (e quando são constantes, o compilador já avisa antes de rodar).</p>
+</blockquote>
 
                     </main>
 

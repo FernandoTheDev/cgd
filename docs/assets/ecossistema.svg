@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 260" width="1120" height="260" role="img" aria-label="Ecossistema local do CGD: CLI, ~/.delegua/cgd, Extensão VS Code e Runtime">
+  <rect width="1120" height="260" rx="16" fill="#07070e" stroke="#231f3a" stroke-width="1.5"/>
+  <text x="32" y="40" fill="#a78bfa" font-family="JetBrains Mono, monospace" font-size="13" font-weight="700" letter-spacing="1.2">// TUDO O QUE VEM JUNTO QUANDO VOCÊ INSTALA O CGD</text>
+
+  <rect x="28" y="64" width="250" height="168" rx="12" fill="#0d0d18" stroke="#5500fe" stroke-width="1.4"/>
+  <text x="46" y="96" fill="#c4b5fd" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700">01 · ~/.local/bin/cgd</text>
+  <text x="46" y="124" fill="#f3f4f8" font-family="Inter, sans-serif" font-size="16" font-weight="700">CLI e Formatador</text>
+  <text x="46" y="148" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12.5">Compila, otimiza (-o),</text>
+  <text x="46" y="167" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12.5">verifica (--verificar), formata</text>
+  <text x="46" y="186" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12.5">e explica erros (--explicar).</text>
+
+  <rect x="298" y="64" width="250" height="168" rx="12" fill="#0d0d18" stroke="#4da8da" stroke-width="1.4"/>
+  <text x="316" y="96" fill="#7dd3fc" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700">02 · ~/.delegua/cgd/</text>
+  <text x="316" y="124" fill="#f3f4f8" font-family="Inter, sans-serif" font-size="16" font-weight="700">Bibliotecas cgd:*</text>
+  <text x="316" y="148" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12.5">24 módulos padrão prontos.</text>
+  <text x="316" y="167" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12.5">Coloque seu .delegua lá e</text>
+  <text x="316" y="186" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12.5">importe com cgd:nome.</text>
+
+  <rect x="568" y="64" width="250" height="168" rx="12" fill="#0d0d18" stroke="#7c4dff" stroke-width="1.4"/>
+  <text x="586" y="96" fill="#c4b5fd" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700">03 · VS Code + LSP</text>
+  <text x="586" y="124" fill="#f3f4f8" font-family="Inter, sans-serif" font-size="16" font-weight="700">Editor Inteligente</text>
+  <text x="586" y="148" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12.5">Autocomplete em importar(),</text>
+  <text x="586" y="167" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12.5">dicas de tipo virtuais, hover</text>
+  <text x="586" y="186" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12.5">CTFE e diagnóstico ao vivo.</text>
+
+  <rect x="838" y="64" width="254" height="168" rx="12" fill="#0d0d18" stroke="#4da8da" stroke-width="1.4"/>
+  <text x="856" y="96" fill="#7dd3fc" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700">04 · delegua-runtime</text>
+  <text x="856" y="124" fill="#f3f4f8" font-family="Inter, sans-serif" font-size="16" font-weight="700">Motor C99 Seguro</text>
+  <text x="856" y="148" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12.5">Coleta Boehm GC, epoll</text>
+  <text x="856" y="167" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12.5">para async, pool de threads</text>
+  <text x="856" y="186" fill="#a1a5bc" font-family="Inter, sans-serif" font-size="12.5">e diagnóstico visual R0001.</text>
+</svg>

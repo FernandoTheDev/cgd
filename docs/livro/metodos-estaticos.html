@@ -1,9 +1,9 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Métodos estáticos e ferramentas do editor - O livro do CGD</title>
+        <title>Membros estáticos (campos e métodos) - O livro do CGD</title>
 
 
         <!-- Custom HTML head -->
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -179,17 +179,20 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="métodos-estáticos-e-ferramentas-do-editor"><a class="header" href="#métodos-estáticos-e-ferramentas-do-editor">Métodos estáticos e ferramentas do editor</a></h1>
-<p>Um método estático pertence à classe e não recebe isto. Veja como declará-lo e como o editor ajuda a encontrar os membros disponíveis em cada receptor.</p>
-<h2 id="receptor-e-visibilidade"><a class="header" href="#receptor-e-visibilidade">Receptor e visibilidade</a></h2>
-<p>estatico/estático declara método sem isto. Ele pode ser herdado e acessado pela classe ou por instância. Campos estáticos não são suportados. Membros públicos/protegidos/privados conservam visibilidade no frontend e no runtime; um privado derivado oculta o homônimo herdado, sem vazar a sugestão pública antiga.</p>
+                        <h1 id="membros-estáticos-campos-e-métodos"><a class="header" href="#membros-estáticos-campos-e-métodos">Membros estáticos (campos e métodos)</a></h1>
+<p>Membros marcados com estatico pertencem à classe inteira, não a um objeto específico. São ótimos para contadores compartilhados, constantes e fábricas de objetos.</p>
+<h2 id="declarando-campos-e-métodos-estáticos"><a class="header" href="#declarando-campos-e-métodos-estáticos">Declarando campos e métodos estáticos</a></h2>
+<p>Use estatico (ou estático) tanto em campos quanto em métodos. Eles respeitam publico, protegido e privado e podem ser herdados normalmente.</p>
 <pre><code class="language-delegua">classe Fabrica {
-    estatico resposta(): inteiro { retorna 42 }
+    estatico criados: inteiro = 0
+
+    estatico proximoId(): inteiro {
+        Fabrica.criados++
+        retorna Fabrica.criados
+    }
 }
-escreva(Fabrica.resposta())
+escreva(Fabrica.proximoId())
 </code></pre>
-<h2 id="editor-como-consumidor-do-frontend"><a class="header" href="#editor-como-consumidor-do-frontend">Editor como consumidor do frontend</a></h2>
-<p>O LSP usa a mesma sequência de análise da CLI, mantém documentos em memória e respeita revisões. Navegação, completion, tipos, formatação e diagnósticos não fazem build por edição. Receptores desconhecidos não recebem sugestões de outros escopos. Resultado CTFE é uma informação limitada de hover, não execução ou depuração do programa.</p>
 <h2 id="experimente-estaticos"><a class="header" href="#experimente-estaticos">Experimente: estaticos</a></h2>
 <pre><code class="language-delegua">classe Calculadora {
     estatico dobro(valor: inteiro): inteiro {
@@ -205,8 +208,48 @@ escreva(Avancada.dobro(4))
 var calculadora: Calculadora = Calculadora()
 escreva(calculadora.dobro(5))
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/estaticos.delegua">Ver exemplo completo e teste</a></p>
-<p>Campos estáticos e depurador/DAP não estão implementados. O editor analisa sem compilar/linkar por edição. Literais longos não são divididos pelo formatador. A prévia usa cópias e orçamento por revisão; falhas deixam o valor para execução.</p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/estaticos.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<h2 id="experimente-43_estaticos_mescla"><a class="header" href="#experimente-43_estaticos_mescla">Experimente: 43_estaticos_mescla</a></h2>
+<pre><code class="language-delegua">funcao de decorador triplicar(original: funcao): funcao {
+    retorna funcao(alvo: qualquer, x: inteiro): inteiro {
+        retorna x * 3
+    }
+}
+
+classe Etiquetavel {
+    prefixo: texto = "Etiqueta:"
+
+    rotulo(nome: texto): texto {
+        retorna isto.prefixo + nome
+    }
+}
+
+classe Registro mescla Etiquetavel {
+    estatico criados: inteiro = 0
+    nome: texto
+
+    construtor(nome: texto) {
+        isto.nome = nome
+        Registro.criados = Registro.criados + 1
+    }
+
+    @triplicar
+    escalar(x: inteiro): inteiro {
+        retorna x
+    }
+}
+
+const a: Registro = Registro("Ana")
+const b: Registro = Registro("Bia")
+escreva(Registro.criados)
+escreva(a.rotulo(a.nome))
+escreva(b.eInstanciaDe(Etiquetavel))
+escreva(a.escalar(10))
+</code></pre>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/43_estaticos_mescla.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>Métodos estáticos não recebem isto. Campos estáticos suportam anotações de tipo, defaults, visibilidade e validação de escrita — e são bloqueados dentro de rotinas paralelas (E3402) para manter o isolamento entre threads.</p>
+</blockquote>
 
                     </main>
 

@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -180,11 +180,9 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="exclusões-de-segurança"><a class="header" href="#exclusões-de-segurança">Exclusões de segurança</a></h1>
-<p>Alguns recursos ficam de fora para manter os limites desta implementação claros. Aqui estão os casos recusados e exemplos que mostram como o compilador responde.</p>
-<h2 id="capturas-e-execução-dinâmica"><a class="header" href="#capturas-e-execução-dinâmica">Capturas e execução dinâmica</a></h2>
-<p>Capturas/upvalues, eval, NPM, importação dinâmica e ponteiros crus não fazem parte do perfil. Uma função anônima sem captura é válida; uma função que usa estado da função externa recebe aviso e erro. Não substitua isso por uma closure silenciosamente incompleta.</p>
-<h2 id="ffi-é-uma-fronteira-explícita"><a class="header" href="#ffi-é-uma-fronteira-explícita">FFI é uma fronteira explícita</a></h2>
-<p>A exclusão anterior de FFI foi revogada pelo usuário para assinaturas declaradas. ABI C e ABI gerenciada têm contratos próprios. Isso permite bibliotecas nativas confiáveis e não concede isolamento ao código C. Compatibilidade JavaScript, dialetos e herança de interfaces têm exclusão definitiva no capítulo de decisões.</p>
+<p>Para manter o compilador previsível e livre de comportamento mágico difícil de depurar, alguns recursos ficam bloqueados de propósito. Veja os exemplos de como o CGD responde a cada caso.</p>
+<h2 id="o-que-é-recusado-por-segurança"><a class="header" href="#o-que-é-recusado-por-segurança">O que é recusado por segurança</a></h2>
+<p>Capturas de ambiente (upvalues), eval, pacotes NPM, importação com caminho calculado em runtime e travessia de diretórios em cgd: (cgd:../...) são bloqueados. FFI C via @definicao é permitida somente com declaração explícita — nunca por conversão implícita de ponteiros crus.</p>
 <h2 id="experimente-01_captura_local"><a class="header" href="#experimente-01_captura_local">Experimente: 01_captura_local</a></h2>
 <pre><code class="language-delegua">funcao criar(x) {
     retorna funcao() {
@@ -194,26 +192,33 @@
     // Captura implícita proibida.
 }
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/seguranca/01_captura_local.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/seguranca/01_captura_local.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-02_captura_global"><a class="header" href="#experimente-02_captura_global">Experimente: 02_captura_global</a></h2>
 <pre><code class="language-delegua">var externo: inteiro = 1
 funcao obter() {
     retorna externo
 }
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/seguranca/02_captura_global.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/seguranca/02_captura_global.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-03_ffi"><a class="header" href="#experimente-03_ffi">Experimente: 03_ffi</a></h2>
 <pre><code class="language-delegua">// Uma classe estrangeira sem assinatura/biblioteca explícita é inválida.
 classe estrangeira Biblioteca {
 }
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/seguranca/03_ffi.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/seguranca/03_ffi.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-04_importacao_dinamica"><a class="header" href="#experimente-04_importacao_dinamica">Experimente: 04_importacao_dinamica</a></h2>
 <pre><code class="language-delegua">var caminho: texto = "modulo.delegua"
 var modulo: qualquer = importar(caminho)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/seguranca/04_importacao_dinamica.delegua">Ver exemplo completo e teste</a></p>
-<p>Uma função que retorna outra função sem captura é válida. Receptor explícito de método ligado é suportado. Ausência de implementação não é motivo para chamar um recurso de inseguro.</p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/seguranca/04_importacao_dinamica.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<h2 id="experimente-07_tupla_imutavel"><a class="header" href="#experimente-07_tupla_imutavel">Experimente: 07_tupla_imutavel</a></h2>
+<pre><code class="language-delegua">var t: tupla = tupla([1, 2])
+t[0] = 3
+</code></pre>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/seguranca/07_tupla_imutavel.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>Funções anônimas e arrows sem captura funcionam perfeitamente; o bloqueio é apenas contra captura implícita de variáveis de fora.</p>
+</blockquote>
 
                     </main>
 

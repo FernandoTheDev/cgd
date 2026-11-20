@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -180,32 +180,30 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="texto-unicode-e-interpolação"><a class="header" href="#texto-unicode-e-interpolação">Texto, Unicode e interpolação</a></h1>
-<p>Acentos e outros caracteres fazem parte do texto. O CGD usa UTF-8 e conta posições por pontos de código; vamos ver o que isso significa ao medir, percorrer e recortar uma string.</p>
-<h2 id="unicode-e-índices"><a class="header" href="#unicode-e-índices">Unicode e índices</a></h2>
-<p>Textos preservam UTF-8 e indexam pontos de código, não bytes nem grafemas. A letra com acento combinante pode ocupar mais de um índice. tamanho conta pontos de código; I/O mede limites em bytes. Não há normalização Unicode automática: preservar os dados evita modificar identificadores, mensagens e conteúdo externo.</p>
-<h2 id="interpolação-e-escapes"><a class="header" href="#interpolação-e-escapes">Interpolação e escapes</a></h2>
-<p>${expressao} insere o valor textual da expressão e preserva a ordem de avaliação. Aspas simples e duplas delimitam texto. Escapes incluem quebra de linha, tabulação, barra e zero interno. O formatador conserva o literal exatamente.</p>
-<pre><code class="language-delegua">var nome: texto = "Ana"
-escreva("Olá, ${nome}\n")
-escreva("ação"[1])
+<p>Acentos, emojis e caracteres especiais funcionam nativamente em UTF-8. Os índices e .tamanho() contam caracteres (pontos de código Unicode), não bytes soltos.</p>
+<h2 id="interpolação-com-" class=".."><a class="header" href="#interpolação-com-">Interpolação com $</a></h2>
+<p>Qualquer expressão dentro de ${...} em uma string é avaliada na ordem em que aparece e convertida para texto — inclusive expressões com aspas internas, como "valor=${mapa["chave"]}".</p>
+<pre><code class="language-delegua">var cidade: texto = "São Paulo"
+escreva("Bem-vindo a ${cidade}!")
+escreva("ação"[1]) // ç
 </code></pre>
-<h2 id="métodos-de-texto"><a class="header" href="#métodos-de-texto">Métodos de texto</a></h2>
-<p>tamanho, inclui/contem/contém, fatiar/subtexto, aparar/apararInicio/apararFim, maiusculo/minusculo, tudoMaiusculo/tudoMinusculo, encontrar, dividir, substituir e concatenar compõem a API textual. Operações de caixa usam Unicode. Encontrar retorna posição por pontos de código. As comparações são lexicográficas; para ordens por idioma use uma biblioteca explicitamente adequada.</p>
 <h2 id="experimente-13_texto_unicode"><a class="header" href="#experimente-13_texto_unicode">Experimente: 13_texto_unicode</a></h2>
 <pre><code class="language-delegua">escreva(tamanho("ação"), "ação"[1], "ação"[1:3])
 escreva("  Olá árvore  ".aparar().maiusculo())
 var n: numero = 2
 escreva("valor ${n + 1}")
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/13_texto_unicode.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/13_texto_unicode.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-28_metodos_texto"><a class="header" href="#experimente-28_metodos_texto">Experimente: 28_metodos_texto</a></h2>
 <pre><code class="language-delegua">// Busca, divisão, substituição e testes de caixa.
 escreva("  a".apararInicio(), "á  ".apararFim())
 escreva("a,b".dividir(","), "ação".substituir("ç", "s"))
 escreva("ABC".tudoMaiusculo(), "abc".tudoMinusculo())
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/28_metodos_texto.delegua">Ver exemplo completo e teste</a></p>
-<p>Métodos: tamanho, inclui/contem/contém, fatiar/subtexto, aparar, apararInicio, apararFim, maiusculo/tudoMaiusculo, minusculo/tudoMinusculo, encontrar, dividir, substituir e concatenar. Pontos de código não equivalem a grafemas visuais.</p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/28_metodos_texto.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>Textos são imutáveis — tentar fazer s[0] = "a" gera erro estático E3110. Métodos disponíveis: tamanho, inclui/contem/contém, fatiar/subtexto, aparar, apararInicio, apararFim, maiusculo, minusculo, tudoMaiusculo, tudoMinusculo, encontrar, dividir, substituir e concatenar.</p>
+</blockquote>
 
                     </main>
 

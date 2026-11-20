@@ -20,21 +20,29 @@ if source.exists():
     shutil.rmtree(source)
 source.mkdir(parents=True, exist_ok=True)
 sections = json.loads((ROOT / "docs/linguagem.json").read_text())
-summary = ["# Sumário", "", "- [Antes de começar](index.md)"]
-(source / "index.md").write_text("""# Vamos escrever Delégua
+summary = ["# Sumário", "", "- [Bem-vindo ao CGD](index.md)"]
+(source / "index.md").write_text("""# Bem-vindo ao Livro do CGD
 
-Este livro acompanha você do primeiro programa às bibliotecas e às ferramentas do
-compilador. Comece pela instalação, rode os exemplos e avance no seu ritmo.
+Este livro foi escrito para quem quer aprender a programar com o **CGD (Compilador Geral Delégua)** sem enrolação — desde instalar as ferramentas até criar servidores HTTP, usar SQLite e rodar tarefas em paralelo com `rotina`.
 
-O CGD compila Delégua para C99 e usa um runtime com memória gerenciada. Hoje,
-Linux x86_64 é a plataforma validada. A linguagem vem do projeto
-[Delégua, da Design Líquido](https://github.com/DesignLiquido/delegua); aqui você
-vai encontrar a sintaxe que este compilador aceita, com suas escolhas e limites.
+## Antes de tudo: qual é a relação com a Delégua original?
 
-Se já conhece a linguagem, use a busca ou o sumário para ir direto ao assunto.
-Para construir o compilador, consulte o [guia de desenvolvimento](desenvolvimento.md).
+A linguagem **Delégua** foi criada pela [Design Líquido](https://github.com/DesignLiquido/delegua) (com sua [wiki oficial](https://github.com/DesignLiquido/delegua/wiki)) e roda originalmente sobre um interpretador em TypeScript/Node.js.
 
-[Voltar ao site do projeto](../index.html)
+O **CGD** pega essa mesma base em português e compila seu código para **C99 e executável nativo** em Linux x86_64, usando um runtime próprio em C com coletor Boehm GC. Por causa disso, várias coisas mudam de comportamento e muitas funcionalidades — como `assincrona`/`aguardar`, `rotina`/`Tarefa<T>`, `Canal`, as 24 bibliotecas `cgd:*` instaladas em `~/.delegua/cgd`, o servidor LSP e o formatador — foram construídas do zero no CGD.
+
+> Se você já conhece Delégua pelo interpretador, vale ler logo o capítulo [Delégua original vs. CGD](delegua-vs-cgd.md) para não se surpreender com as diferenças.
+
+## Por onde começar?
+
+- **Primeira vez aqui?** Vá direto para [Comece aqui: instalar, escrever e executar](inicio.md).
+- **Quer configurar o VS Code?** Veja [Editor VS Code: cores, autocomplete e formatador](editor.md).
+- **Quer explorar bibliotecas prontas?** Confira [Bibliotecas `cgd:*`](bibliotecas-cgd.md).
+- **Quer contribuir com o compilador?** Leia o [Guia de desenvolvimento](desenvolvimento.md).
+
+Use a busca no topo (tecla `S`) ou o menu lateral para pular direto para qualquer assunto.
+
+[← Voltar para a página principal do CGD](../index.html) · [Abrir referência em página única](../linguagem.html)
 """)
 for section in sections:
     identifier = section["id"]
@@ -71,7 +79,7 @@ for section in sections:
             code,
             "```",
             "",
-            f"[Ver exemplo completo e teste](https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/{relative})",
+            f"[Ver exemplo completo e contrato de teste no GitHub](https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/{relative})",
             "",
         ]
     if identifier == "diagnosticos":
@@ -98,8 +106,10 @@ for section in sections:
             )
         parts.append("")
     if section.get("notes"):
-        parts += [section["notes"], ""]
+        parts += ["> " + section["notes"], ""]
     (source / f"{identifier}.md").write_text("\n".join(parts))
+
+summary += ["", "# Guias técnicos aprofundados", ""]
 for name in (
     "desenvolvimento",
     "arquitetura",

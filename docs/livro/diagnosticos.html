@@ -1,9 +1,9 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Diagnósticos e ferramentas - O livro do CGD</title>
+        <title>Diagnósticos, códigos de erro e CLI - O livro do CGD</title>
 
 
         <!-- Custom HTML head -->
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -179,36 +179,35 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="diagnósticos-e-ferramentas"><a class="header" href="#diagnósticos-e-ferramentas">Diagnósticos e ferramentas</a></h1>
-<p>Encontrou um erro? Comece pela mensagem, pelo código e pelo trecho marcado. Você também pode pedir uma explicação ou verificar o arquivo sem gerar um executável.</p>
-<h2 id="encontrar-a-causa"><a class="header" href="#encontrar-a-causa">Encontrar a causa</a></h2>
-<p>Diagnósticos incluem severidade, código, arquivo e intervalo. --diagnosticos=json serve ferramentas; --explicar CODIGO explica o catálogo. Falhas comprovadas em região protegida por pegue recebem avisos W31xx para preservar o tratamento deliberado. Dados externos continuam validados no runtime. R0001 é a categoria dinâmica genérica, não uma pilha completa de chamadas.</p>
-<pre><code class="language-sh">./cgd programa.delegua --verificar --diagnosticos=json
-./cgd --explicar E3101
+                        <h1 id="diagnósticos-códigos-de-erro-e-cli"><a class="header" href="#diagnósticos-códigos-de-erro-e-cli">Diagnósticos, códigos de erro e CLI</a></h1>
+<p>Quando algo dá errado, o CGD mostra exatamente onde está o problema, dá um código estável (como E3109) e muitas vezes já sugere o nome certo. Você ainda pode pedir explicação detalhada direto no terminal.</p>
+<h2 id="consultando-um-código-de-erro"><a class="header" href="#consultando-um-código-de-erro">Consultando um código de erro</a></h2>
+<p>Viu um erro como E3109 ou E3403 e não entendeu de primeira? Rode cgd --explicar CODIGO no terminal para ler o motivo e como corrigir. Para scripts e editores, --diagnosticos=json devolve tudo estruturado em JSON Lines.</p>
+<pre><code class="language-sh">cgd programa.delegua --verificar
+cgd --explicar E3109
+cgd programa.delegua --verificar --diagnosticos=json
 </code></pre>
-<h2 id="recuperação-e-limites"><a class="header" href="#recuperação-e-limites">Recuperação e limites</a></h2>
-<p>O parser tenta reportar erros independentes e o LSP tolera edições incompletas. Fontes, nós, profundidade e módulos têm orçamentos defensivos. Erros de tipos/escopo não são adiados até C para parecer que a análise passou. Avisos não equivalem a uma prova global de segurança.</p>
 <h2 id="experimente-05_diagnosticos"><a class="header" href="#experimente-05_diagnosticos">Experimente: 05_diagnosticos</a></h2>
 <pre><code class="language-delegua">// Dois erros independentes: o parser recupera e reporta os dois.
 var primeiro: qualquer =;
 var segundo: qualquer =;
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/05_diagnosticos.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/05_diagnosticos.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-06_sugestao"><a class="header" href="#experimente-06_sugestao">Experimente: 06_sugestao</a></h2>
 <pre><code class="language-delegua">var mensagem: texto = "Olá"
 escreva(mensage)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/06_sugestao.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/06_sugestao.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-12_divisao_estatica"><a class="header" href="#experimente-12_divisao_estatica">Experimente: 12_divisao_estatica</a></h2>
 <pre><code class="language-delegua">const zero: inteiro = 3 - 3
 escreva(10 / zero)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/12_divisao_estatica.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/12_divisao_estatica.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-13_indice_unicode"><a class="header" href="#experimente-13_indice_unicode">Experimente: 13_indice_unicode</a></h2>
 <pre><code class="language-delegua">// 'ação' tem quatro pontos de código; o maior índice positivo é 3.
 escreva("ação"[4])
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/13_indice_unicode.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/13_indice_unicode.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-14_falha_tratada"><a class="header" href="#experimente-14_falha_tratada">Experimente: 14_falha_tratada</a></h2>
 <pre><code class="language-delegua">// Uma operação deliberadamente inválida dentro de pegue recebe aviso W3101.
 // A exceção continua tratável, e a localização não exige chamada por linha.
@@ -218,7 +217,7 @@ tente {
     escreva("tratado")
 }
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/14_falha_tratada.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/14_falha_tratada.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="códigos-de-diagnóstico"><a class="header" href="#códigos-de-diagnóstico">Códigos de diagnóstico</a></h2>
 <div class="table-wrapper"><table><thead><tr><th>Código</th><th>Mensagem</th><th>O que fazer</th></tr></thead><tbody>
 <tr><td>R0001</td><td>%s</td><td>Falha dinâmica do runtime; consulte a operação e a localização informadas. Tipos dinâmicos, aliases e entrada externa continuam validados em execução.</td></tr>
@@ -279,7 +278,9 @@ tente {
 <tr><td>E3404</td><td>Função assíncrona não pode ser iniciada diretamente com rotina; use chamada normal e aguardar.</td><td>Corrotinas assíncronas executam no loop cooperativo da thread principal, não no pool paralelo.</td></tr>
 </tbody></table>
 </div>
-<p>O parser recupera erros independentes. A verificação estática antecipa divisão por zero, overflow, índices e contratos literais. Em regiões com pegue, falhas conhecidas geram avisos W31xx e continuam tratáveis. Dados dinâmicos, aliases e retornos de funções ainda exigem validação em execução. Diagnósticos legados usam E0001/W0001/H0001; LSP e fix-its não existem.</p>
+<blockquote>
+<p>Os códigos E3101–E3112 cobrem segurança estática (e W3101–W3112 quando estão dentro de tente/pegue). O LSP no VS Code usa exatamente os mesmos diagnósticos e oferece correção rápida (quick-fix) para sugestões H3001.</p>
+</blockquote>
 
                     </main>
 

@@ -1,9 +1,9 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Antes de começar - O livro do CGD</title>
+        <title>Bem-vindo ao CGD - O livro do CGD</title>
 
 
         <!-- Custom HTML head -->
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -179,16 +179,23 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="vamos-escrever-delégua"><a class="header" href="#vamos-escrever-delégua">Vamos escrever Delégua</a></h1>
-<p>Este livro acompanha você do primeiro programa às bibliotecas e às ferramentas do
-compilador. Comece pela instalação, rode os exemplos e avance no seu ritmo.</p>
-<p>O CGD compila Delégua para C99 e usa um runtime com memória gerenciada. Hoje,
-Linux x86_64 é a plataforma validada. A linguagem vem do projeto
-<a href="https://github.com/DesignLiquido/delegua">Delégua, da Design Líquido</a>; aqui você
-vai encontrar a sintaxe que este compilador aceita, com suas escolhas e limites.</p>
-<p>Se já conhece a linguagem, use a busca ou o sumário para ir direto ao assunto.
-Para construir o compilador, consulte o <a href="desenvolvimento.html">guia de desenvolvimento</a>.</p>
-<p><a href="../index.html">Voltar ao site do projeto</a></p>
+                        <h1 id="bem-vindo-ao-livro-do-cgd"><a class="header" href="#bem-vindo-ao-livro-do-cgd">Bem-vindo ao Livro do CGD</a></h1>
+<p>Este livro foi escrito para quem quer aprender a programar com o <strong>CGD (Compilador Geral Delégua)</strong> sem enrolação — desde instalar as ferramentas até criar servidores HTTP, usar SQLite e rodar tarefas em paralelo com <code>rotina</code>.</p>
+<h2 id="antes-de-tudo-qual-é-a-relação-com-a-delégua-original"><a class="header" href="#antes-de-tudo-qual-é-a-relação-com-a-delégua-original">Antes de tudo: qual é a relação com a Delégua original?</a></h2>
+<p>A linguagem <strong>Delégua</strong> foi criada pela <a href="https://github.com/DesignLiquido/delegua">Design Líquido</a> (com sua <a href="https://github.com/DesignLiquido/delegua/wiki">wiki oficial</a>) e roda originalmente sobre um interpretador em TypeScript/Node.js.</p>
+<p>O <strong>CGD</strong> pega essa mesma base em português e compila seu código para <strong>C99 e executável nativo</strong> em Linux x86_64, usando um runtime próprio em C com coletor Boehm GC. Por causa disso, várias coisas mudam de comportamento e muitas funcionalidades — como <code>assincrona</code>/<code>aguardar</code>, <code>rotina</code>/<code>Tarefa&lt;T&gt;</code>, <code>Canal</code>, as 24 bibliotecas <code>cgd:*</code> instaladas em <code>~/.delegua/cgd</code>, o servidor LSP e o formatador — foram construídas do zero no CGD.</p>
+<blockquote>
+<p>Se você já conhece Delégua pelo interpretador, vale ler logo o capítulo <a href="delegua-vs-cgd.html">Delégua original vs. CGD</a> para não se surpreender com as diferenças.</p>
+</blockquote>
+<h2 id="por-onde-começar"><a class="header" href="#por-onde-começar">Por onde começar?</a></h2>
+<ul>
+<li><strong>Primeira vez aqui?</strong> Vá direto para <a href="inicio.html">Comece aqui: instalar, escrever e executar</a>.</li>
+<li><strong>Quer configurar o VS Code?</strong> Veja <a href="editor.html">Editor VS Code: cores, autocomplete e formatador</a>.</li>
+<li><strong>Quer explorar bibliotecas prontas?</strong> Confira <a href="bibliotecas-cgd.html">Bibliotecas <code>cgd:*</code></a>.</li>
+<li><strong>Quer contribuir com o compilador?</strong> Leia o <a href="desenvolvimento.html">Guia de desenvolvimento</a>.</li>
+</ul>
+<p>Use a busca no topo (tecla <code>S</code>) ou o menu lateral para pular direto para qualquer assunto.</p>
+<p><a href="../index.html">← Voltar para a página principal do CGD</a> · <a href="../linguagem.html">Abrir referência em página única</a></p>
 
                     </main>
 

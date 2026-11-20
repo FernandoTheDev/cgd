@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -180,29 +180,35 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="comece-aqui-instalar-escrever-e-executar"><a class="header" href="#comece-aqui-instalar-escrever-e-executar">Comece aqui: instalar, escrever e executar</a></h1>
-<p>Vamos sair do arquivo vazio e chegar a um programa rodando. Você vai instalar as ferramentas, escrever as primeiras linhas e conhecer os comandos que usará no dia a dia.</p>
-<h2 id="ambiente-e-construção"><a class="header" href="#ambiente-e-construção">Ambiente e construção</a></h2>
-<p>O alvo validado é Linux x86_64. Instale DMD ou LDC2, DUB, Clang ou GCC, pkg-config, Python 3, headers do Boehm GC e libcurl &gt;= 7.86. O runtime é um submódulo Git e deve acompanhar a revisão do compilador.</p>
-<pre><code class="language-sh">git submodule update --init --recursive
+<p>Se esta é a sua primeira vez com o CGD, comece por aqui. Em poucos minutos você vai instalar as ferramentas, escrever seu primeiro programa em português e rodar o executável nativo no terminal.</p>
+<h2 id="o-que-você-precisa-instalar-antes"><a class="header" href="#o-que-você-precisa-instalar-antes">O que você precisa instalar antes</a></h2>
+<p>Hoje o CGD é validado em Linux x86_64. Você precisa de Git, DUB, um compilador D (LDC2 ou DMD), um compilador C99 (Clang ou GCC), pkg-config, Python 3, headers do Boehm GC e libcurl (&gt;= 7.86).</p>
+<p>O runtime em C fica no submódulo vendor/delegua-runtime. Depois de compilar, o script ./instalar coloca o binário em ~/.local/bin/cgd, o runtime em ~/.local/share/cgd e as 24 bibliotecas padrão em ~/.delegua/cgd.</p>
+<pre><code class="language-sh">git clone --branch dev --recurse-submodules https://github.com/FernandoTheDev/cgd.git
+cd cgd
 ./build-runtime
 dub build --compiler=ldc2 --build=release
-./instalar
+./instalar --no-build
 </code></pre>
 <h2 id="seu-primeiro-programa"><a class="header" href="#seu-primeiro-programa">Seu primeiro programa</a></h2>
-<p>Salve como ola.delegua. A extensão do arquivo é parte do contrato da CLI. escreva termina com quebra de linha; vários argumentos são escritos em sequência, sem espaço implícito.</p>
-<pre><code class="language-delegua">var nome = "Ana"
+<p>Crie um arquivo chamado ola.delegua. A extensão .delegua é obrigatória. A função escreva imprime o texto e já pula linha no final — se você passar vários argumentos, eles saem colados na ordem em que foram escritos.</p>
+<pre><code class="language-delegua">var nome: texto = "Ana"
 escreva("Olá, ${nome}!")
 </code></pre>
-<h2 id="verificar-compilar-e-otimizar"><a class="header" href="#verificar-compilar-e-otimizar">Verificar, compilar e otimizar</a></h2>
-<p>--verificar executa o frontend sem chamar compilador C. -s escolhe o executável de saída. -o habilita otimização e CTFE; não escolhe o caminho de saída. --emitir-c preserva o C intermediário sem executar o linker.</p>
-<pre><code class="language-sh">./cgd ola.delegua --verificar
-./cgd ola.delegua -s out/ola
+<h2 id="compilar-verificar-otimizar-e-formatar"><a class="header" href="#compilar-verificar-otimizar-e-formatar">Compilar, verificar, otimizar e formatar</a></h2>
+<p>Use -s para escolher o nome do executável de saída e -o quando quiser ativar otimizações e avaliação em tempo de compilação (CTFE). Quer só checar se tem erro sem gerar binário? Use --verificar. Quer deixar o arquivo arrumado com 4 espaços? Use --formatar.</p>
+<pre><code class="language-sh">cgd ola.delegua --verificar
+cgd ola.delegua -s out/ola
 ./out/ola
-./cgd ola.delegua -o -s out/ola-otimizado
-./cgd ola.delegua --emitir-c -s out/ola
+cgd ola.delegua -o -s out/ola-otimizado
+cgd --formatar ola.delegua
+cgd ola.delegua --emitir-c -s out/ola
 </code></pre>
-<h2 id="por-que-um-perfil-próprio"><a class="header" href="#por-que-um-perfil-próprio">Por que um perfil próprio?</a></h2>
-<p>A geração C99 e o runtime gerenciado dão um executável independente do interpretador. Os contratos precisam preservar efeitos, erros, tipos e aliases nos dois modos. Não se aceita código apenas porque outro ambiente Delégua o executa; os limites estão explícitos aqui.</p>
+<h2 id="por-que-o-cgd-funciona-diferente-do-interpretador"><a class="header" href="#por-que-o-cgd-funciona-diferente-do-interpretador">Por que o CGD funciona diferente do interpretador?</a></h2>
+<p>Porque aqui seu código vira C99 e depois um programa nativo independente — sem Node.js e sem interpretador rodando por baixo. No próximo capítulo a gente explica em detalhes o que veio da Delégua original e o que o CGD construiu do zero.</p>
+<blockquote>
+<p>Se ~/.local/bin ainda não estiver no seu PATH, adicione export PATH="$HOME/.local/bin:$PATH" no seu ~/.bashrc ou ~/.zshrc.</p>
+</blockquote>
 
                     </main>
 
@@ -212,7 +218,7 @@ escreva("Olá, ${nome}!")
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="editor.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="delegua-vs-cgd.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -226,7 +232,7 @@ escreva("Olá, ${nome}!")
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="editor.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="delegua-vs-cgd.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

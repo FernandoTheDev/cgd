@@ -1,9 +1,9 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Biblioteca nativa e entrada/saída - O livro do CGD</title>
+        <title>Funções nativas e entrada/saída - O livro do CGD</title>
 
 
         <!-- Custom HTML head -->
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -179,15 +179,19 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="biblioteca-nativa-e-entradasaída"><a class="header" href="#biblioteca-nativa-e-entradasaída">Biblioteca nativa e entrada/saída</a></h1>
-<p>Você não precisa começar tudo do zero. Estas funções já estão disponíveis para escrever na tela, ler uma entrada, converter valores e trabalhar com coleções.</p>
-<h2 id="entrada-e-saída-básicas"><a class="header" href="#entrada-e-saída-básicas">Entrada e saída básicas</a></h2>
-<p>escreva formata valores e termina a linha; leia lê uma linha da entrada padrão, com mensagem opcional. texto, inteiro, real e numero são conversões explícitas e podem falhar. Para arquivos e HTTP, use as classes de biblioteca documentadas, não uma função global inventada.</p>
-<pre><code class="language-delegua">var entrada: texto = leia("Idade: ")
-tente { escreva(inteiro(entrada)) } pegue { escreva("inteiro inválido") }
+                        <h1 id="funções-nativas-e-entradasaída"><a class="header" href="#funções-nativas-e-entradasaída">Funções nativas e entrada/saída</a></h1>
+<p>Mesmo sem importar nenhum módulo, você já tem funções básicas prontas para ler do teclado, escrever no terminal, converter tipos e transformar listas.</p>
+<h2 id="escreva-leia-e-conversões"><a class="header" href="#escreva-leia-e-conversões">escreva, leia e conversões</a></h2>
+<p>escreva imprime valores e pula linha; leia lê uma linha da entrada padrão (com pergunta opcional). Para converter entre tipos, use texto(x), inteiro(x), real(x) e numero(x) — se o texto não for um número válido, a conversão lança uma exceção tratável.</p>
+<pre><code class="language-delegua">var entrada: texto = leia("Digite um número: ")
+tente {
+    escreva(inteiro(entrada) * 2)
+} pegue {
+    escreva("Isso não é um inteiro válido")
+}
 </code></pre>
-<h2 id="operações-gerais"><a class="header" href="#operações-gerais">Operações gerais</a></h2>
-<p>tamanho consulta coleções/texto; clonar copia dados; mapear, filtrar, paraCada, todosEmCondicao e ordenar recebem callbacks sem captura. aleatorio produz real em [0, 1); aleatorioEntre usa limite superior exclusivo. decoradores devolve cópia dos metadados. tipo de é uma expressão para consultar a categoria do valor. Métodos nativos são sugeridos pelo tipo do receptor, nunca por uma lista global após ponto.</p>
+<h2 id="funções-globais-de-apoio"><a class="header" href="#funções-globais-de-apoio">Funções globais de apoio</a></h2>
+<p>Você também conta com tamanho, clonar, mapear, filtrar, paraCada, todosEmCondicao, ordenar, aleatorio, aleatorioEntre, decoradores, destruir e a expressão tipo de.</p>
 <h2 id="experimente-21_biblioteca"><a class="header" href="#experimente-21_biblioteca">Experimente: 21_biblioteca</a></h2>
 <pre><code class="language-delegua">escreva(inteiro("12"), real(".5"), 1234.5689.formatar())
 funcao par(x: qualquer): qualquer {
@@ -199,17 +203,17 @@ paraCada([1, 2], funcao(x: qualquer): qualquer {
     escreva(x * 2)
 })
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/21_biblioteca.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/21_biblioteca.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-27_entrada"><a class="header" href="#experimente-27_entrada">Experimente: 27_entrada</a></h2>
 <pre><code class="language-delegua">var nome: texto = leia("Nome: ")
 escreva("Olá, ${nome}")
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/27_entrada.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/27_entrada.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-29_metodos_numero"><a class="header" href="#experimente-29_metodos_numero">Experimente: 29_metodos_numero</a></h2>
 <pre><code class="language-delegua">escreva((-3).absoluto(), (2.3).arredondarParaCima(), 2.5.formatar(2))
 escreva(1234.5689.formatar({ minimoCasasDecimais: 2, maximoCasasDecimais: 3 }))
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/29_metodos_numero.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/29_metodos_numero.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-33_aleatoriedade"><a class="header" href="#experimente-33_aleatoriedade">Experimente: 33_aleatoriedade</a></h2>
 <pre><code class="language-delegua">// A saída é determinística: verificamos os intervalos, não um valor sorteado.
 para (var i: numero = 0; i &lt; 100; i++) {
@@ -221,8 +225,10 @@ para (var i: numero = 0; i &lt; 100; i++) {
 
 escreva("intervalos validados")
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/33_aleatoriedade.delegua">Ver exemplo completo e teste</a></p>
-<p>Números: absoluto, arredondarParaBaixo, arredondarParaCima e formatar. As bibliotecas de delegua-node não são automaticamente módulos do CGD. leia usa stdin; o catálogo inclui entrada de teste reproduzível.</p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/33_aleatoriedade.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>Números também oferecem os métodos .absoluto(), .arredondarParaBaixo(), .arredondarParaCima() e .formatar().</p>
+</blockquote>
 
                     </main>
 

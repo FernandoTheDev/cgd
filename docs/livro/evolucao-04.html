@@ -1,9 +1,9 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Contratos, arrows e FFI C - O livro do CGD</title>
+        <title>Interfaces, classes abstratas, enums e FFI C - O livro do CGD</title>
 
 
         <!-- Custom HTML head -->
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -179,35 +179,25 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="contratos-arrows-e-ffi-c"><a class="header" href="#contratos-arrows-e-ffi-c">Contratos, arrows e FFI C</a></h1>
-<p>Interfaces descrevem o que uma classe oferece; classes abstratas ajudam a compartilhar uma base. Completam este capítulo os enums, as arrows e a ligação explícita com funções C.</p>
-<h2 id="contratos-explícitos"><a class="header" href="#contratos-explícitos">Contratos explícitos</a></h2>
-<p>Interfaces descrevem campos e métodos públicos; classes usam implementa para satisfazer o contrato, inclusive com membros herdados. Implementações mantêm assinatura explícita. Classe abstrata não pode ser instanciada e pode declarar métodos abstratos. Não há herança entre interfaces: foi excluída por decisão de escopo, não adiada.</p>
-<pre><code class="language-delegua">interface Nomeavel { nome(): texto; }
+                        <h1 id="interfaces-classes-abstratas-enums-e-ffi-c"><a class="header" href="#interfaces-classes-abstratas-enums-e-ffi-c">Interfaces, classes abstratas, enums e FFI C</a></h1>
+<p>Quando o projeto cresce, interfaces ajudam a firmar contratos claros entre classes, enums organizam constantes numéricas e @definicao permite ligar funções C direto no executável.</p>
+<h2 id="interfaces-e-classes-abstratas"><a class="header" href="#interfaces-e-classes-abstratas">Interfaces e classes abstratas</a></h2>
+<p>Uma interface descreve os campos e métodos públicos que uma classe promete entregar usando implementa. Uma classe abstrata não pode ser instanciada diretamente e pode definir métodos abstrato para as filhas completarem.</p>
+<pre><code class="language-delegua">interface Nomeavel {
+    nome(): texto;
+}
 classe Pessoa implementa Nomeavel {
     nome(): texto { retorna "Ana" }
 }
-enum Estado { Inicial, Final = 7 }
 </code></pre>
-<h2 id="enums-e-arrows"><a class="header" href="#enums-e-arrows">Enums e arrows</a></h2>
-<p>Enum é um namespace congelado de inteiros com incremento implícito e diagnóstico de duplicatas/overflow. Seu nome como tipo é alias de inteiro; não há enum nominal ou união algébrica. Arrows reutilizam funções anônimas sem captura. São escolhas do perfil CGD, não uma declaração de equivalência com todos os ambientes Delégua.</p>
-<h2 id="ffi-e-fronteira-de-confiança"><a class="header" href="#ffi-e-fronteira-de-confiança">FFI e fronteira de confiança</a></h2>
-<p>@definicao declara biblioteca, prefixo e símbolo; a ABI C escalar usa numero/real como double, inteiro/longo como int64_t, logico como bool e texto como const char*. Não presuma int C de 32 bits quando o contrato diz inteiro de 64 bits. Textos com zero interno são recusados nessa ABI. A ABI gerenciada delegua passa delegua_value e valida contratos. Assinaturas erradas e código nativo podem corromper o processo: FFI não é sandbox. Callbacks/structs/variádicos arbitrários não são representados por conversões presumidas.</p>
-<h2 id="enums-em-escopos-locais-e-classes"><a class="header" href="#enums-em-escopos-locais-e-classes">Enums em escopos locais e classes</a></h2>
-<p>Enums são açúcar para constantes inteiras agrupadas num namespace imutável. Podem ser declarados em módulos, funções, métodos, blocos de controle, callbacks e corpos de classe/interface; não exigem um contexto global. O alias numérico tem escopo lexical e não vaza ao sair do bloco. Nomes locais podem reaparecer em blocos independentes.</p>
-<p>Dentro de classes, Classe.Enum e isto.Enum acessam o mesmo namespace, inclusive por herança, respeitando privado/protegido. O enum não ocupa um campo de cada instância nem habilita campos estáticos mutáveis. Dentro do corpo da classe o nome serve como alias inteiro; fora dele, anote valores como inteiro. Interfaces podem conter constantes sem exigir sua redeclaração na implementação.</p>
-<p>Acesso conhecido a um membro resolve para o inteiro, inclusive em funções sem captura e em CTFE. Capturar um namespace local inteiro como valor continua sujeito às regras de captura; CTFE representa os membros escalares, não mapas. Receptores com efeitos, como criar().Estado.Fim, continuam sendo avaliados uma vez. Os enums continuam numéricos, sem identidade nominal ou restrição aos membros declarados.</p>
-<pre><code class="language-delegua">funcao estado(): inteiro {
-    enum Estado { Inicio, Final=7 }
-    var atual: Estado = Estado.Final
-    retorna atual
-}
-classe Maquina {
-    enum Estado { Inicio, Final=4 }
-    atual: Estado = isto.Estado.Final
-}
-escreva(Maquina.Estado.Final)
+<h2 id="enums-numéricos-em-qualquer-escopo"><a class="header" href="#enums-numéricos-em-qualquer-escopo">Enums numéricos em qualquer escopo</a></h2>
+<p>Você pode declarar enum no módulo, dentro de funções, blocos ou classes. Os valores incrementam automaticamente a partir de 0 (ou do número que você definir), são imutáveis e funcionam inclusive dentro de funções //&gt;puro (CTFE).</p>
+<pre><code class="language-delegua">enum Estado { Inicio, Rodando, Final = 7 }
+var atual: Estado = Estado.Final
 </code></pre>
+<h2 id="ffi-c-com-definicao-e-classe-estrangeira"><a class="header" href="#ffi-c-com-definicao-e-classe-estrangeira">FFI C com @definicao e classe estrangeira</a></h2>
+<p>Precisa chamar uma função C de uma biblioteca do sistema (como libm)? Declare uma classe estrangeira com @definicao(biblioteca="m") e mapeie cada símbolo. Na ABI C escalar, numero/real viram double, inteiro/longo viram int64_t, logico vira bool e texto vira const char*.</p>
+<p>Lembre-se: FFI é uma fronteira de confiança — confira sempre se os tipos declarados batem exatamente com a função C real.</p>
 <h2 id="experimente-38_contratos"><a class="header" href="#experimente-38_contratos">Experimente: 38_contratos</a></h2>
 <pre><code class="language-delegua">interface Medida {
     valor(): inteiro;
@@ -233,13 +223,13 @@ escreva(objeto.valor())
 escreva(Estado.Final)
 escreva(duplicar(3))
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/38_contratos.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/38_contratos.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-matematica"><a class="header" href="#experimente-matematica">Experimente: matematica</a></h2>
 <pre><code class="language-delegua">var biblioteca: qualquer = importar("cgd:matematica")
 escreva(biblioteca.Matematica.cosseno(0))
 escreva(biblioteca.Matematica.raizQuadrada(9))
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/matematica.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/matematica.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-40_enums_escopos"><a class="header" href="#experimente-40_enums_escopos">Experimente: 40_enums_escopos</a></h2>
 <pre><code class="language-delegua">funcao estado(): inteiro {
     enum Estado {
@@ -263,8 +253,10 @@ escreva(estado())
 escreva(Maquina.Estado.Final)
 escreva(vetor(2))
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/40_enums_escopos.delegua">Ver exemplo completo e teste</a></p>
-<p>Enums são namespaces congelados e alias inteiro; interfaces exigem assinaturas explícitas. FFI exige código nativo confiável. Composição mescla permanece fora desta versão; integração JS é excluída; consulte docs/evolucao-linguagem.md.</p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/40_enums_escopos.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>Enums hoje são namespaces congelados com alias para inteiro (ainda não são enums nominais distintos). Structs e callbacks compostos na ABI C ainda estão pendentes.</p>
+</blockquote>
 
                     </main>
 

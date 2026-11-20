@@ -1,9 +1,9 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Classes, herança e acessores - O livro do CGD</title>
+        <title>Classes, herança, mescla e estáticos - O livro do CGD</title>
 
 
         <!-- Custom HTML head -->
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -179,24 +179,25 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="classes-herança-e-acessores"><a class="header" href="#classes-herança-e-acessores">Classes, herança e acessores</a></h1>
-<p>Use classes para reunir os dados e as operações de uma mesma ideia. Vamos começar com atributos, métodos e valores iniciais; depois veremos herança e controle de acesso.</p>
-<h2 id="atributos-e-inicializadores"><a class="header" href="#atributos-e-inicializadores">Atributos e inicializadores</a></h2>
-<p>Você pode dar um valor ao atributo na própria classe. Ele será calculado a cada objeto criado: dois objetos não compartilham o mesmo vetor só porque o atributo foi declarado uma vez. Primeiro vêm os atributos da base, depois os da classe derivada, sempre na ordem da declaração. O construtor roda em seguida, com esses valores já disponíveis.</p>
-<p>Se um inicializador usa outro atributo, declare esse atributo antes. A inicialização grava o valor inicial diretamente, sem chamar um setter personalizado.</p>
+                        <h1 id="classes-herança-mescla-e-estáticos"><a class="header" href="#classes-herança-mescla-e-estáticos">Classes, herança, mescla e estáticos</a></h1>
+<p>Classes juntam dados e comportamento num só lugar. No CGD você conta com inicializadores por instância, herança (herda), composição por mixins (mescla), campos e métodos estáticos, privacidade e destrutores explícitos.</p>
+<h2 id="atributos-defaults-e-inicializadores-por-objeto"><a class="header" href="#atributos-defaults-e-inicializadores-por-objeto">Atributos, defaults e inicializadores por objeto</a></h2>
+<p>Você pode dar valores iniciais direto nos campos da classe. Cada instância nova recebe sua própria avaliação — então um campo historico: inteiro[] = [] nunca é compartilhado por acidente entre dois objetos. Os campos da classe base inicializam primeiro, depois os da derivada e por fim roda o construtor.</p>
 <pre><code class="language-delegua">classe Contador {
+    estatico totalCriados: inteiro = 0
     valor: inteiro = 1
     historico: inteiro[]
-    incrementar(): vazio { isto.valor++ }
+
+    construtor() {
+        Contador.totalCriados++
+    }
 }
-var a: Contador = Contador()
-var b: Contador = Contador()
-a.historico.adicionar(3) // b.historico continua vazio
 </code></pre>
-<h2 id="herança-e-ciclo-de-vida"><a class="header" href="#herança-e-ciclo-de-vida">Herança e ciclo de vida</a></h2>
-<p>herda aceita uma classe base. Métodos públicos/protegidos são resolvidos com sua visibilidade; privado pertence à classe declaradora. super chama a implementação da base. O construtor da base deve ser chamado explicitamente quando necessário. destruir(objeto) percorre destrutores da derivada às bases uma vez por identidade, mesmo se houver exceção; o primeiro erro é relançado. O GC gerencia memória, mas não executa destrutores Delégua.</p>
-<h2 id="por-que-esses-limites"><a class="header" href="#por-que-esses-limites">Por que esses limites?</a></h2>
-<p>Campos estáticos não são suportados; métodos estáticos não recebem isto. Classes só existem no módulo. O compilador preserva acesso, contratos e aliases em C. Não se inventa um construtor ao ler um campo tipado sem inicializador de objeto: ele começa nulo.</p>
+<h2 id="herança-herda-e-composição-mescla"><a class="header" href="#herança-herda-e-composição-mescla">Herança (herda) e composição (mescla)</a></h2>
+<p>Use herda para especializar uma classe base (chamando super quando quiser reaproveitar a implementação do pai). Quando quiser reutilizar métodos e campos de várias classes sem cair em herança múltipla, use classe MinhaClasse mescla MixinA, MixinB.</p>
+<p>Cada mixin mantém sua própria privacidade, seus inicializadores de campo funcionam automaticamente e eInstanciaDe reconhece tanto a hierarquia de herança quanto os mixins e interfaces.</p>
+<h2 id="privacidade-acessores-e-destrutor-explícito"><a class="header" href="#privacidade-acessores-e-destrutor-explícito">Privacidade, acessores e destrutor explícito</a></h2>
+<p>Agrupe membros em publico { }, protegido { } ou privado { }. Propriedades aceitam acessores personalizados obter() e definir(valor). Para liberar recursos determinísticos, declare destrutor(): vazio e chame destruir(objeto) dentro de um bloco finalmente — o Boehm GC cuida da memória, não de destrutores Delégua.</p>
 <h2 id="experimente-14_classes"><a class="header" href="#experimente-14_classes">Experimente: 14_classes</a></h2>
 <pre><code class="language-delegua">classe Ponto {
     x: numero
@@ -215,7 +216,7 @@ escreva(ponto.x, ponto.dobro())
 ponto.x = 4
 escreva(ponto.dobro())
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/14_classes.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/14_classes.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-15_heranca"><a class="header" href="#experimente-15_heranca">Experimente: 15_heranca</a></h2>
 <pre><code class="language-delegua">classe Base {
     protegido {
@@ -250,7 +251,7 @@ var metodo: funcao = filha.valor // Receptor explícito, gerenciado pelo GC.
 escreva(metodo(), filha.dado())
 escreva(filha.eInstanciaDe(Base))
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/15_heranca.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/15_heranca.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-16_privacidade_acessores"><a class="header" href="#experimente-16_privacidade_acessores">Experimente: 16_privacidade_acessores</a></h2>
 <pre><code class="language-delegua">classe Conta {
     privado {
@@ -275,7 +276,7 @@ var conta: Conta = Conta()
 conta.saldo = 3
 escreva(conta.saldo)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/16_privacidade_acessores.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/16_privacidade_acessores.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-32_objeto_e_metodos"><a class="header" href="#experimente-32_objeto_e_metodos">Experimente: 32_objeto_e_metodos</a></h2>
 <pre><code class="language-delegua">classe Pessoa {
     nome: texto
@@ -294,7 +295,7 @@ escreva(p.tipo())
 escreva(p.respondeA("paraTexto"), p.eInstanciaDe(Objeto))
 escreva(p)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/32_objeto_e_metodos.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/32_objeto_e_metodos.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-36_destrutores"><a class="header" href="#experimente-36_destrutores">Experimente: 36_destrutores</a></h2>
 <pre><code class="language-delegua">classe Base {
     destrutor(): vazio {
@@ -318,7 +319,7 @@ tente {
 destruir(recurso)
 escreva("fim")
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/36_destrutores.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/36_destrutores.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-39_inicializacao"><a class="header" href="#experimente-39_inicializacao">Experimente: 39_inicializacao</a></h2>
 <pre><code class="language-delegua">var n: numero
 var texto: texto
@@ -341,8 +342,48 @@ escreva(tamanho(segunda.itens), tamanho(primeira.itens))
 var ch: texto = "5"
 escreva(ch &gt;= '0' e ch &lt;= '9', "ação" &gt; "a")
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/39_inicializacao.delegua">Ver exemplo completo e teste</a></p>
-<p>Classes devem estar no nível do módulo. Campos são declarados; não há injeção arbitrária de campos. Herança por alias dinâmico de classe importada e tipos locais não têm resolução completa. Destrutores explícitos via destruir(instancia), da derivada às bases; idempotência por identidade, sem chamadas pelo GC ou ao sair do escopo.</p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/39_inicializacao.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<h2 id="experimente-43_estaticos_mescla"><a class="header" href="#experimente-43_estaticos_mescla">Experimente: 43_estaticos_mescla</a></h2>
+<pre><code class="language-delegua">funcao de decorador triplicar(original: funcao): funcao {
+    retorna funcao(alvo: qualquer, x: inteiro): inteiro {
+        retorna x * 3
+    }
+}
+
+classe Etiquetavel {
+    prefixo: texto = "Etiqueta:"
+
+    rotulo(nome: texto): texto {
+        retorna isto.prefixo + nome
+    }
+}
+
+classe Registro mescla Etiquetavel {
+    estatico criados: inteiro = 0
+    nome: texto
+
+    construtor(nome: texto) {
+        isto.nome = nome
+        Registro.criados = Registro.criados + 1
+    }
+
+    @triplicar
+    escalar(x: inteiro): inteiro {
+        retorna x
+    }
+}
+
+const a: Registro = Registro("Ana")
+const b: Registro = Registro("Bia")
+escreva(Registro.criados)
+escreva(a.rotulo(a.nome))
+escreva(b.eInstanciaDe(Etiquetavel))
+escreva(a.escalar(10))
+</code></pre>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/43_estaticos_mescla.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>Classes são declaradas no nível do módulo. Campos precisam ser declarados na classe; acessar um campo ou método que não existe gera erro estático E3109 com sugestão do nome mais parecido (preservando acesso polimórfico a subclasses).</p>
+</blockquote>
 
                     </main>
 

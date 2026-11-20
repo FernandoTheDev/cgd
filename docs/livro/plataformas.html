@@ -1,9 +1,9 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Plataformas e limites da implementação - O livro do CGD</title>
+        <title>Plataformas e toolchain C - O livro do CGD</title>
 
 
         <!-- Custom HTML head -->
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -179,13 +179,13 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="plataformas-e-limites-da-implementação"><a class="header" href="#plataformas-e-limites-da-implementação">Plataformas e limites da implementação</a></h1>
-<p>Hoje, a plataforma testada é Linux x86_64. Há opções para selecionar compilador C, alvo e runtime, mas configurar outro alvo não significa que ele já foi validado.</p>
-<h2 id="alvo-validado-e-configuração"><a class="header" href="#alvo-validado-e-configuração">Alvo validado e configuração</a></h2>
-<p>Linux x86_64 é a plataforma coberta pelos testes. --cc, --target, --sysroot, --runtime-object, --runtime-root, --pkg-config, --cflag e --ldflag separam compilador C, alvo e dependências. Um runtime construído para o mesmo alvo é obrigatório. Não se anuncia Windows/macOS ou cross apenas porque uma opção foi aceita.</p>
-<h2 id="por-que-não-múltiplos-backendsdialetos"><a class="header" href="#por-que-não-múltiplos-backendsdialetos">Por que não múltiplos backends/dialetos?</a></h2>
-<p>O foco é uma linguagem com contratos consistentes, saída C99 e toolchains externas conhecidas. Não há backend próprio LLVM/assembly ou emulação de dialetos. Projetar limites claros reduz combinações de semântica que não poderiam ser validadas de forma confiável.</p>
-<p>Windows/macOS e executáveis cruzados ainda não foram validados. Instaladores são shell/Linux. Não há bigint, dialetos extras, threads da linguagem, debugger ou bibliotecas Node. Consulte o guia de desenvolvimento para configurar a toolchain.</p>
+                        <h1 id="plataformas-e-toolchain-c"><a class="header" href="#plataformas-e-toolchain-c">Plataformas e toolchain C</a></h1>
+<p>O ambiente oficialmente testado hoje é Linux x86_64. O compilador aceita flags para trocar compilador C e preparar outros alvos, mas só declaramos suporte ao que foi validado de verdade.</p>
+<h2 id="escolhendo-clang-gcc-ou-outro-alvo"><a class="header" href="#escolhendo-clang-gcc-ou-outro-alvo">Escolhendo Clang, GCC ou outro alvo</a></h2>
+<p>Por padrão o CGD detecta Clang ou GCC no sistema. Você pode fixar o compilador com CC=gcc ou --cc gcc, além de ajustar --target, --sysroot, --runtime-object, --cflag e --ldflag quando estiver montando um ambiente personalizado.</p>
+<blockquote>
+<p>Windows, macOS e compilação cruzada ainda exigem runtime compilado e validação nativa antes de serem anunciados como suportados.</p>
+</blockquote>
 
                     </main>
 

@@ -1,9 +1,9 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Editor: arquivos, cores, inferência e hover - O livro do CGD</title>
+        <title>Editor VS Code: cores, autocomplete e formatador - O livro do CGD</title>
 
 
         <!-- Custom HTML head -->
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -179,37 +179,36 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="editor-arquivos-cores-inferência-e-hover"><a class="header" href="#editor-arquivos-cores-inferência-e-hover">Editor: arquivos, cores, inferência e hover</a></h1>
-<p>Abra um arquivo .delegua no VS Code e deixe o editor ajudar com tipos, nomes e erros. O servidor roda na sua máquina; editar o texto não compila nem executa o programa.</p>
-<h2 id="instalação-e-identidade-visual"><a class="header" href="#instalação-e-identidade-visual">Instalação e identidade visual</a></h2>
-<p>Com CGD e runtime construídos, prepare as dependências da extensão e use o instalador. A logo do projeto identifica arquivos .delegua nos temas que respeitam ícones de linguagem. Temas de ícones de terceiros podem sobrescrever esse ícone; não alteramos o tema global.</p>
+                        <h1 id="editor-vs-code-cores-autocomplete-e-formatador"><a class="header" href="#editor-vs-code-cores-autocomplete-e-formatador">Editor VS Code: cores, autocomplete e formatador</a></h1>
+<p>Programar fica bem mais leve quando o editor mostra os tipos, sugere métodos certos e avisa erros enquanto você digita. O servidor LSP do CGD roda 100% na sua máquina e nunca compila nem executa código só porque você digitou.</p>
+<h2 id="como-instalar-a-extensão"><a class="header" href="#como-instalar-a-extensão">Como instalar a extensão</a></h2>
+<p>Depois de compilar o CGD e o runtime, instale as dependências da extensão e rode o script de empacotamento. Ele já sincroniza as bibliotecas em ~/.delegua/cgd, associa arquivos .delegua e ativa o ícone oficial da linguagem.</p>
 <pre><code class="language-sh">npm ci --prefix extensao-vscode --ignore-scripts
 python3 scripts/instalar_extensao.py --associate
 </code></pre>
-<h2 id="coloração-e-formatação"><a class="header" href="#coloração-e-formatação">Coloração e formatação</a></h2>
-<p>Palavras-chave, tipos, atributos, métodos e decoradores recebem categorias semânticas. @definicao é formatado junto ao @; biblioteca, prefixo, simbolo e abi são argumentos de metadados. Strings e comentários não são reescritos. Ctrl+Shift+I usa o mesmo formatador da CLI, com quatro espaços.</p>
-<pre><code class="language-delegua">@definicao(biblioteca="m", prefixo="")
-classe estrangeira LibM {
-    @definicao(simbolo="cos")
-    cosseno(x: numero): numero;
-}
+<h2 id="autocomplete-de-bibliotecas-cgd-e-de-membros"><a class="header" href="#autocomplete-de-bibliotecas-cgd-e-de-membros">Autocomplete de bibliotecas cgd: e de membros</a></h2>
+<p>Comece a digitar importar("cgd: e o editor abre na hora a lista de todos os arquivos .delegua disponíveis em ~/.delegua/cgd — incluindo bibliotecas que você mesmo criou e salvou lá. Depois do ponto (objeto.), o LSP só mostra membros reais daquele tipo, classe, herança ou mescla, sem poluir a lista com funções soltas.</p>
+<pre><code class="language-delegua">const JSON: qualquer = importar("cgd:json").JSON
+const dados: dicionario = JSON.analisar('{"ok": true}')
 </code></pre>
-<h2 id="tipos-inferidos-são-dicas-virtuais"><a class="header" href="#tipos-inferidos-são-dicas-virtuais">Tipos inferidos são dicas virtuais</a></h2>
-<p>Em var quantidade = 3 o editor apresenta : numero após quantidade, sem gravar a anotação no arquivo. Variáveis já anotadas não recebem dica redundante. As dicas vêm do tipo resolvido, respeitam a revisão em memória e podem ser desligadas em cgd.inlayHints. A posição usa UTF-16 do protocolo LSP.</p>
-<pre><code class="language-delegua">var quantidade = 3
-var nome = "Ana"
+<h2 id="dicas-virtuais-de-tipo-e-prévia-de-funções-puras"><a class="header" href="#dicas-virtuais-de-tipo-e-prévia-de-funções-puras">Dicas virtuais de tipo e prévia de funções puras</a></h2>
+<p>Se você escrever const lista = [1, 2, 3] ou const t = rotina fib(10), o VS Code exibe os tipos inferidos (: numero[], : Tarefa<numero>) como dicas visuais cinzentas, sem alterar o seu arquivo. Se você já anotou o tipo, a dica não aparece repetida.</p>
+<p>Ao passar o mouse sobre uma função marcada com //&gt;puro, o hover avisa se a pureza foi comprovada e mostra a prévia do valor calculado (lembrando que a substituição real no executável acontece com -o).</p>
+<pre><code class="language-delegua">const lista = [1, 2, 3]
+const primeiro = lista[0]
 var explicito: inteiro = 3
 </code></pre>
-<h2 id="pureza-não-é-promessa-de-otimização"><a class="header" href="#pureza-não-é-promessa-de-otimização">Pureza não é promessa de otimização</a></h2>
-<p>O hover informa se a função tem prova de pureza aprovada para CTFE. Uma chamada com resultado comprovado mostra a prévia. A substituição exige -o; sem otimização ela continua executando em runtime. Métodos, FFI, argumentos dinâmicos ou orçamento esgotado não recebem resultado inventado. Sem prova, a mensagem diz não comprovada, em vez de afirmar que todo código sem anotação tem efeitos.</p>
-<h2 id="comandos-explícitos"><a class="header" href="#comandos-explícitos">Comandos explícitos</a></h2>
-<p>CGD: Verificar arquivo analisa o fonte; Compilar e executar faz build e abre um terminal. F5 é execução, não depuração. Depois de atualizar o VSIX, recarregue a janela. cgd.executable permite selecionar outro binário já construído; a extensão não baixa nem constrói um compilador ao abrir arquivos.</p>
+<h2 id="formatação-com-ctrlshifti"><a class="header" href="#formatação-com-ctrlshifti">Formatação com Ctrl+Shift+I</a></h2>
+<p>Pressionar Ctrl+Shift+I no VS Code roda exatamente o mesmo formatador da CLI (cgd --formatar): 4 espaços de indentação, genéricos limpos (Promessa<inteiro>), fatias sem espaços extras (valores[::-1]), preservação de coleções multilinha, comentários e strings interpoladas.</p>
+<blockquote>
+<p>F5 no VS Code compila e executa o arquivo no terminal — ainda não é um depurador passo a passo (DAP). Sempre que reinstalar a extensão, recarregue a janela do VS Code.</p>
+</blockquote>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="inicio.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="delegua-vs-cgd.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -223,7 +222,7 @@ var explicito: inteiro = 3
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="inicio.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="delegua-vs-cgd.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 

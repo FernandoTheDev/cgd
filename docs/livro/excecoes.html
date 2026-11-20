@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -180,19 +180,19 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="exceções-e-limpeza"><a class="header" href="#exceções-e-limpeza">Exceções e limpeza</a></h1>
-<p>Uma operação pode falhar, e seu programa pode se preparar para isso. Use tente e pegue para tratar a falha, e finalmente para fazer a limpeza que precisa acontecer em qualquer caminho.</p>
-<h2 id="lançar-capturar-e-limpar"><a class="header" href="#lançar-capturar-e-limpar">Lançar, capturar e limpar</a></h2>
-<p>falhar aceita um erro ou valor convertido em Excecao. pegue pode ter vínculo e tipo; finalmente roda também em retorno, sustar, continua e nova falha. O caminho que propaga o erro conserva o valor de exceção; a localização vem da operação falível.</p>
+<p>Erros acontecem — arquivo que não existe, JSON inválido, divisão por zero. Use tente e pegue para lidar com eles sem derrubar o programa, e finalmente para garantir a limpeza.</p>
+<h2 id="tente-pegue-tipado-e-finalmente"><a class="header" href="#tente-pegue-tipado-e-finalmente">tente, pegue tipado e finalmente</a></h2>
+<p>Use falhar para lançar um erro (texto ou instância de Excecao/subclasse). Você pode ter vários blocos pegue filtrando por tipo de exceção. O bloco finalmente sempre roda — tenha dado certo, dado erro ou executado um retorna.</p>
 <pre><code class="language-delegua">tente {
     falhar "entrada inválida"
 } pegue (erro: Excecao) {
     escreva(erro.mensagem)
 } finalmente {
-    escreva("limpeza")
+    escreva("limpeza garantida")
 }
 </code></pre>
-<h2 id="decisão-falha-observável"><a class="header" href="#decisão-falha-observável">Decisão: falha observável</a></h2>
-<p>Otimizações não apagam exceções nem executam um lado descartado de curto-circuito. Falha constante em região deliberadamente capturada recebe aviso estático quando suportado. R0001 agrupa erros dinâmicos; ainda não há uma pilha Delégua completa. Recursos externos devem ser fechados explicitamente ou em finalmente, sem depender do GC.</p>
+<h2 id="erros-estáticos-dentro-de-tentepegue"><a class="header" href="#erros-estáticos-dentro-de-tentepegue">Erros estáticos dentro de tente/pegue</a></h2>
+<p>Quando o compilador prova que uma operação sempre vai falhar (como 1 / 0), ele barra a compilação com E3101. Mas se essa linha estiver dentro de um tente/pegue, ele rebaixa para aviso (W3101) — assim seus testes de tratamento de erro continuam compilando normalmente.</p>
 <h2 id="experimente-17_excecoes"><a class="header" href="#experimente-17_excecoes">Experimente: 17_excecoes</a></h2>
 <pre><code class="language-delegua">tente {
     falhar "proposital"
@@ -208,7 +208,7 @@ tente {
     escreva(erro)
 }
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/17_excecoes.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/17_excecoes.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-18_finalmente_retorno"><a class="header" href="#experimente-18_finalmente_retorno">Experimente: 18_finalmente_retorno</a></h2>
 <pre><code class="language-delegua">funcao obter(): qualquer {
     tente {
@@ -227,7 +227,7 @@ para (var i: numero = 0; i &lt; 2; i++) {
     }
 }
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/18_finalmente_retorno.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/18_finalmente_retorno.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-19_excecoes_tipadas"><a class="header" href="#experimente-19_excecoes_tipadas">Experimente: 19_excecoes_tipadas</a></h2>
 <pre><code class="language-delegua">classe MeuErro herda Excecao {
 }
@@ -242,8 +242,10 @@ pegue {
     escreva("outro erro")
 }
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/19_excecoes_tipadas.delegua">Ver exemplo completo e teste</a></p>
-<p>Falhas do runtime são tratáveis. Sem tratador, o processo termina com status 1. Há localização, mas ainda não uma pilha completa de chamadas Delégua. A localização usa descritores estáticos apenas nas operações falíveis; literais e declarações simples não recebem chamadas de localização. R0001 é o código genérico atual de falha dinâmica.</p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/19_excecoes_tipadas.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>Se uma exceção não for capturada por nenhum pegue, o programa encerra com código 1 e exibe o diagnóstico visual R0001 apontando arquivo, linha e coluna.</p>
+</blockquote>
 
                     </main>
 

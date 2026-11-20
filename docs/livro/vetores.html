@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -180,15 +180,15 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="vetores-compreensão-e-fatias"><a class="header" href="#vetores-compreensão-e-fatias">Vetores, compreensão e fatias</a></h1>
-<p>Vetores guardam uma sequência que pode mudar. Você pode acessar posições, percorrer os elementos, escolher uma fatia ou construir outro vetor com uma compreensão.</p>
-<h2 id="literais-spread-e-compreensão"><a class="header" href="#literais-spread-e-compreensão">Literais, spread e compreensão</a></h2>
-<p>Use [a, b] para vetor; ... espalha elementos. Compreensão filtra e transforma em um novo vetor, sem mudar a coleção original. O vínculo de iteração pode ter anotação.</p>
-<pre><code class="language-delegua">var original: inteiro[] = [1, 2, 3]
-var copia: inteiro[] = [...original, 4]
-var pares = [x*2 para cada x: inteiro em original se x &gt; 1]
+<p>Vetores guardam listas ordenadas de valores. Você pode tipar o vetor (inteiro[]), recortar fatias com passo (valores[::-1]), espalhar elementos (...lista) e criar listas filtradas em uma linha.</p>
+<h2 id="literais-espalhamento--e-compreensão"><a class="header" href="#literais-espalhamento--e-compreensão">Literais, espalhamento (...) e compreensão</a></h2>
+<p>Use colchetes [1, 2, 3] para criar um vetor e ... para espalhar elementos dentro de outro vetor. Compreensões criam um vetor novo filtrando e transformando sem alterar o original.</p>
+<pre><code class="language-delegua">var base: inteiro[] = [1, 2, 3]
+var maior: inteiro[] = [...base, 4]
+var pares = [x * 2 para cada x: inteiro em maior se x % 2 == 0]
 </code></pre>
-<h2 id="fatias-e-métodos"><a class="header" href="#fatias-e-métodos">Fatias e métodos</a></h2>
-<p>v[inicio:fim:passo] usa fim exclusivo. Início/fim podem ser omitidos, passo pode ser negativo e zero é inválido. Métodos incluem adicionar/empilhar, remover, removerPrimeiro/removerUltimo, inverter, somar, juntar, concatenar, encaixar, ordenar, mapear e filtrarPor. As operações que mutam atuam sobre aliases da mesma coleção; fatiar e concatenar produzem resultados próprios. Callbacks são funções sem captura.</p>
+<h2 id="fatias-com-iniciofimpasso"><a class="header" href="#fatias-com-iniciofimpasso">Fatias com [inicio:fim:passo]</a></h2>
+<p>O fim da fatia é exclusivo. Você pode omitir início ou fim, e usar passo negativo para inverter rapidamente (valores[::-1]). Passo zero é bloqueado já na compilação (E3108).</p>
 <h2 id="experimente-09_vetores"><a class="header" href="#experimente-09_vetores">Experimente: 09_vetores</a></h2>
 <pre><code class="language-delegua">var valores: qualquer[] = [3, 1, 2]
 valores.ordenar()
@@ -196,13 +196,13 @@ escreva(valores, valores.somar())
 var removidos: qualquer = valores.encaixar(1, 1, 7, 8)
 escreva(removidos, valores)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/09_vetores.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/09_vetores.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-10_compreensao_fatias"><a class="header" href="#experimente-10_compreensao_fatias">Experimente: 10_compreensao_fatias</a></h2>
 <pre><code class="language-delegua">var valores: qualquer[] = [1, 2, 3, 4, 5]
 escreva([x * 3 para cada x: inteiro em valores se x % 2 == 0])
 escreva(valores[::-1], valores[::2])
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/10_compreensao_fatias.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/10_compreensao_fatias.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-22_contratos_aliases"><a class="header" href="#experimente-22_contratos_aliases">Experimente: 22_contratos_aliases</a></h2>
 <pre><code class="language-delegua">var numeros: inteiro[] = [1]
 var alias: qualquer = numeros
@@ -215,7 +215,7 @@ pegue {
 
 escreva(numeros)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/22_contratos_aliases.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/22_contratos_aliases.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-30_metodos_vetor"><a class="header" href="#experimente-30_metodos_vetor">Experimente: 30_metodos_vetor</a></h2>
 <pre><code class="language-delegua">var v: qualquer[] = [1, 2]
 v.empilhar(3)
@@ -232,8 +232,10 @@ escreva([1, 2, 3].filtrarPor(funcao(x: qualquer): qualquer {
     retorna x * 3
 }))
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/30_metodos_vetor.delegua">Ver exemplo completo e teste</a></p>
-<p>Métodos: adicionar, empilhar, tamanho, inclui/contem/contém, fatiar, mapear, filtrarPor, remover, removerPrimeiro, removerUltimo, inverter, somar, juntar, concatenar, encaixar e ordenar. Restrições por aliases são monotônicas; modificar durante a iteração não cria snapshot. filtrar global recebe vetor e função; não existe método reduzir neste perfil.</p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/30_metodos_vetor.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>Métodos de vetor: adicionar, empilhar, tamanho, inclui/contem/contém, fatiar, mapear, filtrarPor, remover, removerPrimeiro, removerUltimo, inverter, somar, juntar, concatenar, encaixar e ordenar. Em vetores tipados (ex.: inteiro[]), o compilador já rejeita inserções de tipo errado estaticamente.</p>
+</blockquote>
 
                     </main>
 

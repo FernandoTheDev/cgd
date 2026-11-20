@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -180,27 +180,27 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="valores-tipos-e-variáveis"><a class="header" href="#valores-tipos-e-variáveis">Valores, tipos e variáveis</a></h1>
-<p>Uma variável guarda um valor; uma anotação diz qual valor você espera receber. Veja quando usar var ou const e o que acontece quando você deixa o tipo por conta do compilador.</p>
-<h2 id="declarações-e-inferência"><a class="header" href="#declarações-e-inferência">Declarações e inferência</a></h2>
-<p>var permite reatribuir; const exige um inicializador e impede reatribuir o vínculo. Uma coleção em const continua mutável, salvo um namespace de enum congelado. Anote com dois-pontos ou deixe o tipo ser inferido do inicializador.</p>
+<p>Variáveis guardam valores que podem mudar; constantes travam o nome naquele valor inicial. Você pode anotar o tipo explicitamente com dois-pontos ou deixar o compilador inferir para você.</p>
+<h2 id="var-const-e-inferência"><a class="header" href="#var-const-e-inferência">var, const e inferência</a></h2>
+<p>Use var quando o valor vai mudar ao longo do programa, e const quando quiser garantir que aquele nome não seja reatribuído. Para deixar o contrato bem claro (especialmente em bibliotecas e funções), anote o tipo logo após o nome com dois-pontos.</p>
 <pre><code class="language-delegua">var contador: inteiro = 0
 var titulo = "CGD"
 const limite: inteiro = 10
 </code></pre>
-<h2 id="tipos-e-limites"><a class="header" href="#tipos-e-limites">Tipos e limites</a></h2>
+<h2 id="tipos-disponíveis-e-valores-iniciais-padrão"><a class="header" href="#tipos-disponíveis-e-valores-iniciais-padrão">Tipos disponíveis e valores iniciais padrão</a></h2>
+<p>Se você declarar uma variável tipada sem valor inicial, tipos primitivos e coleções já nascem prontos para uso — já objetos, funções e tuplas começam como nulo para não rodar código escondido.</p>
 <div class="table-wrapper"><table><thead><tr><th>Recurso</th><th>Como funciona</th></tr></thead><tbody>
-<tr><td>numero / número</td><td>Contrato numérico: aceita inteiro e real; inicializa com 0.</td></tr>
-<tr><td>inteiro / longo</td><td>Inteiro assinado de 64 bits. Overflow é falha tratável; longo não é bigint.</td></tr>
-<tr><td>real / decimal</td><td>Ponto flutuante de 64 bits; default 0.0. Não há precisão decimal financeira.</td></tr>
-<tr><td>logico / booleano / binario</td><td>Lógico; default falso.</td></tr>
-<tr><td>texto</td><td>UTF-8; default texto vazio. Índices contam pontos de código.</td></tr>
-<tr><td>T[]</td><td>Vetor com contrato de elemento; default vetor novo vazio.</td></tr>
-<tr><td>dicionario / dicionário</td><td>Mapa de chaves primitivas; default mapa novo vazio.</td></tr>
-<tr><td>qualquer, classe, interface, funcao, tupla</td><td>Sem instanciação implícita: ausência de inicializador permanece nulo. Tipos explícitos são conferidos nas atribuições/chamadas correspondentes.</td></tr>
+<tr><td>numero / número</td><td>Aceita inteiro e real; começa em 0.</td></tr>
+<tr><td>inteiro / longo</td><td>Inteiro de 64 bits com sinal. Se estourar o limite (overflow), lança erro tratável.</td></tr>
+<tr><td>real / decimal</td><td>Número decimal de ponto flutuante (64 bits); começa em 0.0.</td></tr>
+<tr><td>logico / booleano / binario</td><td>verdadeiro ou falso; começa em falso.</td></tr>
+<tr><td>texto</td><td>Texto UTF-8 imutável; começa vazio (""). Índices contam caracteres Unicode.</td></tr>
+<tr><td>T[]</td><td>Vetor tipado (ex.: inteiro[], texto[]); começa como um vetor vazio novo.</td></tr>
+<tr><td>dicionario / dicionário</td><td>Mapa de chave e valor; começa como um dicionário vazio novo.</td></tr>
+<tr><td>Promessa<T> e Tarefa<T></td><td>Tipos nativos do CGD para funções assincrona e rotinas paralelas.</td></tr>
+<tr><td>qualquer, classe, interface, funcao, tupla</td><td>Começam como nulo quando declarados sem valor inicial.</td></tr>
 </tbody></table>
 </div>
-<h2 id="decisão-defaults-previsíveis"><a class="header" href="#decisão-defaults-previsíveis">Decisão: defaults previsíveis</a></h2>
-<p>Valores primitivos e coleções têm um estado inicial útil sem depender do construtor. Objetos e funções não são construídos automaticamente: isso poderia executar código, falhar ou criar dependências inesperadas. Inicializadores explícitos sempre prevalecem.</p>
 <h2 id="experimente-01_tipos"><a class="header" href="#experimente-01_tipos">Experimente: 01_tipos</a></h2>
 <pre><code class="language-delegua">// Declaração, valores primitivos e tipo de em execução.
 var vazio: qualquer
@@ -210,7 +210,7 @@ var medida: real = 2.5
 escreva(vazio, ativo)
 escreva(tipo de idade, " ", tipo de medida, " ", tipo de "olá", " ", tipo de ativo)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/01_tipos.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/01_tipos.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-03_atribuicoes"><a class="header" href="#experimente-03_atribuicoes">Experimente: 03_atribuicoes</a></h2>
 <pre><code class="language-delegua">var a: numero, b: numero = 1, 2
 a, b = b, a // Os valores da direita são avaliados antes das escritas.
@@ -220,7 +220,7 @@ escreva(a, b, contador)
 var destino: numero = 0
 escreva(destino = 5)
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/03_atribuicoes.delegua">Ver exemplo completo e teste</a></p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/03_atribuicoes.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <h2 id="experimente-25_escopos"><a class="header" href="#experimente-25_escopos">Experimente: 25_escopos</a></h2>
 <pre><code class="language-delegua">var x: numero = 1
 se verdadeiro {
@@ -238,8 +238,10 @@ funcao criar(): qualquer {
 
 escreva(criar()(4))
 </code></pre>
-<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/25_escopos.delegua">Ver exemplo completo e teste</a></p>
-<p>Constante impede reatribuir o vínculo; coleções continuam tendo sua mutabilidade própria. Inteiros/longo têm 64 bits e reais/decimal usam ponto flutuante de 64 bits. Não há bigint.</p>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/25_escopos.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
+<blockquote>
+<p>const impede reatribuir a variável, mas se ela guardar um vetor ou dicionário, você ainda pode alterar os itens lá dentro. Inteiros têm 64 bits verificados e reais usam ponto flutuante de 64 bits (não existe BigInt).</p>
+</blockquote>
 
                     </main>
 

@@ -1,3 +1,54 @@
+# Recriação do site e da documentação (tema preto + roxo/azul) — 20/11/2026
+
+Solicitação ativa: recriar todo o site e reescrever a documentação do CGD de
+forma mais profissional, humana e acessível para iniciantes, com tema padrão
+preto e paleta roxo/azul alinhada às logos do CGD (`#5500FE`) e de Delégua
+(`#4994BE`), diagramas/imagens, referências, links e diferenciação clara entre
+Delégua original (wiki da Design Líquido) e o que o CGD reimplementou ou criou
+do zero.
+
+## Implementação entregue
+
+- **Identidade visual e ativos (`docs/assets/` e `livro/tema/`)**:
+  - `docs/assets/style.css` reescrito com tema padrão preto (`#050507`) e
+    paleta roxo elétrico (`#5500FE` / `#8B5CF6` / `#A78BFA`) + azul Delégua
+    (`#4DA8DA` / `#7DD3FC`), tipografia limpa, cartões responsivos e realce de
+    sintaxe consistente.
+  - Copiada `docs/assets/delegua.png` (logo Delégua) e criados três diagramas
+    SVG vetoriais escuros: `docs/assets/pipeline.svg`,
+    `docs/assets/delegua-vs-cgd.svg` e `docs/assets/ecossistema.svg`.
+  - `livro/book.toml` e `livro/tema/cgd.css`: tema padrão alterado para `coal`
+    com sobrescrita preta + roxo/azul para manter o livro 100% alinhado ao site.
+- **Página principal (`docs/index.html`)**:
+  - Reescrita completa em português natural e direto para iniciantes: hero com
+    exemplo real + terminal, 4 pilares, passo a passo de instalação (incluindo
+    `~/.delegua/cgd` e VS Code), seção dedicada **Delégua original vs. CGD**
+    com logos, diagrama e tabela comparativa, arquitetura, tabela filtrável de
+    recursos, mapa das 24 bibliotecas `cgd:*`, 4 exemplos práticos copiáveis,
+    limites atualizados da v0.9.0 e links para referências oficiais.
+- **Documentação do livro e referência (`docs/linguagem.json`, `scripts/gerar_referencia.py`, `scripts/gerar_livro.py`)**:
+  - Adicionado capítulo dedicado `delegua-vs-cgd` comparando a wiki oficial da
+    Design Líquido com a implementação nativa do CGD (assincronismo, rotinas,
+    `~/.delegua/cgd`, runtime C, CTFE, segurança estática e mudanças semânticas).
+  - Reescritos e atualizados todos os 26 capítulos em tom humano e didático,
+    corrigindo notas desatualizadas (campos estáticos, `mescla`, envelopes em
+    métodos, LSP, `E3109`–`E3112`, 24 bibliotecas).
+  - Regenerados `docs/linguagem.html` e `docs/livro/` (40 páginas).
+
+## Testes realmente executados
+
+- `scripts/gerar_referencia.py --check` (26 capítulos sincronizados).
+- `scripts/gerar_livro.py --check` e `testes/livro.py` (40 páginas, links
+  locais, âncoras, recursos e índice de busca conferidos).
+- `testes/site.py --static-only` (2 páginas HTML, IDs únicos, âncoras e assets
+  locais validados) + validação XML dos 3 SVGs + verificação dos seletores/buscas
+  e renderização visual.
+- `scripts/formatar.py --check` (Prettier/Ruff/Taplo/dfmt/shfmt/clang-format).
+- Nota: `testes/site.py` completo com Chrome não pôde rodar porque Chrome/Chromium
+  não está instalado neste ambiente (apenas Firefox).
+
+---
+
 # Bibliotecas `cgd:` dinâmicas em `~/.delegua/cgd` — 20/11/2026
 
 Solicitação ativa: instalar as bibliotecas padrão do CGD em `~/.delegua/cgd`,

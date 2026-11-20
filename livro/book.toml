@@ -8,8 +8,8 @@ src = "../out/livro-src"
 build-dir = "../docs/livro"
 
 [output.html]
-default-theme = "navy"
-preferred-dark-theme = "navy"
+default-theme = "coal"
+preferred-dark-theme = "coal"
 additional-css = ["tema/cgd.css"]
 additional-js = ["tema/delegua.js"]
 git-repository-url = "https://github.com/FernandoTheDev/cgd"

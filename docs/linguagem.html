@@ -5,58 +5,59 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta
       name="description"
-      content="Referência do perfil compilado Delégua: sintaxe, exemplos, recursos disponíveis e limites explícitos."
+      content="Referência rápida do CGD (Compilador Geral Delégua): sintaxe, exemplos executáveis, bibliotecas cgd:* e diferenças para o Delégua original."
     />
-    <title>CGD — Guia da linguagem</title>
+    <title>CGD — Referência da linguagem</title>
+    <link rel="icon" type="image/png" href="assets/logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&amp;family=Inter:wght@400;500;600;700;800&amp;display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="assets/style.css?v=docs-3" />
-    <script src="assets/guia.js?v=docs-3" defer></script>
+    <link rel="stylesheet" href="assets/style.css?v=docs-4" />
+    <script src="assets/guia.js?v=docs-4" defer></script>
   </head>
   <body>
     <a href="#conteudo" class="skip-link">Pular para o conteúdo</a>
     <header class="navbar">
       <a class="logo-container home-link" href="index.html" aria-label="CGD, início"
-        ><img src="assets/logo.png" alt="" class="logo" /><span class="brand"
+        ><img src="assets/logo.png" alt="Logo do CGD" class="logo" /><span class="brand"
           >cgd<span class="brand-dim">.exe</span></span
-        ></a
+        ><span class="version-pill">v0.9.0</span></a
       >
       <nav aria-label="Principal">
-        <a class="link-source" href="index.html#instalar">instalar</a
-        ><a class="link-source" href="index.html">projeto</a
-        ><a class="link-source" href="https://github.com/FernandoTheDev/cgd/tree/dev"
-          >código-fonte</a
-        >
+        <a class="link-source" href="index.html">início</a
+        ><a class="link-source" href="index.html#instalar">instalar</a
+        ><a class="link-source" href="livro/index.html">livro</a
+        ><a class="link-source" href="https://github.com/FernandoTheDev/cgd/tree/dev">github</a>
       </nav>
     </header>
     <main class="docs-wrap guide" id="conteudo">
       <section class="doc-section">
-        <span class="eyebrow">// referência do perfil compilado</span>
-        <h1>A linguagem do CGD.</h1>
+        <span class="eyebrow">// referência em página única</span>
+        <h1>Guia completo da linguagem no CGD.</h1>
         <p class="section-intro">
-          Como escrever cada recurso, o que já funciona e quais fronteiras permanecem. Esta é a
-          referência própria da linguagem suportada pelo compilador, do primeiro programa às
-          bibliotecas e contratos de execução. Os exemplos possuem contratos para testes com e sem
-          otimização.
+          Tudo o que você precisa para escrever, compilar e tirar dúvidas sem sair desta página — do
+          primeiro programa até assincronismo, rotinas paralelas, bibliotecas em
+          <code>~/.delegua/cgd</code> e o catálogo de diagnósticos. Prefere ler capítulo por
+          capítulo? <a href="livro/index.html">Abra o livro do CGD</a>.
         </p>
-        <p>
-          Referência original:
-          <a href="https://github.com/DesignLiquido/delegua">Delégua, da Design Líquido</a> e sua
-          <a href="https://github.com/DesignLiquido/delegua/wiki">wiki oficial</a>. Este guia
-          descreve o perfil do CGD; não promete equivalência com todos os ambientes do
-          interpretador.
+        <p class="callout">
+          <strong>Transparência sobre a origem:</strong> a linguagem Delégua foi criada pela
+          <a href="https://github.com/DesignLiquido/delegua">Design Líquido</a> (<a
+            href="https://github.com/DesignLiquido/delegua/wiki"
+            >wiki oficial</a
+          >). O CGD é um compilador nativo independente e documenta claramente
+          <a href="#delegua-vs-cgd">o que muda e o que foi criado do zero</a>.
         </p>
         <div class="guide-controls">
           <div>
-            <label for="guide-search">Buscar recurso, sintaxe ou exemplo</label
+            <label for="guide-search">Buscar recurso, sintaxe, biblioteca ou erro</label
             ><input
               type="search"
               id="guide-search"
-              placeholder="Ex.: herança, importar, finalmente"
+              placeholder="Ex.: herança, rotinas, sqlite, E3109, mescla"
             />
           </div>
           <div>
@@ -65,41 +66,42 @@
               <option value="">Todos os capítulos</option>
               <option value="suportado">Disponível</option>
               <option value="parcial">Com limites</option>
-              <option value="excluido">Excluído por segurança</option>
+              <option value="excluido">Fora do perfil</option>
             </select>
           </div>
         </div>
-        <p id="guide-count" role="status">25 capítulos</p>
+        <p id="guide-count" role="status">26 capítulos</p>
         <nav class="section-nav" aria-label="Capítulos da linguagem">
           <a href="#inicio">Comece aqui: instalar, escrever e executar</a
-          ><a href="#editor">Editor: arquivos, cores, inferência e hover</a
+          ><a href="#delegua-vs-cgd">Delégua original vs. CGD: o que muda e o que é novo</a
+          ><a href="#editor">Editor VS Code: cores, autocomplete e formatador</a
           ><a href="#valores">Valores, tipos e variáveis</a
           ><a href="#operadores">Operadores e ordem de avaliação</a
           ><a href="#controle">Condições, escolha e laços</a
-          ><a href="#coletores">Laços como expressões</a><a href="#funcoes">Funções e parâmetros</a
+          ><a href="#coletores">Laços como expressões</a
+          ><a href="#funcoes">Funções, assincronismo e rotinas paralelas</a
           ><a href="#vetores">Vetores, compreensão e fatias</a
           ><a href="#dicionarios">Dicionários, tuplas e clonagem</a
           ><a href="#texto">Texto, Unicode e interpolação</a
-          ><a href="#classes">Classes, herança e acessores</a
-          ><a href="#excecoes">Exceções e limpeza</a><a href="#modulos">Módulos estáticos</a
-          ><a href="#biblioteca">Biblioteca nativa e entrada/saída</a
+          ><a href="#classes">Classes, herança, mescla e estáticos</a
+          ><a href="#excecoes">Exceções e limpeza</a
+          ><a href="#modulos">Módulos estáticos e ~/.delegua/cgd</a
+          ><a href="#biblioteca">Funções nativas e entrada/saída</a
           ><a href="#metadados">Decoradores e asserções</a
-          ><a href="#otimizacoes">Otimização e avaliação em compilação</a
-          ><a href="#diagnosticos">Diagnósticos e ferramentas</a
+          ><a href="#otimizacoes">Otimização (-o) e CTFE (//&gt;puro)</a
+          ><a href="#diagnosticos">Diagnósticos, códigos de erro e CLI</a
           ><a href="#exclusoes">Exclusões de segurança</a
-          ><a href="#plataformas">Plataformas e limites da implementação</a
-          ><a href="#bibliotecas-cgd">JSON, rede, arquivos e coleções do CGD</a
-          ><a href="#metodos-estaticos">Métodos estáticos e ferramentas do editor</a
-          ><a href="#evolucao-04">Contratos, arrows e FFI C</a
-          ><a href="#decisoes">Decisões de escopo: o que não fará parte da linguagem</a
-          ><a href="#runtime-erros">Erros do programa: apresentação e localização</a
-          ><a href="#stdlib-ampliada"
-            >Biblioteca padrão: textos, estatística, caminhos e coleções</a
-          >
+          ><a href="#plataformas">Plataformas e toolchain C</a
+          ><a href="#bibliotecas-cgd">Bibliotecas cgd:* (Web, Dados, Cripto e Sistema)</a
+          ><a href="#metodos-estaticos">Membros estáticos (campos e métodos)</a
+          ><a href="#evolucao-04">Interfaces, classes abstratas, enums e FFI C</a
+          ><a href="#decisoes">Decisões de escopo: o que não vai entrar no CGD</a
+          ><a href="#runtime-erros">Lendo erros em tempo de execução (R0001)</a
+          ><a href="#stdlib-ampliada">Na prática: textos, estatística, caminhos e coleções</a>
         </nav>
       </section>
       <div id="guide-empty" hidden>
-        <p>Nenhum capítulo encontrado. Tente outro termo ou situação.</p>
+        <p class="callout">Nenhum capítulo encontrado. Tente outro termo ou limpe o filtro.</p>
       </div>
       <section
         class="doc-section guide-chapter"
@@ -109,46 +111,211 @@
       >
         <span class="status-badge status-parcial">Com limites</span>
         <h2 id="title-inicio">Comece aqui: instalar, escrever e executar</h2>
-        <p>
-          Vamos sair do arquivo vazio e chegar a um programa rodando. Você vai instalar as
-          ferramentas, escrever as primeiras linhas e conhecer os comandos que usará no dia a dia.
+        <p class="section-intro">
+          Se esta é a sua primeira vez com o CGD, comece por aqui. Em poucos minutos você vai
+          instalar as ferramentas, escrever seu primeiro programa em português e rodar o executável
+          nativo no terminal.
         </p>
-        <h3>Ambiente e construção</h3>
+        <h3>O que você precisa instalar antes</h3>
         <p>
-          O alvo validado é Linux x86_64. Instale DMD ou LDC2, DUB, Clang ou GCC, pkg-config, Python
-          3, headers do Boehm GC e libcurl &gt;= 7.86. O runtime é um submódulo Git e deve
-          acompanhar a revisão do compilador.
+          Hoje o CGD é validado em Linux x86_64. Você precisa de Git, DUB, um compilador D (LDC2 ou
+          DMD), um compilador C99 (Clang ou GCC), pkg-config, Python 3, headers do Boehm GC e
+          libcurl (&gt;= 7.86).
         </p>
-        <pre><code>git submodule update --init --recursive
+        <p>
+          O runtime em C fica no submódulo vendor/delegua-runtime. Depois de compilar, o script
+          ./instalar coloca o binário em ~/.local/bin/cgd, o runtime em ~/.local/share/cgd e as 24
+          bibliotecas padrão em ~/.delegua/cgd.
+        </p>
+        <pre><code>git clone --branch dev --recurse-submodules https://github.com/FernandoTheDev/cgd.git
+cd cgd
 ./build-runtime
 dub build --compiler=ldc2 --build=release
-./instalar</code></pre>
+./instalar --no-build</code></pre>
         <h3>Seu primeiro programa</h3>
         <p>
-          Salve como ola.delegua. A extensão do arquivo é parte do contrato da CLI. escreva termina
-          com quebra de linha; vários argumentos são escritos em sequência, sem espaço implícito.
+          Crie um arquivo chamado ola.delegua. A extensão .delegua é obrigatória. A função escreva
+          imprime o texto e já pula linha no final — se você passar vários argumentos, eles saem
+          colados na ordem em que foram escritos.
         </p>
-        <pre><code>var nome = &quot;Ana&quot;
+        <pre><code>var nome: texto = &quot;Ana&quot;
 escreva(&quot;Olá, ${nome}!&quot;)</code></pre>
-        <h3>Verificar, compilar e otimizar</h3>
+        <h3>Compilar, verificar, otimizar e formatar</h3>
         <p>
-          --verificar executa o frontend sem chamar compilador C. -s escolhe o executável de saída.
-          -o habilita otimização e CTFE; não escolhe o caminho de saída. --emitir-c preserva o C
-          intermediário sem executar o linker.
+          Use -s para escolher o nome do executável de saída e -o quando quiser ativar otimizações e
+          avaliação em tempo de compilação (CTFE). Quer só checar se tem erro sem gerar binário? Use
+          --verificar. Quer deixar o arquivo arrumado com 4 espaços? Use --formatar.
         </p>
-        <pre><code>./cgd ola.delegua --verificar
-./cgd ola.delegua -s out/ola
+        <pre><code>cgd ola.delegua --verificar
+cgd ola.delegua -s out/ola
 ./out/ola
-./cgd ola.delegua -o -s out/ola-otimizado
-./cgd ola.delegua --emitir-c -s out/ola</code></pre>
-        <h3>Por que um perfil próprio?</h3>
+cgd ola.delegua -o -s out/ola-otimizado
+cgd --formatar ola.delegua
+cgd ola.delegua --emitir-c -s out/ola</code></pre>
+        <h3>Por que o CGD funciona diferente do interpretador?</h3>
         <p>
-          A geração C99 e o runtime gerenciado dão um executável independente do interpretador. Os
-          contratos precisam preservar efeitos, erros, tipos e aliases nos dois modos. Não se aceita
-          código apenas porque outro ambiente Delégua o executa; os limites estão explícitos aqui.
+          Porque aqui seu código vira C99 e depois um programa nativo independente — sem Node.js e
+          sem interpretador rodando por baixo. No próximo capítulo a gente explica em detalhes o que
+          veio da Delégua original e o que o CGD construiu do zero.
         </p>
 
-        <p class="callout"></p>
+        <p class="callout">
+          Se ~/.local/bin ainda não estiver no seu PATH, adicione export
+          PATH=&quot;$HOME/.local/bin:$PATH&quot; no seu ~/.bashrc ou ~/.zshrc.
+        </p>
+      </section>
+      <section
+        class="doc-section guide-chapter"
+        id="delegua-vs-cgd"
+        data-status="parcial"
+        aria-labelledby="title-delegua-vs-cgd"
+      >
+        <span class="status-badge status-parcial">Com limites</span>
+        <h2 id="title-delegua-vs-cgd">Delégua original vs. CGD: o que muda e o que é novo</h2>
+        <p class="section-intro">
+          Muita gente chega aqui já conhecendo a wiki oficial da Delégua (da Design Líquido). Esta
+          página deixa tudo às claras: o que funciona igual, o que muda de comportamento e o que o
+          CGD inventou de forma 100% nativa.
+        </p>
+        <h3>Duas ferramentas com a mesma língua, mas objetivos diferentes</h3>
+        <p>
+          A linguagem Delégua nasceu na Design Líquido (github.com/DesignLiquido/delegua) com foco
+          em ensino, navegador e Node.js, rodando num interpretador escrito em TypeScript. Ela traz
+          múltiplos dialetos, modo interativo LAIR e acesso a pacotes NPM.
+        </p>
+        <p>
+          O CGD preserva a autoria original e a licença Apache-2.0, mas segue outro caminho: é um
+          compilador próprio escrito em D que traduz Delégua para C99 e vincula com um runtime
+          nativo em C (delegua-runtime) usando Boehm GC. Não existe Node.js nem JavaScript por trás.
+        </p>
+        <h3>O que o CGD criou do zero (não existe no Delégua original)</h3>
+        <p>
+          Vários recursos importantes do CGD foram desenhados do zero pensando em programas nativos,
+          sem equivalente direto na wiki base do interpretador:
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Recurso</th>
+                <th>Como funciona</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Assincronismo nativo (assincrona / aguardar / Promessa&lt;T&gt;)</td>
+                <td>
+                  Máquina de estados stackless gerada pelo compilador, com reactor epoll no Linux,
+                  temporizadores, HTTP e TCP não bloqueantes.
+                </td>
+              </tr>
+              <tr>
+                <td>Rotinas paralelas (rotina / Tarefa&lt;T&gt; / Canal / GrupoTarefas)</td>
+                <td>
+                  Execução paralela real em pool de threads C com TLS por thread, registro no Boehm
+                  GC e transferência segura de valores.
+                </td>
+              </tr>
+              <tr>
+                <td>Bibliotecas cgd:* em ~/.delegua/cgd</td>
+                <td>
+                  24 módulos padrão (servidor HTTP, SQLite, Cripto/OpenSSL, Compressão/zlib, Bytes,
+                  Sockets, Processos, JSON, Rede, Tempo...) carregados diretamente de ~/.delegua/cgd
+                  — sem lista hardcoded e sem NPM.
+                </td>
+              </tr>
+              <tr>
+                <td>Runtime próprio em C (delegua-runtime)</td>
+                <td>
+                  Valores tipados, UTF-8, Boehm GC, diagnósticos visuais R0001 com trecho do
+                  arquivo, epoll e pool de threads.
+                </td>
+              </tr>
+              <tr>
+                <td>Segurança estática (E3101–E3112) e CTFE (//&gt;puro)</td>
+                <td>
+                  Detecta erros antes de rodar (divisão por zero, overflow, membro inexistente,
+                  mutação de tupla/texto, operações em nulo) e calcula funções puras ainda na
+                  compilação com -o.
+                </td>
+              </tr>
+              <tr>
+                <td>Extensão VS Code, LSP próprio e formatador nativo</td>
+                <td>
+                  Autocomplete direto de ~/.delegua/cgd em importar(&quot;cgd:&quot;), dicas
+                  virtuais de tipo, prévia de CTFE no hover e formatador próprio de 4 espaços.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Onde a semântica do CGD difere da wiki oficial</h3>
+        <p>
+          Se você copiar um código pronto da wiki oficial da Design Líquido, alguns detalhes
+          funcionam diferente aqui — quase sempre para evitar armadilhas em código nativo:
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Recurso</th>
+                <th>Como funciona</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Sem capturas implícitas (closures / upvalues)</td>
+                <td>
+                  Na wiki original, funções internas podem ler variáveis de fora. No CGD isso é
+                  bloqueado (W4001/E4001): passe os dados como parâmetro ou use um objeto.
+                </td>
+              </tr>
+              <tr>
+                <td>Importação estática em vez de NPM</td>
+                <td>
+                  Em vez de importar pacotes NPM ou nomes calculados em runtime, o CGD usa caminhos
+                  literais .delegua ou importar(&quot;cgd:nome&quot;) vindo de ~/.delegua/cgd.
+                </td>
+              </tr>
+              <tr>
+                <td>Herança simples + mescla + interfaces</td>
+                <td>
+                  A wiki oficial tem herança múltipla. No CGD uma classe herda de uma única base
+                  (herda), pode misturar comportamentos com mescla e cumprir vários contratos com
+                  implementa.
+                </td>
+              </tr>
+              <tr>
+                <td>Limpeza explícita (finalmente / destruir)</td>
+                <td>
+                  Em vez de tendo ... como com finalizar(), use tente/finalmente e destrutor()
+                  chamado por destruir(objeto).
+                </td>
+              </tr>
+              <tr>
+                <td>FFI C estática no binário</td>
+                <td>
+                  Na wiki, @definicao usa um despachador dinâmico como Koffi ou classes TS do host.
+                  No CGD, classe estrangeira gera chamada C direta no executável.
+                </td>
+              </tr>
+              <tr>
+                <td>Tipos mais rígidos e sem dialetos</td>
+                <td>
+                  Não existem dialetos extras (Portugol, Mapler...) nem compatibilidade com
+                  JavaScript. Inteiros são 64 bits verificados e variáveis tipadas começam com
+                  defaults previsíveis.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="callout">
+          Sempre que quiser consultar a especificação da linguagem original, visite
+          https://github.com/DesignLiquido/delegua/wiki. Quando quiser saber exatamente como o CGD
+          compila e executa, este livro é a referência fiel.
+        </p>
       </section>
       <section
         class="doc-section guide-chapter"
@@ -157,58 +324,55 @@ escreva(&quot;Olá, ${nome}!&quot;)</code></pre>
         aria-labelledby="title-editor"
       >
         <span class="status-badge status-parcial">Com limites</span>
-        <h2 id="title-editor">Editor: arquivos, cores, inferência e hover</h2>
-        <p>
-          Abra um arquivo .delegua no VS Code e deixe o editor ajudar com tipos, nomes e erros. O
-          servidor roda na sua máquina; editar o texto não compila nem executa o programa.
+        <h2 id="title-editor">Editor VS Code: cores, autocomplete e formatador</h2>
+        <p class="section-intro">
+          Programar fica bem mais leve quando o editor mostra os tipos, sugere métodos certos e
+          avisa erros enquanto você digita. O servidor LSP do CGD roda 100% na sua máquina e nunca
+          compila nem executa código só porque você digitou.
         </p>
-        <h3>Instalação e identidade visual</h3>
+        <h3>Como instalar a extensão</h3>
         <p>
-          Com CGD e runtime construídos, prepare as dependências da extensão e use o instalador. A
-          logo do projeto identifica arquivos .delegua nos temas que respeitam ícones de linguagem.
-          Temas de ícones de terceiros podem sobrescrever esse ícone; não alteramos o tema global.
+          Depois de compilar o CGD e o runtime, instale as dependências da extensão e rode o script
+          de empacotamento. Ele já sincroniza as bibliotecas em ~/.delegua/cgd, associa arquivos
+          .delegua e ativa o ícone oficial da linguagem.
         </p>
         <pre><code>npm ci --prefix extensao-vscode --ignore-scripts
 python3 scripts/instalar_extensao.py --associate</code></pre>
-        <h3>Coloração e formatação</h3>
+        <h3>Autocomplete de bibliotecas cgd: e de membros</h3>
         <p>
-          Palavras-chave, tipos, atributos, métodos e decoradores recebem categorias semânticas.
-          @definicao é formatado junto ao @; biblioteca, prefixo, simbolo e abi são argumentos de
-          metadados. Strings e comentários não são reescritos. Ctrl+Shift+I usa o mesmo formatador
-          da CLI, com quatro espaços.
+          Comece a digitar importar(&quot;cgd: e o editor abre na hora a lista de todos os arquivos
+          .delegua disponíveis em ~/.delegua/cgd — incluindo bibliotecas que você mesmo criou e
+          salvou lá. Depois do ponto (objeto.), o LSP só mostra membros reais daquele tipo, classe,
+          herança ou mescla, sem poluir a lista com funções soltas.
         </p>
-        <pre><code>@definicao(biblioteca=&quot;m&quot;, prefixo=&quot;&quot;)
-classe estrangeira LibM {
-    @definicao(simbolo=&quot;cos&quot;)
-    cosseno(x: numero): numero;
-}</code></pre>
-        <h3>Tipos inferidos são dicas virtuais</h3>
+        <pre><code>const JSON: qualquer = importar(&quot;cgd:json&quot;).JSON
+const dados: dicionario = JSON.analisar(&#x27;{&quot;ok&quot;: true}&#x27;)</code></pre>
+        <h3>Dicas virtuais de tipo e prévia de funções puras</h3>
         <p>
-          Em var quantidade = 3 o editor apresenta : numero após quantidade, sem gravar a anotação
-          no arquivo. Variáveis já anotadas não recebem dica redundante. As dicas vêm do tipo
-          resolvido, respeitam a revisão em memória e podem ser desligadas em cgd.inlayHints. A
-          posição usa UTF-16 do protocolo LSP.
+          Se você escrever const lista = [1, 2, 3] ou const t = rotina fib(10), o VS Code exibe os
+          tipos inferidos (: numero[], : Tarefa&lt;numero&gt;) como dicas visuais cinzentas, sem
+          alterar o seu arquivo. Se você já anotou o tipo, a dica não aparece repetida.
         </p>
-        <pre><code>var quantidade = 3
-var nome = &quot;Ana&quot;
+        <p>
+          Ao passar o mouse sobre uma função marcada com //&gt;puro, o hover avisa se a pureza foi
+          comprovada e mostra a prévia do valor calculado (lembrando que a substituição real no
+          executável acontece com -o).
+        </p>
+        <pre><code>const lista = [1, 2, 3]
+const primeiro = lista[0]
 var explicito: inteiro = 3</code></pre>
-        <h3>Pureza não é promessa de otimização</h3>
+        <h3>Formatação com Ctrl+Shift+I</h3>
         <p>
-          O hover informa se a função tem prova de pureza aprovada para CTFE. Uma chamada com
-          resultado comprovado mostra a prévia. A substituição exige -o; sem otimização ela continua
-          executando em runtime. Métodos, FFI, argumentos dinâmicos ou orçamento esgotado não
-          recebem resultado inventado. Sem prova, a mensagem diz não comprovada, em vez de afirmar
-          que todo código sem anotação tem efeitos.
-        </p>
-        <h3>Comandos explícitos</h3>
-        <p>
-          CGD: Verificar arquivo analisa o fonte; Compilar e executar faz build e abre um terminal.
-          F5 é execução, não depuração. Depois de atualizar o VSIX, recarregue a janela.
-          cgd.executable permite selecionar outro binário já construído; a extensão não baixa nem
-          constrói um compilador ao abrir arquivos.
+          Pressionar Ctrl+Shift+I no VS Code roda exatamente o mesmo formatador da CLI (cgd
+          --formatar): 4 espaços de indentação, genéricos limpos (Promessa&lt;inteiro&gt;), fatias
+          sem espaços extras (valores[::-1]), preservação de coleções multilinha, comentários e
+          strings interpoladas.
         </p>
 
-        <p class="callout"></p>
+        <p class="callout">
+          F5 no VS Code compila e executa o arquivo no terminal — ainda não é um depurador passo a
+          passo (DAP). Sempre que reinstalar a extensão, recarregue a janela do VS Code.
+        </p>
       </section>
       <section
         class="doc-section guide-chapter"
@@ -218,81 +382,86 @@ var explicito: inteiro = 3</code></pre>
       >
         <span class="status-badge status-parcial">Com limites</span>
         <h2 id="title-valores">Valores, tipos e variáveis</h2>
-        <p>
-          Uma variável guarda um valor; uma anotação diz qual valor você espera receber. Veja quando
-          usar var ou const e o que acontece quando você deixa o tipo por conta do compilador.
+        <p class="section-intro">
+          Variáveis guardam valores que podem mudar; constantes travam o nome naquele valor inicial.
+          Você pode anotar o tipo explicitamente com dois-pontos ou deixar o compilador inferir para
+          você.
         </p>
-        <h3>Declarações e inferência</h3>
+        <h3>var, const e inferência</h3>
         <p>
-          var permite reatribuir; const exige um inicializador e impede reatribuir o vínculo. Uma
-          coleção em const continua mutável, salvo um namespace de enum congelado. Anote com
-          dois-pontos ou deixe o tipo ser inferido do inicializador.
+          Use var quando o valor vai mudar ao longo do programa, e const quando quiser garantir que
+          aquele nome não seja reatribuído. Para deixar o contrato bem claro (especialmente em
+          bibliotecas e funções), anote o tipo logo após o nome com dois-pontos.
         </p>
         <pre><code>var contador: inteiro = 0
 var titulo = &quot;CGD&quot;
 const limite: inteiro = 10</code></pre>
-        <h3>Tipos e limites</h3>
+        <h3>Tipos disponíveis e valores iniciais padrão</h3>
+        <p>
+          Se você declarar uma variável tipada sem valor inicial, tipos primitivos e coleções já
+          nascem prontos para uso — já objetos, funções e tuplas começam como nulo para não rodar
+          código escondido.
+        </p>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Recurso</th>
-                <th>Contrato</th>
+                <th>Como funciona</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td>numero / número</td>
-                <td>Contrato numérico: aceita inteiro e real; inicializa com 0.</td>
+                <td>Aceita inteiro e real; começa em 0.</td>
               </tr>
               <tr>
                 <td>inteiro / longo</td>
-                <td>Inteiro assinado de 64 bits. Overflow é falha tratável; longo não é bigint.</td>
+                <td>
+                  Inteiro de 64 bits com sinal. Se estourar o limite (overflow), lança erro
+                  tratável.
+                </td>
               </tr>
               <tr>
                 <td>real / decimal</td>
-                <td>
-                  Ponto flutuante de 64 bits; default 0.0. Não há precisão decimal financeira.
-                </td>
+                <td>Número decimal de ponto flutuante (64 bits); começa em 0.0.</td>
               </tr>
               <tr>
                 <td>logico / booleano / binario</td>
-                <td>Lógico; default falso.</td>
+                <td>verdadeiro ou falso; começa em falso.</td>
               </tr>
               <tr>
                 <td>texto</td>
-                <td>UTF-8; default texto vazio. Índices contam pontos de código.</td>
+                <td>
+                  Texto UTF-8 imutável; começa vazio (&quot;&quot;). Índices contam caracteres
+                  Unicode.
+                </td>
               </tr>
               <tr>
                 <td>T[]</td>
-                <td>Vetor com contrato de elemento; default vetor novo vazio.</td>
+                <td>Vetor tipado (ex.: inteiro[], texto[]); começa como um vetor vazio novo.</td>
               </tr>
               <tr>
                 <td>dicionario / dicionário</td>
-                <td>Mapa de chaves primitivas; default mapa novo vazio.</td>
+                <td>Mapa de chave e valor; começa como um dicionário vazio novo.</td>
+              </tr>
+              <tr>
+                <td>Promessa&lt;T&gt; e Tarefa&lt;T&gt;</td>
+                <td>Tipos nativos do CGD para funções assincrona e rotinas paralelas.</td>
               </tr>
               <tr>
                 <td>qualquer, classe, interface, funcao, tupla</td>
-                <td>
-                  Sem instanciação implícita: ausência de inicializador permanece nulo. Tipos
-                  explícitos são conferidos nas atribuições/chamadas correspondentes.
-                </td>
+                <td>Começam como nulo quando declarados sem valor inicial.</td>
               </tr>
             </tbody>
           </table>
         </div>
-        <h3>Decisão: defaults previsíveis</h3>
-        <p>
-          Valores primitivos e coleções têm um estado inicial útil sem depender do construtor.
-          Objetos e funções não são construídos automaticamente: isso poderia executar código,
-          falhar ou criar dependências inesperadas. Inicializadores explícitos sempre prevalecem.
-        </p>
         <details>
           <summary>linguagem/01_tipos.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/01_tipos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// Declaração, valores primitivos e tipo de em execução.
@@ -308,7 +477,7 @@ escreva(tipo de idade, &quot; &quot;, tipo de medida, &quot; &quot;, tipo de &qu
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/03_atribuicoes.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var a: numero, b: numero = 1, 2
@@ -324,7 +493,7 @@ escreva(destino = 5)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/25_escopos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var x: numero = 1
@@ -345,8 +514,9 @@ escreva(criar()(4))</code></pre>
         </details>
 
         <p class="callout">
-          Constante impede reatribuir o vínculo; coleções continuam tendo sua mutabilidade própria.
-          Inteiros/longo têm 64 bits e reais/decimal usam ponto flutuante de 64 bits. Não há bigint.
+          const impede reatribuir a variável, mas se ela guardar um vetor ou dicionário, você ainda
+          pode alterar os itens lá dentro. Inteiros têm 64 bits verificados e reais usam ponto
+          flutuante de 64 bits (não existe BigInt).
         </p>
       </section>
       <section
@@ -357,33 +527,34 @@ escreva(criar()(4))</code></pre>
       >
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-operadores">Operadores e ordem de avaliação</h2>
-        <p>
-          Some, compare e combine valores. Além da conta em si, importa a ordem: argumentos e
-          índices são avaliados na ordem em que aparecem no código.
+        <p class="section-intro">
+          Contas matemáticas, comparações, lógica e operadores bit a bit funcionam do jeito que você
+          espera — e sempre avaliam da esquerda para a direita, sem surpresas quando você ativa
+          otimizações.
         </p>
-        <h3>Comparações textuais</h3>
+        <h3>Comparando textos</h3>
         <p>
-          &lt;, &lt;=, &gt; e &gt;= entre textos usam ordem lexicográfica dos pontos de código
-          Unicode em UTF-8 válido, incluindo textos com zero interno. Prefixo mais curto vem antes.
-          Não há ordenação por idioma, normalização ou comparação sem acentos. Runtime, dobras de
-          literais e CTFE compartilham o resultado.
+          Os operadores &lt;, &lt;=, &gt; e &gt;= funcionam também com textos, comparando pela ordem
+          dos pontos de código Unicode em UTF-8. Textos menores que são prefixo vêm primeiro
+          (&quot;a&quot; &lt; &quot;ab&quot;). Misturar texto com número em comparações não faz
+          conversão mágica escondida.
         </p>
-        <pre><code>var ch: texto = &#x27;5&#x27;
-se ch &gt;= &#x27;0&#x27; e ch &lt;= &#x27;9&#x27; { escreva(&#x27;dígito ASCII&#x27;) }
-escreva(&#x27;ação&#x27; &gt; &#x27;a&#x27;)</code></pre>
-        <h3>Efeitos e precedência</h3>
+        <pre><code>var letra: texto = &#x27;5&#x27;
+se letra &gt;= &#x27;0&#x27; e letra &lt;= &#x27;9&#x27; {
+    escreva(&#x27;É um dígito&#x27;)
+}</code></pre>
+        <h3>Curto-circuito e efeitos previsíveis</h3>
         <p>
-          Operandos, receptor e argumentos mantêm a ordem da fonte. e/ou/?: avaliam apenas o lado
-          necessário. Atribuições compostas e incrementos avaliam o destino uma vez. Comparações
-          misturando texto e número não fazem conversão textual silenciosa. Use parênteses quando a
-          intenção de precedência não ficar clara.
+          e, ou e ?: só avaliam o lado direito quando realmente precisam, e retornam o próprio valor
+          escolhido. Atribuições compostas (+=, -=, *=, /=, %=) e incrementos (++ / --) avaliam o
+          destino uma única vez.
         </p>
         <details>
           <summary>linguagem/02_operadores.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/02_operadores.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// Potência, divisão inteira, bits, comparação e curto-circuito.
@@ -395,7 +566,7 @@ escreva(3 != 4, falso e (1 / 0), nulo ?: 10)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/35_bits_e_atribuicoes.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var n: numero = 8
@@ -410,8 +581,9 @@ escreva(++a + 1)</code></pre>
         </details>
 
         <p class="callout">
-          e/ou retornam o valor selecionado. 0, texto vazio e coleções vazias são verdadeiros; falso
-          e nulo são falsos. ?: troca somente nulo. Overflow e divisão por zero lançam exceção.
+          No CGD, apenas falso e nulo contam como falsos em condições; 0, &quot;&quot; e [] contam
+          como verdadeiros. O operador ?: substitui apenas nulo. Divisão por zero e overflow lançam
+          exceção (e quando são constantes, o compilador já avisa antes de rodar).
         </p>
       </section>
       <section
@@ -422,32 +594,35 @@ escreva(++a + 1)</code></pre>
       >
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-controle">Condições, escolha e laços</h2>
-        <p>
-          Seu programa precisa escolher caminhos e repetir tarefas. Comece com se e enquanto; depois
-          experimente escolha, para cada e as formas de encerrar uma repetição.
+        <p class="section-intro">
+          Para tomar decisões no seu programa, use se/senao, ternário ? : ou escolha/caso. Para
+          repetir tarefas, use enquanto, faca/enquanto, para ou para cada.
         </p>
-        <h3>Blocos e desvios</h3>
+        <h3>Decisões limpas com se, ternário e escolha</h3>
         <p>
-          Blocos usam chaves. se/senao e escolha/caso selecionam comandos. sustar sai do
-          laço/escolha; continua passa à próxima iteração. finalmente ainda executa em
-          transferências de controle. Um comando depois de retorno ou falha pode gerar aviso de
-          código inalcançável.
+          Blocos sempre usam chaves { }. No se e no enquanto, os parênteses em volta da condição são
+          opcionais. No escolha, você pode empilhar vários casos que executam o mesmo bloco e usar
+          padrao para o resto.
         </p>
-        <h3>Iteração com tipo</h3>
+        <pre><code>var idade: inteiro = 20
+escreva(idade &gt;= 18 ? &quot;adulto&quot; : &quot;menor&quot;)</code></pre>
+        <h3>Percorrendo coleções com para cada</h3>
         <p>
-          para cada elem: T em coleção valida o vínculo a cada iteração. Vetores produzem elementos;
-          texto produz caracteres por ponto de código; dicionários produzem pares chave/valor.
-          Desestruturações e compreensões também aceitam tipos. Não se promete snapshot quando a
-          coleção é alterada durante a própria iteração.
+          O para cada percorre vetores (elemento por elemento), textos (caractere Unicode por
+          caractere) e dicionários (pares chave/valor). Você pode anotar o tipo do elemento direto
+          no laço — e se não anotar, o compilador infere automaticamente quando conhece o tipo da
+          coleção.
         </p>
-        <pre><code>var valores: inteiro[] = [1, 2, 3]
-para cada valor: inteiro em valores { escreva(valor) }</code></pre>
+        <pre><code>var numeros: inteiro[] = [10, 20, 30]
+para cada n: inteiro em numeros {
+    escreva(n)
+}</code></pre>
         <details>
           <summary>linguagem/04_condicionais.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/04_condicionais.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var idade: numero = 20
@@ -464,7 +639,7 @@ escolha 2 {
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/05_lacos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>para (var i: numero = 0; i &lt; 4; i++) {
@@ -496,7 +671,7 @@ escreva(soma)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/34_lacos_variantes.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var i: numero = 0
@@ -519,7 +694,11 @@ escreva(segundo)
 escreva(terceiro)</code></pre>
         </details>
 
-        <p class="callout"></p>
+        <p class="callout">
+          sustar sai do laço ou do escolha; continua pula para a próxima volta. Mesmo quando você
+          usa sustar, continua ou retorna, qualquer bloco finalmente no caminho continua sendo
+          executado.
+        </p>
       </section>
       <section
         class="doc-section guide-chapter"
@@ -529,30 +708,26 @@ escreva(terceiro)</code></pre>
       >
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-coletores">Laços como expressões</h2>
-        <p>
-          Às vezes o resultado de um laço é justamente a lista que ele produz. Um coletor permite
-          escrever essa transformação sem montar o vetor à mão.
+        <p class="section-intro">
+          Em vez de criar um vetor vazio antes e ficar chamando .adicionar() dentro de um laço, você
+          pode usar o próprio laço como expressão para montar o resultado.
         </p>
-        <h3>Construir um vetor com um laço</h3>
+        <h3>Montando vetores direto no laço</h3>
         <p>
-          Laços usados como expressão acumulam valores. retorna dentro do corpo coletor acrescenta
-          ao resultado, em vez de sair da função externa. Condições, efeitos e finalmente continuam
-          em ordem; sustar encerra a coleta e continua passa à próxima iteração.
+          Qualquer laço (para, enquanto, para cada) pode devolver um vetor se for usado do lado
+          direito de uma atribuição ou dentro de uma expressão. Cada retorna dentro do corpo empurra
+          mais um valor para o vetor final.
         </p>
-        <pre><code>var quadrados = para (var i: inteiro = 0; i &lt; 4; i++) { retorna i*i }
-escreva(quadrados)</code></pre>
-        <h3>Coleta não é execução antecipada</h3>
-        <p>
-          Uma expressão de laço é executada no programa, a menos que um passe especificamente prove
-          uma simplificação segura. Capturas não são necessárias para construir o resultado e o
-          código não é executado pelo editor.
-        </p>
+        <pre><code>var quadrados = para (var i: inteiro = 0; i &lt; 4; i++) {
+    retorna i * i
+}
+escreva(quadrados) // [0, 1, 4, 9]</code></pre>
         <details>
           <summary>linguagem/06_lacos_resultado.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/06_lacos_resultado.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// Retornos dentro de uma expressão de laço acumulam os valores.
@@ -570,7 +745,10 @@ escreva(quadrados)
 escreva(pares)</code></pre>
         </details>
 
-        <p class="callout"></p>
+        <p class="callout">
+          Dentro de um laço usado como expressão, retorna adiciona um item ao vetor resultante em
+          vez de encerrar a função externa.
+        </p>
       </section>
       <section
         class="doc-section guide-chapter"
@@ -579,50 +757,61 @@ escreva(pares)</code></pre>
         aria-labelledby="title-funcoes"
       >
         <span class="status-badge status-suportado">Disponível</span>
-        <h2 id="title-funcoes">Funções e parâmetros</h2>
-        <p>
-          Dê nome a uma operação para usá-la de novo. Depois, passe funções como argumentos e
-          experimente valores padrão, argumentos variáveis e callbacks sem captura.
+        <h2 id="title-funcoes">Funções, assincronismo e rotinas paralelas</h2>
+        <p class="section-intro">
+          Funções organizam e reaproveitam lógica. No CGD você escreve funções normais, funções seta
+          (=&gt;), funções assíncronas (assincrona/aguardar) e tarefas paralelas em threads
+          (rotina).
         </p>
-        <h3>Parâmetros e retornos</h3>
+        <h3>Funções normais, valores padrão e arrows (=&gt;)</h3>
         <p>
-          Use funcao/função, argumentos tipados opcionais e retorno após dois-pontos. Parâmetros
-          opcionais devem vir depois dos obrigatórios; o espalhamento deve ser o último. Um
-          parâmetro padrão pode usar parâmetros anteriores. Sem retorna, o valor final é nulo, não a
-          última expressão.
+          Declare funções com funcao (ou função), parâmetros opcionais com = valor e argumentos
+          variáveis no final com ...nome. Se uma função terminar sem retorna, ela devolve nulo.
+          Funções anônimas e arrows (=&gt;) funcionam como callbacks sem captura.
         </p>
         <pre><code>funcao somar(a: inteiro, b: inteiro = 1): inteiro {
     retorna a + b
 }
-var duplicar: funcao = (x: inteiro): inteiro =&gt; x * 2</code></pre>
-        <h3>Sem captura implícita</h3>
+const dobrar: funcao = (x: inteiro): inteiro =&gt; x * 2</code></pre>
+        <h3>Funções assíncronas: assincrona, aguardar e Promessa&lt;T&gt;</h3>
         <p>
-          Funções e arrows podem ser valores e callbacks. Não carregam variáveis do ambiente
-          externo: passe os dados por parâmetros. Capturas geram aviso e erro. Métodos ligados
-          mantêm seu receptor explicitamente gerenciado. Esta decisão evita introduzir um ambiente
-          de closures com semântica parcial.
-        </p>
-        <h3>Assincronismo experimental do CGD</h3>
-        <p>
-          assincrona funcao f(): T inicia imediatamente e devolve Promessa&lt;T&gt;. aguardar
-          suspende apenas o corpo assíncrono atual e retoma por uma microtask, inclusive para
-          resultados prontos. O runtime drena essas continuações depois da raiz síncrona. Não há
-          threads paralelas.
+          Uma funcao marcada como assincrona devolve automaticamente uma Promessa&lt;T&gt;. Dentro
+          dela, você usa aguardar para esperar temporizadores, requisições HTTP, sockets TCP ou
+          outras promessas sem travar o resto do programa — tudo coordenado por um reactor epoll no
+          runtime C.
         </p>
         <p>
-          Funções e métodos assíncronos aceitam tente/pegue/finalmente, laços, escolha, compreensões
-          e spread. Classes locais em corpos assíncronos recebem E3305. Promessa oferece
-          combinadores e cancelamento cooperativo. O módulo cgd:assincrono fornece temporizadores,
-          cliente HTTP e TCP sobre o reactor Linux. As bibliotecas Tempo, Rede e Processo mantêm
-          suas operações síncronas. Os contratos e limites experimentais estão em
-          docs/assincronismo.md.
+          Promessa também traz combinadores estáticos prontos: Promessa.resolvida,
+          Promessa.rejeitada, Promessa.todas, Promessa.corrida, Promessa.qualquer e
+          Promessa.todasResolvidas, além de cancelamento cooperativo (.cancelar()).
         </p>
+        <pre><code>assincrona funcao buscarDados(): texto {
+    const Tempo: qualquer = importar(&quot;cgd:assincrono&quot;).Tempo
+    aguardar Tempo.dormir(10)
+    retorna &quot;pronto&quot;
+}</code></pre>
+        <h3>Paralelismo real: rotina, Tarefa&lt;T&gt; e Canal</h3>
+        <p>
+          Quando você quer fazer trabalho pesado de CPU em paralelo em outro núcleo, use rotina
+          minhaFuncao(args). Ela dispara a função num pool de threads nativo e devolve uma
+          Tarefa&lt;T&gt;, que você espera com aguardar.
+        </p>
+        <p>
+          Para evitar condições de corrida e bugs difíceis de rastrear, o compilador audita a função
+          em tempo de compilação (E3401–E3404): rotinas só aceitam argumentos e retornos
+          transferíveis (nulo, lógico, inteiro, real ou texto copiado) e não podem mexer em estado
+          global mutável. Para trocar mensagens entre tarefas, use Canal e GrupoTarefas em
+          cgd:assincrono.
+        </p>
+        <pre><code>const t1: Tarefa&lt;inteiro&gt; = rotina fib(12)
+const t2: Tarefa&lt;inteiro&gt; = rotina fib(14)
+escreva(aguardar t1, aguardar t2)</code></pre>
         <details>
           <summary>linguagem/07_funcoes.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/07_funcoes.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>funcao soma(a: inteiro, b: inteiro = a + 2): inteiro {
@@ -641,7 +830,7 @@ escreva(reunir(1, ...[2, 3]))</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/08_funcoes_valores.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>funcao dobro(x: qualquer): qualquer {
@@ -667,7 +856,7 @@ escreva(mapear([1, 2, 3], funcao(x: qualquer): qualquer {
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/41_assincronismo.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>assincrona funcao maisUm(valor: inteiro): inteiro {
@@ -685,10 +874,60 @@ escreva(&quot;raiz&quot;)
 mostrar()
 escreva(&quot;continua&quot;)</code></pre>
         </details>
+        <details>
+          <summary>linguagem/42_rotinas.delegua</summary>
+          <p>
+            <a
+              href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/42_rotinas.delegua"
+              >Abrir arquivo completo e contrato de teste no GitHub</a
+            >
+          </p>
+          <pre><code>funcao fib(n: inteiro): inteiro {
+    se n &lt;= 1 {
+        retorna n
+    }
+
+    retorna fib(n - 1) + fib(n - 2)
+}
+
+assincrona funcao produtor(canal: qualquer): vazio {
+    para var i: inteiro = 1; i &lt;= 5; i++ {
+        aguardar canal.enviar(i * 10)
+    }
+
+    canal.fechar()
+}
+
+assincrona funcao principal(): vazio {
+    const Async: qualquer = importar(&quot;cgd:assincrono&quot;)
+    const t1: Tarefa&lt;inteiro&gt; = rotina fib(10)
+    const t2: Tarefa&lt;inteiro&gt; = rotina fib(12)
+    escreva(aguardar t1)
+    escreva(aguardar t2)
+
+    const ch: qualquer = Async.Canal(2)
+    const envio: Promessa&lt;vazio&gt; = produtor(ch)
+    var soma: inteiro = 0
+    enquanto verdadeiro {
+        tente {
+            soma = soma + aguardar ch.receber()
+        } pegue (erro: Excecao) {
+            sustar
+        }
+    }
+
+    aguardar envio
+    escreva(soma)
+    escreva(ch.fechado())
+}
+
+principal()</code></pre>
+        </details>
 
         <p class="callout">
-          Capturas de variáveis externas são bloqueadas. Passe o estado explicitamente por
-          parâmetros; um método ligado mantém apenas seu receptor gerenciado.
+          No CGD, funções nunca capturam variáveis externas (upvalues). Passe tudo por parâmetro ou
+          use métodos de classe. Assincronismo e rotinas são recursos nativos do CGD, distintos da
+          wiki base da Delégua.
         </p>
       </section>
       <section
@@ -699,32 +938,30 @@ escreva(&quot;continua&quot;)</code></pre>
       >
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-vetores">Vetores, compreensão e fatias</h2>
-        <p>
-          Vetores guardam uma sequência que pode mudar. Você pode acessar posições, percorrer os
-          elementos, escolher uma fatia ou construir outro vetor com uma compreensão.
+        <p class="section-intro">
+          Vetores guardam listas ordenadas de valores. Você pode tipar o vetor (inteiro[]), recortar
+          fatias com passo (valores[::-1]), espalhar elementos (...lista) e criar listas filtradas
+          em uma linha.
         </p>
-        <h3>Literais, spread e compreensão</h3>
+        <h3>Literais, espalhamento (...) e compreensão</h3>
         <p>
-          Use [a, b] para vetor; ... espalha elementos. Compreensão filtra e transforma em um novo
-          vetor, sem mudar a coleção original. O vínculo de iteração pode ter anotação.
+          Use colchetes [1, 2, 3] para criar um vetor e ... para espalhar elementos dentro de outro
+          vetor. Compreensões criam um vetor novo filtrando e transformando sem alterar o original.
         </p>
-        <pre><code>var original: inteiro[] = [1, 2, 3]
-var copia: inteiro[] = [...original, 4]
-var pares = [x*2 para cada x: inteiro em original se x &gt; 1]</code></pre>
-        <h3>Fatias e métodos</h3>
+        <pre><code>var base: inteiro[] = [1, 2, 3]
+var maior: inteiro[] = [...base, 4]
+var pares = [x * 2 para cada x: inteiro em maior se x % 2 == 0]</code></pre>
+        <h3>Fatias com [inicio:fim:passo]</h3>
         <p>
-          v[inicio:fim:passo] usa fim exclusivo. Início/fim podem ser omitidos, passo pode ser
-          negativo e zero é inválido. Métodos incluem adicionar/empilhar, remover,
-          removerPrimeiro/removerUltimo, inverter, somar, juntar, concatenar, encaixar, ordenar,
-          mapear e filtrarPor. As operações que mutam atuam sobre aliases da mesma coleção; fatiar e
-          concatenar produzem resultados próprios. Callbacks são funções sem captura.
+          O fim da fatia é exclusivo. Você pode omitir início ou fim, e usar passo negativo para
+          inverter rapidamente (valores[::-1]). Passo zero é bloqueado já na compilação (E3108).
         </p>
         <details>
           <summary>linguagem/09_vetores.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/09_vetores.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var valores: qualquer[] = [3, 1, 2]
@@ -738,7 +975,7 @@ escreva(removidos, valores)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/10_compreensao_fatias.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var valores: qualquer[] = [1, 2, 3, 4, 5]
@@ -750,7 +987,7 @@ escreva(valores[::-1], valores[::2])</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/22_contratos_aliases.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var numeros: inteiro[] = [1]
@@ -769,7 +1006,7 @@ escreva(numeros)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/30_metodos_vetor.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var v: qualquer[] = [1, 2]
@@ -789,10 +1026,10 @@ escreva([1, 2, 3].filtrarPor(funcao(x: qualquer): qualquer {
         </details>
 
         <p class="callout">
-          Métodos: adicionar, empilhar, tamanho, inclui/contem/contém, fatiar, mapear, filtrarPor,
-          remover, removerPrimeiro, removerUltimo, inverter, somar, juntar, concatenar, encaixar e
-          ordenar. Restrições por aliases são monotônicas; modificar durante a iteração não cria
-          snapshot. filtrar global recebe vetor e função; não existe método reduzir neste perfil.
+          Métodos de vetor: adicionar, empilhar, tamanho, inclui/contem/contém, fatiar, mapear,
+          filtrarPor, remover, removerPrimeiro, removerUltimo, inverter, somar, juntar, concatenar,
+          encaixar e ordenar. Em vetores tipados (ex.: inteiro[]), o compilador já rejeita inserções
+          de tipo errado estaticamente.
         </p>
       </section>
       <section
@@ -803,35 +1040,33 @@ escreva([1, 2, 3].filtrarPor(funcao(x: qualquer): qualquer {
       >
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-dicionarios">Dicionários, tuplas e clonagem</h2>
-        <p>
-          Use um dicionário para procurar um valor pela chave, e uma tupla para reunir valores sem
-          mudar sua estrutura. Neste capítulo, você também verá como copiar coleções sem perder suas
-          relações.
+        <p class="section-intro">
+          Dicionários associam chaves a valores; tuplas agrupam valores fixos que não podem ser
+          alterados depois de criados. E quando você precisar de uma cópia independente, existe
+          clonar().
         </p>
-        <h3>Chaves, pares e presença</h3>
+        <h3>Trabalhando com dicionários</h3>
         <p>
-          Dicionários usam chaves nulas, lógicas, numéricas ou textuais. A chave 1 e a chave 1.0
-          identificam a mesma entrada; verdadeiro é uma chave diferente. Chaves numéricas não
-          finitas são rejeitadas. A ordem de iteração não é ordem de inserção prometida.
+          Chaves podem ser texto, número, lógico ou nulo. Use .obter(chave, padrao) para ler com
+          segurança e .contemChave(chave) para saber se a chave existe (mesmo quando o valor
+          guardado for nulo). Outros métodos úteis: definir, remover, chaves, valores, itens,
+          tamanho e limpar.
         </p>
-        <pre><code>var dados: dicionario = { nome: &quot;Ana&quot;, ativo: nulo }
-escreva(dados.obter(&quot;nome&quot;, &quot;sem nome&quot;))
-escreva(dados.contemChave(&quot;ativo&quot;))
-para cada par: qualquer em dados { escreva(par[0], par[1]) }</code></pre>
-        <h3>Tuplas, desestruturação e cópia</h3>
+        <pre><code>var perfil: dicionario = { nome: &quot;Ana&quot;, pontos: 10 }
+escreva(perfil.obter(&quot;nome&quot;, &quot;Visitante&quot;))
+escreva(perfil.contemChave(&quot;pontos&quot;))</code></pre>
+        <h3>Tuplas imutáveis e clonagem profunda</h3>
         <p>
-          Literais como (1, &quot;a&quot;) criam tuplas imutáveis; tupla(vetor) converte coleções de
-          2 a 10 elementos. Propriedades ordinais como primeiro e segundo dão acesso aos membros.
-          Desestruturação const { nome: texto } = dados cria um vínculo, sem copiar profundamente o
-          objeto. clonar suporta ciclos e mantém identidades compartilhadas dentro da cópia; não
-          clona código de função nem abre outro recurso nativo.
+          Crie tuplas com (1, &quot;a&quot;) ou tupla(vetor) (de 2 a 10 itens). Além do índice [0],
+          tuplas aceitam propriedades ordinais como .primeiro, .segundo até .decimo. Para copiar
+          coleções aninhadas (inclusive com ciclos) sem compartilhar referências, use clonar(valor).
         </p>
         <details>
           <summary>linguagem/11_dicionarios.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/11_dicionarios.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var original: dicionario = { a: 1 }
@@ -853,7 +1088,7 @@ escreva(&quot;a&quot; em dados)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/12_tuplas.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// Tuplas possuem acesso por índice e por propriedades ordinais.
@@ -867,7 +1102,7 @@ escreva(tipada)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/20_clonagem.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var original: dicionario = { dados: [1] }
@@ -885,7 +1120,7 @@ escreva(clonado[0] == clonado)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/31_metodos_dicionario.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var d: dicionario = { b: 2, a: 1 }
@@ -899,7 +1134,7 @@ escreva(d.obter(&quot;a&quot;))</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/37_dicionario_obter.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var dados: dicionario = { &quot;presente&quot;: nulo }
@@ -914,10 +1149,8 @@ escreva(tamanho(dados))</code></pre>
         </details>
 
         <p class="callout">
-          Dicionários: chaves, valores, tamanho, remover e inclui/contem/contém. Tuplas: tamanho,
-          inclui/contem/contém e fatiar, além das propriedades ordinais demonstradas. A iteração de
-          dicionários não garante ordem de inserção. Dicionários também oferecem obter(chave,
-          padrão), definir, contemChave, itens e limpar. Nulo armazenado não é ausência.
+          Dicionários não garantem ordem de inserção ao iterar. Tentar modificar um item de uma
+          tupla (t[0] = 3) agora é pego em tempo de compilação com o erro E3110.
         </p>
       </section>
       <section
@@ -928,41 +1161,25 @@ escreva(tamanho(dados))</code></pre>
       >
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-texto">Texto, Unicode e interpolação</h2>
-        <p>
-          Acentos e outros caracteres fazem parte do texto. O CGD usa UTF-8 e conta posições por
-          pontos de código; vamos ver o que isso significa ao medir, percorrer e recortar uma
-          string.
+        <p class="section-intro">
+          Acentos, emojis e caracteres especiais funcionam nativamente em UTF-8. Os índices e
+          .tamanho() contam caracteres (pontos de código Unicode), não bytes soltos.
         </p>
-        <h3>Unicode e índices</h3>
+        <h3>Interpolação com ${...}</h3>
         <p>
-          Textos preservam UTF-8 e indexam pontos de código, não bytes nem grafemas. A letra com
-          acento combinante pode ocupar mais de um índice. tamanho conta pontos de código; I/O mede
-          limites em bytes. Não há normalização Unicode automática: preservar os dados evita
-          modificar identificadores, mensagens e conteúdo externo.
+          Qualquer expressão dentro de ${...} em uma string é avaliada na ordem em que aparece e
+          convertida para texto — inclusive expressões com aspas internas, como
+          &quot;valor=${mapa[&quot;chave&quot;]}&quot;.
         </p>
-        <h3>Interpolação e escapes</h3>
-        <p>
-          ${expressao} insere o valor textual da expressão e preserva a ordem de avaliação. Aspas
-          simples e duplas delimitam texto. Escapes incluem quebra de linha, tabulação, barra e zero
-          interno. O formatador conserva o literal exatamente.
-        </p>
-        <pre><code>var nome: texto = &quot;Ana&quot;
-escreva(&quot;Olá, ${nome}\n&quot;)
-escreva(&quot;ação&quot;[1])</code></pre>
-        <h3>Métodos de texto</h3>
-        <p>
-          tamanho, inclui/contem/contém, fatiar/subtexto, aparar/apararInicio/apararFim,
-          maiusculo/minusculo, tudoMaiusculo/tudoMinusculo, encontrar, dividir, substituir e
-          concatenar compõem a API textual. Operações de caixa usam Unicode. Encontrar retorna
-          posição por pontos de código. As comparações são lexicográficas; para ordens por idioma
-          use uma biblioteca explicitamente adequada.
-        </p>
+        <pre><code>var cidade: texto = &quot;São Paulo&quot;
+escreva(&quot;Bem-vindo a ${cidade}!&quot;)
+escreva(&quot;ação&quot;[1]) // ç</code></pre>
         <details>
           <summary>linguagem/13_texto_unicode.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/13_texto_unicode.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>escreva(tamanho(&quot;ação&quot;), &quot;ação&quot;[1], &quot;ação&quot;[1:3])
@@ -975,7 +1192,7 @@ escreva(&quot;valor ${n + 1}&quot;)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/28_metodos_texto.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// Busca, divisão, substituição e testes de caixa.
@@ -985,9 +1202,10 @@ escreva(&quot;ABC&quot;.tudoMaiusculo(), &quot;abc&quot;.tudoMinusculo())</code>
         </details>
 
         <p class="callout">
-          Métodos: tamanho, inclui/contem/contém, fatiar/subtexto, aparar, apararInicio, apararFim,
-          maiusculo/tudoMaiusculo, minusculo/tudoMinusculo, encontrar, dividir, substituir e
-          concatenar. Pontos de código não equivalem a grafemas visuais.
+          Textos são imutáveis — tentar fazer s[0] = &quot;a&quot; gera erro estático E3110. Métodos
+          disponíveis: tamanho, inclui/contem/contém, fatiar/subtexto, aparar, apararInicio,
+          apararFim, maiusculo, minusculo, tudoMaiusculo, tudoMinusculo, encontrar, dividir,
+          substituir e concatenar.
         </p>
       </section>
       <section
@@ -997,50 +1215,52 @@ escreva(&quot;ABC&quot;.tudoMaiusculo(), &quot;abc&quot;.tudoMinusculo())</code>
         aria-labelledby="title-classes"
       >
         <span class="status-badge status-parcial">Com limites</span>
-        <h2 id="title-classes">Classes, herança e acessores</h2>
-        <p>
-          Use classes para reunir os dados e as operações de uma mesma ideia. Vamos começar com
-          atributos, métodos e valores iniciais; depois veremos herança e controle de acesso.
+        <h2 id="title-classes">Classes, herança, mescla e estáticos</h2>
+        <p class="section-intro">
+          Classes juntam dados e comportamento num só lugar. No CGD você conta com inicializadores
+          por instância, herança (herda), composição por mixins (mescla), campos e métodos
+          estáticos, privacidade e destrutores explícitos.
         </p>
-        <h3>Atributos e inicializadores</h3>
+        <h3>Atributos, defaults e inicializadores por objeto</h3>
         <p>
-          Você pode dar um valor ao atributo na própria classe. Ele será calculado a cada objeto
-          criado: dois objetos não compartilham o mesmo vetor só porque o atributo foi declarado uma
-          vez. Primeiro vêm os atributos da base, depois os da classe derivada, sempre na ordem da
-          declaração. O construtor roda em seguida, com esses valores já disponíveis.
-        </p>
-        <p>
-          Se um inicializador usa outro atributo, declare esse atributo antes. A inicialização grava
-          o valor inicial diretamente, sem chamar um setter personalizado.
+          Você pode dar valores iniciais direto nos campos da classe. Cada instância nova recebe sua
+          própria avaliação — então um campo historico: inteiro[] = [] nunca é compartilhado por
+          acidente entre dois objetos. Os campos da classe base inicializam primeiro, depois os da
+          derivada e por fim roda o construtor.
         </p>
         <pre><code>classe Contador {
+    estatico totalCriados: inteiro = 0
     valor: inteiro = 1
     historico: inteiro[]
-    incrementar(): vazio { isto.valor++ }
-}
-var a: Contador = Contador()
-var b: Contador = Contador()
-a.historico.adicionar(3) // b.historico continua vazio</code></pre>
-        <h3>Herança e ciclo de vida</h3>
+
+    construtor() {
+        Contador.totalCriados++
+    }
+}</code></pre>
+        <h3>Herança (herda) e composição (mescla)</h3>
         <p>
-          herda aceita uma classe base. Métodos públicos/protegidos são resolvidos com sua
-          visibilidade; privado pertence à classe declaradora. super chama a implementação da base.
-          O construtor da base deve ser chamado explicitamente quando necessário. destruir(objeto)
-          percorre destrutores da derivada às bases uma vez por identidade, mesmo se houver exceção;
-          o primeiro erro é relançado. O GC gerencia memória, mas não executa destrutores Delégua.
+          Use herda para especializar uma classe base (chamando super quando quiser reaproveitar a
+          implementação do pai). Quando quiser reutilizar métodos e campos de várias classes sem
+          cair em herança múltipla, use classe MinhaClasse mescla MixinA, MixinB.
         </p>
-        <h3>Por que esses limites?</h3>
         <p>
-          Campos estáticos não são suportados; métodos estáticos não recebem isto. Classes só
-          existem no módulo. O compilador preserva acesso, contratos e aliases em C. Não se inventa
-          um construtor ao ler um campo tipado sem inicializador de objeto: ele começa nulo.
+          Cada mixin mantém sua própria privacidade, seus inicializadores de campo funcionam
+          automaticamente e eInstanciaDe reconhece tanto a hierarquia de herança quanto os mixins e
+          interfaces.
+        </p>
+        <h3>Privacidade, acessores e destrutor explícito</h3>
+        <p>
+          Agrupe membros em publico { }, protegido { } ou privado { }. Propriedades aceitam
+          acessores personalizados obter() e definir(valor). Para liberar recursos determinísticos,
+          declare destrutor(): vazio e chame destruir(objeto) dentro de um bloco finalmente — o
+          Boehm GC cuida da memória, não de destrutores Delégua.
         </p>
         <details>
           <summary>linguagem/14_classes.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/14_classes.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>classe Ponto {
@@ -1065,7 +1285,7 @@ escreva(ponto.dobro())</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/15_heranca.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>classe Base {
@@ -1106,7 +1326,7 @@ escreva(filha.eInstanciaDe(Base))</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/16_privacidade_acessores.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>classe Conta {
@@ -1137,7 +1357,7 @@ escreva(conta.saldo)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/32_objeto_e_metodos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>classe Pessoa {
@@ -1162,7 +1382,7 @@ escreva(p)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/36_destrutores.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>classe Base {
@@ -1192,7 +1412,7 @@ escreva(&quot;fim&quot;)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/39_inicializacao.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var n: numero
@@ -1216,12 +1436,55 @@ escreva(tamanho(segunda.itens), tamanho(primeira.itens))
 var ch: texto = &quot;5&quot;
 escreva(ch &gt;= &#x27;0&#x27; e ch &lt;= &#x27;9&#x27;, &quot;ação&quot; &gt; &quot;a&quot;)</code></pre>
         </details>
+        <details>
+          <summary>linguagem/43_estaticos_mescla.delegua</summary>
+          <p>
+            <a
+              href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/43_estaticos_mescla.delegua"
+              >Abrir arquivo completo e contrato de teste no GitHub</a
+            >
+          </p>
+          <pre><code>funcao de decorador triplicar(original: funcao): funcao {
+    retorna funcao(alvo: qualquer, x: inteiro): inteiro {
+        retorna x * 3
+    }
+}
+
+classe Etiquetavel {
+    prefixo: texto = &quot;Etiqueta:&quot;
+
+    rotulo(nome: texto): texto {
+        retorna isto.prefixo + nome
+    }
+}
+
+classe Registro mescla Etiquetavel {
+    estatico criados: inteiro = 0
+    nome: texto
+
+    construtor(nome: texto) {
+        isto.nome = nome
+        Registro.criados = Registro.criados + 1
+    }
+
+    @triplicar
+    escalar(x: inteiro): inteiro {
+        retorna x
+    }
+}
+
+const a: Registro = Registro(&quot;Ana&quot;)
+const b: Registro = Registro(&quot;Bia&quot;)
+escreva(Registro.criados)
+escreva(a.rotulo(a.nome))
+escreva(b.eInstanciaDe(Etiquetavel))
+escreva(a.escalar(10))</code></pre>
+        </details>
 
         <p class="callout">
-          Classes devem estar no nível do módulo. Campos são declarados; não há injeção arbitrária
-          de campos. Herança por alias dinâmico de classe importada e tipos locais não têm resolução
-          completa. Destrutores explícitos via destruir(instancia), da derivada às bases;
-          idempotência por identidade, sem chamadas pelo GC ou ao sair do escopo.
+          Classes são declaradas no nível do módulo. Campos precisam ser declarados na classe;
+          acessar um campo ou método que não existe gera erro estático E3109 com sugestão do nome
+          mais parecido (preservando acesso polimórfico a subclasses).
         </p>
       </section>
       <section
@@ -1232,37 +1495,35 @@ escreva(ch &gt;= &#x27;0&#x27; e ch &lt;= &#x27;9&#x27;, &quot;ação&quot; &gt;
       >
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-excecoes">Exceções e limpeza</h2>
-        <p>
-          Uma operação pode falhar, e seu programa pode se preparar para isso. Use tente e pegue
-          para tratar a falha, e finalmente para fazer a limpeza que precisa acontecer em qualquer
-          caminho.
+        <p class="section-intro">
+          Erros acontecem — arquivo que não existe, JSON inválido, divisão por zero. Use tente e
+          pegue para lidar com eles sem derrubar o programa, e finalmente para garantir a limpeza.
         </p>
-        <h3>Lançar, capturar e limpar</h3>
+        <h3>tente, pegue tipado e finalmente</h3>
         <p>
-          falhar aceita um erro ou valor convertido em Excecao. pegue pode ter vínculo e tipo;
-          finalmente roda também em retorno, sustar, continua e nova falha. O caminho que propaga o
-          erro conserva o valor de exceção; a localização vem da operação falível.
+          Use falhar para lançar um erro (texto ou instância de Excecao/subclasse). Você pode ter
+          vários blocos pegue filtrando por tipo de exceção. O bloco finalmente sempre roda — tenha
+          dado certo, dado erro ou executado um retorna.
         </p>
         <pre><code>tente {
     falhar &quot;entrada inválida&quot;
 } pegue (erro: Excecao) {
     escreva(erro.mensagem)
 } finalmente {
-    escreva(&quot;limpeza&quot;)
+    escreva(&quot;limpeza garantida&quot;)
 }</code></pre>
-        <h3>Decisão: falha observável</h3>
+        <h3>Erros estáticos dentro de tente/pegue</h3>
         <p>
-          Otimizações não apagam exceções nem executam um lado descartado de curto-circuito. Falha
-          constante em região deliberadamente capturada recebe aviso estático quando suportado.
-          R0001 agrupa erros dinâmicos; ainda não há uma pilha Delégua completa. Recursos externos
-          devem ser fechados explicitamente ou em finalmente, sem depender do GC.
+          Quando o compilador prova que uma operação sempre vai falhar (como 1 / 0), ele barra a
+          compilação com E3101. Mas se essa linha estiver dentro de um tente/pegue, ele rebaixa para
+          aviso (W3101) — assim seus testes de tratamento de erro continuam compilando normalmente.
         </p>
         <details>
           <summary>linguagem/17_excecoes.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/17_excecoes.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>tente {
@@ -1284,7 +1545,7 @@ tente {
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/18_finalmente_retorno.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>funcao obter(): qualquer {
@@ -1309,7 +1570,7 @@ para (var i: numero = 0; i &lt; 2; i++) {
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/19_excecoes_tipadas.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>classe MeuErro herda Excecao {
@@ -1327,10 +1588,8 @@ pegue {
         </details>
 
         <p class="callout">
-          Falhas do runtime são tratáveis. Sem tratador, o processo termina com status 1. Há
-          localização, mas ainda não uma pilha completa de chamadas Delégua. A localização usa
-          descritores estáticos apenas nas operações falíveis; literais e declarações simples não
-          recebem chamadas de localização. R0001 é o código genérico atual de falha dinâmica.
+          Se uma exceção não for capturada por nenhum pegue, o programa encerra com código 1 e exibe
+          o diagnóstico visual R0001 apontando arquivo, linha e coluna.
         </p>
       </section>
       <section
@@ -1340,34 +1599,39 @@ pegue {
         aria-labelledby="title-modulos"
       >
         <span class="status-badge status-suportado">Disponível</span>
-        <h2 id="title-modulos">Módulos estáticos</h2>
-        <p>
-          Quando o programa crescer, divida o código em arquivos. A importação usa caminhos
-          conhecidos na compilação e resolve cada caminho a partir do arquivo que o declara.
+        <h2 id="title-modulos">Módulos estáticos e ~/.delegua/cgd</h2>
+        <p class="section-intro">
+          Divida projetos maiores em vários arquivos .delegua ou importe bibliotecas prontas com
+          importar(&quot;cgd:nome&quot;). Tudo é resolvido estaticamente na compilação, com detecção
+          de ciclos e cache automático.
         </p>
-        <h3>Importação literal e namespace</h3>
+        <h3>Módulos locais e bibliotecas em ~/.delegua/cgd</h3>
         <p>
-          importar recebe um caminho literal .delegua relativo ao módulo importador, ou um alias de
-          biblioteca cgd:. A unidade é carregada na compilação, inicializada uma vez na execução e
-          acessada como namespace. Não são importados pacotes NPM, código baixado ou nomes
-          computados.
+          Para importar um arquivo do seu projeto, passe o caminho relativo terminado em .delegua:
+          importar(&quot;util.delegua&quot;).
         </p>
-        <pre><code>var biblioteca: qualquer = importar(&quot;cgd:json&quot;)
-var documento: qualquer = biblioteca.JSON.deTexto(&quot;{}&quot;)</code></pre>
-        <h3>Identidade, ciclos e visibilidade</h3>
         <p>
-          O carregador canonicaliza caminhos, aplica orçamento e detecta ciclos com cadeia de
-          importação. Arquivos abertos em memória prevalecem sobre disco no LSP. Tipos de classes
-          possuem identidade de declaração; um nome igual em outro módulo não é o mesmo tipo.
-          Herança por alias dinâmico de classe importada não é resolvida. A ausência de busca
-          irrestrita no disco torna o trabalho do editor limitado e previsível.
+          Para bibliotecas cgd:, o CGD NÃO usa uma lista fixa no compilador: ele procura diretamente
+          &lt;nome&gt;.delegua dentro de ~/.delegua/cgd (ou na pasta definida pela variável de
+          ambiente CGD_LIBS_DIR), usando bibliotecas/ ao lado do executável apenas como fallback. Se
+          você salvar ~/.delegua/cgd/minhalib.delegua, importar(&quot;cgd:minhalib&quot;) funciona
+          na hora — e já aparece no autocomplete do VS Code!
+        </p>
+        <pre><code>const JSON: qualquer = importar(&quot;cgd:json&quot;).JSON
+const util: qualquer = importar(&quot;./util.delegua&quot;)</code></pre>
+        <h3>Namespaces, ciclos e identidade de classes</h3>
+        <p>
+          Cada módulo é inicializado uma única vez e expõe suas funções, variáveis e classes como
+          namespace. O compilador detecta ciclos (E2001), verifica se o membro importado realmente
+          existe (E3109) e garante que duas classes com o mesmo nome em módulos diferentes nunca
+          sejam confundidas.
         </p>
         <details>
           <summary>modulos/01_importacao.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/modulos/01_importacao.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var calculos: qualquer = importar(&quot;lib/calculos.delegua&quot;)
@@ -1379,7 +1643,7 @@ escreva(calculos.soma(3), outraReferencia.versao, calculos.Valor(4).dado)</code>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/08_otimizacao_modulos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// As duas importações compartilham o módulo, sem repetir inicialização.
@@ -1389,8 +1653,8 @@ escreva(primeiro.dobro(2 + 2))</code></pre>
         </details>
 
         <p class="callout">
-          Inicialização é única; se falhar, permite nova tentativa. Exportações não podem ser
-          substituídas. Importação dinâmica, NPM e código estrangeiro são excluídos.
+          Caminhos em importar() precisam ser literais conhecidos na compilação. Tentativas de
+          travessia em cgd: (como cgd:../segredo) são bloqueadas com E2003.
         </p>
       </section>
       <section
@@ -1400,34 +1664,34 @@ escreva(primeiro.dobro(2 + 2))</code></pre>
         aria-labelledby="title-biblioteca"
       >
         <span class="status-badge status-suportado">Disponível</span>
-        <h2 id="title-biblioteca">Biblioteca nativa e entrada/saída</h2>
-        <p>
-          Você não precisa começar tudo do zero. Estas funções já estão disponíveis para escrever na
-          tela, ler uma entrada, converter valores e trabalhar com coleções.
+        <h2 id="title-biblioteca">Funções nativas e entrada/saída</h2>
+        <p class="section-intro">
+          Mesmo sem importar nenhum módulo, você já tem funções básicas prontas para ler do teclado,
+          escrever no terminal, converter tipos e transformar listas.
         </p>
-        <h3>Entrada e saída básicas</h3>
+        <h3>escreva, leia e conversões</h3>
         <p>
-          escreva formata valores e termina a linha; leia lê uma linha da entrada padrão, com
-          mensagem opcional. texto, inteiro, real e numero são conversões explícitas e podem falhar.
-          Para arquivos e HTTP, use as classes de biblioteca documentadas, não uma função global
-          inventada.
+          escreva imprime valores e pula linha; leia lê uma linha da entrada padrão (com pergunta
+          opcional). Para converter entre tipos, use texto(x), inteiro(x), real(x) e numero(x) — se
+          o texto não for um número válido, a conversão lança uma exceção tratável.
         </p>
-        <pre><code>var entrada: texto = leia(&quot;Idade: &quot;)
-tente { escreva(inteiro(entrada)) } pegue { escreva(&quot;inteiro inválido&quot;) }</code></pre>
-        <h3>Operações gerais</h3>
+        <pre><code>var entrada: texto = leia(&quot;Digite um número: &quot;)
+tente {
+    escreva(inteiro(entrada) * 2)
+} pegue {
+    escreva(&quot;Isso não é um inteiro válido&quot;)
+}</code></pre>
+        <h3>Funções globais de apoio</h3>
         <p>
-          tamanho consulta coleções/texto; clonar copia dados; mapear, filtrar, paraCada,
-          todosEmCondicao e ordenar recebem callbacks sem captura. aleatorio produz real em [0, 1);
-          aleatorioEntre usa limite superior exclusivo. decoradores devolve cópia dos metadados.
-          tipo de é uma expressão para consultar a categoria do valor. Métodos nativos são sugeridos
-          pelo tipo do receptor, nunca por uma lista global após ponto.
+          Você também conta com tamanho, clonar, mapear, filtrar, paraCada, todosEmCondicao,
+          ordenar, aleatorio, aleatorioEntre, decoradores, destruir e a expressão tipo de.
         </p>
         <details>
           <summary>linguagem/21_biblioteca.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/21_biblioteca.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>escreva(inteiro(&quot;12&quot;), real(&quot;.5&quot;), 1234.5689.formatar())
@@ -1445,7 +1709,7 @@ paraCada([1, 2], funcao(x: qualquer): qualquer {
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/27_entrada.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var nome: texto = leia(&quot;Nome: &quot;)
@@ -1456,7 +1720,7 @@ escreva(&quot;Olá, ${nome}&quot;)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/29_metodos_numero.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>escreva((-3).absoluto(), (2.3).arredondarParaCima(), 2.5.formatar(2))
@@ -1467,7 +1731,7 @@ escreva(1234.5689.formatar({ minimoCasasDecimais: 2, maximoCasasDecimais: 3 }))<
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/33_aleatoriedade.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// A saída é determinística: verificamos os intervalos, não um valor sorteado.
@@ -1482,52 +1746,47 @@ escreva(&quot;intervalos validados&quot;)</code></pre>
         </details>
 
         <p class="callout">
-          Números: absoluto, arredondarParaBaixo, arredondarParaCima e formatar. As bibliotecas de
-          delegua-node não são automaticamente módulos do CGD. leia usa stdin; o catálogo inclui
-          entrada de teste reproduzível.
+          Números também oferecem os métodos .absoluto(), .arredondarParaBaixo(),
+          .arredondarParaCima() e .formatar().
         </p>
       </section>
       <section
         class="doc-section guide-chapter"
         id="metadados"
-        data-status="parcial"
+        data-status="suportado"
         aria-labelledby="title-metadados"
       >
-        <span class="status-badge status-parcial">Com limites</span>
+        <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-metadados">Decoradores e asserções</h2>
-        <p>
-          Metadados descrevem uma declaração; asserções verificam uma condição durante a execução.
-          Conheça as duas ferramentas antes de usar os decoradores mais avançados.
+        <p class="section-intro">
+          Use @decoradores para anexar metadados ou envolver funções e métodos com comportamento
+          extra (como logs ou validações), e assercao() para checar condições importantes em
+          execução.
         </p>
-        <h3>Metadados declarativos</h3>
+        <h3>Metadados declarativos e envelopes</h3>
         <p>
-          @nome ou @nome(chave=valor) associa dados a funções/classes/campos/métodos. Argumentos
-          precisam ser constantes, sem executar chamadas. @definicao tem significado adicional nas
-          classes estrangeiras e declara a fronteira ABI; seus argumentos não são uma expressão de
-          carregamento dinâmico.
+          Um decorador simples como @rota(caminho=&quot;/usuarios&quot;) guarda dados constantes que
+          podem ser consultados com decoradores(alvo). Se você declarar uma funcao de decorador, ela
+          envolve automaticamente a função ou método decorado — recebendo a função original e
+          devolvendo a nova versão.
         </p>
-        <pre><code>@descricao(nome=&quot;Exemplo&quot;)
-classe Exemplo { valor: inteiro = 1 }
-escreva(decoradores(Exemplo))</code></pre>
-        <h3>Envelopes e asserções</h3>
+        <pre><code>funcao de decorador dobrarResultado(original: funcao): funcao {
+    retorna funcao(alvo: qualquer, x: inteiro): inteiro {
+        retorna original(alvo, x) * 2
+    }
+}</code></pre>
+        <h3>Asserções em runtime</h3>
         <p>
-          Envelopes de funções livres podem substituir a função sem capturar o ambiente. Envelopes
-          em métodos não são suportados; metadados em métodos são aceitos. assercao/asserção
-          verifica uma condição e lança erro tratável com mensagem opcional.
+          assercao(condicao, &quot;mensagem opcional&quot;) verifica uma garantia do seu código e
+          lança uma exceção tratável caso falhe.
         </p>
-        <pre><code>assercao(2+2 == 4, &quot;contrato aritmético&quot;)</code></pre>
-        <h3>Decisão: metadados não são eval</h3>
-        <p>
-          O formato dos decoradores é analisável estaticamente e preserva autoria/posição. Código do
-          programa não pode ser executado no frontend só para obter argumentos ou descobrir tipos.
-          Asserções também não desaparecem apenas porque a otimização está habilitada.
-        </p>
+        <pre><code>assercao(2 + 2 == 4, &quot;a aritmética falhou&quot;)</code></pre>
         <details>
           <summary>linguagem/23_decoradores.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/23_decoradores.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>@minimo(valor = 0)
@@ -1556,7 +1815,7 @@ escreva(obter())</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/24_assercoes.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>assercao 2 + 2 == 4
@@ -1568,10 +1827,54 @@ pegue (erro) {
     escreva(erro)
 }</code></pre>
         </details>
+        <details>
+          <summary>linguagem/43_estaticos_mescla.delegua</summary>
+          <p>
+            <a
+              href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/43_estaticos_mescla.delegua"
+              >Abrir arquivo completo e contrato de teste no GitHub</a
+            >
+          </p>
+          <pre><code>funcao de decorador triplicar(original: funcao): funcao {
+    retorna funcao(alvo: qualquer, x: inteiro): inteiro {
+        retorna x * 3
+    }
+}
+
+classe Etiquetavel {
+    prefixo: texto = &quot;Etiqueta:&quot;
+
+    rotulo(nome: texto): texto {
+        retorna isto.prefixo + nome
+    }
+}
+
+classe Registro mescla Etiquetavel {
+    estatico criados: inteiro = 0
+    nome: texto
+
+    construtor(nome: texto) {
+        isto.nome = nome
+        Registro.criados = Registro.criados + 1
+    }
+
+    @triplicar
+    escalar(x: inteiro): inteiro {
+        retorna x
+    }
+}
+
+const a: Registro = Registro(&quot;Ana&quot;)
+const b: Registro = Registro(&quot;Bia&quot;)
+escreva(Registro.criados)
+escreva(a.rotulo(a.nome))
+escreva(b.eInstanciaDe(Etiquetavel))
+escreva(a.escalar(10))</code></pre>
+        </details>
 
         <p class="callout">
-          Envelopes em métodos ainda são rejeitados. Metadados em métodos, classes e campos são
-          suportados. Asserções não são removidas por -o.
+          Envelopes de decoradores funcionam em funções livres, métodos de instância e métodos
+          estáticos (sem captura de ambiente). Asserções nunca são apagadas pelo -o.
         </p>
       </section>
       <section
@@ -1581,35 +1884,36 @@ pegue (erro) {
         aria-labelledby="title-otimizacoes"
       >
         <span class="status-badge status-parcial">Com limites</span>
-        <h2 id="title-otimizacoes">Otimização e avaliação em compilação</h2>
-        <p>
-          Um programa correto deve continuar correto depois de otimizado. Veja o que a opção -o
-          permite simplificar e quando uma chamada pode ser calculada ainda na compilação.
+        <h2 id="title-otimizacoes">Otimização (-o) e CTFE (//&gt;puro)</h2>
+        <p class="section-intro">
+          Passar -o ativa otimizações do compilador e -O2 no Clang/GCC. Regra de ouro do CGD:
+          otimizar nunca pode mudar o comportamento observável, apagar efeitos ou esconder exceções.
         </p>
-        <h3>Optar por CTFE</h3>
+        <h3>Calculando resultados na compilação com //&gt;puro</h3>
         <p>
-          //&gt;puro marca uma função livre para análise de pureza e de representabilidade na VM.
-          Argumentos precisam ter representação constante; resultados passam por contratos. A VM
-          limita instruções, recursão, operandos, slots e tamanho de texto. Falhas não são
-          suprimidas: uma chamada não dobrável continua em runtime, permitindo o tratamento de
-          exceções.
+          Coloque //&gt;puro acima de uma função livre que só depende dos próprios parâmetros. Com
+          -o, quando ela for chamada com valores constantes, a VM interna do CGD calcula o resultado
+          durante a compilação e substitui direto no código C gerado.
         </p>
         <pre><code>//&gt;puro
-funcao quadrado(x: inteiro): inteiro { retorna x*x }
-var resultado = quadrado(7)</code></pre>
-        <h3>Correção antes de simplificação</h3>
+funcao fatorial(n: inteiro): inteiro {
+    se n &lt;= 1 { retorna 1 }
+    retorna n * fatorial(n - 1)
+}
+const resultado: inteiro = fatorial(6) // já vira 720 com -o</code></pre>
+        <h3>O que o otimizador simplifica com segurança</h3>
         <p>
-          -o busca ponto fixo medindo mudanças. Não descarta inicializadores ou escritas só porque
-          seu resultado não aparece depois. Identidades como f()*0 não podem apagar f(). O hover é
-          uma prévia limitada e não executa FFI, rede ou I/O. Métodos ainda não têm avaliação CTFE
-          suportada.
+          O gerenciador de passes roda até atingir ponto fixo: dobra operações constantes
+          (aritmética, unários, comparações, textos), propaga constantes tipadas com segurança,
+          simplifica curto-circuito (verdadeiro e x, falso ou x) e remove caudas comprovadamente
+          inalcançáveis — preservando blocos finalmente e efeitos colaterais.
         </p>
         <details>
           <summary>linguagem/26_ctfe.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/26_ctfe.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// A VM é usada na compilação, não na execução do binário final.
@@ -1629,7 +1933,7 @@ escreva(fibonacci(10))</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/01_constantes_escopos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// A propagação usa a declaração resolvida, preservando o sombreamento.
@@ -1646,7 +1950,7 @@ escreva(valor + 1)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/02_efeitos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// Mesmo com -o, multiplicar por zero não elimina a avaliação da função.
@@ -1662,7 +1966,7 @@ escreva(calcular() * 0)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/03_fluxo.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// --verificar avisa sobre a cauda inalcançável; finalmente permanece em -o.
@@ -1682,7 +1986,7 @@ escreva(resultado())</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/04_curto_circuito.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>funcao proibida(): qualquer {
@@ -1696,7 +2000,7 @@ escreva(verdadeiro ? 7 : proibida(), falso e proibida(), verdadeiro ou proibida(
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/07_metodos_e_padroes.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// Os passes também visitam métodos, valores padrão e funções anônimas.
@@ -1717,7 +2021,7 @@ escreva(Medida().dobro(), calcular())</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/09_ctfe_fluxo_escopos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// A VM preserva senão, slots locais, parâmetros mutáveis e ordem de argumentos.
@@ -1752,7 +2056,7 @@ escreva(escolher(falso), calcular())</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/10_ctfe_excecao.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// Uma falha da CTFE preserva a chamada para permitir tratamento em execução.
@@ -1772,7 +2076,7 @@ tente {
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/11_ctfe_contrato.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// A otimização não pode remover a validação de inteiro, nem em funções puras.
@@ -1785,47 +2089,38 @@ escreva(incrementar(2.5))</code></pre>
         </details>
 
         <p class="callout">
-          A VM preserva senão, escopos, parâmetros mutáveis e a ordem dos argumentos, além de
-          validar contratos primitivos de parâmetros, locais e retorno. Limites, falhas e valores
-          não representáveis mantêm a chamada nativa. Há diagnóstico para recursos fora do
-          subconjunto CTFE. Não há backend próprio LLVM/assembly.
+          Se uma função //&gt;puro ultrapassar o limite de passos na compilação ou lançar erro, o
+          CGD simplesmente mantém a chamada normal em runtime.
         </p>
       </section>
       <section
         class="doc-section guide-chapter"
         id="diagnosticos"
-        data-status="parcial"
+        data-status="suportado"
         aria-labelledby="title-diagnosticos"
       >
-        <span class="status-badge status-parcial">Com limites</span>
-        <h2 id="title-diagnosticos">Diagnósticos e ferramentas</h2>
-        <p>
-          Encontrou um erro? Comece pela mensagem, pelo código e pelo trecho marcado. Você também
-          pode pedir uma explicação ou verificar o arquivo sem gerar um executável.
+        <span class="status-badge status-suportado">Disponível</span>
+        <h2 id="title-diagnosticos">Diagnósticos, códigos de erro e CLI</h2>
+        <p class="section-intro">
+          Quando algo dá errado, o CGD mostra exatamente onde está o problema, dá um código estável
+          (como E3109) e muitas vezes já sugere o nome certo. Você ainda pode pedir explicação
+          detalhada direto no terminal.
         </p>
-        <h3>Encontrar a causa</h3>
+        <h3>Consultando um código de erro</h3>
         <p>
-          Diagnósticos incluem severidade, código, arquivo e intervalo. --diagnosticos=json serve
-          ferramentas; --explicar CODIGO explica o catálogo. Falhas comprovadas em região protegida
-          por pegue recebem avisos W31xx para preservar o tratamento deliberado. Dados externos
-          continuam validados no runtime. R0001 é a categoria dinâmica genérica, não uma pilha
-          completa de chamadas.
+          Viu um erro como E3109 ou E3403 e não entendeu de primeira? Rode cgd --explicar CODIGO no
+          terminal para ler o motivo e como corrigir. Para scripts e editores, --diagnosticos=json
+          devolve tudo estruturado em JSON Lines.
         </p>
-        <pre><code>./cgd programa.delegua --verificar --diagnosticos=json
-./cgd --explicar E3101</code></pre>
-        <h3>Recuperação e limites</h3>
-        <p>
-          O parser tenta reportar erros independentes e o LSP tolera edições incompletas. Fontes,
-          nós, profundidade e módulos têm orçamentos defensivos. Erros de tipos/escopo não são
-          adiados até C para parecer que a análise passou. Avisos não equivalem a uma prova global
-          de segurança.
-        </p>
+        <pre><code>cgd programa.delegua --verificar
+cgd --explicar E3109
+cgd programa.delegua --verificar --diagnosticos=json</code></pre>
         <details>
           <summary>compilador/05_diagnosticos.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/05_diagnosticos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// Dois erros independentes: o parser recupera e reporta os dois.
@@ -1837,7 +2132,7 @@ var segundo: qualquer =;</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/06_sugestao.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var mensagem: texto = &quot;Olá&quot;
@@ -1848,7 +2143,7 @@ escreva(mensage)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/12_divisao_estatica.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>const zero: inteiro = 3 - 3
@@ -1859,7 +2154,7 @@ escreva(10 / zero)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/13_indice_unicode.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// &#x27;ação&#x27; tem quatro pontos de código; o maior índice positivo é 3.
@@ -1870,7 +2165,7 @@ escreva(&quot;ação&quot;[4])</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/14_falha_tratada.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// Uma operação deliberadamente inválida dentro de pegue recebe aviso W3101.
@@ -1883,9 +2178,10 @@ tente {
         </details>
         <h3>Catálogo de diagnósticos</h3>
         <p>
-          Gerado do catálogo central do compilador. Consulte também
-          <code>cgd --explicar E3101</code>. Os códigos W3101–W3112 são as versões em aviso das
-          respectivas falhas E31xx em regiões com tratador.
+          Gerado direto do catálogo central do compilador. No terminal, use
+          <code>cgd --explicar E3109</code> para consultar qualquer código. Os códigos
+          <code>W3101</code>–<code>W3112</code> são as versões em aviso dentro de blocos
+          <code>tente/pegue</code>.
         </p>
         <div class="table-wrap">
           <table>
@@ -1893,7 +2189,7 @@ tente {
               <tr>
                 <th>Código</th>
                 <th>Mensagem / modelo</th>
-                <th>Referência</th>
+                <th>Como resolver</th>
               </tr>
             </thead>
             <tbody>
@@ -2263,11 +2559,9 @@ tente {
           </table>
         </div>
         <p class="callout">
-          O parser recupera erros independentes. A verificação estática antecipa divisão por zero,
-          overflow, índices e contratos literais. Em regiões com pegue, falhas conhecidas geram
-          avisos W31xx e continuam tratáveis. Dados dinâmicos, aliases e retornos de funções ainda
-          exigem validação em execução. Diagnósticos legados usam E0001/W0001/H0001; LSP e fix-its
-          não existem.
+          Os códigos E3101–E3112 cobrem segurança estática (e W3101–W3112 quando estão dentro de
+          tente/pegue). O LSP no VS Code usa exatamente os mesmos diagnósticos e oferece correção
+          rápida (quick-fix) para sugestões H3001.
         </p>
       </section>
       <section
@@ -2278,30 +2572,24 @@ tente {
       >
         <span class="status-badge status-excluido">Fora do perfil</span>
         <h2 id="title-exclusoes">Exclusões de segurança</h2>
-        <p>
-          Alguns recursos ficam de fora para manter os limites desta implementação claros. Aqui
-          estão os casos recusados e exemplos que mostram como o compilador responde.
+        <p class="section-intro">
+          Para manter o compilador previsível e livre de comportamento mágico difícil de depurar,
+          alguns recursos ficam bloqueados de propósito. Veja os exemplos de como o CGD responde a
+          cada caso.
         </p>
-        <h3>Capturas e execução dinâmica</h3>
+        <h3>O que é recusado por segurança</h3>
         <p>
-          Capturas/upvalues, eval, NPM, importação dinâmica e ponteiros crus não fazem parte do
-          perfil. Uma função anônima sem captura é válida; uma função que usa estado da função
-          externa recebe aviso e erro. Não substitua isso por uma closure silenciosamente
-          incompleta.
-        </p>
-        <h3>FFI é uma fronteira explícita</h3>
-        <p>
-          A exclusão anterior de FFI foi revogada pelo usuário para assinaturas declaradas. ABI C e
-          ABI gerenciada têm contratos próprios. Isso permite bibliotecas nativas confiáveis e não
-          concede isolamento ao código C. Compatibilidade JavaScript, dialetos e herança de
-          interfaces têm exclusão definitiva no capítulo de decisões.
+          Capturas de ambiente (upvalues), eval, pacotes NPM, importação com caminho calculado em
+          runtime e travessia de diretórios em cgd: (cgd:../...) são bloqueados. FFI C via
+          @definicao é permitida somente com declaração explícita — nunca por conversão implícita de
+          ponteiros crus.
         </p>
         <details>
           <summary>seguranca/01_captura_local.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/seguranca/01_captura_local.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>funcao criar(x) {
@@ -2317,7 +2605,7 @@ tente {
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/seguranca/02_captura_global.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var externo: inteiro = 1
@@ -2330,7 +2618,7 @@ funcao obter() {
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/seguranca/03_ffi.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// Uma classe estrangeira sem assinatura/biblioteca explícita é inválida.
@@ -2342,17 +2630,27 @@ classe estrangeira Biblioteca {
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/seguranca/04_importacao_dinamica.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var caminho: texto = &quot;modulo.delegua&quot;
 var modulo: qualquer = importar(caminho)</code></pre>
         </details>
+        <details>
+          <summary>seguranca/07_tupla_imutavel.delegua</summary>
+          <p>
+            <a
+              href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/seguranca/07_tupla_imutavel.delegua"
+              >Abrir arquivo completo e contrato de teste no GitHub</a
+            >
+          </p>
+          <pre><code>var t: tupla = tupla([1, 2])
+t[0] = 3</code></pre>
+        </details>
 
         <p class="callout">
-          Uma função que retorna outra função sem captura é válida. Receptor explícito de método
-          ligado é suportado. Ausência de implementação não é motivo para chamar um recurso de
-          inseguro.
+          Funções anônimas e arrows sem captura funcionam perfeitamente; o bloqueio é apenas contra
+          captura implícita de variáveis de fora.
         </p>
       </section>
       <section
@@ -2362,113 +2660,164 @@ var modulo: qualquer = importar(caminho)</code></pre>
         aria-labelledby="title-plataformas"
       >
         <span class="status-badge status-parcial">Com limites</span>
-        <h2 id="title-plataformas">Plataformas e limites da implementação</h2>
-        <p>
-          Hoje, a plataforma testada é Linux x86_64. Há opções para selecionar compilador C, alvo e
-          runtime, mas configurar outro alvo não significa que ele já foi validado.
+        <h2 id="title-plataformas">Plataformas e toolchain C</h2>
+        <p class="section-intro">
+          O ambiente oficialmente testado hoje é Linux x86_64. O compilador aceita flags para trocar
+          compilador C e preparar outros alvos, mas só declaramos suporte ao que foi validado de
+          verdade.
         </p>
-        <h3>Alvo validado e configuração</h3>
+        <h3>Escolhendo Clang, GCC ou outro alvo</h3>
         <p>
-          Linux x86_64 é a plataforma coberta pelos testes. --cc, --target, --sysroot,
-          --runtime-object, --runtime-root, --pkg-config, --cflag e --ldflag separam compilador C,
-          alvo e dependências. Um runtime construído para o mesmo alvo é obrigatório. Não se anuncia
-          Windows/macOS ou cross apenas porque uma opção foi aceita.
-        </p>
-        <h3>Por que não múltiplos backends/dialetos?</h3>
-        <p>
-          O foco é uma linguagem com contratos consistentes, saída C99 e toolchains externas
-          conhecidas. Não há backend próprio LLVM/assembly ou emulação de dialetos. Projetar limites
-          claros reduz combinações de semântica que não poderiam ser validadas de forma confiável.
+          Por padrão o CGD detecta Clang ou GCC no sistema. Você pode fixar o compilador com CC=gcc
+          ou --cc gcc, além de ajustar --target, --sysroot, --runtime-object, --cflag e --ldflag
+          quando estiver montando um ambiente personalizado.
         </p>
 
         <p class="callout">
-          Windows/macOS e executáveis cruzados ainda não foram validados. Instaladores são
-          shell/Linux. Não há bigint, dialetos extras, threads da linguagem, debugger ou bibliotecas
-          Node. Consulte o guia de desenvolvimento para configurar a toolchain.
+          Windows, macOS e compilação cruzada ainda exigem runtime compilado e validação nativa
+          antes de serem anunciados como suportados.
         </p>
       </section>
       <section
         class="doc-section guide-chapter"
         id="bibliotecas-cgd"
-        data-status="parcial"
+        data-status="suportado"
         aria-labelledby="title-bibliotecas-cgd"
       >
-        <span class="status-badge status-parcial">Com limites</span>
-        <h2 id="title-bibliotecas-cgd">JSON, rede, arquivos e coleções do CGD</h2>
-        <p>
-          Para ler arquivos, conversar por HTTP ou trabalhar com JSON, importe uma das bibliotecas
-          cgd:. Cada módulo reúne classes voltadas para uma tarefa.
+        <span class="status-badge status-suportado">Disponível</span>
+        <h2 id="title-bibliotecas-cgd">Bibliotecas cgd:* (Web, Dados, Cripto e Sistema)</h2>
+        <p class="section-intro">
+          O CGD vem com 24 módulos prontos instalados em ~/.delegua/cgd. Você importa apenas o que
+          precisa com importar(&quot;cgd:nome&quot;) e o LSP já completa os nomes e métodos no VS
+          Code.
         </p>
-        <h3>Escolher uma biblioteca</h3>
+        <h3>Mapa completo dos 24 módulos em ~/.delegua/cgd</h3>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Recurso</th>
-                <th>Contrato</th>
+                <th>Como funciona</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>cgd:json</td>
+                <td>cgd:servidor</td>
                 <td>
-                  JSON.deTexto, analisar/serializar, obter/contem/caminho/definir/copiar/chaves.
-                  Profundidade, nós, Unicode, números grandes e ciclos têm contratos explícitos.
+                  Servidor HTTP/1.1 com rotas, parâmetros, JSON, middlewares e modo concorrente
+                  epoll (escutarAsync + keep-alive).
                 </td>
               </tr>
               <tr>
                 <td>cgd:rede</td>
                 <td>
-                  Sessao de libcurl; ClienteHTTP e RespostaHTTP com
-                  obter/enviar/enviarJSON/atualizar/remover. Rede só acontece quando o programa
-                  pede.
+                  Cliente HTTP síncrono e assíncrono sobre libcurl (ClienteHTTP, RespostaHTTP,
+                  obter/enviar/enviarJSON).
+                </td>
+              </tr>
+              <tr>
+                <td>cgd:sockets</td>
+                <td>
+                  Sockets TCP/UDP, resolução DNS e suporte a IPv6 (OuvinteTCP, Conexao, SocketUDP,
+                  resolverDNS).
+                </td>
+              </tr>
+              <tr>
+                <td>cgd:assincrono</td>
+                <td>
+                  Tempo.dormir, HTTP e TCP assíncronos sobre epoll, Canal limitado e GrupoTarefas.
+                </td>
+              </tr>
+              <tr>
+                <td>cgd:json</td>
+                <td>
+                  Parser e serializador JSON em Delégua puro com limites de profundidade e navegação
+                  por caminho.
+                </td>
+              </tr>
+              <tr>
+                <td>cgd:sqlite</td>
+                <td>
+                  Banco SQLite (libsqlite3) com consultas parametrizadas, transações e fechamento
+                  explícito.
+                </td>
+              </tr>
+              <tr>
+                <td>cgd:bytes</td>
+                <td>
+                  Buffer binário nativo (Bytes) para manipular bytes, hex, base64 e fatiamento sem
+                  depender de texto UTF-8.
+                </td>
+              </tr>
+              <tr>
+                <td>cgd:cripto</td>
+                <td>
+                  Hashes SHA-256/SHA-512, HMAC e bytes aleatórios criptográficos sobre OpenSSL
+                  (libcrypto).
+                </td>
+              </tr>
+              <tr>
+                <td>cgd:compressao</td>
+                <td>
+                  Compressão e descompressão gzip/deflate (zlib) com teto contra bombas de
+                  descompressão.
                 </td>
               </tr>
               <tr>
                 <td>cgd:arquivos</td>
                 <td>
-                  Arquivo(caminho): ler/linhas/escrever/anexar/informacoes/tamanho/remover. Cada
-                  chamada fecha seu descritor; leitura padrão 16 MiB, teto 64 MiB.
+                  Leitura, escrita, linhas, JSON, cópia e remoção de arquivos regulares com limite
+                  seguro de memória.
                 </td>
               </tr>
               <tr>
-                <td>cgd:matematica</td>
+                <td>cgd:processo / cgd:ambiente / cgd:sistema</td>
                 <td>
-                  Matematica sobre libm:
-                  seno/cosseno/tangente/raizQuadrada/potencia/absoluto/piso/teto/logaritmo/exponencial.
+                  Execução de subprocessos sem shell (argv separado + timeout), variáveis de
+                  ambiente e dados do sistema.
                 </td>
               </tr>
               <tr>
-                <td>cgd:colecoes</td>
+                <td>cgd:tempo</td>
+                <td>Relógios, Duracao, Cronometro, dormirAsync e calendário DataHora.</td>
+              </tr>
+              <tr>
+                <td>cgd:io / cgd:cli / cgd:log</td>
                 <td>
-                  Colecoes.unicos/intervalo/reduzir/agrupar/achatar. Callbacks não capturam
-                  ambiente.
+                  Entrada/saída estruturada, parser de argumentos de linha de comando e logger
+                  estruturado.
+                </td>
+              </tr>
+              <tr>
+                <td>cgd:textos / cgd:colecoes / cgd:caminhos</td>
+                <td>
+                  Utilitários de string, transformações de vetores (agrupar, reduzir, particionar,
+                  blocos) e caminhos POSIX.
+                </td>
+              </tr>
+              <tr>
+                <td>cgd:matematica / cgd:estatistica / cgd:algoritmos</td>
+                <td>
+                  Funções matemáticas (libm), média/mediana/variância/desvio padrão, busca binária e
+                  CRC32.
                 </td>
               </tr>
               <tr>
                 <td>cgd:nativo</td>
                 <td>
-                  Primitivas da ABI gerenciada para implementar bibliotecas; prefira as classes
-                  públicas acima nos programas.
+                  Primitivas da ABI gerenciada usadas internamente para construir as bibliotecas
+                  acima.
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-        <h3>I/O e respostas com erros</h3>
-        <p>
-          Arquivo preserva bytes, inclusive zero interno; operações Unicode ainda exigem UTF-8
-          válido. Escrita pode ser parcial se o sistema falhar: não é transação. ClienteHTTP usa
-          sessão isolada por requisição; sucesso exige transporte sem erro e status 200..299.
-          exigirSucesso transforma uma resposta inspecionável em exceção tratável. Nunca há rede
-          automática no editor.
-        </p>
         <details>
           <summary>bibliotecas/json_classe.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/json_classe.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var biblioteca: qualquer = importar(&quot;../../bibliotecas/json.delegua&quot;)
@@ -2485,7 +2834,7 @@ escreva(documento.definir(&quot;versao&quot;, 2).texto())</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/rede.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>// Não faz requisições externas: introspecção e codificação são locais.
@@ -2499,7 +2848,7 @@ escreva(tamanho(rede.opcoes()) &gt; 100)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/colecoes.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var biblioteca = importar(&quot;../../bibliotecas/colecoes.delegua&quot;)
@@ -2521,7 +2870,7 @@ escreva(colecoes.blocos([1, 2, 3, 4, 5], 2))</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/json_navegacao.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var json: qualquer = importar(&quot;cgd:json&quot;)
@@ -2538,7 +2887,7 @@ escreva(documento.contem(&quot;novo&quot;))</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/arquivos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var arquivos: qualquer = importar(&quot;cgd:arquivos&quot;)
@@ -2546,50 +2895,103 @@ var arquivo: qualquer = arquivos.Arquivo(&quot;dados.txt&quot;)
 // Instanciar não abre nem modifica o arquivo. I/O só acontece por chamada explícita.
 escreva(arquivo.caminho())</code></pre>
         </details>
+        <details>
+          <summary>bibliotecas/bytes_cripto_sqlite.delegua</summary>
+          <p>
+            <a
+              href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/bytes_cripto_sqlite.delegua"
+              >Abrir arquivo completo e contrato de teste no GitHub</a
+            >
+          </p>
+          <pre><code>const Bytes: qualquer = importar(&quot;cgd:bytes&quot;).Bytes
+const Cripto: qualquer = importar(&quot;cgd:cripto&quot;).Cripto
+const Comp: qualquer = importar(&quot;cgd:compressao&quot;).Compressao
+const SQLite: qualquer = importar(&quot;cgd:sqlite&quot;).SQLite
+const DataHora: qualquer = importar(&quot;cgd:tempo&quot;).DataHora
+
+escreva(Bytes.deTexto(&quot;abc&quot;).paraHex())
+escreva(Cripto.sha256(&quot;abc&quot;))
+
+const gz: texto = Comp.gzipComprimir(&quot;delegua-compilador-c99&quot;)
+escreva(Comp.gzipDescomprimir(gz) == &quot;delegua-compilador-c99&quot;)
+
+const db: qualquer = SQLite.abrir(&quot;:memory:&quot;)
+tente {
+    db.executar(&quot;CREATE TABLE pessoas (id INTEGER PRIMARY KEY, nome TEXT)&quot;)
+    db.executar(&quot;INSERT INTO pessoas (nome) VALUES (?)&quot;, [&quot;Ana&quot;])
+    const linha: qualquer = db.consultarUm(&quot;SELECT nome FROM pessoas WHERE id = ?&quot;, [1])
+    escreva(linha[&quot;nome&quot;])
+} finalmente {
+    db.fechar()
+}
+
+escreva(DataHora.deUTC(2026, 11, 20, 14, 30, 5).formatarISO())</code></pre>
+        </details>
+        <details>
+          <summary>servidor/http.delegua</summary>
+          <p>
+            <a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/servidor/http.delegua"
+              >Abrir arquivo completo e contrato de teste no GitHub</a
+            >
+          </p>
+          <pre><code>// Servidor local: execute e acesse http://127.0.0.1:8080/.
+// GET /parar encerra este exemplo; não exponha essa rota em aplicações públicas.
+const Servidor: qualquer = importar(&quot;cgd:servidor&quot;)
+var app: qualquer = Servidor.HTTP()
+app.get(&quot;/&quot;, funcao(req: qualquer, res: qualquer): vazio {
+    res.enviar(&quot;Olá, CGD!\n&quot;)
+})
+app.get(&quot;/usuarios/:nome&quot;, funcao(req: qualquer, res: qualquer): vazio {
+    res.json({ nome: req.parametro(&quot;nome&quot;), pagina: req.query(&quot;pagina&quot;, &quot;1&quot;) })
+})
+app.post(&quot;/api/eco&quot;, funcao(req: qualquer, res: qualquer): vazio {
+    res.status(201).json(req.json())
+})
+app.head(&quot;/&quot;, funcao(req: qualquer, res: qualquer): vazio {
+    res.enviar(&quot;Olá, CGD!\n&quot;)
+})
+app.get(&quot;/parar&quot;, funcao(req: qualquer, res: qualquer): vazio {
+    res.enviar(&quot;Até logo!\n&quot;).pararServidor()
+})
+app.escutar(&quot;127.0.0.1&quot;, 8080)</code></pre>
+        </details>
 
         <p class="callout">
-          JSON em Delégua puro, limite de profundidade e preservação de números além da
-          representação nativa. Rede exige libcurl &gt;=7.86; opções com ponteiros/callbacks
-          arbitrários são recusadas. WebSocket depende da libcurl instalada, não validado neste
-          ambiente. I/O usa arquivos regulares, fecha descritores por chamada e limita
-          leituras/escritas a 64 MiB.
+          As bibliotecas cgd:* são nativas do CGD (não vêm do NPM nem do delegua-node). Para
+          adicionar um módulo seu, basta colocar o .delegua dentro de ~/.delegua/cgd.
         </p>
       </section>
       <section
         class="doc-section guide-chapter"
         id="metodos-estaticos"
-        data-status="parcial"
+        data-status="suportado"
         aria-labelledby="title-metodos-estaticos"
       >
-        <span class="status-badge status-parcial">Com limites</span>
-        <h2 id="title-metodos-estaticos">Métodos estáticos e ferramentas do editor</h2>
-        <p>
-          Um método estático pertence à classe e não recebe isto. Veja como declará-lo e como o
-          editor ajuda a encontrar os membros disponíveis em cada receptor.
+        <span class="status-badge status-suportado">Disponível</span>
+        <h2 id="title-metodos-estaticos">Membros estáticos (campos e métodos)</h2>
+        <p class="section-intro">
+          Membros marcados com estatico pertencem à classe inteira, não a um objeto específico. São
+          ótimos para contadores compartilhados, constantes e fábricas de objetos.
         </p>
-        <h3>Receptor e visibilidade</h3>
+        <h3>Declarando campos e métodos estáticos</h3>
         <p>
-          estatico/estático declara método sem isto. Ele pode ser herdado e acessado pela classe ou
-          por instância. Campos estáticos não são suportados. Membros públicos/protegidos/privados
-          conservam visibilidade no frontend e no runtime; um privado derivado oculta o homônimo
-          herdado, sem vazar a sugestão pública antiga.
+          Use estatico (ou estático) tanto em campos quanto em métodos. Eles respeitam publico,
+          protegido e privado e podem ser herdados normalmente.
         </p>
         <pre><code>classe Fabrica {
-    estatico resposta(): inteiro { retorna 42 }
+    estatico criados: inteiro = 0
+
+    estatico proximoId(): inteiro {
+        Fabrica.criados++
+        retorna Fabrica.criados
+    }
 }
-escreva(Fabrica.resposta())</code></pre>
-        <h3>Editor como consumidor do frontend</h3>
-        <p>
-          O LSP usa a mesma sequência de análise da CLI, mantém documentos em memória e respeita
-          revisões. Navegação, completion, tipos, formatação e diagnósticos não fazem build por
-          edição. Receptores desconhecidos não recebem sugestões de outros escopos. Resultado CTFE é
-          uma informação limitada de hover, não execução ou depuração do programa.
-        </p>
+escreva(Fabrica.proximoId())</code></pre>
         <details>
           <summary>estaticos.delegua</summary>
           <p>
             <a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/estaticos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>classe Calculadora {
@@ -2606,11 +3008,55 @@ escreva(Avancada.dobro(4))
 var calculadora: Calculadora = Calculadora()
 escreva(calculadora.dobro(5))</code></pre>
         </details>
+        <details>
+          <summary>linguagem/43_estaticos_mescla.delegua</summary>
+          <p>
+            <a
+              href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/43_estaticos_mescla.delegua"
+              >Abrir arquivo completo e contrato de teste no GitHub</a
+            >
+          </p>
+          <pre><code>funcao de decorador triplicar(original: funcao): funcao {
+    retorna funcao(alvo: qualquer, x: inteiro): inteiro {
+        retorna x * 3
+    }
+}
+
+classe Etiquetavel {
+    prefixo: texto = &quot;Etiqueta:&quot;
+
+    rotulo(nome: texto): texto {
+        retorna isto.prefixo + nome
+    }
+}
+
+classe Registro mescla Etiquetavel {
+    estatico criados: inteiro = 0
+    nome: texto
+
+    construtor(nome: texto) {
+        isto.nome = nome
+        Registro.criados = Registro.criados + 1
+    }
+
+    @triplicar
+    escalar(x: inteiro): inteiro {
+        retorna x
+    }
+}
+
+const a: Registro = Registro(&quot;Ana&quot;)
+const b: Registro = Registro(&quot;Bia&quot;)
+escreva(Registro.criados)
+escreva(a.rotulo(a.nome))
+escreva(b.eInstanciaDe(Etiquetavel))
+escreva(a.escalar(10))</code></pre>
+        </details>
 
         <p class="callout">
-          Campos estáticos e depurador/DAP não estão implementados. O editor analisa sem
-          compilar/linkar por edição. Literais longos não são divididos pelo formatador. A prévia
-          usa cópias e orçamento por revisão; falhas deixam o valor para execução.
+          Métodos estáticos não recebem isto. Campos estáticos suportam anotações de tipo, defaults,
+          visibilidade e validação de escrita — e são bloqueados dentro de rotinas paralelas (E3402)
+          para manter o isolamento entre threads.
         </p>
       </section>
       <section
@@ -2620,76 +3066,48 @@ escreva(calculadora.dobro(5))</code></pre>
         aria-labelledby="title-evolucao-04"
       >
         <span class="status-badge status-parcial">Com limites</span>
-        <h2 id="title-evolucao-04">Contratos, arrows e FFI C</h2>
-        <p>
-          Interfaces descrevem o que uma classe oferece; classes abstratas ajudam a compartilhar uma
-          base. Completam este capítulo os enums, as arrows e a ligação explícita com funções C.
+        <h2 id="title-evolucao-04">Interfaces, classes abstratas, enums e FFI C</h2>
+        <p class="section-intro">
+          Quando o projeto cresce, interfaces ajudam a firmar contratos claros entre classes, enums
+          organizam constantes numéricas e @definicao permite ligar funções C direto no executável.
         </p>
-        <h3>Contratos explícitos</h3>
+        <h3>Interfaces e classes abstratas</h3>
         <p>
-          Interfaces descrevem campos e métodos públicos; classes usam implementa para satisfazer o
-          contrato, inclusive com membros herdados. Implementações mantêm assinatura explícita.
-          Classe abstrata não pode ser instanciada e pode declarar métodos abstratos. Não há herança
-          entre interfaces: foi excluída por decisão de escopo, não adiada.
+          Uma interface descreve os campos e métodos públicos que uma classe promete entregar usando
+          implementa. Uma classe abstrata não pode ser instanciada diretamente e pode definir
+          métodos abstrato para as filhas completarem.
         </p>
-        <pre><code>interface Nomeavel { nome(): texto; }
+        <pre><code>interface Nomeavel {
+    nome(): texto;
+}
 classe Pessoa implementa Nomeavel {
     nome(): texto { retorna &quot;Ana&quot; }
-}
-enum Estado { Inicial, Final = 7 }</code></pre>
-        <h3>Enums e arrows</h3>
+}</code></pre>
+        <h3>Enums numéricos em qualquer escopo</h3>
         <p>
-          Enum é um namespace congelado de inteiros com incremento implícito e diagnóstico de
-          duplicatas/overflow. Seu nome como tipo é alias de inteiro; não há enum nominal ou união
-          algébrica. Arrows reutilizam funções anônimas sem captura. São escolhas do perfil CGD, não
-          uma declaração de equivalência com todos os ambientes Delégua.
+          Você pode declarar enum no módulo, dentro de funções, blocos ou classes. Os valores
+          incrementam automaticamente a partir de 0 (ou do número que você definir), são imutáveis e
+          funcionam inclusive dentro de funções //&gt;puro (CTFE).
         </p>
-        <h3>FFI e fronteira de confiança</h3>
+        <pre><code>enum Estado { Inicio, Rodando, Final = 7 }
+var atual: Estado = Estado.Final</code></pre>
+        <h3>FFI C com @definicao e classe estrangeira</h3>
         <p>
-          @definicao declara biblioteca, prefixo e símbolo; a ABI C escalar usa numero/real como
-          double, inteiro/longo como int64_t, logico como bool e texto como const char*. Não presuma
-          int C de 32 bits quando o contrato diz inteiro de 64 bits. Textos com zero interno são
-          recusados nessa ABI. A ABI gerenciada delegua passa delegua_value e valida contratos.
-          Assinaturas erradas e código nativo podem corromper o processo: FFI não é sandbox.
-          Callbacks/structs/variádicos arbitrários não são representados por conversões presumidas.
-        </p>
-        <h3>Enums em escopos locais e classes</h3>
-        <p>
-          Enums são açúcar para constantes inteiras agrupadas num namespace imutável. Podem ser
-          declarados em módulos, funções, métodos, blocos de controle, callbacks e corpos de
-          classe/interface; não exigem um contexto global. O alias numérico tem escopo lexical e não
-          vaza ao sair do bloco. Nomes locais podem reaparecer em blocos independentes.
+          Precisa chamar uma função C de uma biblioteca do sistema (como libm)? Declare uma classe
+          estrangeira com @definicao(biblioteca=&quot;m&quot;) e mapeie cada símbolo. Na ABI C
+          escalar, numero/real viram double, inteiro/longo viram int64_t, logico vira bool e texto
+          vira const char*.
         </p>
         <p>
-          Dentro de classes, Classe.Enum e isto.Enum acessam o mesmo namespace, inclusive por
-          herança, respeitando privado/protegido. O enum não ocupa um campo de cada instância nem
-          habilita campos estáticos mutáveis. Dentro do corpo da classe o nome serve como alias
-          inteiro; fora dele, anote valores como inteiro. Interfaces podem conter constantes sem
-          exigir sua redeclaração na implementação.
+          Lembre-se: FFI é uma fronteira de confiança — confira sempre se os tipos declarados batem
+          exatamente com a função C real.
         </p>
-        <p>
-          Acesso conhecido a um membro resolve para o inteiro, inclusive em funções sem captura e em
-          CTFE. Capturar um namespace local inteiro como valor continua sujeito às regras de
-          captura; CTFE representa os membros escalares, não mapas. Receptores com efeitos, como
-          criar().Estado.Fim, continuam sendo avaliados uma vez. Os enums continuam numéricos, sem
-          identidade nominal ou restrição aos membros declarados.
-        </p>
-        <pre><code>funcao estado(): inteiro {
-    enum Estado { Inicio, Final=7 }
-    var atual: Estado = Estado.Final
-    retorna atual
-}
-classe Maquina {
-    enum Estado { Inicio, Final=4 }
-    atual: Estado = isto.Estado.Final
-}
-escreva(Maquina.Estado.Final)</code></pre>
         <details>
           <summary>linguagem/38_contratos.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/38_contratos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>interface Medida {
@@ -2721,7 +3139,7 @@ escreva(duplicar(3))</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/matematica.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var biblioteca: qualquer = importar(&quot;cgd:matematica&quot;)
@@ -2733,7 +3151,7 @@ escreva(biblioteca.Matematica.raizQuadrada(9))</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/40_enums_escopos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>funcao estado(): inteiro {
@@ -2760,9 +3178,8 @@ escreva(vetor(2))</code></pre>
         </details>
 
         <p class="callout">
-          Enums são namespaces congelados e alias inteiro; interfaces exigem assinaturas explícitas.
-          FFI exige código nativo confiável. Composição mescla permanece fora desta versão;
-          integração JS é excluída; consulte docs/evolucao-linguagem.md.
+          Enums hoje são namespaces congelados com alias para inteiro (ainda não são enums nominais
+          distintos). Structs e callbacks compostos na ABI C ainda estão pendentes.
         </p>
       </section>
       <section
@@ -2772,10 +3189,10 @@ escreva(vetor(2))</code></pre>
         aria-labelledby="title-decisoes"
       >
         <span class="status-badge status-parcial">Com limites</span>
-        <h2 id="title-decisoes">Decisões de escopo: o que não fará parte da linguagem</h2>
-        <p>
-          Por que esta linguagem funciona assim? Estas escolhas explicam o recorte do CGD, incluindo
-          os recursos que não serão adicionados e as diferenças em relação ao interpretador Delégua.
+        <h2 id="title-decisoes">Decisões de escopo: o que não vai entrar no CGD</h2>
+        <p class="section-intro">
+          Dizer &#x27;não&#x27; a certas coisas é o que permite manter o compilador rápido,
+          consistente e testável. Aqui estão as escolhas definitivas do projeto.
         </p>
         <h3>Exclusões definitivas</h3>
         <div class="table-wrap">
@@ -2783,56 +3200,52 @@ escreva(vetor(2))</code></pre>
             <thead>
               <tr>
                 <th>Recurso</th>
-                <th>Contrato</th>
+                <th>Como funciona</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td>Compatibilidade com JavaScript e classes de host JS</td>
                 <td>
-                  Não será implementada. Evita depender de VM, coerções e ciclo de vida de um
-                  ambiente JavaScript. FFI C tipada é a integração nativa.
+                  O CGD é compilado para C99 e não depende de Node.js nem de motor JS. Para
+                  conversar com bibliotecas externas, use FFI C tipada.
                 </td>
               </tr>
               <tr>
                 <td>Múltiplos dialetos</td>
                 <td>
-                  Não serão implementados. Há uma gramática e um conjunto de contratos a manter,
-                  testar e documentar.
+                  Mantemos uma única sintaxe Delégua clara e bem testada, em vez de emular vários
+                  dialetos diferentes.
                 </td>
               </tr>
               <tr>
-                <td>Herança de interfaces</td>
+                <td>Herança entre interfaces</td>
                 <td>
-                  Não será implementada. Classes podem implementar vários contratos diretamente; não
-                  há grafo de interfaces herdadas para resolver.
+                  Classes podem implementar quantas interfaces quiserem diretamente, mantendo a
+                  resolução de contratos simples e previsível.
                 </td>
               </tr>
               <tr>
                 <td>NPM, eval e importação dinâmica</td>
                 <td>
-                  Não fazem parte do perfil. Módulos fonte são conhecidos na compilação, e código do
-                  programa não é executado pela edição.
+                  Todo código compilado é conhecido antes de gerar o executável; bibliotecas
+                  compartilhadas vivem em ~/.delegua/cgd.
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-        <h3>Limitação não é sinônimo de insegurança</h3>
+        <h3>O que ainda pode chegar no futuro</h3>
         <p>
-          Composição mescla, enums nominais, campos estáticos e ABIs C compostas não estão
-          disponíveis. Isso não é uma classificação automática de insegurança e não constitui
-          compromisso de implementação. DAP continua adiado; executar não é depurar. Outros alvos
-          precisam de toolchain e runtime validados antes de serem anunciados.
-        </p>
-        <h3>Origem e autoria</h3>
-        <p>
-          Delégua original é um projeto da Design Líquido. O CGD preserva as referências e a licença
-          Apache-2.0; sua documentação explica o perfil próprio em vez de sugerir compatibilidade
-          total com o interpretador, Node ou JavaScript.
+          Enums nominais (distintos de inteiro), structs/callbacks compostos na ABI C, suporte a
+          classes locais dentro de funções assincrona, novos alvos (Windows/macOS validados) e
+          depurador passo a passo (DAP) são itens em aberto — não exclusões definitivas.
         </p>
 
-        <p class="callout"></p>
+        <p class="callout">
+          Delégua original pertence à Design Líquido (licença Apache-2.0). O CGD honra essa origem e
+          documenta com transparência tudo o que estende ou altera.
+        </p>
       </section>
       <section
         class="doc-section guide-chapter"
@@ -2841,41 +3254,25 @@ escreva(vetor(2))</code></pre>
         aria-labelledby="title-runtime-erros"
       >
         <span class="status-badge status-suportado">Disponível</span>
-        <h2 id="title-runtime-erros">Erros do programa: apresentação e localização</h2>
-        <p>
-          Quando uma falha escapa dos seus tratadores, o programa mostra a mensagem e aponta o
-          trecho de origem. Saiba ler esse diagnóstico e o que ainda aparece quando o arquivo já não
-          está disponível.
+        <h2 id="title-runtime-erros">Lendo erros em tempo de execução (R0001)</h2>
+        <p class="section-intro">
+          Se uma exceção escapar do seu programa enquanto ele roda, o runtime mostra um diagnóstico
+          colorido/visual apontando o arquivo, a linha, a coluna e o trecho exato do código.
         </p>
-        <h3>Ler um diagnóstico</h3>
+        <h3>Como ler a mensagem</h3>
         <p>
-          O cabeçalho identifica a categoria, seguido por arquivo, linha e coluna. Quando o fonte
-          está acessível, a linha e um marcador ^ mostram a operação falível. Tabs são expandidas; o
-          arquivo é tratado como texto UTF-8 e controles são escapados para não inserir sequências
-          de terminal.
+          O cabeçalho mostra error[R0001] seguido do motivo, o caminho do arquivo com linha:coluna e
+          a linha marcada com ^. Caracteres de controle são escapados e arquivos indisponíveis nunca
+          travam nem escondem o erro.
         </p>
         <pre><code>error[R0001]: Divisão por zero.
  --&gt; { programa.delegua:2:10 }
    2 | retorna a / b
      |          ^</code></pre>
-        <h3>Custo e limites</h3>
-        <p>
-          O C gerado mantém descritores estáticos e atribui um ponteiro antes de operações que podem
-          falhar. Não há leitura de arquivo ou formatação por nó no caminho normal. Somente uma
-          exceção sem tratador é renderizada; pegue continua recebendo o valor sem impressão
-          automática. A API C antiga de localização é preservada.
-        </p>
-        <p>
-          A linha é lida do disco na falha, não embutida no executável. Se o arquivo mudou, o trecho
-          pode divergir do fonte compilado. Fonte ausente, inválido, muito longo ou fora do
-          orçamento nunca apaga o código e a localização conhecidos. A leitura é limitada e só
-          aceita arquivo regular; FIFO/dispositivo não bloqueia o diagnóstico. A janela mostrada é
-          limitada e pode indicar posição fora do trecho.
-        </p>
 
         <p class="callout">
-          O código dinâmico permanece R0001. O formato humano não substitui um protocolo de
-          depuração.
+          O código R0001 identifica erros dinâmicos do runtime. A localização usa metadados
+          estáticos no C gerado e só lê o arquivo do disco no momento da falha.
         </p>
       </section>
       <section
@@ -2885,96 +3282,45 @@ escreva(vetor(2))</code></pre>
         aria-labelledby="title-stdlib-ampliada"
       >
         <span class="status-badge status-suportado">Disponível</span>
-        <h2 id="title-stdlib-ampliada">
-          Biblioteca padrão: textos, estatística, caminhos e coleções
-        </h2>
-        <p>
-          Precisa preencher um código com zeros, resumir uma amostra ou montar o caminho de um
-          arquivo? Estas classes cuidam dessas tarefas sem espalhar pequenos utilitários pelo seu
-          programa.
+        <h2 id="title-stdlib-ampliada">Na prática: textos, estatística, caminhos e coleções</h2>
+        <p class="section-intro">
+          Exemplos rápidos de quatro módulos muito usados no dia a dia: manipulação avançada de
+          texto, resumo estatístico, normalização de caminhos e transformações de coleções.
         </p>
         <h3>Textos — cgd:textos</h3>
         <p>
-          Textos.comecaCom/terminaCom aceitam prefixo/sufixo vazio. repetir exige quantidade entre 0
-          e 1.000.000 e resultado de até um milhão de pontos de código. preencherInicio/preencherFim
-          exigem exatamente um caractere Unicode de preenchimento; não truncam texto maior que o
-          comprimento pedido.
+          comecaCom, terminaCom, repetir, preencherInicio, preencherFim, linhas, digitos, juntar,
+          inverter e contar resolvem as tarefas mais chatas de formatação de strings com suporte a
+          Unicode.
         </p>
-        <p>
-          linhas normaliza CRLF e CR e preserva linhas vazias e a quebra final. digitos aceita
-          somente uma sequência não vazia de dígitos ASCII. juntar combina texto[]; inverter inverte
-          pontos de código, não grafemas; contar conta ocorrências não sobrepostas e rejeita trecho
-          vazio.
-        </p>
-        <pre><code>var textos: qualquer = importar(&quot;cgd:textos&quot;).Textos
-escreva(textos.preencherInicio(&quot;7&quot;, 3, &quot;0&quot;))
-escreva(textos.digitos(&quot;0123&quot;))</code></pre>
+        <pre><code>const Textos: qualquer = importar(&quot;cgd:textos&quot;).Textos
+escreva(Textos.preencherInicio(&quot;7&quot;, 3, &quot;0&quot;)) // 007</code></pre>
         <h3>Estatistica — cgd:estatistica</h3>
         <p>
-          Estatistica oferece soma, media, minimo, maximo, mediana, variancia, desvioPadrao e
-          resumo. soma([]) é zero; média, mínimo, máximo e mediana rejeitam vazio. Mediana ordena
-          uma cópia e preserva o vetor recebido.
+          Calcula soma, media, minimo, maximo, mediana, variancia (populacional ou amostral),
+          desvioPadrao e resumo sem alterar o vetor original.
         </p>
-        <p>
-          Variância usa atualização incremental, exige um elemento na versão populacional e dois na
-          amostral. O segundo argumento amostral é falso por padrão. Não há arredondamento decimal
-          implícito; cálculos usam números do runtime. resumo reúne quantidade, soma, mínimo,
-          máximo, média, mediana e variância.
-        </p>
-        <pre><code>var estatistica: qualquer = importar(&quot;cgd:estatistica&quot;).Estatistica
-escreva(estatistica.mediana([4, 1, 2, 3]))
-escreva(estatistica.variancia([1, 2, 3], verdadeiro))</code></pre>
+        <pre><code>const Est: qualquer = importar(&quot;cgd:estatistica&quot;).Estatistica
+escreva(Est.mediana([4, 1, 2, 3]))</code></pre>
         <h3>Caminhos — cgd:caminhos</h3>
         <p>
-          Caminhos.absoluto consulta o prefixo /. normalizar remove componentes vazios e ., resolve
-          .. lexicalmente e preserva .. que não podem ser resolvidos em caminho relativo. Vazio vira
-          .; não se sobe acima de /.
+          juntar, normalizar, absoluto, nome, diretorio, extensao e semExtensao manipulam caminhos
+          POSIX de forma pura e previsível, sem encostar no disco.
         </p>
+        <pre><code>const Caminhos: qualquer = importar(&quot;cgd:caminhos&quot;).Caminhos
+escreva(Caminhos.juntar([&quot;dados&quot;, &quot;..&quot;, &quot;saida&quot;, &quot;a.json&quot;]))</code></pre>
+        <h3>Colecoes — cgd:colecoes</h3>
         <p>
-          juntar recebe texto[]; um componente absoluto reinicia o caminho acumulado. nome,
-          diretorio, extensao e semExtensao operam no caminho normalizado. A extensão inclui o
-          ponto; .perfil não possui extensão. Nenhuma operação consulta disco, resolve symlinks,
-          cria diretórios ou garante confinamento: normalização lexical não é uma sandbox.
-        </p>
-        <pre><code>var caminhos: qualquer = importar(&quot;cgd:caminhos&quot;).Caminhos
-escreva(caminhos.juntar([&quot;dados&quot;, &quot;..&quot;, &quot;saida&quot;, &quot;a.json&quot;]))
-escreva(caminhos.extensao(&quot;a.tar.gz&quot;))</code></pre>
-        <h3>Colecoes — resultados e compartilhamento</h3>
-        <p>
-          Além de unicos/intervalo/reduzir/agrupar/achatar, a classe oferece primeiro/ultimo com
-          alternativa para vazio, encontrar com predicado, contar, particionar, combinar, blocos e
-          frequencias. particionar devolve tupla (aceitos, recusados). combinar para no menor vetor.
-          blocos exige tamanho positivo e conserva o último bloco incompleto.
-        </p>
-        <p>
-          Os resultados são coleções novas, mas seus elementos são referências rasas aos dados de
-          entrada. frequencias e agrupar exigem chaves aceitas pelo dicionário. Callbacks são
-          avaliados em ordem e não podem capturar ambiente; seus efeitos e exceções permanecem
-          observáveis.
-        </p>
-        <p>
-          intervalo é semiaberto, recusa passo zero e limita o resultado a um milhão de elementos.
-          Se o próximo passo sair de int64, a iteração termina: esse valor já ultrapassou qualquer
-          limite final representável, sem provocar overflow artificial.
-        </p>
-        <h3>Arquivos e matemática</h3>
-        <p>
-          Arquivo.lerJSON combina leitura limitada e parser JSON; escreverJSON serializa antes de
-          abrir o destino. copiarPara lê antes de escrever, inclusive se origem e destino
-          coincidirem. Não é uma cópia em streaming nem uma transação; respeita o limite de leitura.
-        </p>
-        <p>
-          Matematica acrescenta arcoSeno/arcoCosseno/arcoTangente/arcoTangente2,
-          logaritmo10/logaritmo2, arredondar, truncar, hipotenusa e resto. arredondar segue round de
-          C (metades para longe de zero); resto usa fmod, distinto do operador inteiro %. A ABI
-          permanece explícita e validada.
+          unicos, intervalo, reduzir, agrupar, achatar, primeiro, ultimo, encontrar, contar,
+          particionar, combinar, blocos e frequencias deixam transformações de listas bem mais
+          curtas e legíveis.
         </p>
         <details>
           <summary>bibliotecas/textos.delegua</summary>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/textos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var textos: qualquer = importar(&quot;cgd:textos&quot;).Textos
@@ -2989,7 +3335,7 @@ escreva(textos.inverter(&quot;aç💚&quot;))</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/estatistica.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var estatistica: qualquer = importar(&quot;cgd:estatistica&quot;).Estatistica
@@ -3005,7 +3351,7 @@ assercao(medidas[0] == 4)</code></pre>
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/caminhos.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var caminhos: qualquer = importar(&quot;cgd:caminhos&quot;).Caminhos
@@ -3020,7 +3366,7 @@ escreva(caminhos.nome(destino))
           <p>
             <a
               href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/colecoes.delegua"
-              >Abrir fonte e contrato de teste</a
+              >Abrir arquivo completo e contrato de teste no GitHub</a
             >
           </p>
           <pre><code>var biblioteca = importar(&quot;../../bibliotecas/colecoes.delegua&quot;)
@@ -3039,33 +3385,40 @@ escreva(colecoes.blocos([1, 2, 3, 4, 5], 2))</code></pre>
         </details>
 
         <p class="callout">
-          APIs matemáticas seguem libm: domínios inválidos podem produzir valores não finitos.
-          Caminhos são POSIX lexicais, sem resolução de links.
+          Todos esses módulos já ficam instalados automaticamente em ~/.delegua/cgd quando você roda
+          ./instalar.
         </p>
       </section>
       <section class="doc-section" id="catalogo">
-        <h2>Catálogo completo</h2>
+        <h2>Catálogo completo de exemplos</h2>
         <p>
-          Todos os exemplos, incluindo programas históricos, entrada padrão e falhas esperadas,
-          estão no
+          Todos os 136 exemplos do repositório (incluindo entrada padrão, bibliotecas e erros
+          esperados) fazem parte da suíte de testes no
           <a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/README.md"
-            >catálogo do repositório</a
-          >. Nenhum arquivo .delegua do catálogo é ignorado pela suíte.
+            >catálogo do GitHub</a
+          >.
         </p>
         <pre><code>mkdir -p out
-./cgd exemplos/linguagem/14_classes.delegua -o -s out/classes
+cgd exemplos/linguagem/14_classes.delegua -o -s out/classes
 ./out/classes
 python3 testes/exemplos.py</code></pre>
         <p>
-          Passes, formato dos diagnósticos e configuração de toolchains:
-          <a href="https://github.com/FernandoTheDev/cgd/blob/dev/docs/desenvolvimento.md"
-            >guia de desenvolvimento</a
-          >.
+          Quer entender os passes internos do compilador? Leia o
+          <a href="livro/desenvolvimento.html">guia de desenvolvimento</a>.
         </p>
       </section>
     </main>
     <footer>
-      <p>CGD · Delégua compilada · <a href="index.html">Voltar ao projeto</a></p>
+      <div class="footer-inner">
+        <p style="margin: 0">
+          CGD · Compilador Geral Delégua · Linguagem original por
+          <a href="https://github.com/DesignLiquido/delegua">Design Líquido</a> · Apache-2.0.
+        </p>
+        <div class="footer-links">
+          <a href="index.html">Início</a><a href="livro/index.html">Livro</a
+          ><a href="https://github.com/FernandoTheDev/cgd/tree/dev">GitHub</a>
+        </div>
+      </div>
     </footer>
   </body>
 </html>

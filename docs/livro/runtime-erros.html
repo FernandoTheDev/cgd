@@ -1,9 +1,9 @@
 <!DOCTYPE HTML>
-<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Erros do programa: apresentação e localização - O livro do CGD</title>
+        <title>Lendo erros em tempo de execução (R0001) - O livro do CGD</title>
 
 
         <!-- Custom HTML head -->
@@ -35,8 +35,8 @@
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
-            const default_light_theme = "navy";
-            const default_dark_theme = "navy";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
             window.path_to_searchindex_js = "searchindex.js";
         </script>
         <!-- Start loading toc.js asap -->
@@ -78,7 +78,7 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
-            html.classList.remove('navy')
+            html.classList.remove('coal')
             html.classList.add(theme);
             html.classList.add("js");
         </script>
@@ -179,19 +179,18 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="erros-do-programa-apresentação-e-localização"><a class="header" href="#erros-do-programa-apresentação-e-localização">Erros do programa: apresentação e localização</a></h1>
-<p>Quando uma falha escapa dos seus tratadores, o programa mostra a mensagem e aponta o trecho de origem. Saiba ler esse diagnóstico e o que ainda aparece quando o arquivo já não está disponível.</p>
-<h2 id="ler-um-diagnóstico"><a class="header" href="#ler-um-diagnóstico">Ler um diagnóstico</a></h2>
-<p>O cabeçalho identifica a categoria, seguido por arquivo, linha e coluna. Quando o fonte está acessível, a linha e um marcador ^ mostram a operação falível. Tabs são expandidas; o arquivo é tratado como texto UTF-8 e controles são escapados para não inserir sequências de terminal.</p>
+                        <h1 id="lendo-erros-em-tempo-de-execução-r0001"><a class="header" href="#lendo-erros-em-tempo-de-execução-r0001">Lendo erros em tempo de execução (R0001)</a></h1>
+<p>Se uma exceção escapar do seu programa enquanto ele roda, o runtime mostra um diagnóstico colorido/visual apontando o arquivo, a linha, a coluna e o trecho exato do código.</p>
+<h2 id="como-ler-a-mensagem"><a class="header" href="#como-ler-a-mensagem">Como ler a mensagem</a></h2>
+<p>O cabeçalho mostra error[R0001] seguido do motivo, o caminho do arquivo com linha:coluna e a linha marcada com ^. Caracteres de controle são escapados e arquivos indisponíveis nunca travam nem escondem o erro.</p>
 <pre><code class="language-delegua">error[R0001]: Divisão por zero.
  --&gt; { programa.delegua:2:10 }
    2 | retorna a / b
      |          ^
 </code></pre>
-<h2 id="custo-e-limites"><a class="header" href="#custo-e-limites">Custo e limites</a></h2>
-<p>O C gerado mantém descritores estáticos e atribui um ponteiro antes de operações que podem falhar. Não há leitura de arquivo ou formatação por nó no caminho normal. Somente uma exceção sem tratador é renderizada; pegue continua recebendo o valor sem impressão automática. A API C antiga de localização é preservada.</p>
-<p>A linha é lida do disco na falha, não embutida no executável. Se o arquivo mudou, o trecho pode divergir do fonte compilado. Fonte ausente, inválido, muito longo ou fora do orçamento nunca apaga o código e a localização conhecidos. A leitura é limitada e só aceita arquivo regular; FIFO/dispositivo não bloqueia o diagnóstico. A janela mostrada é limitada e pode indicar posição fora do trecho.</p>
-<p>O código dinâmico permanece R0001. O formato humano não substitui um protocolo de depuração.</p>
+<blockquote>
+<p>O código R0001 identifica erros dinâmicos do runtime. A localização usa metadados estáticos no C gerado e só lê o arquivo do disco no momento da falha.</p>
+</blockquote>
 
                     </main>
 
