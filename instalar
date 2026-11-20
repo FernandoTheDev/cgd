@@ -5,6 +5,7 @@ set -eu
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 install_prefix=${CGD_PREFIX:-${XDG_DATA_HOME:-$HOME/.local/share}/cgd}
 install_bin_dir=${CGD_BIN_DIR:-$HOME/.local/bin}
+install_libs_dir=${CGD_LIBS_DIR:-$HOME/.delegua/cgd}
 build_profile=release
 build_required=1
 d_compiler=${DC:-}
@@ -12,11 +13,12 @@ d_compiler=${DC:-}
 usage() {
     cat <<'EOF'
 Uso: ./instalar [--compiler dmd|ldc2] [--prefix DIRETORIO] [--bin-dir DIRETORIO]
-                  [--release|--debug] [--no-build]
+                  [--libs-dir DIRETORIO] [--release|--debug] [--no-build]
 
 --no-build reutiliza cgd e lib/libdelegua_rt.o já compilados e validados.
 O diretório --prefix contém o executável, o runtime e os headers.
 O diretório --bin-dir recebe um link simbólico chamado cgd.
+O diretório --libs-dir (padrão ~/.delegua/cgd) recebe as bibliotecas cgd:.
 EOF
 }
 
@@ -26,12 +28,13 @@ fail() {
 }
 while [ "$#" -gt 0 ]; do
     case "$1" in
-    --compiler | --prefix | --bin-dir)
+    --compiler | --prefix | --bin-dir | --libs-dir)
         [ "$#" -ge 2 ] || fail "Falta valor para $1."
         case "$1" in
         --compiler) d_compiler=$2 ;;
         --prefix) install_prefix=$2 ;;
         --bin-dir) install_bin_dir=$2 ;;
+        --libs-dir) install_libs_dir=$2 ;;
         esac
         shift 2
         ;;
@@ -77,20 +80,20 @@ fi
 [ -x cgd ] || fail 'Executável cgd ausente. Execute dub build.'
 [ -f lib/libdelegua_rt.o ] || fail 'Runtime ausente. Execute ./build-runtime.'
 
-mkdir -p "$install_prefix/lib" "$install_prefix/vendor/delegua-runtime/src" "$install_bin_dir"
+mkdir -p "$install_prefix/lib" "$install_prefix/vendor/delegua-runtime/src" "$install_bin_dir" "$install_libs_dir"
 # Caminhos absolutos tornam o link independente do diretório de execução.
 install_prefix=$(CDPATH= cd -- "$install_prefix" && pwd)
 install_bin_dir=$(CDPATH= cd -- "$install_bin_dir" && pwd)
+install_libs_dir=$(CDPATH= cd -- "$install_libs_dir" && pwd)
 [ ! -d "$install_bin_dir/cgd" ] || fail 'O destino do link cgd é um diretório.'
 cp cgd "$install_prefix/.cgd-install-$$"
 chmod +x "$install_prefix/.cgd-install-$$"
 mv -f "$install_prefix/.cgd-install-$$" "$install_prefix/cgd"
 cp lib/libdelegua_rt.o "$install_prefix/lib/"
-mkdir -p "$install_prefix/bibliotecas"
-cp bibliotecas/*.delegua "$install_prefix/bibliotecas/"
+cp bibliotecas/*.delegua "$install_libs_dir/"
 cp vendor/delegua-runtime/src/*.h "$install_prefix/vendor/delegua-runtime/src/"
 if [ "$install_bin_dir/cgd" != "$install_prefix/cgd" ]; then
     ln -sf "$install_prefix/cgd" "$install_bin_dir/cgd"
 fi
-printf 'Instalado: %s/cgd\nRuntime: %s/lib/libdelegua_rt.o\n' "$install_bin_dir" "$install_prefix"
+printf 'Instalado: %s/cgd\nRuntime: %s/lib/libdelegua_rt.o\nBibliotecas: %s\n' "$install_bin_dir" "$install_prefix" "$install_libs_dir"
 printf 'Inclua %s no PATH, se necessário.\n' "$install_bin_dir"

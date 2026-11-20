@@ -163,7 +163,7 @@ class LanguageServer
             capabilities[name] = JSONValue(true);
         capabilities["renameProvider"] = JSONValue(["prepareProvider": JSONValue(true)]);
         capabilities["completionProvider"] = JSONValue([
-            "triggerCharacters": arrayJSON([JSONValue("."), JSONValue(":")]),
+            "triggerCharacters": arrayJSON([JSONValue("."), JSONValue(":"), JSONValue("/")]),
             "resolveProvider": JSONValue(false)
         ]);
         capabilities["signatureHelpProvider"] = JSONValue([

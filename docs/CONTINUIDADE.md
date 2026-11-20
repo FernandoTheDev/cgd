@@ -1,3 +1,89 @@
+# Bibliotecas `cgd:` dinâmicas em `~/.delegua/cgd` — 20/11/2026
+
+Solicitação ativa: instalar as bibliotecas padrão do CGD em `~/.delegua/cgd`,
+remover a lista fixa (hardcoded) de `cgd:` no compilador para resolver arquivos
+diretamente de lá e listar essas bibliotecas dinamicamente no LSP ao digitar
+`importar("cgd:...")`.
+
+## Implementação entregue
+
+- `src/frontend/modules.d`:
+  - Removida a whitelist fixa de bibliotecas `cgd:`.
+  - Adicionados `cgdLibraryRoots()`, `isValidCgdModuleName()`, `resolveCgdLibrary()`
+    e `listCgdLibraries()`: prioridade para `CGD_LIBS_DIR` (se definida) ou
+    `~/.delegua/cgd`, com fallback para `bibliotecas/` ao lado do executável
+    (checkout/VSIX). Suporta subdiretórios (`cgd:sub/modulo`) e bloqueia
+    travessia de caminho (`..`, `/`, `\`, `:`, byte nulo) com `E2003`.
+- `src/lsp/completion.d` e `src/lsp/server.d`:
+  - Completion contextual dentro de `importar("cgd:...")` (com gatilhos `:`,
+    `/` e prefixo), listando dinamicamente os `.delegua` de `~/.delegua/cgd`
+    com `CompletionItemKind.Module`, `textEdit` exato em UTF-16 e fallback ao
+    lado do executável. Go-to-definition, document links e completion de membros
+    resolvem diretamente o arquivo em `~/.delegua/cgd`.
+- `instalar`, `scripts/instalar_extensao.py` e `scripts/validar_instalacao.py`:
+  - `instalar` agora instala `bibliotecas/*.delegua` em `~/.delegua/cgd`
+    (configurável via `--libs-dir` ou `CGD_LIBS_DIR`).
+  - `scripts/instalar_extensao.py` também sincroniza `~/.delegua/cgd` durante
+    a instalação da extensão.
+  - `scripts/validar_instalacao.py` valida instalação isolada em `~/.delegua/cgd`,
+    incluindo importação de `cgd:json` e de biblioteca personalizada adicionada
+    em `~/.delegua/cgd` sem recompilar o CGD.
+
+## Testes realmente executados
+
+- Unitários D: DMD e LDC2 (10 módulos cada, incluindo validação de nomes,
+  bloqueio de travessia e resolução/listagem dinâmica em `testes/unit/frontend.d`).
+- Build release LDC2 (`./cgd`).
+- `testes/lsp.py` (completion de `importar("cgd:")` e `importar("cgd:ex")` a
+  partir de `~/.delegua/cgd`, `textEdit` UTF-16, definição apontando para o
+  arquivo em `~/.delegua/cgd` e rejeição `E2003` em `cgd:../extra`).
+- `scripts/validar_instalacao.py`, `testes/driver.py` (26),
+  `testes/bibliotecas.py` (342), `testes/stdlib.py` (114),
+  `testes/stdlib_avancada.py` (11), `scripts/formatar.py --check` e
+  `scripts/verificar_tipos.py`.
+
+---
+
+# Melhoria do formatador Delégua (`src/frontend/formatter.d`) — 20/11/2026
+
+Solicitação ativa: melhorar o formatador próprio Delégua (`src/frontend/formatter.d`)
+mantendo indentação de 4 espaços, preservação literal de strings/comentários/contratos
+e idempotência em toda a base.
+
+## Implementação entregue
+
+- `src/frontend/formatter.d`:
+  - Tokenizador aprimorado: comentários de bloco `/* ... */`, strings
+    interpoladas `${...}` com aspas internas aninhadas (espelhando `lexer.d`) e
+    literais numéricos decimais sem separar o ponto.
+  - Genéricos `Promessa<T>` e `Tarefa<T>` (inclusive aninhados com `>>`), sem
+    afetar comparações `a < b` ou deslocamentos `n >> 2`.
+  - Unários `-`/`+` (com proteção contra fusão em `- -1` / `+ +1`), prefixo vs
+    pós-fixo `++`/`--`, fatias `valores[::-1]` / `valores[1:3]` (preservando
+    anotações em compreensões `[x para cada x: inteiro em valores]`), ternário
+    `cond ? a : b` e operador spread/rest `...resto`.
+  - Cabeçalho `para` sem parênteses mantido em uma linha (`para var i: inteiro = 1; i <= 5; i++ {`),
+    campos estáticos sem quebra após modificador (`estatico criados: inteiro = 0`),
+    modificadores acentuados (`assíncrona`, `estática`, `abstrata`), `faca { ... } enquanto (...)`,
+    espaçamento correto antes de `(` / `[` após operadores binários e preservação
+    de coleções (`[...]` / `{...}`) multilinha com indentação de 4 espaços.
+- Reformatados exemplos/bibliotecas com `scripts/formatar.py` e regenerados
+  `docs/linguagem.html` e `docs/livro`.
+
+## Testes realmente executados
+
+- Unitários D: DMD e LDC2 (10 módulos cada, incluindo novos testes unitários em
+  `src/frontend/formatter.d`).
+- Build release LDC2 (`./cgd`).
+- `testes/formatador.py`: 160 arquivos idempotentes com indentação múltipla de 4
+  espaços e 136 exemplos / 272 verificações preservados.
+- `testes/driver.py` (26), `testes/lsp.py`, `testes/livro.py` (39 páginas),
+  `testes/site.py --static-only`, `scripts/verificar_tipos.py`,
+  `scripts/gerar_referencia.py --check`, `scripts/gerar_livro.py --check` e
+  `scripts/formatar.py --check`.
+
+---
+
 # Segurança estática ampliada (E3109–E3112) e inferência no LSP — 20/11/2026
 
 Solicitação ativa: continuidade da revisão 0.9.0 após reinicialização do sistema,

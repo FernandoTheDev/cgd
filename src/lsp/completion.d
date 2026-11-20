@@ -1,21 +1,74 @@
 module lsp.completion;
 
 import frontend;
+import frontend.modules : CgdLibraryEntry, listCgdLibraries;
 import frontend.semantic.members;
 import lsp.model;
 import lsp.builtins : builtinMethod, builtinMethods;
 import std.json;
 import std.conv : to;
-import std.string : lastIndexOf, startsWith;
+import std.string : endsWith, lastIndexOf, startsWith, stripRight;
 
 private Context nativeContext;
+
+private bool isModulePathChar(char ch)
+{
+    return cast(ubyte) ch >= 128 || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0'
+            && ch <= '9') || ch == '_' || ch == '-' || ch == '/' || ch == ':';
+}
+
+private bool importStringContext(string prefix, out string typed, out size_t lineStart, out size_t contentStart)
+{
+    long nl = prefix.lastIndexOf('\n');
+    lineStart = nl >= 0 ? cast(size_t)(nl + 1) : 0;
+    string currentLine = prefix[lineStart .. $];
+    char quote = 0;
+    bool escaped;
+    size_t quoteIndex;
+    foreach (size_t i, char ch; currentLine)
+    {
+        if (quote)
+        {
+            if (escaped)
+                escaped = false;
+            else if (ch == '\\')
+                escaped = true;
+            else if (ch == quote)
+                quote = 0;
+        }
+        else if (ch == '"' || ch == '\'')
+        {
+            quote = ch;
+            quoteIndex = i;
+        }
+    }
+    if (!quote)
+        return false;
+    string beforeQuote = currentLine[0 .. quoteIndex].stripRight;
+    if (!beforeQuote.endsWith("("))
+        return false;
+    string beforeParen = beforeQuote[0 .. $ - 1].stripRight;
+    if (!beforeParen.endsWith("importar"))
+        return false;
+    if (beforeParen.length > "importar".length)
+    {
+        char prev = beforeParen[$ - "importar".length - 1];
+        bool wordChar = cast(ubyte) prev >= 128 || (prev >= 'a' && prev <= 'z') || (prev >= 'A'
+                && prev <= 'Z') || (prev >= '0' && prev <= '9') || prev == '_';
+        if (wordChar)
+            return false;
+    }
+    contentStart = lineStart + quoteIndex + 1;
+    typed = currentLine[quoteIndex + 1 .. $];
+    return true;
+}
 
 JSONValue completionItem(string name, string kind, string detail)
 {
     return JSONValue([
         "label": JSONValue(name),
         "kind": JSONValue(kind == "class" ? 7 : kind == "method" ? 2 : kind == "function"
-                ? 3 : kind == "property" ? 5 : kind == "keyword" ? 14 : 6),
+                ? 3 : kind == "property" ? 5 : kind == "keyword" ? 14 : kind == "module" ? 9 : 6),
         "detail": JSONValue(detail)
     ]);
 }
@@ -25,8 +78,41 @@ JSONValue completions(Document doc, JSONValue params)
     JSONValue[] items;
     bool[string] names;
     JSONValue position = get(params, "position");
-    size_t offset = doc.byteOffset(cast(uint) integer(position, "line"), cast(uint) integer(position, "character"));
+    uint lineIndex = cast(uint) integer(position, "line");
+    uint characterIndex = cast(uint) integer(position, "character");
+    size_t offset = doc.byteOffset(lineIndex, characterIndex);
     string prefix = doc.text[0 .. offset];
+    string importTyped;
+    size_t importLineStart;
+    size_t importContentStart;
+    if (importStringContext(prefix, importTyped, importLineStart, importContentStart))
+    {
+        if (importTyped.startsWith("cgd:") || "cgd:".startsWith(importTyped))
+        {
+            size_t endOffset = offset;
+            while (endOffset < doc.text.length && doc.text[endOffset] != '\n'
+                    && doc.text[endOffset] != '"' && doc.text[endOffset] != '\''
+                    && isModulePathChar(doc.text[endOffset]))
+                endOffset++;
+            uint startCol = doc.utf16(lineIndex,
+                    cast(uint) doc.text[importLineStart .. importContentStart].to!dstring.length);
+            uint endCol = doc.utf16(lineIndex, cast(uint) doc.text[importLineStart .. endOffset].to!dstring.length);
+            JSONValue editRange = rangeJSON(point(lineIndex, startCol), point(lineIndex, endCol));
+            string filterPrefix = importTyped.startsWith("cgd:") ? importTyped[4 .. $] : "";
+            foreach (CgdLibraryEntry entry; listCgdLibraries())
+            {
+                if (filterPrefix.length && !entry.name.startsWith(filterPrefix))
+                    continue;
+                string fullName = "cgd:" ~ entry.name;
+                string detail = entry.fromUserDir ? "~/.delegua/cgd/" ~ entry.name ~ ".delegua" : entry.path;
+                JSONValue item = completionItem(fullName, "module", detail);
+                item["filterText"] = JSONValue(fullName);
+                item["textEdit"] = JSONValue(["range": editRange, "newText": JSONValue(fullName)]);
+                items ~= item;
+            }
+            return JSONValue(["isIncomplete": JSONValue(false), "items": arrayJSON(items)]);
+        }
+    }
     long dot = prefix.lastIndexOf('.');
     bool member = dot >= 0;
     if (member)

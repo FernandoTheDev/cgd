@@ -1,14 +1,125 @@
 module frontend.modules;
+
 import frontend;
+import std.algorithm : canFind, sort;
+import std.array : join;
+import std.conv;
 import std.file;
 import std.path;
-import std.conv;
+import std.process : environment;
 import std.string;
-import std.algorithm : canFind;
-import std.array : join;
 
 version (Posix) import core.sys.posix.stdlib : realpath;
 import core.stdc.stdlib : free;
+
+struct CgdLibraryEntry
+{
+    string name;
+    string path;
+    bool fromUserDir;
+}
+
+/// Diretórios de busca das bibliotecas `cgd:`, em ordem de prioridade:
+/// 1) `CGD_LIBS_DIR` (se definida) ou `~/.delegua/cgd`
+/// 2) `bibliotecas/` ao lado do executável (fallback de checkout/bundle)
+string[] cgdLibraryRoots()
+{
+    string[] roots;
+    string envLibs = environment.get("CGD_LIBS_DIR");
+    if (envLibs.length)
+        roots ~= envLibs;
+    else
+    {
+        string home = environment.get("HOME");
+        version (Windows)
+            if (!home.length)
+                home = environment.get("USERPROFILE");
+        if (home.length)
+            roots ~= buildPath(home, ".delegua", "cgd");
+    }
+    string exeLibs = buildPath(dirName(thisExePath()), "bibliotecas");
+    if (!roots.canFind(exeLibs))
+        roots ~= exeLibs;
+    return roots;
+}
+
+/// Valida nome de módulo após `cgd:`, impedindo travessia de caminho e caracteres inválidos.
+bool isValidCgdModuleName(string name)
+{
+    if (!name.length || name.startsWith("/") || name.endsWith("/") || name.canFind('\\')
+            || name.canFind('\0') || name.canFind(':'))
+        return false;
+    string[] segments = name.split("/");
+    foreach (string segment; segments)
+    {
+        if (!segment.length || segment == "." || segment == "..")
+            return false;
+        foreach (char ch; segment)
+        {
+            bool ok = cast(ubyte) ch >= 128 || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+                || (ch >= '0' && ch <= '9') || ch == '_' || ch == '-';
+            if (!ok)
+                return false;
+        }
+    }
+    return true;
+}
+
+/// Resolve `cgd:<nome>` procurando `<nome>.delegua` nos diretórios configurados.
+string resolveCgdLibrary(string name, string[string] overlays = null)
+{
+    if (!isValidCgdModuleName(name))
+        return null;
+    string[] segments = name.split("/");
+    string relative = buildPath(segments) ~ ".delegua";
+    foreach (string root; cgdLibraryRoots())
+    {
+        string candidate = buildPath(root, relative);
+        string normalized = absolutePath(candidate).asNormalizedPath.to!string;
+        if (overlays !is null && (normalized in overlays))
+            return normalized;
+        if (exists(candidate) && isFile(candidate))
+            return candidate;
+    }
+    return null;
+}
+
+/// Lista bibliotecas `.delegua` disponíveis para `importar("cgd:...")` (priorizando `~/.delegua/cgd`).
+CgdLibraryEntry[] listCgdLibraries()
+{
+    CgdLibraryEntry[] entries;
+    bool[string] seen;
+    string[] roots = cgdLibraryRoots();
+    foreach (size_t rootIndex, string root; roots)
+    {
+        if (!exists(root) || !isDir(root))
+            continue;
+        bool fromUserDir = rootIndex == 0 && root != buildPath(dirName(thisExePath()), "bibliotecas");
+        size_t scanned;
+        try
+        {
+            foreach (DirEntry entry; dirEntries(root, SpanMode.breadth))
+            {
+                if (++scanned > 512)
+                    break;
+                if (!entry.isFile || extension(entry.name) != ".delegua")
+                    continue;
+                string rel = relativePath(entry.name, root);
+                string withoutExt = stripExtension(rel).replace("\\", "/");
+                if (!isValidCgdModuleName(withoutExt) || (withoutExt in seen))
+                    continue;
+                seen[withoutExt] = true;
+                entries ~= CgdLibraryEntry(withoutExt, entry.name, fromUserDir);
+            }
+        }
+        catch (FileException)
+        {
+            continue;
+        }
+    }
+    entries.sort!((CgdLibraryEntry a, CgdLibraryEntry b) => a.name < b.name)();
+    return entries;
+}
 
 class ModuleLoader
 {
@@ -78,20 +189,15 @@ class ModuleLoader
                 return;
             }
             string path = literal.value.to!string;
-            if (path == "cgd:json" || path == "cgd:rede" || path == "cgd:colecoes" || path == "cgd:arquivos"
-                    || path == "cgd:matematica" || path == "cgd:nativo" || path == "cgd:textos"
-                    || path == "cgd:estatistica" || path == "cgd:caminhos"
-                    || path == "cgd:processo" || path == "cgd:ambiente" || path == "cgd:sistema"
-                    || path == "cgd:tempo" || path == "cgd:sockets"
-                    || path == "cgd:assincrono" || path == "cgd:servidor" || path == "cgd:io"
-                    || path == "cgd:algoritmos" || path == "cgd:cli"
-                    || path == "cgd:log" || path == "cgd:bytes" || path == "cgd:cripto"
-                    || path == "cgd:compressao" || path == "cgd:sqlite")
-                path = buildPath(dirName(thisExePath()), "bibliotecas", path[4 .. $] ~ ".delegua");
-            else if (path.startsWith("cgd:"))
+            if (path.startsWith("cgd:"))
             {
-                diagnostics.error(node.pos, "Biblioteca CGD desconhecida: " ~ path, "E2003");
-                return;
+                string resolved = resolveCgdLibrary(path[4 .. $], overlays);
+                if (!resolved.length)
+                {
+                    diagnostics.error(node.pos, "Biblioteca CGD desconhecida: " ~ path, "E2003");
+                    return;
+                }
+                path = resolved;
             }
             if (path.canFind('\0'))
             {
@@ -106,7 +212,7 @@ class ModuleLoader
             }
             try
             {
-                string target = canonical(buildPath(dirName(filename), path));
+                string target = canonical(isAbsolute(path) ? path : buildPath(dirName(filename), path));
                 if (target in active)
                 {
                     diagnostics.errorCode(node.pos, moduleCycle, importStack.join(" -> ") ~ " -> " ~ target);
