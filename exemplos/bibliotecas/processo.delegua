@@ -1,0 +1,9 @@
+//! ação com espaços\n0
+var processo: qualquer = importar("cgd:processo").Processo
+// Cada item é um argumento. Não há interpretação de shell.
+var resultado: qualquer = processo.executar("/bin/printf", ["%s", "ação com espaços"])
+resultado.exigirSucesso()
+escreva(resultado.saidaPadrao())
+escreva(resultado.codigoSaida())
+// argv inclui o executável; argumentos() contém apenas os argumentos da aplicação.
+assercao(processo.argc() == tamanho(processo.argv()))

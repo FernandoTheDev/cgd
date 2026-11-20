@@ -1,0 +1,24 @@
+//! 616263\nba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\nverdadeiro\nAna\n2026-11-20T14:30:05Z
+const Bytes: qualquer = importar("cgd:bytes").Bytes
+const Cripto: qualquer = importar("cgd:cripto").Cripto
+const Comp: qualquer = importar("cgd:compressao").Compressao
+const SQLite: qualquer = importar("cgd:sqlite").SQLite
+const DataHora: qualquer = importar("cgd:tempo").DataHora
+
+escreva(Bytes.deTexto("abc").paraHex())
+escreva(Cripto.sha256("abc"))
+
+const gz: texto = Comp.gzipComprimir("delegua-compilador-c99")
+escreva(Comp.gzipDescomprimir(gz) == "delegua-compilador-c99")
+
+const db: qualquer = SQLite.abrir(":memory:")
+tente {
+    db.executar("CREATE TABLE pessoas (id INTEGER PRIMARY KEY, nome TEXT)")
+    db.executar("INSERT INTO pessoas (nome) VALUES (?)", ["Ana"])
+    const linha: qualquer = db.consultarUm("SELECT nome FROM pessoas WHERE id = ?", [1])
+    escreva(linha["nome"])
+} finalmente {
+    db.fechar()
+}
+
+escreva(DataHora.deUTC(2026, 11, 20, 14, 30, 5).formatarISO())

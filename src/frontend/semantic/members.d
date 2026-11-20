@@ -20,13 +20,20 @@ struct ClassMember
         if (access == 1)
             return false;
         bool[ClassDecl] seen;
-        for (ClassDecl current = caller; current !is null && current !in seen; current = current.superClass)
+        bool inherits(ClassDecl current)
         {
+            if (current is null || current in seen)
+                return false;
+            seen[current] = true;
             if (current is owner)
                 return true;
-            seen[current] = true;
+            foreach (ClassDecl mixinClass; current.mixins)
+                if (inherits(mixinClass))
+                    return true;
+            return inherits(current.superClass);
         }
-        return false;
+
+        return inherits(caller);
     }
 }
 
@@ -34,8 +41,10 @@ struct ClassMember
 ClassMember resolveClassMember(ClassDecl declaration, dstring name)
 {
     bool[ClassDecl] seen;
-    for (ClassDecl current = declaration; current !is null && current !in seen; current = current.superClass)
+    ClassMember search(ClassDecl current)
     {
+        if (current is null || current in seen)
+            return ClassMember.init;
         seen[current] = true;
         foreach (FnDecl method; current.methods)
             if (method.fn == name)
@@ -43,6 +52,14 @@ ClassMember resolveClassMember(ClassDecl declaration, dstring name)
         foreach (ref ClassField field; current.fields)
             if (field.name == name)
                 return ClassMember(current, null, &field);
+        foreach_reverse (ClassDecl mixinClass; current.mixins)
+        {
+            ClassMember fromMixin = search(mixinClass);
+            if (fromMixin.owner !is null)
+                return fromMixin;
+        }
+        return search(current.superClass);
     }
-    return ClassMember.init;
+
+    return search(declaration);
 }

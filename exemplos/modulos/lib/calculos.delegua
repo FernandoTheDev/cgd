@@ -1,4 +1,4 @@
-//# 0
+//!
 funcao soma(a: inteiro, b: inteiro = 2): inteiro {
     retorna a + b
 }

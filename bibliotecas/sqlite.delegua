@@ -1,0 +1,70 @@
+// Acesso SQLite3 gerenciado com consultas parametrizadas e ciclo de vida explícito.
+classe BancoSQLite {
+    privado {
+        _recurso: qualquer
+        _aberto: logico
+    }
+
+    construtor(caminho: texto = ":memory:") {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        isto._recurso = nativo.sqliteAbrir(caminho)
+        isto._aberto = verdadeiro
+    }
+
+    aberto(): logico {
+        retorna isto._aberto
+    }
+
+    executar(sql: texto, parametros: qualquer[] = []): inteiro {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sqliteExecutar(isto._recurso, sql, parametros)
+    }
+
+    consultar(sql: texto, parametros: qualquer[] = []): dicionario[] {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sqliteConsultar(isto._recurso, sql, parametros)
+    }
+
+    consultarUm(sql: texto, parametros: qualquer[] = []): qualquer {
+        var linhas: dicionario[] = isto.consultar(sql, parametros)
+        se tamanho(linhas) == 0 {
+            retorna nulo
+        }
+        retorna linhas[0]
+    }
+
+    ultimoId(): inteiro {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sqliteUltimoId(isto._recurso)
+    }
+
+    iniciarTransacao(): vazio {
+        isto.executar("BEGIN TRANSACTION")
+    }
+
+    confirmar(): vazio {
+        isto.executar("COMMIT")
+    }
+
+    reverter(): vazio {
+        isto.executar("ROLLBACK")
+    }
+
+    fechar(): vazio {
+        se isto._aberto {
+            var nativo: qualquer = importar("cgd:nativo").Primitivas
+            nativo.sqliteFechar(isto._recurso)
+            isto._aberto = falso
+        }
+    }
+
+    destrutor(): vazio {
+        isto.fechar()
+    }
+}
+
+classe SQLite {
+    estatico abrir(caminho: texto = ":memory:"): BancoSQLite {
+        retorna BancoSQLite(caminho)
+    }
+}

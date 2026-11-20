@@ -1,0 +1,478 @@
+<!DOCTYPE HTML>
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Desenvolvimento - O livro do CGD</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="tema/cgd.css">
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('coal')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">O livro do CGD</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/FernandoTheDev/cgd" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="desenvolvimento-do-compilador"><a class="header" href="#desenvolvimento-do-compilador">Desenvolvimento do compilador</a></h1>
+<p>Leia <a href="https://github.com/FernandoTheDev/cgd/blob/dev/AGENTS.md">AGENTS.md</a> antes de alterar o pipeline. A linguagem original é
+<a href="https://github.com/DesignLiquido/delegua">Delégua, da Design Líquido</a>.</p>
+<h2 id="pipeline-e-contratos"><a class="header" href="#pipeline-e-contratos">Pipeline e contratos</a></h2>
+<p>A ordem é: UTF-8/tokens → parsing recuperável → loading estático → validação da
+estrutura → declaração de símbolos/tipos → resolução semântica → segurança estática → pureza → análise de fluxo →
+otimizações opcionais → lowering → C99 → toolchain externa.</p>
+<p><code>--verificar</code> encerra após a análise, sem exigir runtime nem compilador C.
+<code>--emitir-c</code> gera somente o C, inclusive com <code>-o</code>, sem vincular bibliotecas.
+O backend não executa código da linguagem para descobrir tipos.</p>
+<p><code>AstRewriter</code> percorre os slots mutáveis da AST em pós-ordem e visita referências
+compartilhadas a módulos/funções uma vez. Não segue links de resolução para
+símbolos, superclasses ou donos de métodos. Nomes de propriedades e destinos de
+atribuição não são expressões substituíveis.</p>
+<p>O gerenciador de passes mede alterações e encerra ao atingir ponto fixo, com teto
+defensivo de oito iterações. Uma árvore já estável passa apenas uma vez, em vez
+das vinte repetições fixas anteriores. <code>-d -o</code> mostra os contadores.</p>
+<div class="table-wrapper"><table><thead><tr><th>Otimização</th><th>Garantia</th></tr></thead><tbody>
+<tr><td>Dobra de literais</td><td>Aritmética, comparações, concatenação, módulo inteiro e negação; overflow, divisão por zero e resultados reais não finitos ficam no runtime</td></tr>
+<tr><td>Propagação de constantes</td><td>Identidade da declaração resolvida, não busca pelo nome; somente constantes literais sem anotação que possa converter o valor</td></tr>
+<tr><td>Curto-circuito/coalescência/ternário</td><td>Elimina só lados que comprovadamente não executam; preserva os valores retornados pelos operadores</td></tr>
+<tr><td>Ramos e laços mortos</td><td>Remove ramos literais e <code>enquanto falso</code>; não antecipa condições nem efeitos de laços</td></tr>
+<tr><td>Caudas inalcançáveis</td><td>Retorno, falha, sustar/continua e ambos os ramos terminantes; mantém funções/classes declaradas adiante e os blocos finalmente</td></tr>
+<tr><td>CTFE</td><td>Função resolvida precisa ser exatamente a função registrada como pura, com aridade exata e argumentos literais; limites, falhas e contratos preservam execução nativa</td></tr>
+</tbody></table>
+</div>
+<p>A VM usa slots distintos por declaração e por parâmetro, restaura vínculos ao
+sair de blocos, implementa <code>senão</code>, atribuições compostas e incrementos e avalia
+argumentos da esquerda para a direita. Contratos primitivos de parâmetros,
+variáveis locais e retorno são validados antes de aceitar um resultado CTFE.
+Não se substituem chamadas que falham, retornam nulo implicitamente, dependem de
+conversão textual mista ou usam valores que a VM não representa: a chamada nativa
+permanece e sua exceção pode ser tratada normalmente. Chamadas indiretas e funções
+locais dentro de funções marcadas puras recebem diagnóstico de limitação da CTFE.</p>
+<p>Não use identidades algébricas como <code>x * 0 → 0</code>: avaliar <code>x</code> pode lançar exceção ou
+ter efeitos. Não remova variáveis apenas por contagem de usos. Não propague
+coleções mutáveis ou remova validações de contratos.</p>
+<h2 id="diagnósticos-e-limites"><a class="header" href="#diagnósticos-e-limites">Diagnósticos e limites</a></h2>
+<p><code>--diagnosticos=json</code> escreve um objeto JSON por linha em stderr. Cada objeto tem
+<code>severity</code>, <code>code</code>, <code>message</code> e, quando existe posição, <code>file</code> e <code>range</code> com
+<code>start/end</code>, <code>line/column</code>. Linhas e colunas começam em 1; as colunas contam
+pontos de código Unicode, e o final é exclusivo. Falhas gerais usam <code>E9001</code> e
+podem não ter intervalo. Mensagens permanecem em português.</p>
+<p>Códigos: <code>E1001</code> sintaxe, <code>E1002</code> UTF-8, <code>E1003</code> aninhamento sintático,
+<code>E1004</code> estrutura, <code>E2001</code> ciclo de módulos, <code>E2002</code> orçamento de loading,
+<code>E2003</code> importação, <code>E3001/H3001</code> símbolo ausente/sugestão, <code>W3001</code> código
+inalcançável e <code>W3002</code> possível retorno implícito em função tipada. Diagnósticos
+legados conservam <code>E0001/W0001/H0001</code>. Os códigos são mais estáveis que o texto;
+o LSP usa os mesmos diagnósticos; não há fix-its automáticos gerais.</p>
+<p>O parser sincroniza em declarações, comandos, ponto e vírgula e fechamento de
+bloco. Ele não envia uma AST com erros para a semântica. Há limite de 256 níveis
+sintáticos e de 512 níveis/500 mil nós antes dos passes recursivos; fontes têm
+limite de 4 MiB, módulos têm orçamento acumulado de 64 MiB/1024 unidades e 64
+níveis. O renderer limita o trecho a cinco linhas e evita repetir diagnósticos.</p>
+<p>Os codificadores de nomes e textos C reservam buffers e escrevem dígitos hexadecimais/
+octais diretamente, mantendo exatamente os bytes da versão anterior. O teste em D
+compara ambas as codificações para Unicode, aspas, barra, newline e byte nulo.
+O microbenchmark <code>rdmd -O -release -Isrc scripts/benchmark_codegen.d</code> mediu
+362 ms antes e 51 ms depois nesta máquina. É uma medição desses codificadores,
+não da compilação completa; o script não impõe limiares frágeis de tempo.</p>
+<p>A análise de fluxo é conservadora: avisa sobre caudas inalcançáveis e possível
+retorno implícito; não pretende provar terminação de laços ou ausência de falhas.
+Os avisos não dependem de <code>-o</code> e não tornam uma compilação válida inválida.</p>
+<h2 id="toolchain-e-compilação-cruzada"><a class="header" href="#toolchain-e-compilação-cruzada">Toolchain e compilação cruzada</a></h2>
+<pre><code class="language-sh">./cgd programa.delegua --verificar --diagnosticos=json
+./cgd programa.delegua --emitir-c -o -s out/programa
+./cgd programa.delegua --cc clang --target aarch64-linux-gnu \
+  --sysroot /sdk --runtime-object /sdk/lib/libdelegua_rt.o \
+  --runtime-root /sdk/cgd --pkg-config aarch64-linux-gnu-pkg-config \
+  --cflag=-g --ldflag=-static -s out/programa
+</code></pre>
+<p>O último comando é um modelo de configuração, não um SDK fornecido pelo CGD.
+O runtime, Boehm GC e todas as bibliotecas precisam ter sido compilados para o
+mesmo alvo. <code>--target</code> usa a opção de Clang; para GCC cruzado selecione o
+executável apropriado em <code>--cc</code> e omita essa opção. <code>PKG_CONFIG_LIBDIR</code> e
+<code>PKG_CONFIG_SYSROOT_DIR</code> são herdados. Bibliotecas Linux não são injetadas em
+triplas Windows. Nenhum executável cruzado foi validado nesta etapa.</p>
+<p>A canonicalização POSIX mantém realpath e cache por identidade. A alternativa
+Windows usa caminhos absolutos normalizados e comparação sem distinção de caixa;
+junctions/symlinks e o runtime ainda exigem validação nativa. Os instaladores shell
+continuam sendo destinados ao ambiente Linux validado.</p>
+<h2 id="formatação-reproduzível"><a class="header" href="#formatação-reproduzível">Formatação reproduzível</a></h2>
+<p>Instale <a href="https://github.com/dlang-community/dfmt">dfmt</a>,
+<a href="https://clang.llvm.org/docs/ClangFormat.html">clang-format</a>,
+<a href="https://docs.astral.sh/ruff/formatter/">Ruff</a>,
+<a href="https://prettier.io/docs/install">Prettier</a> e
+<a href="https://github.com/mvdan/sh">shfmt</a> e <a href="https://taplo.tamasfe.dev/">Taplo</a> para TOML. As configurações estão na raiz.</p>
+<pre><code class="language-sh">python3 scripts/formatar.py
+python3 scripts/formatar.py --check
+</code></pre>
+<p>Ferramentas usadas nesta revisão: dfmt <code>c65d1c8</code>, clang-format 22, Ruff 0.17.5,
+Prettier 3.8.1, shfmt 3.12.0 e Taplo 0.9.0. O script também aceita ferramentas locais em
+<code>out/tools/</code>, sem adicioná-las ao Git. Não baixa executáveis automaticamente.</p>
+<p>Arquivos <code>.delegua</code> usam o formatador próprio <code>frontend/formatter.d</code>, com quatro
+espaços, preservando strings e contratos; não se usa um parser JavaScript no lugar dele. Tabelas Unicode
+geradas são reproduzidas pelo gerador e não reformatadas. Licenças e binários
+não são entradas de formatadores de código.</p>
+<h2 id="verificar-mudanças"><a class="header" href="#verificar-mudanças">Verificar mudanças</a></h2>
+<p>Além da matriz e dos sanitizadores documentados no README, execute
+<code>python3 testes/driver.py</code>, <code>python3 scripts/gerar_referencia.py --check</code> e os
+testes do website. A referência web incorpora os próprios exemplos versionados;
+edite os fontes e regenere com <code>python3 scripts/gerar_referencia.py</code>.</p>
+<h2 id="segurança-estática-e-catálogo-de-mensagens"><a class="header" href="#segurança-estática-e-catálogo-de-mensagens">Segurança estática e catálogo de mensagens</a></h2>
+<p><code>frontend/semantic/static_safety.d</code> prova falhas locais antes do backend e funciona também
+sem <code>-o</code>. Ele avalia expressões literais e constantes imutáveis, sem executar
+funções ou presumir o conteúdo de vetores compartilhados. Divisão/módulo por
+zero, overflow de 64 bits, índices de literais, passos zero, deslocamentos,
+conversões textuais, contratos primitivos demonstravelmente incompatíveis,
+membros inexistentes em tipos/classes/módulos conhecidos, mutação de coleções
+imutáveis, operações sobre nulo e chamadas de valores não invocáveis recebem
+E3101–E3112. Anotações de vetores/tuplas também verificam literais e inserções.</p>
+<p>Ramos constantes descartados por se, ternário, curto-circuito e laços falsos
+não recebem falsos erros dessa etapa. Em um corpo protegido por pegue, a falha
+conhecida gera W31xx: o tratamento deliberado de exceções é preservado. Isso não
+prova que um pegue tipado específico capturará a falha. Não há prova global de
+programas: aliases mutáveis, entrada externa, chamadas indiretas e condições
+não conhecidas continuam protegidos pelo runtime. A avaliação de constantes tem
+limite de profundidade para não esgotar a pilha através de cadeias de símbolos.</p>
+<p>O catálogo está em <code>src/diagnostics/catalog.d</code>: código, modelo da mensagem e
+explicação ficam juntos. Lexer, fluxo, tipos, capturas e o novo passe usam esse
+catálogo. O parser compartilha um modelo contextual para tokens esperados;
+diagnósticos ainda não migrados conservam códigos genéricos. O renderer humano,
+o JSON e <code>--explicar</code> consomem as mesmas referências. A tabela da referência web
+é gerada diretamente desse catálogo, sem copiar as mensagens manualmente.</p>
+<pre><code class="language-sh">./cgd --explicar E3101
+./cgd --explicar R0001
+./cgd fonte.delegua --verificar --diagnosticos=json
+</code></pre>
+<h2 id="localização-sem-chamadas-no-caminho-normal"><a class="header" href="#localização-sem-chamadas-no-caminho-normal">Localização sem chamadas no caminho normal</a></h2>
+<p>O C gerado contém uma tabela <code>static const delegua_local cgd_source_sites[]</code>.
+Antes das operações que podem falhar, o compilador emite uma atribuição a
+<code>delegua_local_atual</code>; não emite <code>delegua_localizar()</code> por expressão ou linha.
+Literais numéricos, leitura simples de variáveis e declarações não falíveis não
+fazem essa atualização. Há custo de uma escrita de ponteiro nos pontos falíveis;
+a localização não é gratuita nem exige uma chamada adicional.</p>
+<p>Formatação e impressão da localização ocorrem somente no caminho de erro do
+runtime. O código R0001 identifica a categoria dinâmica genérica; ainda não há
+um código distinto para cada mensagem nativa. A API C antiga <code>delegua_localizar</code>
+continua compatível para consumidores nativos. Não há uma pilha completa de
+chamadas ou reconstrução precisa de todos os auxiliares de coleções.</p>
+<h2 id="editar-o-runtime-a-partir-deste-checkout"><a class="header" href="#editar-o-runtime-a-partir-deste-checkout">Editar o runtime a partir deste checkout</a></h2>
+<p>O vendor já é um submódulo com seu próprio Git e remote; não execute git init.
+Os commits de fonte pertencem primeiro ao repositório do runtime, e o CGD
+registra o commit utilizado.</p>
+<pre><code class="language-sh">git -C vendor/delegua-runtime status
+git -C vendor/delegua-runtime remote -v
+# Edite vendor/delegua-runtime/src/...
+(cd vendor/delegua-runtime &amp;&amp; ./tests/run.sh)
+git -C vendor/delegua-runtime add src tests
+git -C vendor/delegua-runtime commit -m "fix(runtime): descrever a mudança"
+git -C vendor/delegua-runtime push origin dev
+./build-runtime
+git add vendor/delegua-runtime
+git commit -m "build: atualizar referencia do runtime"
+</code></pre>
+<p>Remote original: https://github.com/FernandoTheDev/delegua-runtime. Atualizações
+explícitas usam <code>git -C vendor/delegua-runtime pull --ff-only origin dev</code>; preserve
+alterações locais antes disso. Stashes existentes não são descartados.</p>
+<h2 id="estilo-de-tipos-e-formatador-delégua"><a class="header" href="#estilo-de-tipos-e-formatador-delégua">Estilo de tipos e formatador Delégua</a></h2>
+<p>Declare tipos concretos em D e não introduza <code>auto</code>, foreach inferido ou argumentos
+de lambdas sem tipo. Nas bibliotecas e exemplos Delégua, mantenha argumentos,
+retornos e vínculos explícitos; use <code>qualquer</code> para o domínio dinâmico. Fixtures
+que exercitam inferência ou erros deliberados conservam sua finalidade de teste.
+<code>python3 scripts/verificar_tipos.py</code> verifica a política nos fontes/testes D e nas
+bibliotecas Delégua. <code>scripts/formatar.py</code> usa o próprio CGD para <code>.delegua</code>; faça
+build do CGD antes. Ctrl+Shift+I no editor aciona o mesmo formatador via LSP.</p>
+<h2 id="organização-da-análise-e-emissão-revisão-de-16112026"><a class="header" href="#organização-da-análise-e-emissão-revisão-de-16112026">Organização da análise e emissão (revisão de 16/11/2026)</a></h2>
+<p><code>frontend/semantic/pipeline.d</code> define a sequência compartilhada entre CLI e LSP.
+<code>declarations.d</code> registra símbolos e nomes de tipos na mesma passagem; não existe
+mais um passe numérico separado apenas para cadastrar classes. <code>analyzer.d</code>
+resolve expressões e escopos; <code>assignments.d</code> concentra a mutabilidade de destinos
+para atribuições e incrementos; <code>members.d</code> compartilha busca/visibilidade de
+membros com o editor. <code>native_methods.d</code> fornece as assinaturas dos métodos
+nativos. Dicionários mantêm propriedades dinâmicas que podem ocultar métodos.</p>
+<p><code>semantic/flow.d</code>, <code>semantic/static_safety.d</code> e <code>semantic/purity.d</code> são análises,
+sem reescrever o programa. Os módulos antigos de fluxo/segurança reexportam essas
+APIs para preservar consumidores. <code>semantic/constants.d</code> avalia operações
+primitivas sem alterar a AST; segurança, otimização e hover compartilham essa
+implementação. O frontend não importa o gerador C nem passes de otimização.</p>
+<p>A preparação do bytecode em <code>ctfe/prepare.d</code> é separada da validação.
+Chamadas da VM usam a identidade resolvida da função, inclusive entre módulos
+homônimos. A VM descarta resultados de comandos, limita textos a 1.048.576 pontos
+de código, operandos por chamada a 16.384 e slots locais ativos a 100.000, além
+dos limites de instruções e recursão. Exceder limites conserva a chamada nativa.</p>
+<p>O lowering traduz expressões já verificadas; não decide se um destino é
+modificável. O gerador C omite rótulos que não recebem saltos e resultados
+intermediários de atribuições/incrementos usados só como comando. Vínculos locais
+continuam inicializados; <code>(void)&amp;vinculo</code> evita avisos de uso sem ler um valor
+volatile. Essas mudanças não autorizam descartar inicializadores ou contratos.</p>
+<p>Os novos diagnósticos E3013–E3017 cobrem destrutores, acesso a membros, uso da
+classe como instância, aridade e destinos imutáveis. E3201 protege a análise de
+pureza contra vínculos externos. As mensagens e explicações permanecem no catálogo.</p>
+<p><strong>Validação:</strong> a suspensão de testes foi revogada em 17/11/2026. A matriz e
+os resultados efetivamente executados estão em <code>CONTINUIDADE.md</code> e <code>out/</code>.
+Regressões novas incluem <code>testes/stdlib.py</code>, <code>testes/runtime_diagnosticos.py</code>,
+<code>testes/expansao.py</code> e <code>testes/unit/expansion.d</code>.</p>
+<h2 id="defaults-e-diagnósticos-do-runtime"><a class="header" href="#defaults-e-diagnósticos-do-runtime">Defaults e diagnósticos do runtime</a></h2>
+<p><code>semantic/defaults.d</code> determina os defaults de variáveis e atributos tipados.
+Inicializadores de atributo são funções de instância internas, avaliadas por
+objeto em ordem de declaração, primeiro nas bases. O runtime armazena a lista de
+inicializadores sem expor métodos internos à linguagem. Strings/literais de
+coleção são avaliados no inicializador; nunca se guarda um vetor mutável de
+atributo no descritor estático da classe. O carregador percorre os valores dos
+campos antes da semântica, e os passes seguintes percorrem as funções sintetizadas.</p>
+<p><code>vendor/delegua-runtime/src/diagnosticos.c</code> renderiza erros não capturados sem
+alocar valores gerenciados ou gerar novas exceções. O cabeçalho segue
+<code>error[R0001]</code>, com localização, trecho e marcador quando disponíveis. Leitura de
+fonte é limitada e aceita só arquivos regulares, abertos sem bloquear em FIFO.
+Controles são escapados, tabs expandidas e a janela é limitada. A fonte vem do
+disco no momento do erro; mudanças após compilação podem alterar o trecho.
+A API antiga de localização e o custo normal de uma escrita de ponteiro são
+preservados. Tratadores recebem a exceção sem renderização automática.</p>
+<h2 id="publicar-o-livro"><a class="header" href="#publicar-o-livro">Publicar o livro</a></h2>
+<p>O guia de leitura usa mdBook 0.4.52. O gerador prepara os capítulos a partir de
+<code>docs/linguagem.json</code>, dos guias Markdown e dos exemplos; o mdBook escreve a saída
+em <code>docs/livro</code>. O GitHub Pages continua servindo <code>dev/docs</code>.</p>
+<pre><code class="language-sh">python3 scripts/gerar_referencia.py
+python3 scripts/gerar_livro.py
+python3 scripts/gerar_livro.py --check
+python3 testes/livro.py
+python3 testes/site.py
+</code></pre>
+<p>Edite o conteúdo nas fontes e o tema em <code>livro/tema</code>. Não edite nem formate
+<code>docs/livro</code> à mão: ali também estão os recursos que o mdBook fornece. O destaque
+de Delégua é registrado em <code>livro/tema/delegua.js</code>; não usa a gramática JavaScript.</p>
+<h2 id="lowering-assíncrono-experimental"><a class="header" href="#lowering-assíncrono-experimental">Lowering assíncrono experimental</a></h2>
+<p>A especificação e o estado real ficam em <a href="assincronismo.html">assincronismo.md</a>.
+frontend/semantic/async_validation.d mantém as limitações temporárias visíveis
+para CLI/LSP. middle/async_ir.d normaliza avaliações e analisa vivacidade; o
+backend C emite wrapper/step e slots persistentes. O runtime assincrono.c separa
+Promessas, tarefas e filas; não mantém setjmp de ativações suspensas. O código
+síncrono conserva seu caminho. Registre novos opcodes nas travessias/verificador
+e teste efeitos/aliasing com e sem otimização antes de ampliar o subconjunto.</p>
+<pre><code class="language-sh">python3 testes/assincronismo.py
+python3 testes/async_linguagem.py
+CC=gcc python3 testes/async_linguagem.py
+python3 testes/async_linguagem.py --sanitizadores
+</code></pre>
+<p>Os runners isolam objetos em out/, sem instalar o compilador/extensão. A suíte
+sanitizada usa detect_stack_use_after_return=0 e detect_leaks=0 conforme o
+contrato Boehm. A matriz GCC do núcleo mantém fontes antigas em O0 devido aos
+avisos de fluxo documentados; o núcleo/teste novo é O2. Isso não substitui a
+matriz completa DMD/LDC2 × debug/release × Clang/GCC.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="stdlib-ampliada.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="arquitetura.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="stdlib-ampliada.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="arquitetura.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="tema/delegua.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

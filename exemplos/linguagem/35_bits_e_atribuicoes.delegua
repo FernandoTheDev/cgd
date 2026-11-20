@@ -7,4 +7,4 @@ a -= 1
 a *= 2
 a /= 4
 a %= 3
-escreva(++ a + 1)
+escreva(++a + 1)

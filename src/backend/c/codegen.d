@@ -8,8 +8,11 @@ import std.conv;
 import std.math : isFinite;
 
 import frontend.lexer.token;
+import middle.async_ir;
 import frontend.type_sema;
 import frontend.type_expr;
+import backend.c.async_codegen;
+import backend.c.descriptors;
 import backend.c.lvalue;
 import backend.c.foreign;
 import frontend.parser;
@@ -24,26 +27,15 @@ private:
     size_t tmp;
     dstring[] sourceSites;
     size_t[string] sourceSiteIds;
-    ClassDecl currentClass;
+    package ClassDecl currentClass;
     TypeExpr functionReturn;
-    dstring descriptor(TypeExpr type)
+    package dstring asyncSelf;
+    package dstring descriptor(TypeExpr type)
     {
-        if (TypeExprNamed named = cast(TypeExprNamed) type)
-            return named.classLinkName.length ? formatD("delegua_descr_classe(%s)",
-                    cName(named.classLinkName)) : formatD("delegua_descr_nome(%s)", cString(named.name));
-        if (TypeExprArray array = cast(TypeExprArray) type)
-            return formatD("delegua_descr_array(%s)", descriptor(array.base));
-        if (TypeExprTuple tuple = cast(TypeExprTuple) type)
-        {
-            dstring[] children;
-            foreach (TypeExpr t; tuple.types)
-                children ~= descriptor(t);
-            return formatD("delegua_descr_tupla(%s,(delegua_tipo*[]){%s})", children.length, children.join(","));
-        }
-        return "delegua_descr_nome(\"qualquer\")";
+        return typeDescriptor(type);
     }
 
-    dstring checked(dstring value, TypeExpr type, Position pos = null)
+    package dstring checked(dstring value, TypeExpr type, Position pos = null)
     {
         if (type is null || type.toStr() == "qualquer")
             return value;
@@ -65,7 +57,7 @@ private:
     }
 
     // Referenciar o endereço marca uso em C99 sem ler um vínculo volatile.
-    dstring acknowledgeBinding(dstring name)
+    package dstring acknowledgeBinding(dstring name)
     {
         return formatD("(void)&%s;", name);
     }
@@ -260,7 +252,7 @@ private:
         return name;
     }
 
-    dstring captureExpr(Node node, out dstring expression)
+    package dstring captureExpr(Node node, out dstring expression)
     {
         pushFrame();
         expression = compileExpr(node);
@@ -290,7 +282,10 @@ private:
         return result.join("\n");
     }
 
-    dstring[] includes = [`#include "vendor/delegua-runtime/src/delegua_rt.h"`];
+    dstring[] includes = [
+        `#include "vendor/delegua-runtime/src/delegua_rt.h"`,
+        `#include "vendor/delegua-runtime/src/assincrono.h"`
+    ];
 
     dstring[] prototypes = ["\n/* protótipos */",];
 
@@ -318,7 +313,7 @@ private:
         return buffer;
     }
 
-    pragma(inline, true) void emit(dstring line, uint indent = 0)
+    package pragma(inline, true) void emit(dstring line, uint indent = 0)
     {
         code ~= genIndent(indent) ~ line;
     }
@@ -335,7 +330,7 @@ private:
             emit(line, indent);
     }
 
-    pragma(inline, true) void emitProto(dstring line, uint indent = 0)
+    package pragma(inline, true) void emitProto(dstring line, uint indent = 0)
     {
         prototypes ~= genIndent(indent) ~ line;
     }
@@ -424,6 +419,7 @@ private:
                     return atSite(target.write(checked(updated, unary.value.type_expr, unary.pos)), unary.pos) ~ ";";
                 }
                 return "(void)(" ~ compileExpr(node) ~ ");";
+            case NodeKind.RoutineExpr:
             case NodeKind.CallExpr:
                 return "(void)(" ~ compileExpr(node) ~ ");";
 
@@ -500,7 +496,7 @@ private:
         return (sideEffects ~ result).join("\n");
     }
 
-    dstring location(Position pos)
+    package dstring location(Position pos)
     {
         if (pos is null)
             return "";
@@ -517,7 +513,7 @@ private:
         return formatD("delegua_local_atual=&cgd_source_sites[%s]", index);
     }
 
-    dstring location(Node node)
+    package dstring location(Node node)
     {
         return node is null ? ""d : location(node.pos);
     }
@@ -534,6 +530,7 @@ private:
             return false;
         switch (node.kind)
         {
+            case NodeKind.RoutineExpr:
             case NodeKind.CallExpr:
             case NodeKind.IndexExpr:
             case NodeKind.MemberExpr:
@@ -671,8 +668,8 @@ private:
                 return formatD("(%s_init(), %s)", name, name);
             case NodeKind.SuperExpr:
                 SuperExpr superExpr = cast(SuperExpr) node;
-                return formatD("delegua_super_metodo(%s, %s, %s)", lexicalClass(), cName("isto"),
-                        cString(superExpr.name));
+                return formatD("delegua_super_metodo(%s, %s, %s)", lexicalClass(),
+                        asyncSelf.length ? asyncSelf : cName("isto"), cString(superExpr.name));
             case NodeKind.FunctionExpr:
                 return functionValue((cast(FunctionExpr) node).declaration);
             case NodeKind.MemberExpr:
@@ -702,6 +699,14 @@ private:
             case NodeKind.BoolLit:
                 return formatD("create_bool(%d)", (cast(BoolLit) node).value);
 
+            case NodeKind.RoutineExpr:
+                RoutineExpr routine = cast(RoutineExpr) node;
+                if (!cast(Identifier) routine.call.fn)
+                    cast(void) materialize(routine.call.fn);
+                dstring rargs = nodesToStr(routine.call.args);
+                return formatD("delegua_rotina_iniciar(%s, %s, %s, %s)", cName(routine.target.linkName),
+                        routine.call.args.length, routine.call.args.length
+                        ? "(delegua_value[]){" ~ rargs ~ "}" : "NULL", descriptor(routine.resultType));
             case NodeKind.CallExpr:
                 CallExpr call = cast(CallExpr) node;
                 if (call.runtimeCall)
@@ -819,6 +824,11 @@ private:
     {
         dstring proto = formatD("delegua_value %s(sz argc, delegua_value *argv)", cName(node.linkName));
         emitProto(proto ~ ";");
+        if (node.isAsync && !node.isAbstract)
+        {
+            compileAsyncFn(node, proto);
+            return;
+        }
         if (node.foreignSymbol.length)
         {
             dstring[] parameterContracts;
@@ -870,6 +880,11 @@ private:
         functionReturn = previousReturn;
     }
 
+    void compileAsyncFn(FnDecl node, dstring prototype)
+    {
+        emitAsyncFunction(this, node, prototype);
+    }
+
     FnDecl[] functions;
     bool[FnDecl] functionsInitialized, functionsInitializing;
     dstring metadata(Decorator[] decorators)
@@ -907,8 +922,14 @@ private:
             emit(formatD("%s=%s;", name, original));
             foreach_reverse (Decorator d; fn.decorators)
                 if (d.envelope !is null)
-                    emit(formatD("%s=delegua_assegurar_tipo(delegua_chamar(%s,1,&%s),\"funcao\");",
-                            name, functionValue(d.envelope), name));
+                {
+                    if (fn.isMethod && !fn.isStatic)
+                        emit(formatD("%s=delegua_ajustar_metodo_envelope(%s,delegua_assegurar_tipo(delegua_chamar(%s,1,&%s),\"funcao\"));",
+                                name, name, functionValue(d.envelope), name));
+                    else
+                        emit(formatD("%s=delegua_assegurar_tipo(delegua_chamar(%s,1,&%s),\"funcao\");",
+                                name, functionValue(d.envelope), name));
+                }
             dstring attrs = metadata(fn.decorators);
             emit(formatD("delegua_definir_decoradores(%s,%s);", name, attrs));
         }
@@ -943,7 +964,11 @@ private:
         initializedClasses[c] = true;
         if (c.superClass !is null)
             initializeClass(c.superClass);
+        foreach (ClassDecl mixinClass; c.mixins)
+            initializeClass(mixinClass);
         dstring name = cName(c.signature.linkName);
+        foreach (ClassDecl mixinClass; c.mixins)
+            emit(formatD("delegua_classe_mescla(%s,%s);", name, classValue(mixinClass)));
         if (c.decorators.length)
             emit(formatD("delegua_definir_decoradores(%s,%s);", name, metadata(c.decorators)));
         foreach (ClassField field; c.fields)
@@ -954,6 +979,9 @@ private:
             if (field.isEnum)
                 emit(formatD("delegua_classe_enum(%s,%s,%s,%s);", name, cString(field.name),
                         materialize(field.value), field.access));
+            else if (field.isStatic)
+                emit(formatD("delegua_classe_campo_estatico(%s,%s,%s,%s,%s);", name,
+                        cString(field.name), descriptor(field.type), materialize(field.value), field.access));
             else
                 emit(formatD("delegua_classe_campo_tipo(%s,%s,%s,%s);", name, cString(field.name),
                         descriptor(field.type), field.access));
@@ -974,9 +1002,13 @@ private:
         }
         foreach (FnDecl method; c.methods)
             if (!method.accessor)
+            {
+                if (method.decorators.length)
+                    initializeFunction(method);
                 emit(formatD(method.isStatic
                         ? "delegua_classe_metodo_estatico(%s,%s,%s,%s);" : "delegua_classe_metodo_acesso(%s,%s,%s,%s);",
                         name, cString(method.fn), functionValue(method), method.access));
+            }
     }
 
     void compileModule(ModuleUnit m)

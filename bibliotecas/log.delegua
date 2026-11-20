@@ -1,0 +1,57 @@
+classe Logger {
+    enum Nivel {
+        Depuracao, Informacao, Aviso, Erro
+    }
+
+    privado {
+        _nome: texto;
+        _minimo: inteiro;
+        _usarErro: logico;
+        _timestamp: logico
+    }
+
+    construtor(nome: texto = "", minimo: inteiro = 1, usarErro: logico = verdadeiro, timestamp: logico = verdadeiro) {
+        se minimo < 0 ou minimo > 3 {
+            falhar "Logger: nível deve ser 0..3"
+        }
+        isto._nome = nome;
+        isto._minimo = minimo;
+        isto._usarErro = usarErro;
+        isto._timestamp = timestamp
+    }
+
+    registrar(nivel: inteiro, mensagem: texto): vazio {
+        se nivel < 0 ou nivel > 3 {
+            falhar "Logger: nível deve ser 0..3"
+        }
+        se nivel >= isto._minimo {
+            var io: qualquer = importar("cgd:io").IO
+            var tempo: qualquer = importar("cgd:tempo").Tempo
+            var nomes: texto[] = ["DEBUG", "INFO", "AVISO", "ERRO"]
+            var data: texto = isto._timestamp ? "${tempo.unix()} " : ""
+            var nome: texto = isto._nome == "" ? "" : " ${isto._nome}"
+            var linha: texto = "${data}[${nomes[nivel]}]${nome}: ${mensagem}\n"
+            se isto._usarErro {
+                io.erro(linha)
+            } senao {
+                io.escrever(linha)
+            }
+        }
+    }
+
+    depurar(mensagem: texto): vazio {
+        isto.registrar(0, mensagem)
+    }
+
+    info(mensagem: texto): vazio {
+        isto.registrar(1, mensagem)
+    }
+
+    aviso(mensagem: texto): vazio {
+        isto.registrar(2, mensagem)
+    }
+
+    erro(mensagem: texto): vazio {
+        isto.registrar(3, mensagem)
+    }
+}

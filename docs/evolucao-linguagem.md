@@ -83,8 +83,11 @@ necessária mesmo com FFI.
 ## Diferenças e trabalho ainda necessário
 
 A wiki descreve diversos ambientes, dialetos, tradução e integração JavaScript.
-Esses capítulos não são suporte automático em um compilador C99. Permanecem pendentes composição `mescla`, enums nominais,
-structs/variádicos/callbacks na ABI C e equivalência integral de bibliotecas.
+Esses capítulos não são suporte automático em um compilador C99. Na revisão 0.9.0
+foram acrescentados composição `mescla`, campos estáticos, envelopes de
+decoradores em métodos e rotinas paralelas (`rotina`/`Tarefa<T>`). Permanecem
+pendentes enums nominais, structs/variádicos/callbacks compostos na ABI C e
+equivalência integral de bibliotecas externas.
 Capturas/upvalues, eval e importação dinâmica continuam excluídos pelo contrato
 de segurança; não são habilitados por arrows ou FFI.
 DAP continua adiado. Linux x86_64 é o único alvo previamente validado.

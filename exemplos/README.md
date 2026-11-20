@@ -52,6 +52,19 @@ mkdir -p out
 | [34_lacos_variantes.delegua](linguagem/34_lacos_variantes.delegua) | Variações de laços |
 | [35_bits_e_atribuicoes.delegua](linguagem/35_bits_e_atribuicoes.delegua) | Bits e atribuições |
 
+## Os próximos passos
+
+Depois dos fundamentos, experimente [destrutores](linguagem/36_destrutores.delegua),
+[dicionário.obter](linguagem/37_dicionario_obter.delegua),
+[interfaces, classes abstratas e arrows](linguagem/38_contratos.delegua),
+[valores padrão](linguagem/39_inicializacao.delegua) e
+[enums em diferentes escopos](linguagem/40_enums_escopos.delegua).
+
+Para tarefas do dia a dia, há exemplos de [textos](bibliotecas/textos.delegua),
+[estatística](bibliotecas/estatistica.delegua), [caminhos](bibliotecas/caminhos.delegua)
+e [coleções](bibliotecas/colecoes.delegua). São programas pequenos: rode, mude uma
+entrada e veja o que acontece antes de partir para a calculadora ou o MiniJS.
+
 ## Módulos
 
 [Importação](modulos/01_importacao.delegua) usa a
@@ -108,7 +121,7 @@ Os exemplos [divisão estática](compilador/12_divisao_estatica.delegua) e
 com E3101 e E3103. [Falha tratada](compilador/14_falha_tratada.delegua) demonstra
 um aviso W3101 em região com pegue, preservando o tratamento em execução.
 
-Novos contratos de 16/11/2026 (ainda não executados por solicitação do usuário):
+Exemplos de destruição, dicionários e I/O, já incluídos na validação:
 
 - [Destrutores explícitos](linguagem/36_destrutores.delegua)
 - [Métodos de dicionário](linguagem/37_dicionario_obter.delegua)
@@ -131,3 +144,25 @@ fibonacci, funções, vetores, objetos, laços e escopos têm saída exata verif
 É um programa didático em Delégua; não habilita integração JS ou compatibilidade
 ECMAScript no compilador. O contrato `diretorio: fonte` mantém o caminho relativo
 válido também ao testar cópias formatadas.
+
+## Ferramentas de sistema
+
+Comece por [Processo](bibliotecas/processo.delegua) e [Ambiente](bibliotecas/ambiente.delegua).
+Os exemplos de [Sistema](bibliotecas/sistema.delegua), [Tempo](bibliotecas/tempo.delegua)
+e [IO](bibliotecas/io.delegua) cobrem a base. Depois experimente
+[CLI](bibliotecas/cli.delegua), [Logger](bibliotecas/log.delegua) e
+[Algoritmos](bibliotecas/algoritmos.delegua). APIs, dependências e erros estão
+no [guia de sistema](../docs/stdlib-sistema.md).
+
+### Servidor HTTP
+
+[servidor/http.delegua](servidor/http.delegua) cria rotas locais, responde JSON,
+captura parâmetros e encerra por uma rota do exemplo. O contrato do catálogo
+verifica compilação; `python3 testes/servidor.py` valida a comunicação real.
+
+## Assincronismo, rotinas paralelas, mixins e bibliotecas avançadas
+
+- [Assincronismo e Promessas](linguagem/41_assincronismo.delegua)
+- [Rotinas paralelas e Canal](linguagem/42_rotinas.delegua)
+- [Campos estáticos, mescla e envelopes em métodos](linguagem/43_estaticos_mescla.delegua)
+- [Bytes, Cripto, Compressão, SQLite e DataHora](bibliotecas/bytes_cripto_sqlite.delegua)

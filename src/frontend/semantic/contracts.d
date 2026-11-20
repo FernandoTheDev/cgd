@@ -24,6 +24,8 @@ void validateClassContracts(ClassDecl declaration, Diagnostics diagnostics)
                 diagnostics.error(declaration.pos, "Campo incompatível com interface: " ~ name.to!string);
             return;
         }
+        if (found.method.isAsync != expected.isAsync)
+            diagnostics.errorCode(found.method.pos, asyncEffect);
         if (found.method.args.length != expected.args.length
                 || found.method.type_expr.toStr() != expected.type_expr.toStr())
             diagnostics.error(found.method.pos, "Assinatura incompatível com contrato: " ~ name.to!string);
@@ -35,6 +37,13 @@ void validateClassContracts(ClassDecl declaration, Diagnostics diagnostics)
                     diagnostics.error(found.method.pos, "Parâmetro incompatível com contrato: " ~ name.to!string);
     }
 
+    if (declaration.superClass !is null)
+        foreach (FnDecl method; declaration.methods)
+        {
+            ClassMember inherited = resolveClassMember(declaration.superClass, method.fn);
+            if (inherited.method !is null && inherited.method.isAsync != method.isAsync)
+                diagnostics.errorCode(method.pos, asyncEffect);
+        }
     ClassDecl[] contracts = declaration.interfaces.dup;
     for (ClassDecl parent = declaration.superClass; parent !is null; parent = parent.superClass)
         contracts ~= parent.interfaces;

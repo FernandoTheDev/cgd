@@ -1,5 +1,5 @@
 //! 4ççã\nOLÁ ÁRVORE\nvalor 3
-escreva(tamanho("ação"), "ação"[1], "ação"[1: 3])
+escreva(tamanho("ação"), "ação"[1], "ação"[1:3])
 escreva("  Olá árvore  ".aparar().maiusculo())
 var n: numero = 2
 escreva("valor ${n + 1}")

@@ -1,5 +1,7 @@
 //$
 //# 0
+//? fase: execucao
+//? saida: ^A{1000}\n?$
 
 //>puro
 função ateZero(n: qualquer, s: qualquer): qualquer {

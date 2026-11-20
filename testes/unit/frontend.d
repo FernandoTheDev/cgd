@@ -148,7 +148,8 @@ unittest
     assert(!analyzed("classe A{estatico dobro(x:inteiro):inteiro{retorna x*2}} var a:inteiro=A.dobro(2)").hasErrors());
     assert(analyzed("classe A{estatico erro():qualquer{retorna isto}}").hasErrors());
     assert(analyzed("classe A{estatico construtor(){}}").entries.any!((const(Diagnostic) d) => d.code == "E3012"));
-    assert(analyzed("classe A{estatico contador:inteiro}").entries.any!((const(Diagnostic) d) => d.code == "E3011"));
+    assert(!analyzed("classe A{estatico contador:inteiro}").hasErrors());
+    assert(analyzed("interface I{estatico contador:inteiro}").entries.any!((const(Diagnostic) d) => d.code == "E3011"));
     assert(!analyzed("para cada valor:inteiro em [1,2]{escreva(valor)}").hasErrors());
 }
 
@@ -168,4 +169,42 @@ unittest
     assert(!analyzed("const {nome:texto, idade:inteiro}={nome:'CGD',idade:1}").hasErrors());
     assert(!analyzed("para cada {nome:texto, valor:inteiro} em {x:1}{escreva(nome,valor)}").hasErrors());
     assert(!analyzed("var v:inteiro[]=[1,2];escreva([x+1 para cada x:inteiro em v])").hasErrors());
+}
+
+unittest
+{
+    import std.process : environment;
+
+    assert(isValidCgdModuleName("json"));
+    assert(isValidCgdModuleName("sub/minha_lib-2"));
+    assert(!isValidCgdModuleName(""));
+    assert(!isValidCgdModuleName("../segredo"));
+    assert(!isValidCgdModuleName("a/../b"));
+    assert(!isValidCgdModuleName("/etc/passwd"));
+    assert(!isValidCgdModuleName("a\\b"));
+    assert(!isValidCgdModuleName("a:b"));
+
+    string folder = buildPath(tempDir(), "cgd-libs-" ~ randomUUID().toString());
+    mkdirRecurse(buildPath(folder, "sub"));
+    scope (exit)
+        rmdirRecurse(folder);
+    string customFile = buildPath(folder, "custom.delegua");
+    string nestedFile = buildPath(folder, "sub", "helper.delegua");
+    write(customFile, "funcao ping(): inteiro { retorna 42 }\n");
+    write(nestedFile, "funcao ok(): logico { retorna verdadeiro }\n");
+    string previousEnv = environment.get("CGD_LIBS_DIR");
+    environment["CGD_LIBS_DIR"] = folder;
+    scope (exit)
+    {
+        if (previousEnv.length)
+            environment["CGD_LIBS_DIR"] = previousEnv;
+        else
+            environment.remove("CGD_LIBS_DIR");
+    }
+    assert(resolveCgdLibrary("custom") == customFile);
+    assert(resolveCgdLibrary("sub/helper") == nestedFile);
+    assert(resolveCgdLibrary("../custom") is null);
+    CgdLibraryEntry[] libs = listCgdLibraries();
+    assert(libs.any!((CgdLibraryEntry e) => e.name == "custom" && e.fromUserDir));
+    assert(libs.any!((CgdLibraryEntry e) => e.name == "sub/helper" && e.fromUserDir));
 }

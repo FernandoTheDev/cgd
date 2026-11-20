@@ -1,0 +1,41 @@
+//! 55\n144\n150\nverdadeiro
+funcao fib(n: inteiro): inteiro {
+    se n <= 1 {
+        retorna n
+    }
+
+    retorna fib(n - 1) + fib(n - 2)
+}
+
+assincrona funcao produtor(canal: qualquer): vazio {
+    para var i: inteiro = 1; i <= 5; i++ {
+        aguardar canal.enviar(i * 10)
+    }
+
+    canal.fechar()
+}
+
+assincrona funcao principal(): vazio {
+    const Async: qualquer = importar("cgd:assincrono")
+    const t1: Tarefa<inteiro> = rotina fib(10)
+    const t2: Tarefa<inteiro> = rotina fib(12)
+    escreva(aguardar t1)
+    escreva(aguardar t2)
+
+    const ch: qualquer = Async.Canal(2)
+    const envio: Promessa<vazio> = produtor(ch)
+    var soma: inteiro = 0
+    enquanto verdadeiro {
+        tente {
+            soma = soma + aguardar ch.receber()
+        } pegue (erro: Excecao) {
+            sustar
+        }
+    }
+
+    aguardar envio
+    escreva(soma)
+    escreva(ch.fechado())
+}
+
+principal()

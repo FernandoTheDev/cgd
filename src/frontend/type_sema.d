@@ -16,6 +16,8 @@ enum TypeSemaBase : dstring
 
 enum TypeSemaKind : ubyte
 {
+    Promise,
+    Task,
     Builtin,
     Array,
     Tuple,
@@ -207,5 +209,127 @@ class TypeSemaClass : TypeSema
     override dstring toStr()
     {
         return declaration.name;
+    }
+}
+
+class TypeSemaPromise : TypeSema
+{
+    TypeSema result;
+    this(TypeSema result)
+    {
+        kind = TypeSemaKind.Promise;
+        this.result = result is null ? new TypeSemaBuiltin(TypeSemaBase.Any) : result;
+    }
+
+    override bool isNumeric()
+    {
+        return false;
+    }
+
+    override bool isBool()
+    {
+        return false;
+    }
+
+    private bool dynamicResult(TypeSema type)
+    {
+        TypeSemaBuiltin primitive = cast(TypeSemaBuiltin) type;
+        return primitive !is null && primitive.base == TypeSemaBase.Any;
+    }
+
+    private bool sameResult(TypeSema left, TypeSema right)
+    {
+        if (dynamicResult(left) || dynamicResult(right))
+            return true;
+        if (left.kind != right.kind)
+            return false;
+        if (TypeSemaArray array = cast(TypeSemaArray) left)
+            return sameResult(array.base, (cast(TypeSemaArray) right).base);
+        if (TypeSemaPromise promise = cast(TypeSemaPromise) left)
+            return sameResult(promise.result, (cast(TypeSemaPromise) right).result);
+        if (TypeSemaTask task = cast(TypeSemaTask) left)
+            return sameResult(task.result, (cast(TypeSemaTask) right).result);
+        if (TypeSemaClass klass = cast(TypeSemaClass) left)
+            return klass.declaration is(cast(TypeSemaClass) right).declaration;
+        return left.toStr() == right.toStr();
+    }
+
+    override bool isComp(TypeSema other)
+    {
+        if (dynamicResult(other))
+            return true;
+        TypeSemaPromise promise = cast(TypeSemaPromise) other;
+        return promise !is null && sameResult(result, promise.result);
+    }
+
+    override TypeSema promote(TypeSema other)
+    {
+        return this;
+    }
+
+    override dstring toStr()
+    {
+        return "Promessa<" ~ result.toStr() ~ ">";
+    }
+}
+
+class TypeSemaTask : TypeSema
+{
+    TypeSema result;
+    this(TypeSema result)
+    {
+        kind = TypeSemaKind.Task;
+        this.result = result is null ? new TypeSemaBuiltin(TypeSemaBase.Any) : result;
+    }
+
+    override bool isNumeric()
+    {
+        return false;
+    }
+
+    override bool isBool()
+    {
+        return false;
+    }
+
+    private bool dynamicResult(TypeSema type)
+    {
+        TypeSemaBuiltin primitive = cast(TypeSemaBuiltin) type;
+        return primitive !is null && primitive.base == TypeSemaBase.Any;
+    }
+
+    private bool sameResult(TypeSema left, TypeSema right)
+    {
+        if (dynamicResult(left) || dynamicResult(right))
+            return true;
+        if (left.kind != right.kind)
+            return false;
+        if (TypeSemaArray array = cast(TypeSemaArray) left)
+            return sameResult(array.base, (cast(TypeSemaArray) right).base);
+        if (TypeSemaPromise promise = cast(TypeSemaPromise) left)
+            return sameResult(promise.result, (cast(TypeSemaPromise) right).result);
+        if (TypeSemaTask task = cast(TypeSemaTask) left)
+            return sameResult(task.result, (cast(TypeSemaTask) right).result);
+        if (TypeSemaClass klass = cast(TypeSemaClass) left)
+            return klass.declaration is(cast(TypeSemaClass) right).declaration;
+        return left.toStr() == right.toStr();
+    }
+
+    override bool isComp(TypeSema other)
+    {
+        if (dynamicResult(other))
+            return true;
+        TypeSemaTask task = cast(TypeSemaTask) other;
+        return task !is null && sameResult(result, task.result);
+    }
+
+    override TypeSema promote(TypeSema other)
+    {
+        return this;
+    }
+
+    override dstring toStr()
+    {
+        return "Tarefa<" ~ result.toStr() ~ ">";
     }
 }

@@ -7,6 +7,8 @@ import frontend.lexer : Position;
 
 enum TypeExprKind : ubyte
 {
+    Promise,
+    Task,
     Array,
     Tuple,
     Named
@@ -76,5 +78,37 @@ class TypeExprArray : TypeExpr
     override dstring toStr()
     {
         return base.toStr() ~ "[]";
+    }
+}
+
+class TypeExprPromise : TypeExpr
+{
+    TypeExpr result;
+    this(TypeExpr result, Position pos)
+    {
+        this.kind = TypeExprKind.Promise;
+        this.result = result;
+        this.pos = pos;
+    }
+
+    override dstring toStr()
+    {
+        return "Promessa<" ~ result.toStr() ~ ">";
+    }
+}
+
+class TypeExprTask : TypeExpr
+{
+    TypeExpr result;
+    this(TypeExpr result, Position pos)
+    {
+        this.kind = TypeExprKind.Task;
+        this.result = result;
+        this.pos = pos;
+    }
+
+    override dstring toStr()
+    {
+        return "Tarefa<" ~ result.toStr() ~ ">";
     }
 }

@@ -1,0 +1,7 @@
+//! dados/saida.json\n.json\nsaida.json
+var caminhos: qualquer = importar("cgd:caminhos").Caminhos
+var destino: texto = caminhos.juntar(["dados", "temporario", "..", "saida.json"])
+escreva(destino)
+escreva(caminhos.extensao(destino))
+escreva(caminhos.nome(destino))
+// Normalizar um caminho não consulta o disco nem resolve links simbólicos.

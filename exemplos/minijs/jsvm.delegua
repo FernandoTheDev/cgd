@@ -131,18 +131,18 @@ classe Lexer {
                 enquanto !isto.fim() e isto.dig(isto.src[isto.p]) {
                     isto.p++
                 }
-                out.empilhar(Token(TK.Num, numero(isto.src[ini: isto.p]), ini))
+                out.empilhar(Token(TK.Num, numero(isto.src[ini:isto.p]), ini))
                 continua
             }
             se (isto.letra(c)) {
                 enquanto !isto.fim() e isto.alnum(isto.src[isto.p]) {
                     isto.p++
                 }
-                var s = isto.src[ini: isto.p]
+                var s = isto.src[ini:isto.p]
                 // Reconhece console.log como keyword composta.
                 se (s == "console") {
                     se (isto.p + 4 <= isto.src.tamanho()) {
-                        se (isto.src[isto.p: isto.p + 4] == ".log") {
+                        se (isto.src[isto.p:isto.p + 4] == ".log") {
                             isto.p = isto.p + 4
                             s = "console.log"
                         }
@@ -878,7 +878,7 @@ classe Compiler {
             // && e || usam salto para preservar curto-circuito.
             se (x.op == TK.And) {
                 isto.expression(x.a)
-                const j = isto.chunk.emit(OP.JFALSE, - 1)
+                const j = isto.chunk.emit(OP.JFALSE, -1)
                 isto.chunk.emit(OP.POP)
                 isto.expression(x.b)
                 isto.chunk.patch(j, isto.chunk.size())
@@ -886,7 +886,7 @@ classe Compiler {
             }
             se (x.op == TK.Or) {
                 isto.expression(x.a)
-                const j = isto.chunk.emit(OP.JTRUE, - 1)
+                const j = isto.chunk.emit(OP.JTRUE, -1)
                 isto.chunk.emit(OP.POP)
                 isto.expression(x.b)
                 isto.chunk.patch(j, isto.chunk.size())
@@ -955,10 +955,10 @@ classe Compiler {
         }
         se (s.k == NK.If) {
             isto.expression(s.test)
-            const jf = isto.chunk.emit(OP.JFALSE, - 1)
+            const jf = isto.chunk.emit(OP.JFALSE, -1)
             isto.chunk.emit(OP.POP)
             isto.statement(s.yes)
-            const end = isto.chunk.emit(OP.JMP, - 1)
+            const end = isto.chunk.emit(OP.JMP, -1)
             isto.chunk.patch(jf, isto.chunk.size())
             isto.chunk.emit(OP.POP)
             se (s.no != nulo) isto.statement(s.no)
@@ -968,7 +968,7 @@ classe Compiler {
         se (s.k == NK.While) {
             const begin = isto.chunk.size()
             isto.expression(s.test)
-            const jf = isto.chunk.emit(OP.JFALSE, - 1)
+            const jf = isto.chunk.emit(OP.JFALSE, -1)
             isto.chunk.emit(OP.POP)
             isto.statement(s.body)
             isto.chunk.emit(OP.JMP, begin)
@@ -1286,7 +1286,7 @@ classe VM {
             }
             se (op == OP.NEG ou op == OP.NOT) {
                 se (sp < 1) falhar "Stack underflow"
-                se (op == OP.NEG) stack[sp - 1] = - stack[sp - 1]
+                se (op == OP.NEG) stack[sp - 1] = -stack[sp - 1]
                 se (op == OP.NOT) stack[sp - 1] = !isto.truthy(stack[sp - 1])
                 continua
             }

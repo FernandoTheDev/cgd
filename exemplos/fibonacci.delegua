@@ -1,19 +1,19 @@
-//# 0
+//! 0\n1\n1\n2\n3\n5
 
 funcao fibonacci(n: qualquer): qualquer {
     se (n == 0) {
-        retorna(0)
+        retorna (0)
     }
 
     se (n == 1) {
-        retorna(1)
+        retorna (1)
     }
 
     var n1: qualquer = n - 1
     var n2: qualquer = n - 2
     var f1: qualquer = fibonacci(n1)
     var f2: qualquer = fibonacci(n2)
-    retorna(f1 + f2)
+    retorna (f1 + f2)
 }
 
 var a: qualquer = fibonacci(0)

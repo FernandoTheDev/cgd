@@ -36,8 +36,8 @@ private:
                 registry.rememberClass(c);
                 foreach (dstring name; [
                     "Objeto"d, "Excecao"d, "texto"d, "numero"d, "número"d, "inteiro"d, "real"d,
-                    "decimal"d, "longo"d, "logico"d, "lógico"d, "booleano"d, "binario"d,
-                    "binário"d, "qualquer"d, "tupla"d, "dicionario"d, "dicionário"d, "vazio"d
+                    "decimal"d, "longo"d, "logico"d, "lógico"d, "booleano"d, "binario"d, "binário"d,
+                    "qualquer"d, "tupla"d, "dicionario"d, "dicionário"d, "vazio"d, "Promessa"d
                 ])
                     if (c.name == name)
                         err.error(c.pos, "Nome de tipo nativo reservado.");
@@ -96,6 +96,25 @@ private:
             ];
             context.set(name, new SymbolFn(c.signature));
         }
+        ClassDecl promise = new ClassDecl("Promessa", "", null);
+        promise.isAbstract = true;
+        promise.signature.builtinName = "Promessa";
+        foreach (dstring name; [
+            "resolvida"d, "rejeitada"d, "todas"d, "corrida"d, "qualquer"d, "todasResolvidas"d
+        ])
+        {
+            bool collection = name != "resolvida" && name != "rejeitada";
+            TypeExpr anyType = new TypeExprNamed("qualquer", null);
+            TypeExpr result = name == "todas" || name == "todasResolvidas" ? new TypeExprArray(anyType, null) : anyType;
+            FnArg argument = new FnArg(collection ? "promessas" : "valor", collection
+                    ? new TypeExprArray(anyType, null) : anyType, null, null);
+            FnDecl method = new FnDecl(name, [argument], new TypeExprPromise(result, null), [], 0, null);
+            method.isMethod = true;
+            method.isStatic = true;
+            method.ownerClass = promise;
+            promise.methods ~= method;
+        }
+        context.set("Promessa", new SymbolFn(promise.signature));
         FnArg condition = new FnArg("condicao", new TypeExprNamed("qualquer", null), null, null);
         FnArg message = new FnArg("mensagem", new TypeExprNamed("texto", null),
                 new StringLit("A asserção falhou.", null), null);

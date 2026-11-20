@@ -20,14 +20,34 @@ final class CgdConstantFolding : AstRewriter
         this.ctfe = ctfe;
     }
 
+    private bool typedConstantMatches(VarDecl declaration)
+    {
+        if (declaration.type_expr is null)
+            return true;
+        dstring name = declaration.type_expr.toStr();
+        Node value = declaration.value;
+        if (cast(IntLit) value)
+            return name == "inteiro" || name == "numero" || name == "número" || name == "longo" || name == "qualquer";
+        if (cast(DoubleLit) value)
+            return name == "real" || name == "decimal" || name == "qualquer";
+        if (cast(StringLit) value)
+            return name == "texto" || name == "qualquer";
+        if (cast(BoolLit) value)
+            return name == "logico" || name == "lógico" || name == "booleano" || name == "binario"
+                || name == "binário" || name == "qualquer";
+        if (cast(NullLit) value)
+            return name == "nulo" || name == "qualquer";
+        return false;
+    }
+
     override protected Node transform(Node node)
     {
         Node result;
         if (Identifier id = cast(Identifier) node)
         {
             VarDecl declaration = id.variableRef;
-            // Tipos explícitos podem converter/verificar o valor: mantenha essa fronteira.
-            if (declaration !is null && declaration.isConst && declaration.type_expr is null)
+            // Propaga somente literais que já satisfazem o tipo declarado sem conversão.
+            if (declaration !is null && declaration.isConst && typedConstantMatches(declaration))
             {
                 Node value = declaration.value;
                 if (IntLit n = cast(IntLit) value)
@@ -60,6 +80,15 @@ final class CgdConstantFolding : AstRewriter
                     result = new IntLit(-value.value, node.pos);
                 if (unary.op == TokenKind.Plus)
                     result = new IntLit(value.value, node.pos);
+                if (unary.op == TokenKind.BITNot)
+                    result = new IntLit(~value.value, node.pos);
+            }
+            if (DoubleLit value = cast(DoubleLit) unary.value)
+            {
+                if (unary.op == TokenKind.Minus)
+                    result = new DoubleLit(-value.value, node.pos);
+                if (unary.op == TokenKind.Plus)
+                    result = new DoubleLit(value.value, node.pos);
             }
         }
         else if (ConditionalExpr conditional = cast(ConditionalExpr) node)
@@ -73,10 +102,10 @@ final class CgdConstantFolding : AstRewriter
         {
             if (BoolLit left = cast(BoolLit) binary.left)
             {
-                if (binary.op == TokenKind.And && !left.value)
-                    result = new BoolLit(false, node.pos);
-                if (binary.op == TokenKind.Or && left.value)
-                    result = new BoolLit(true, node.pos);
+                if (binary.op == TokenKind.And)
+                    result = left.value ? binary.right : new BoolLit(false, node.pos);
+                if (binary.op == TokenKind.Or)
+                    result = left.value ? new BoolLit(true, node.pos) : binary.right;
             }
             if (binary.op == TokenKind.Coalesce && literal(binary.left) !is null)
                 result = binary.left.kind == NodeKind.NullLit ? binary.right : binary.left;

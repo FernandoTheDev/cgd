@@ -14,6 +14,8 @@ public:
     this()
     {
         // inicializa com os tipos builtin da linguagem
+        types["Promessa"] = new TypeSemaPromise(new TypeSemaBuiltin(TypeSemaBase.Any));
+        types["Tarefa"] = new TypeSemaTask(new TypeSemaBuiltin(TypeSemaBase.Any));
         types["dicionario"] = new TypeSemaBuiltin(TypeSemaBase.Map);
         types["dicionário"] = types["dicionario"];
         types["tupla"] = new TypeSemaBuiltin(TypeSemaBase.Tuple);

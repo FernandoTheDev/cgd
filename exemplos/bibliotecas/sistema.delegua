@@ -1,0 +1,5 @@
+//! Linux\n/\nverdadeiro
+var sistema: qualquer = importar("cgd:sistema").Sistema
+escreva(sistema.nome())
+escreva(sistema.separadorCaminho())
+escreva(sistema.capacidades()["processos"])

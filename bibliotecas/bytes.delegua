@@ -1,0 +1,99 @@
+// Buffer binário gerenciado com limite explícito de 64 MiB e conversões seguras.
+classe Bytes {
+    privado {
+        _recurso: qualquer
+    }
+
+    construtor(recurso: qualquer) {
+        isto._recurso = recurso
+    }
+
+    estatico criar(tamanho: inteiro = 0): Bytes {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna Bytes(nativo.bytesCriar(tamanho))
+    }
+
+    estatico deTexto(valor: texto): Bytes {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna Bytes(nativo.bytesDeTexto(valor))
+    }
+
+    estatico deVetor(valores: inteiro[]): Bytes {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna Bytes(nativo.bytesDeVetor(valores))
+    }
+
+    estatico deHex(hex: texto): Bytes {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna Bytes(nativo.bytesDeHex(hex))
+    }
+
+    estatico deBase64(valor: texto): Bytes {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna Bytes(nativo.bytesDeBase64(valor))
+    }
+
+    recursoInterno(): qualquer {
+        retorna isto._recurso
+    }
+
+    tamanho(): inteiro {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.bytesTamanho(isto._recurso)
+    }
+
+    obter(indice: inteiro): inteiro {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.bytesObter(isto._recurso, indice)
+    }
+
+    definir(indice: inteiro, valor: inteiro): vazio {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        nativo.bytesDefinir(isto._recurso, indice, valor)
+    }
+
+    fatiar(inicio: inteiro, fim: inteiro = -1): Bytes {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        var limite: inteiro = fim < 0 ? isto.tamanho() : fim
+        retorna Bytes(nativo.bytesFatiar(isto._recurso, inicio, limite))
+    }
+
+    concatenar(outro: Bytes): Bytes {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna Bytes(nativo.bytesConcatenar(isto._recurso, outro.recursoInterno()))
+    }
+
+    paraTexto(): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.bytesParaTexto(isto._recurso)
+    }
+
+    paraHex(): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.bytesParaHex(isto._recurso)
+    }
+
+    paraBase64(): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.bytesParaBase64(isto._recurso)
+    }
+
+    paraVetor(): inteiro[] {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.bytesParaVetor(isto._recurso)
+    }
+
+    igual(outro: Bytes): logico {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.bytesIgual(isto._recurso, outro.recursoInterno())
+    }
+
+    encontrar(alvo: Bytes, inicio: inteiro = 0): inteiro {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.bytesEncontrar(isto._recurso, alvo.recursoInterno(), inicio)
+    }
+
+    copiar(): Bytes {
+        retorna isto.fatiar(0, isto.tamanho())
+    }
+}

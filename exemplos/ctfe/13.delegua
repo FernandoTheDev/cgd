@@ -1,9 +1,9 @@
 //$
-//# 0
+//! Resultado principal: 2204.1\nResultado secundario: 1813.8\nTotal: 4017.9\nPrimo 97? verdadeiro\nPalindromo 909? verdadeiro
 
 //>puro
 funcao eh_par(n: qualquer): qualquer {
-    retorne(n & 1) == 0
+    retorne (n & 1) == 0
 }
 
 //>puro
@@ -12,7 +12,7 @@ funcao colapso_collatz(n: qualquer): qualquer {
         retorne n / 2
     }
 
-    retorne(n * 3) + 1
+    retorne (n * 3) + 1
 }
 
 //>puro
@@ -116,7 +116,7 @@ funcao soma_digitos(n: qualquer): qualquer {
     var soma: numero = 0
     var atual: qualquer = n
     enquanto atual > 0 {
-        soma = soma +(atual % 10)
+        soma = soma + (atual % 10)
         atual = atual \ 10
     }
 
@@ -129,7 +129,7 @@ funcao eh_palindromo_numerico(n: qualquer): qualquer {
     var invertido: numero = 0
     var atual: qualquer = n
     enquanto atual > 0 {
-        invertido =(invertido * 10) +(atual % 10)
+        invertido = (invertido * 10) + (atual % 10)
         atual = atual \ 10
     }
 
@@ -138,16 +138,16 @@ funcao eh_palindromo_numerico(n: qualquer): qualquer {
 
 //>puro
 funcao media_ponderada(a: qualquer, b: qualquer, peso: qualquer): qualquer {
-    retorne(a * peso) +(b *(1.0 - peso))
+    retorne (a * peso) + (b * (1.0 - peso))
 }
 
 //>puro
 funcao distancia_aproximada(dx: qualquer, dy: qualquer): qualquer {
-    var soma_quadrados: qualquer =(dx * dx) +(dy * dy)
+    var soma_quadrados: qualquer = (dx * dx) + (dy * dy)
     var estimativa: real = soma_quadrados / 2.0
     var i: numero = 0
     enquanto i < 5 {
-        estimativa =(estimativa +(soma_quadrados / estimativa)) / 2.0
+        estimativa = (estimativa + (soma_quadrados / estimativa)) / 2.0
         i = i + 1
     }
 
@@ -169,7 +169,7 @@ funcao combinar_metricas(n1: qualquer, n2: qualquer, n3: qualquer): qualquer {
     var dist: qualquer = distancia_aproximada(3, 4)
 
     var acumulado: qualquer = fib + fat + pot + divisor + primos + dig
-    var ajustado: real = acumulado -(media * 2.0) + dist
+    var ajustado: real = acumulado - (media * 2.0) + dist
 
     retorne ajustado
 }

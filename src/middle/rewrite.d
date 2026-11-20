@@ -29,8 +29,12 @@ class AstRewriter
             foreach (FnDecl method; n.methods)
                 rewrite(method);
             foreach (ref ClassField field; n.fields)
+            {
+                if (field.isStatic && field.value !is null)
+                    field.value = rewrite(field.value);
                 foreach (ref Decorator decorator; field.decorators)
                     rewriteBody(decorator.values);
+            }
         }
         else if (FnDecl n = cast(FnDecl) node)
         {
@@ -46,6 +50,16 @@ class AstRewriter
         {
             n.left = rewrite(n.left);
             n.right = rewrite(n.right);
+        }
+        else if (AwaitExpr n = cast(AwaitExpr) node)
+            n.value = rewrite(n.value);
+        else if (RoutineExpr n = cast(RoutineExpr) node)
+        {
+            if (n.call !is null)
+            {
+                n.call.fn = rewrite(n.call.fn);
+                rewriteBody(n.call.args);
+            }
         }
         else if (UnaryExpr n = cast(UnaryExpr) node)
             n.value = rewrite(n.value);

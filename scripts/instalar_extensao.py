@@ -100,6 +100,10 @@ print(
 )
 
 if not args.package_only:
+    libs_dir = Path(os.environ.get("CGD_LIBS_DIR", Path.home() / ".delegua/cgd"))
+    libs_dir.mkdir(parents=True, exist_ok=True)
+    for lib_file in (ROOT / "bibliotecas").glob("*.delegua"):
+        shutil.copy2(lib_file, libs_dir / lib_file.name)
     executable = shutil.which("code")
     if not executable:
         raise SystemExit(f"VSIX pronto em {output}; instale manualmente no VS Code.")

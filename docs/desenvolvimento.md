@@ -134,8 +134,10 @@ edite os fontes e regenere com `python3 scripts/gerar_referencia.py`.
 sem `-o`. Ele avalia expressões literais e constantes imutáveis, sem executar
 funções ou presumir o conteúdo de vetores compartilhados. Divisão/módulo por
 zero, overflow de 64 bits, índices de literais, passos zero, deslocamentos,
-conversões textuais e contratos primitivos demonstravelmente incompatíveis
-recebem E3101–E3108. Anotações de vetores/tuplas também verificam literais.
+conversões textuais, contratos primitivos demonstravelmente incompatíveis,
+membros inexistentes em tipos/classes/módulos conhecidos, mutação de coleções
+imutáveis, operações sobre nulo e chamadas de valores não invocáveis recebem
+E3101–E3112. Anotações de vetores/tuplas também verificam literais e inserções.
 
 Ramos constantes descartados por se, ternário, curto-circuito e laços falsos
 não recebem falsos erros dessa etapa. Em um corpo protegido por pegue, a falha
@@ -261,3 +263,44 @@ Controles são escapados, tabs expandidas e a janela é limitada. A fonte vem do
 disco no momento do erro; mudanças após compilação podem alterar o trecho.
 A API antiga de localização e o custo normal de uma escrita de ponteiro são
 preservados. Tratadores recebem a exceção sem renderização automática.
+
+## Publicar o livro
+
+O guia de leitura usa mdBook 0.4.52. O gerador prepara os capítulos a partir de
+`docs/linguagem.json`, dos guias Markdown e dos exemplos; o mdBook escreve a saída
+em `docs/livro`. O GitHub Pages continua servindo `dev/docs`.
+
+```sh
+python3 scripts/gerar_referencia.py
+python3 scripts/gerar_livro.py
+python3 scripts/gerar_livro.py --check
+python3 testes/livro.py
+python3 testes/site.py
+```
+
+Edite o conteúdo nas fontes e o tema em `livro/tema`. Não edite nem formate
+`docs/livro` à mão: ali também estão os recursos que o mdBook fornece. O destaque
+de Delégua é registrado em `livro/tema/delegua.js`; não usa a gramática JavaScript.
+
+## Lowering assíncrono experimental
+
+A especificação e o estado real ficam em [assincronismo.md](assincronismo.md).
+frontend/semantic/async_validation.d mantém as limitações temporárias visíveis
+para CLI/LSP. middle/async_ir.d normaliza avaliações e analisa vivacidade; o
+backend C emite wrapper/step e slots persistentes. O runtime assincrono.c separa
+Promessas, tarefas e filas; não mantém setjmp de ativações suspensas. O código
+síncrono conserva seu caminho. Registre novos opcodes nas travessias/verificador
+e teste efeitos/aliasing com e sem otimização antes de ampliar o subconjunto.
+
+```sh
+python3 testes/assincronismo.py
+python3 testes/async_linguagem.py
+CC=gcc python3 testes/async_linguagem.py
+python3 testes/async_linguagem.py --sanitizadores
+```
+
+Os runners isolam objetos em out/, sem instalar o compilador/extensão. A suíte
+sanitizada usa detect_stack_use_after_return=0 e detect_leaks=0 conforme o
+contrato Boehm. A matriz GCC do núcleo mantém fontes antigas em O0 devido aos
+avisos de fluxo documentados; o núcleo/teste novo é O2. Isso não substitui a
+matriz completa DMD/LDC2 × debug/release × Clang/GCC.

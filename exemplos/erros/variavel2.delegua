@@ -1,4 +1,6 @@
 //# 1
+//? fase: compilacao
+//? erro: A variavel 'x' já existe.
 
 funcao principal() {
     var x: inteiro = 10

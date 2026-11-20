@@ -10,6 +10,9 @@ enum TokenKind : ubyte
     // keywords
     Var,
     Const,
+    Async,
+    Await,
+    Routine,
     Fn,
     Return,
     If,
@@ -37,6 +40,7 @@ enum TokenKind : ubyte
     Enum,
     Foreign,
     Implements,
+    Mixins,
     Arrow,
     Extends,
     This,

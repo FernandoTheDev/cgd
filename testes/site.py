@@ -262,6 +262,43 @@ with tempfile.TemporaryDirectory(prefix="cgd chrome ") as profile:
         (out / "guia-desktop.png").write_bytes(
             base64.b64decode(rpc("Page.captureScreenshot", {"format": "png"})["data"])
         )
+        rpc("Page.navigate", {"url": origin + "/livro/classes.html"})
+        for _ in range(100):
+            if evaluate(
+                "document.readyState === 'complete' && !!document.querySelector('code.language-delegua .hljs-keyword')"
+            ):
+                break
+            time.sleep(0.1)
+        assert evaluate("!!document.querySelector('code.language-delegua .hljs-keyword')"), (
+            "Delégua sem destaque de sintaxe"
+        )
+        assert evaluate(
+            "!!document.querySelector('#sidebar') && !!document.querySelector('#searchbar')"
+        )
+        evaluate(
+            "document.querySelector('#search-toggle').click();document.querySelector('#searchbar').value='construtor';document.querySelector('#searchbar').dispatchEvent(new KeyboardEvent('keyup', {key:'r'}))"
+        )
+        for _ in range(100):
+            if evaluate("document.querySelectorAll('#searchresults li').length > 0"):
+                break
+            time.sleep(0.1)
+        assert evaluate("document.querySelectorAll('#searchresults li').length > 0"), (
+            "Busca do livro não retornou resultados"
+        )
+        evaluate(
+            "document.querySelector('#searchbar').value='';document.querySelector('#searchbar').dispatchEvent(new KeyboardEvent('keyup', {key:'Backspace'}))"
+        )
+        (out / "livro-desktop.png").write_bytes(
+            base64.b64decode(rpc("Page.captureScreenshot", {"format": "png"})["data"])
+        )
+        rpc(
+            "Emulation.setDeviceMetricsOverride",
+            {"width": 390, "height": 844, "deviceScaleFactor": 1, "mobile": True},
+        )
+        assert evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        (out / "livro-mobile.png").write_bytes(
+            base64.b64decode(rpc("Page.captureScreenshot", {"format": "png"})["data"])
+        )
         assert not errors, errors
         report = {
             "passed": True,
@@ -277,6 +314,7 @@ with tempfile.TemporaryDirectory(prefix="cgd chrome ") as profile:
                 "copy interaction",
                 "navigation",
                 "language guide search/status/examples",
+                "mdBook search/sidebar and Delegua syntax highlighting",
                 "no JS exceptions",
             ],
         }

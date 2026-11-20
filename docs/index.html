@@ -5,31 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="CGD: Delégua compilada para executáveis nativos. Instalação, exemplos, arquitetura, testes e limites do perfil seguro."
+      content="CGD (Compilador Geral Delégua): escreva em português e compile para código nativo C99 com runtime gerenciado, rotinas paralelas, 24 bibliotecas em ~/.delegua/cgd e LSP para VS Code."
     />
     <title>CGD — Compilador Geral Delégua</title>
+    <link rel="icon" type="image/png" href="assets/logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="assets/style.css?v=docs-3" />
-    <script src="assets/site.js?v=docs-3" defer></script>
+    <link rel="stylesheet" href="assets/style.css?v=docs-4" />
+    <script src="assets/site.js?v=docs-4" defer></script>
   </head>
   <body>
     <a href="#conteudo" class="skip-link">Pular para o conteúdo</a>
     <header class="navbar">
       <a class="logo-container home-link" href="#inicio" aria-label="CGD, início">
-        <img src="assets/logo.png" alt="" class="logo" />
+        <img src="assets/logo.png" alt="Logo do CGD" class="logo" />
         <span class="brand">cgd<span class="brand-dim">.exe</span></span>
+        <span class="version-pill">v0.9.0</span>
       </a>
       <nav aria-label="Principal">
         <a href="#instalar" class="link-source">instalar</a>
-        <a href="linguagem.html" class="link-source">guia da linguagem</a>
-        <a href="https://github.com/FernandoTheDev/cgd/tree/dev" class="link-source"
-          >código-fonte</a
-        >
+        <a href="#delegua-vs-cgd" class="link-source">delégua vs cgd</a>
+        <a href="#bibliotecas" class="link-source">bibliotecas</a>
+        <a href="livro/index.html" class="link-source">livro</a>
+        <a href="linguagem.html" class="link-source">referência</a>
+        <a href="https://github.com/FernandoTheDev/cgd/tree/dev" class="link-source">github</a>
         <a
           href="https://www.patreon.com/fernandothedev"
           target="_blank"
@@ -39,34 +42,56 @@
         >
       </nav>
     </header>
+
     <main id="conteudo">
       <section class="hero" id="inicio" aria-labelledby="hero-title">
         <div class="hero-text">
-          <span class="eyebrow">// delégua → c99 → executável nativo</span>
-          <h1 id="hero-title">Compilador Geral Delégua</h1>
+          <div class="hero-badge">
+            <span class="status-dot" aria-hidden="true"></span>
+            Delégua → C99 → executável nativo · Linux x86_64
+          </div>
+          <h1 id="hero-title">
+            Escreva em português. <span class="accent-text">Compile para código nativo.</span>
+          </h1>
           <p class="description">
-            Escreva em português. Compile para código nativo. O CGD combina um frontend em D com um
-            runtime gerenciado em C, verificações de tipos e limites explícitos para recursos
-            inseguros.
+            O CGD pega a sintaxe em português de Delégua e gera um programa nativo de verdade, sem
+            precisar de Node.js ou interpretador na hora de rodar. Vem com verificação de erros
+            antes da execução, assincronismo, rotinas paralelas, 24 bibliotecas prontas e extensão
+            para VS Code.
           </p>
           <div class="cta-group">
-            <a href="#instalar" class="btn-primary">Começar do zero</a>
-            <a href="#exemplos" class="btn-secondary">Explorar exemplos</a>
+            <a href="livro/index.html" class="btn-primary">Ler o livro passo a passo</a>
+            <a href="#instalar" class="btn-secondary">Instalar agora</a>
+            <a href="linguagem.html" class="btn-ghost">Guia de referência</a>
           </div>
           <p class="hero-note">
-            <span class="status-dot" aria-hidden="true"></span> branch dev · Linux x86_64 · DMD e
-            LDC2
+            <span>Licença Apache-2.0</span> · <span>Frontend em D (DMD/LDC2)</span> ·
+            <span>Runtime C99 + Boehm GC</span>
           </p>
         </div>
-        <div class="terminal" aria-label="Exemplo de uso no terminal">
+
+        <div class="terminal" aria-label="Exemplo de código e compilação do CGD">
           <div class="terminal-bar">
-            <span class="dot dot-red"></span><span class="dot dot-yellow"></span
-            ><span class="dot dot-green"></span>
-            <span class="terminal-title">bash — cgd</span>
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+            <span class="terminal-title">ola.delegua — cgd 0.9.0</span>
           </div>
+          <pre
+            class="terminal-code"
+          ><code><span class="tk-kw">const</span> JSON: <span class="tk-ty">qualquer</span> = <span class="tk-fn">importar</span>(<span class="tk-str">"cgd:json"</span>).JSON
+
+<span class="tk-kw">classe</span> <span class="tk-ty">Pessoa</span> {
+    nome: <span class="tk-ty">texto</span>
+    <span class="tk-kw">construtor</span>(nome: <span class="tk-ty">texto</span>) { <span class="tk-kw">isto</span>.nome = nome }
+    <span class="tk-fn">saudar</span>(): <span class="tk-ty">texto</span> { <span class="tk-kw">retorna</span> <span class="tk-str">"Olá, ${isto.nome}!"</span> }
+}
+
+<span class="tk-kw">const</span> dados: <span class="tk-ty">dicionario</span> = JSON.<span class="tk-fn">analisar</span>(<span class="tk-str">'{"nome":"Delégua"}'</span>)
+<span class="tk-fn">escreva</span>(<span class="tk-ty">Pessoa</span>(dados[<span class="tk-str">"nome"</span>]).<span class="tk-fn">saudar</span>())</code></pre>
           <div class="terminal-body">
-            <p class="line"><span class="prompt">$</span> cgd ola.delegua -o</p>
-            <p class="line out">Fonte → análise → C99 → binário</p>
+            <p class="line"><span class="prompt">$</span> cgd ola.delegua -o -s ola</p>
+            <p class="line out">Análise → Segurança E31xx → CTFE → C99 → binário nativo</p>
             <p class="line"><span class="prompt">$</span> ./ola</p>
             <p class="line out success">Olá, Delégua!</p>
             <p class="line"><span class="prompt">$</span> <span class="cursor">▌</span></p>
@@ -74,23 +99,67 @@
         </div>
       </section>
 
-      <div class="docs-wrap">
-        <nav class="section-nav" aria-label="Documentação nesta página">
-          <a href="#instalar">01 instalação</a><a href="#arquitetura">02 arquitetura</a>
-          <a href="#recursos">03 linguagem</a><a href="#exemplos">04 exemplos</a>
-          <a href="#seguranca">05 limites</a><a href="#testes">06 testes</a>
-        </nav>
-        <section class="doc-section" id="instalar" aria-labelledby="install-title">
-          <span class="eyebrow">// 01 — preparar, compilar, usar</span>
-          <h2 id="install-title">Do checkout ao primeiro programa.</h2>
-          <p class="section-intro">
-            Você precisa de Git, DUB, DMD ou LDC2, um compilador C99, pkg-config, Boehm GC e libcurl
-            &gt;=7.86 com headers. Python 3 é usado no build do runtime e nos testes.
+      <section class="pillars" aria-label="Destaques do compilador">
+        <article class="pillar-card">
+          <span class="pillar-icon">C99</span>
+          <h2>Binário nativo de verdade</h2>
+          <p>
+            Seu código vira C99 limpo e é compilado com Clang ou GCC, ligado ao runtime em C com
+            coletor Boehm GC.
           </p>
+        </article>
+        <article class="pillar-card">
+          <span class="pillar-icon">E31</span>
+          <h2>Erros antes de rodar</h2>
+          <p>
+            Divisão por zero, membro inexistente, índice fora do limite e mutação de tupla são pegos
+            ainda na compilação, com sugestão de correção.
+          </p>
+        </article>
+        <article class="pillar-card">
+          <span class="pillar-icon">cgd:</span>
+          <h2>24 bibliotecas prontas</h2>
+          <p>
+            Instaladas em <code>~/.delegua/cgd</code>: servidor HTTP, SQLite, JSON, criptografia,
+            sockets, processos e assincronismo sem pacotes externos.
+          </p>
+        </article>
+        <article class="pillar-card">
+          <span class="pillar-icon">LSP</span>
+          <h2>Editor que ajuda de verdade</h2>
+          <p>
+            Extensão VS Code com autocomplete em <code>importar("cgd:")</code>, dicas virtuais de
+            tipo, prévia de funções puras e formatador próprio.
+          </p>
+        </article>
+      </section>
+
+      <div class="docs-wrap">
+        <nav class="section-nav" aria-label="Seções desta página">
+          <a href="#instalar">01 instalar</a>
+          <a href="#delegua-vs-cgd">02 delégua vs cgd</a>
+          <a href="#arquitetura">03 arquitetura</a>
+          <a href="#recursos">04 linguagem</a>
+          <a href="#bibliotecas">05 bibliotecas e editor</a>
+          <a href="#exemplos">06 exemplos</a>
+          <a href="#seguranca">07 limites</a>
+          <a href="#testes">08 testes e links</a>
+        </nav>
+
+        <!-- 01 INSTALAR -->
+        <section class="doc-section" id="instalar" aria-labelledby="install-title">
+          <span class="eyebrow">// 01 — do zero ao primeiro executável</span>
+          <h2 id="install-title">Baixe, compile e rode em poucos minutos.</h2>
+          <p class="section-intro">
+            Hoje o CGD é testado e validado em <strong>Linux x86_64</strong>. Você só precisa de um
+            compilador D (LDC2 ou DMD), um compilador C (Clang ou GCC), Git, DUB, Boehm GC e
+            libcurl. Siga os três blocos abaixo em ordem.
+          </p>
+
           <div class="doc-grid">
             <article class="doc-card">
-              <h3>Dependências</h3>
-              <label for="distro">Comando de exemplo para sua distribuição</label>
+              <h3>Passo 1 — Instale as dependências</h3>
+              <label for="distro">Escolha sua distribuição Linux</label>
               <select id="distro">
                 <option value="debian">Debian / Ubuntu</option>
                 <option value="fedora">Fedora</option>
@@ -103,15 +172,19 @@
               <pre><code id="deps-code">sudo apt-get update
 sudo apt-get install git build-essential clang pkg-config libgc-dev libcurl4-openssl-dev ldc dub python3</code></pre>
               <p>
-                Para DMD, use os
-                <a href="https://dlang.org/download.html">downloads oficiais de D</a>. Os nomes dos
-                pacotes variam por distribuição.
+                Prefere usar DMD? Baixe nos
+                <a href="https://dlang.org/download.html" target="_blank" rel="noopener noreferrer"
+                  >downloads oficiais da linguagem D</a
+                >. Para usar <code>cgd:cripto</code>, <code>cgd:compressao</code> e
+                <code>cgd:sqlite</code>, o sistema usa as bibliotecas compartilhadas padrão
+                (OpenSSL, zlib e SQLite3).
               </p>
             </article>
+
             <article class="doc-card">
-              <h3>Build do zero</h3>
+              <h3>Passo 2 — Clone e compile o compilador</h3>
               <div class="code-head">
-                <span>com submódulos</span
+                <span>com submódulo do runtime</span
                 ><button type="button" class="copy-button" data-copy="build-code">Copiar</button>
               </div>
               <pre><code id="build-code">git clone --branch dev --recurse-submodules https://github.com/FernandoTheDev/cgd.git
@@ -119,481 +192,897 @@ cd cgd
 ./build-runtime
 dub build --compiler=ldc2 --build=release
 
-# Alternativa com DMD:
+# Se preferir DMD:
 dub build --compiler=dmd --build=release</code></pre>
               <p>
-                O runtime é um submódulo separado. <code>build-runtime</code> compila seu estado
-                local; não executa pulls silenciosos.
+                O runtime em C vive no submódulo <code>vendor/delegua-runtime</code>. Por isso a
+                opção <code>--recurse-submodules</code> é importante: ela já traz tudo pronto para o
+                <code>./build-runtime</code>.
               </p>
             </article>
           </div>
-          <article class="doc-card install-card">
+
+          <article class="doc-card install-card accent-card">
             <div>
-              <h3>Instalar no usuário</h3>
+              <h3>Passo 3 — Instale no seu usuário (sem sudo)</h3>
               <p>
-                O executável, o objeto do runtime e os headers ficam em
-                <code>~/.local/share/cgd</code>. Um link em <code>~/.local/bin</code> permite chamar
-                o compilador fora do checkout, sem sudo.
+                O script <code>./instalar</code> coloca o binário em <code>~/.local/bin/cgd</code>,
+                o runtime em <code>~/.local/share/cgd</code> e todas as bibliotecas padrão em
+                <strong><code>~/.delegua/cgd</code></strong
+                >.
+              </p>
+              <p>
+                Depois disso você pode chamar <code>cgd</code> de qualquer pasta — e se quiser criar
+                uma biblioteca reutilizável, basta salvar um arquivo <code>.delegua</code> dentro de
+                <code>~/.delegua/cgd</code> e usar <code>importar("cgd:seu_arquivo")</code>.
               </p>
             </div>
             <div>
               <div class="code-head">
-                <span>instalação</span
+                <span>instalar cli + bibliotecas + vs code</span
                 ><button type="button" class="copy-button" data-copy="install-code">Copiar</button>
               </div>
-              <pre><code id="install-code">./instalar --compiler ldc2 --release
+              <pre><code id="install-code">./instalar --no-build
 export PATH="$HOME/.local/bin:$PATH"
-cgd ola.delegua -s ola
-./ola</code></pre>
+
+# Opcional: extensão VS Code (LSP + cores + formatador)
+npm ci --prefix extensao-vscode --ignore-scripts
+python3 scripts/instalar_extensao.py --associate
+
+# Teste agora:
+cgd ola.delegua -o -s ola && ./ola</code></pre>
             </div>
           </article>
+
           <p class="callout">
-            <strong>Atenção às opções:</strong> <code>-o</code> ativa otimizações. Para escolher o
-            nome do executável, use <code>-s caminho</code>. O C intermediário é gravado ao lado do
-            binário.
+            <strong>Dica rápida para não confundir:</strong> <code>-o</code> liga as otimizações do
+            CGD e <code>-O2</code> no compilador C. Quem escolhe o nome do arquivo de saída é
+            <strong><code>-s caminho</code></strong> (de <em>saída</em>).
           </p>
+
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Opção</th>
-                  <th>Uso</th>
+                  <th>Comando / opção</th>
+                  <th>Para que serve no dia a dia</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td><code>-a / --ajuda</code></td>
-                  <td>Ajuda da CLI.</td>
-                </tr>
-                <tr>
-                  <td><code>-s / --saida</code></td>
-                  <td>Caminho do executável.</td>
+                  <td><code>cgd app.delegua -s app</code></td>
+                  <td>Compila e gera o executável <code>./app</code>.</td>
                 </tr>
                 <tr>
                   <td><code>-o / --otimizar</code></td>
-                  <td>Otimizações do CGD e -O2 no compilador C.</td>
-                </tr>
-                <tr>
-                  <td><code>-d / --depurar</code></td>
-                  <td>AST, C gerado e comando de compilação.</td>
-                </tr>
-                <tr>
-                  <td><code>-t / --tempo</code></td>
-                  <td>Tempo dos passes.</td>
+                  <td>
+                    Ativa otimizações, CTFE (<code>//&gt;puro</code>) e <code>-O2</code> em C.
+                  </td>
                 </tr>
                 <tr>
                   <td><code>--verificar</code></td>
-                  <td>Analisa sem gerar binário ou exigir toolchain C.</td>
+                  <td>
+                    Checa sintaxe, tipos e erros estáticos sem gerar binário nem chamar Clang/GCC.
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>--formatar arquivo.delegua</code></td>
+                  <td>
+                    Formata o código com 4 espaços preservando strings, interpolações e comentários.
+                  </td>
+                </tr>
+                <tr>
+                  <td><code>--explicar E3109</code></td>
+                  <td>Mostra a explicação detalhada de qualquer código de erro ou aviso do CGD.</td>
                 </tr>
                 <tr>
                   <td><code>--emitir-c</code></td>
-                  <td>Emite C99 sem vincular runtime.</td>
+                  <td>Gera somente o código C99 para você inspecionar, sem vincular o binário.</td>
                 </tr>
                 <tr>
                   <td><code>--diagnosticos=json</code></td>
-                  <td>Diagnósticos JSON Lines em stderr.</td>
+                  <td>
+                    Emite erros e avisos em JSON Lines no <code>stderr</code> para scripts/CI.
+                  </td>
                 </tr>
                 <tr>
-                  <td><code>--target / --sysroot</code></td>
-                  <td>Configura alvo e SDK; exige runtime e bibliotecas do alvo.</td>
+                  <td><code>--lsp</code></td>
+                  <td>
+                    Inicia o servidor de linguagem local (usado automaticamente pela extensão VS
+                    Code).
+                  </td>
                 </tr>
                 <tr>
-                  <td><code>CC=gcc</code></td>
-                  <td>Seleciona o executável do compilador C; sem concatenar opções.</td>
+                  <td><code>CC=gcc</code> / <code>--target</code></td>
+                  <td>
+                    Permite trocar o compilador C ou preparar compilação cruzada com runtime
+                    próprio.
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
         </section>
 
-        <section class="doc-section" id="arquitetura" aria-labelledby="architecture-title">
-          <span class="eyebrow">// 02 — o caminho da compilação</span>
-          <h2 id="architecture-title">Um pipeline que você pode inspecionar.</h2>
-          <p class="callout">
-            O pipeline inclui limites estruturais, segurança estática e análise de fluxo. Falhas
-            comprovadas são antecipadas; os diagnósticos possuem códigos consultáveis com
-            <code>cgd --explicar E3101</code>. A localização de execução usa metadados estáticos,
-            sem chamada de debug por linha.
-          </p>
+        <!-- 02 DELÉGUA ORIGINAL VS CGD -->
+        <section class="doc-section" id="delegua-vs-cgd" aria-labelledby="compare-title">
+          <span class="eyebrow">// 02 — transparência total sobre a linguagem</span>
+          <h2 id="compare-title">Delégua original vs. CGD: o que é igual e o que é nosso.</h2>
           <p class="section-intro">
-            O frontend não vira um interpretador embutido no programa. Ele valida a fonte e gera
-            C99; o compilador C produz o executável ligado ao runtime, ao GC e à libcurl.
+            Delégua foi criada pela
+            <a
+              href="https://github.com/DesignLiquido/delegua"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Design Líquido</a
+            >
+            como uma linguagem em português acessível para aprender e construir projetos, rodando
+            originalmente sobre um interpretador em TypeScript (<code>delegua-node</code> e
+            <code>delegua-web</code>). O CGD respeita essa origem, preserva a autoria e a licença
+            Apache-2.0, mas <strong>não é uma cópia do interpretador</strong>: muita coisa aqui foi
+            repensada ou construída do zero para o mundo compilado.
           </p>
-          <ol class="pipeline">
-            <li>
-              <b>01</b><strong>Tokens e AST</strong
-              ><span>Lexer, escapes, posições e estruturas da linguagem.</span>
-            </li>
-            <li>
-              <b>02</b><strong>Módulos e semântica</strong
-              ><span>Símbolos, tipos, herança, aridade e capturas proibidas.</span>
-            </li>
-            <li>
-              <b>03</b><strong>CTFE e lowering</strong
-              ><span>Otimização opcional e operações explícitas do runtime.</span>
-            </li>
-            <li>
-              <b>04</b><strong>C99 e vínculo</strong
-              ><span>Clang, GCC ou TCC, com runtime, Boehm GC e libcurl.</span>
-            </li>
-          </ol>
+
+          <figure class="diagram-figure">
+            <img
+              src="assets/delegua-vs-cgd.svg"
+              alt="Diagrama comparando Delégua original da Design Líquido com o compilador CGD"
+              width="1120"
+              height="340"
+            />
+            <figcaption>
+              Mesma raiz em português, caminhos técnicos diferentes: o CGD compila para C99 e traz
+              recursos próprios como rotinas paralelas, assincronismo nativo e bibliotecas em
+              <code>~/.delegua/cgd</code>.
+            </figcaption>
+          </figure>
+
           <div class="doc-grid">
-            <article class="doc-card">
-              <h3>Frontend em D</h3>
+            <article class="doc-card blue-card">
+              <div class="brand-compare-head">
+                <img
+                  src="assets/delegua.png"
+                  alt="Logo oficial da linguagem Delégua"
+                  class="brand-compare-logo"
+                />
+                <div>
+                  <span class="tag tag-origin" style="margin-bottom: 0.25rem"
+                    >Projeto original</span
+                  >
+                  <h3 style="margin: 0">Delégua (Design Líquido)</h3>
+                </div>
+              </div>
               <p>
-                DMD e LDC2 compilam a mesma base. Os passes ficam em <code>src/frontend</code>,
-                <code>src/ctfe</code>, <code>src/middle</code> e <code>src/backend/c</code>.
+                Documentado na
+                <a
+                  href="https://github.com/DesignLiquido/delegua/wiki"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >wiki oficial de Delégua</a
+                >. Pensado para funcionar em Node.js e no navegador, com foco didático e integração
+                direta ao ecossistema JavaScript.
               </p>
+              <ul>
+                <li>Executa em interpretador TypeScript (e modo interativo LAIR).</li>
+                <li>Importa módulos NPM via <code>delegua-node</code> e bibliotecas JS.</li>
+                <li>Suporta vários dialetos (Portugol Studio, Égua, Mapler, Pituguês...).</li>
+                <li>
+                  Usa <code>tendo ... como</code> com <code>finalizar()</code> e pilha com
+                  <em>montão</em>.
+                </li>
+                <li>FFI delegada ao ambiente hospedeiro (como Koffi no Node).</li>
+              </ul>
             </article>
-            <article class="doc-card">
-              <h3>Runtime gerenciado</h3>
+
+            <article class="doc-card accent-card">
+              <div class="brand-compare-head">
+                <img src="assets/logo.png" alt="Logo do CGD" class="brand-compare-logo" />
+                <div>
+                  <span class="tag tag-cgd" style="margin-bottom: 0.25rem"
+                    >Criado do zero no CGD</span
+                  >
+                  <h3 style="margin: 0">O que o CGD traz de nativo</h3>
+                </div>
+              </div>
               <p>
-                Valores carregam seus tipos. Chamadas indiretas, acesso a membros e coleções têm
-                verificações em execução. Funções não guardam endereços de variáveis locais
-                encerradas.
+                Recursos desenhados do zero neste projeto — não existem na especificação original do
+                interpretador e usam o runtime próprio em C (<code>delegua-runtime</code>):
               </p>
+              <ul>
+                <li>
+                  <strong>Assincronismo real:</strong> <code>assincrona</code>,
+                  <code>aguardar</code>, <code>Promessa&lt;T&gt;</code>, combinadores e reactor
+                  <code>epoll</code>.
+                </li>
+                <li>
+                  <strong>Paralelismo seguro:</strong> <code>rotina</code>,
+                  <code>Tarefa&lt;T&gt;</code>, <code>Canal</code> e <code>GrupoTarefas</code> com
+                  pool de threads e isolamento por thread.
+                </li>
+                <li>
+                  <strong>Bibliotecas <code>cgd:*</code> em <code>~/.delegua/cgd</code>:</strong> 24
+                  módulos prontos (servidor HTTP, SQLite, Cripto, Sockets, Processos, Bytes...).
+                </li>
+                <li>
+                  <strong>CTFE e análise estática:</strong> funções <code>//&gt;puro</code> na
+                  compilação e diagnósticos <code>E3101</code>–<code>E3112</code>.
+                </li>
+                <li>
+                  <strong>Enums, arrows, <code>destruir()</code>, LSP e formatador:</strong>
+                  ferramentas completas sem depender de Node ou JS.
+                </li>
+              </ul>
             </article>
           </div>
-          <p>
-            A VM de CTFE funciona durante a compilação de funções <code>//&gt;puro</code>, com
-            limites de trabalho. Ao atingir esses limites, a chamada é preservada para execução
-            nativa.
-          </p>
-          <a
-            class="text-link"
-            href="https://github.com/FernandoTheDev/cgd/blob/dev/docs/arquitetura.md"
-            >Ler a arquitetura e a ABI em detalhes →</a
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Assunto</th>
+                  <th>Na wiki oficial de Delégua</th>
+                  <th>No CGD (como funciona aqui)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Execução e memória</td>
+                  <td>Interpretador JS/TS com pilha de escopos e <em>montão</em>.</td>
+                  <td>Código C99 compilado + runtime nativo C com coletor Boehm GC.</td>
+                </tr>
+                <tr>
+                  <td>Importação de bibliotecas</td>
+                  <td>Pacotes NPM (<code>delegua-node</code>) ou registro manual na web.</td>
+                  <td>
+                    Caminhos literais <code>.delegua</code> e
+                    <code>importar("cgd:nome")</code> resolvido direto de
+                    <code>~/.delegua/cgd</code>.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Funções internas e escopo</td>
+                  <td>Permite acessar variáveis externas (closures).</td>
+                  <td>
+                    <strong>Sem captura implícita (upvalues)</strong>: passe dados por parâmetro ou
+                    método de objeto.
+                  </td>
+                </tr>
+                <tr>
+                  <td>Herança e composição</td>
+                  <td>Herança múltipla + composição <code>mescla</code> + interfaces.</td>
+                  <td>
+                    Herança simples (<code>herda</code>) + composição <code>mescla</code> +
+                    múltiplas interfaces (<code>implementa</code>).
+                  </td>
+                </tr>
+                <tr>
+                  <td>Ciclo de vida / limpeza</td>
+                  <td><code>tendo ... como</code> chamando <code>finalizar()</code>.</td>
+                  <td>
+                    <code>tente / finalmente</code> e destrutores explícitos
+                    <code>destrutor()</code> chamados via <code>destruir(obj)</code>.
+                  </td>
+                </tr>
+                <tr>
+                  <td>FFI (<code>classe estrangeira</code>)</td>
+                  <td>Despachador dinâmico (Koffi / classes TS do host).</td>
+                  <td>
+                    Ligação C estática via <code>@definicao</code> (ABI C escalar ou ABI gerenciada
+                    <code>delegua</code>).
+                  </td>
+                </tr>
+                <tr>
+                  <td>Concorrência e threads</td>
+                  <td>Não há <code>rotina</code> ou <code>Canal</code> na wiki base.</td>
+                  <td>
+                    Nativo do CGD: <code>assincrona</code>/<code>aguardar</code> (epoll) e
+                    <code>rotina</code>/<code>Tarefa&lt;T&gt;</code>/<code>Canal</code>.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <a class="text-link" href="livro/delegua-vs-cgd.html"
+            >Ler o guia completo de diferenças entre Delégua original e CGD →</a
           >
         </section>
 
-        <section class="doc-section" id="recursos" aria-labelledby="features-title">
-          <span class="eyebrow">// 03 — perfil compilado de delégua</span>
-          <h2 id="features-title">Recursos, com exemplos verificáveis.</h2>
-          <p class="callout">
-            <a href="linguagem.html">Abra a referência completa da linguagem</a>: sintaxe, exemplos
-            executáveis e situação de cada recurso, incluindo limites e exclusões.
+        <!-- 03 ARQUITETURA -->
+        <section class="doc-section" id="arquitetura" aria-labelledby="architecture-title">
+          <span class="eyebrow">// 03 — por dentro do compilador</span>
+          <h2 id="architecture-title">Um pipeline claro que você pode inspecionar.</h2>
+          <p class="section-intro">
+            O CGD não esconde mágica nem embute um interpretador no seu binário. Se quiser ver o
+            resultado intermediário, rode <code>cgd programa.delegua --emitir-c</code> e leia o C99
+            gerado.
           </p>
-          <label class="search-label" for="feature-search">Buscar um recurso</label>
+
+          <figure class="diagram-figure">
+            <img
+              src="assets/pipeline.svg"
+              alt="Diagrama do pipeline do CGD: entrada .delegua, frontend D, otimização CTFE, geração C99 e executável nativo"
+              width="1120"
+              height="300"
+            />
+            <figcaption>
+              O frontend em D compartilha o mesmo motor de análise entre a CLI e o servidor LSP no
+              VS Code — editar código nunca compila nem executa seu programa silenciosamente.
+            </figcaption>
+          </figure>
+
+          <ol class="pipeline">
+            <li>
+              <b>01</b>
+              <strong>Tokens e AST</strong>
+              <span
+                >Lexer UTF-8, interpolação <code>${...}</code> e parser com recuperação de
+                erros.</span
+              >
+            </li>
+            <li>
+              <b>02</b>
+              <strong>Módulos e segurança</strong>
+              <span
+                >Carrega <code>~/.delegua/cgd</code>, valida tipos, visibilidade e erros
+                <code>E3101</code>–<code>E3112</code>.</span
+              >
+            </li>
+            <li>
+              <b>03</b>
+              <strong>CTFE e lowering</strong>
+              <span
+                >Otimização <code>-o</code> com VM <code>//&gt;puro</code> e máquina de estados para
+                <code>assincrona</code>.</span
+              >
+            </li>
+            <li>
+              <b>04</b>
+              <strong>C99 e vínculo</strong>
+              <span
+                >Clang ou GCC gera o binário nativo ligado ao <code>delegua-runtime</code> e Boehm
+                GC.</span
+              >
+            </li>
+          </ol>
+
+          <div class="doc-grid">
+            <article class="doc-card">
+              <h3>Segurança estática antes de rodar</h3>
+              <p>
+                Mesmo sem <code>-o</code>, o compilador pega divisão por zero, overflow de 64 bits,
+                índices inválidos, membros inexistentes (<code>E3109</code>), mutação de texto/tupla
+                (<code>E3110</code>) e chamadas em <code>nulo</code> (<code>E3111</code>). Dentro de
+                <code>tente/pegue</code>, vira aviso <code>W31xx</code> para não quebrar testes de
+                erro propositais.
+              </p>
+            </article>
+            <article class="doc-card">
+              <h3>Diagnósticos visuais no runtime</h3>
+              <p>
+                Quando um erro escapa em execução (<code>R0001</code>), o runtime mostra arquivo,
+                linha, coluna e a linha do código sublinhada — sem gastar chamadas de debug no
+                caminho normal, usando uma tabela estática no C gerado.
+              </p>
+            </article>
+          </div>
+          <a class="text-link" href="livro/arquitetura.html"
+            >Explorar a arquitetura e a ABI em detalhes no livro →</a
+          >
+        </section>
+
+        <!-- 04 RECURSOS DA LINGUAGEM -->
+        <section class="doc-section" id="recursos" aria-labelledby="features-title">
+          <span class="eyebrow">// 04 — o que você pode escrever hoje</span>
+          <h2 id="features-title">Encontre rápido qualquer recurso da linguagem.</h2>
+          <p class="callout">
+            Quer aprender do zero com explicações passo a passo?
+            <a href="livro/index.html"><strong>Abra o livro do CGD</strong></a> ou use o
+            <a href="linguagem.html">guia de referência em página única</a>.
+          </p>
+
+          <label class="search-label" for="feature-search"
+            >Filtrar recursos (funciona sem acento)</label
+          >
           <input
             id="feature-search"
             type="search"
-            placeholder="classes, exceções, Unicode, módulos…"
+            placeholder="Ex.: classes, excecoes, rotinas, assincrona, sqlite, mescla…"
             autocomplete="off"
           />
+
           <div class="table-wrap">
             <table class="features-table">
               <thead>
                 <tr>
                   <th>Área</th>
-                  <th>O que está disponível</th>
-                  <th>Exemplo</th>
+                  <th>O que funciona no CGD</th>
+                  <th>Onde ver</th>
                 </tr>
               </thead>
               <tbody>
                 <tr class="feature-row">
                   <td>Tipos e variáveis</td>
                   <td>
-                    Nulo, lógicos, números, anotações, constantes, múltipla atribuição e escopos.
+                    <code>nulo</code>, lógicos, inteiros 64-bit, reais, textos UTF-8, inferência,
+                    constantes e defaults previsíveis.
                   </td>
-                  <td>
-                    <a
-                      href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/01_tipos.delegua"
-                      >tipos →</a
-                    >
-                  </td>
+                  <td><a href="livro/valores.html">valores →</a></td>
                 </tr>
                 <tr class="feature-row">
                   <td>Controle de fluxo</td>
                   <td>
-                    Se, ternário, escolha/caso, laços, sustar, continua e laços como expressões.
+                    <code>se/senao</code>, ternário <code>? :</code>, coalescência <code>?:</code>,
+                    <code>escolha/caso</code>, laços e laços coletores.
                   </td>
-                  <td>
-                    <a
-                      href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/06_lacos_resultado.delegua"
-                      >laços →</a
-                    >
-                  </td>
+                  <td><a href="livro/controle.html">controle →</a></td>
                 </tr>
                 <tr class="feature-row">
-                  <td>Funções como valores</td>
+                  <td>Funções e arrows</td>
                   <td>
-                    Nomeadas e anônimas sem captura, callbacks, padrões, espalhamento e parâmetros
-                    variáveis.
+                    Funções nomeadas, anônimas e <code>=&gt;</code> sem captura, parâmetros
+                    opcionais, <code>...spread</code> e callbacks.
                   </td>
+                  <td><a href="livro/funcoes.html">funções →</a></td>
+                </tr>
+                <tr class="feature-row">
+                  <td>Assincronismo e rotinas</td>
                   <td>
-                    <a
-                      href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/08_funcoes_valores.delegua"
-                      >funções →</a
-                    >
+                    <code>assincrona</code>, <code>aguardar</code>, <code>Promessa&lt;T&gt;</code>,
+                    <code>rotina</code>, <code>Tarefa&lt;T&gt;</code>, <code>Canal</code> e
+                    <code>GrupoTarefas</code>.
                   </td>
+                  <td><a href="livro/rotinas.html">rotinas →</a></td>
                 </tr>
                 <tr class="feature-row">
                   <td>Coleções</td>
                   <td>
-                    Vetores, tuplas imutáveis, dicionários, compreensão, desestruturação e fatias
-                    com passo.
+                    Vetores tipados <code>T[]</code>, tuplas imutáveis, dicionários, compreensão de
+                    listas, desestruturação e fatias <code>[::-1]</code>.
                   </td>
-                  <td>
-                    <a
-                      href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/10_compreensao_fatias.delegua"
-                      >coleções →</a
-                    >
-                  </td>
+                  <td><a href="livro/vetores.html">vetores →</a></td>
                 </tr>
                 <tr class="feature-row">
                   <td>Texto e Unicode</td>
                   <td>
-                    Interpolação, escapes, pontos de código, busca, conversão de caixa e métodos de
-                    texto.
+                    UTF-8 por pontos de código, interpolação <code>${...}</code>, escapes e métodos
+                    como <code>dividir</code>, <code>substituir</code> e <code>aparar</code>.
                   </td>
-                  <td>
-                    <a
-                      href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/13_texto_unicode.delegua"
-                      >Unicode →</a
-                    >
-                  </td>
+                  <td><a href="livro/texto.html">texto →</a></td>
                 </tr>
                 <tr class="feature-row">
-                  <td>Classes</td>
-                  <td>Construtores, herança, isto, super, métodos ligados e identidade nominal.</td>
+                  <td>Classes, herança e mescla</td>
                   <td>
-                    <a
-                      href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/15_heranca.delegua"
-                      >herança →</a
-                    >
+                    Construtores, <code>herda</code>, composição <code>mescla</code>, interfaces
+                    <code>implementa</code>, classes abstratas, campos e métodos
+                    <code>estatico</code>.
                   </td>
+                  <td><a href="livro/classes.html">classes →</a></td>
                 </tr>
                 <tr class="feature-row">
-                  <td>Privacidade e acessores</td>
-                  <td>Público, privado, protegido, obter/definir e validação de campos tipados.</td>
+                  <td>Privacidade, acessores e enums</td>
                   <td>
-                    <a
-                      href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/16_privacidade_acessores.delegua"
-                      >acessores →</a
-                    >
+                    Blocos <code>publico</code>, <code>privado</code> e <code>protegido</code>,
+                    <code>obter/definir</code>, <code>destrutor</code> e <code>enum</code> numérico.
                   </td>
+                  <td><a href="livro/evolucao-04.html">contratos →</a></td>
                 </tr>
                 <tr class="feature-row">
                   <td>Exceções</td>
-                  <td>Tente, pegue tipado, finalmente, falhar e subclasses de Excecao.</td>
                   <td>
-                    <a
-                      href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/19_excecoes_tipadas.delegua"
-                      >exceções →</a
-                    >
+                    <code>tente</code>, <code>pegue</code> tipado, <code>finalmente</code>,
+                    <code>falhar</code> e subclasses de <code>Excecao</code>.
                   </td>
+                  <td><a href="livro/excecoes.html">exceções →</a></td>
                 </tr>
                 <tr class="feature-row">
-                  <td>Módulos</td>
+                  <td>Módulos e ~/.delegua/cgd</td>
                   <td>
-                    Fontes locais, caminhos literais, cache, ciclos diagnosticados e inicialização
-                    única.
+                    Importação literal de <code>.delegua</code> locais e resolução dinâmica de
+                    <code>importar("cgd:nome")</code> a partir de <code>~/.delegua/cgd</code>.
                   </td>
-                  <td>
-                    <a
-                      href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/modulos/01_importacao.delegua"
-                      >módulos →</a
-                    >
-                  </td>
+                  <td><a href="livro/modulos.html">módulos →</a></td>
                 </tr>
                 <tr class="feature-row">
-                  <td>Biblioteca nativa</td>
+                  <td>Decoradores, CTFE e FFI C</td>
                   <td>
-                    Entrada/saída, conversões, mapear, filtrar, ordenar, clonagem profunda e
-                    aleatoriedade.
+                    Metadados <code>@nome</code>, envelopes em funções e métodos, funções puras
+                    <code>//&gt;puro</code> e <code>classe estrangeira</code> com
+                    <code>@definicao</code>.
                   </td>
-                  <td>
-                    <a
-                      href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/21_biblioteca.delegua"
-                      >biblioteca →</a
-                    >
-                  </td>
-                </tr>
-                <tr class="feature-row">
-                  <td>Metadados e asserções</td>
-                  <td>
-                    Decoradores de dados, envelopes de funções livres sem captura e asserções
-                    tratáveis.
-                  </td>
-                  <td>
-                    <a
-                      href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/23_decoradores.delegua"
-                      >metadados →</a
-                    >
-                  </td>
+                  <td><a href="livro/metadados.html">metadados →</a></td>
                 </tr>
               </tbody>
             </table>
           </div>
           <p id="features-empty" class="callout" hidden>
-            Nenhum recurso corresponde à busca. Consulte também os limites abaixo.
+            Nenhum recurso bateu com a busca. Tente outro termo ou abra o
+            <a href="livro/index.html">livro completo</a>.
           </p>
-          <a
-            class="text-link"
-            href="https://github.com/FernandoTheDev/cgd/blob/dev/docs/compatibilidade.md"
-            >Consultar a matriz completa de compatibilidade →</a
+        </section>
+
+        <!-- 05 BIBLIOTECAS E EDITOR -->
+        <section class="doc-section" id="bibliotecas" aria-labelledby="libs-title">
+          <span class="eyebrow">// 05 — bibliotecas padrão e experiência no editor</span>
+          <h2 id="libs-title">24 módulos prontos em ~/.delegua/cgd — e autocomplete no VS Code.</h2>
+          <p class="section-intro">
+            Em vez de uma lista fixa dentro do compilador, o CGD instala as bibliotecas padrão em
+            <code>~/.delegua/cgd</code>. Quando você digita <code>importar("cgd:</code> no VS Code,
+            o LSP lê essa pasta na hora e sugere tanto as bibliotecas oficiais quanto qualquer
+            módulo <code>.delegua</code> que você mesmo colocar lá.
+          </p>
+
+          <figure class="diagram-figure">
+            <img
+              src="assets/ecossistema.svg"
+              alt="Diagrama do ecossistema local do CGD: CLI, ~/.delegua/cgd, extensão VS Code e runtime"
+              width="1120"
+              height="260"
+            />
+            <figcaption>
+              CLI, bibliotecas dinâmicas, extensão VS Code com LSP local e runtime C99 trabalham
+              juntos sem exigir acesso à internet ou gerenciadores externos.
+            </figcaption>
+          </figure>
+
+          <div class="doc-grid-3">
+            <article class="doc-card">
+              <h3>Rede, Web e Concorrência</h3>
+              <p>
+                Clientes HTTP, servidor HTTP/1.1 concorrente sobre <code>epoll</code>, sockets TCP e
+                UDP, DNS e canais para rotinas paralelas.
+              </p>
+              <ul class="lib-list">
+                <li><code>cgd:servidor</code></li>
+                <li><code>cgd:rede</code></li>
+                <li><code>cgd:sockets</code></li>
+                <li><code>cgd:assincrono</code></li>
+              </ul>
+            </article>
+
+            <article class="doc-card">
+              <h3>Dados, Banco e Segurança</h3>
+              <p>
+                Parser JSON puro, SQLite parametrizado com transações, buffers binários, OpenSSL e
+                compressão gzip/deflate com limite de memória.
+              </p>
+              <ul class="lib-list">
+                <li><code>cgd:json</code></li>
+                <li><code>cgd:sqlite</code></li>
+                <li><code>cgd:bytes</code></li>
+                <li><code>cgd:cripto</code></li>
+                <li><code>cgd:compressao</code></li>
+                <li><code>cgd:arquivos</code></li>
+              </ul>
+            </article>
+
+            <article class="doc-card">
+              <h3>Sistema, CLI e Utilidades</h3>
+              <p>
+                Subprocessos, ambiente, calendário <code>DataHora</code>, argumentos de linha de
+                comando, logs, matemática, estatística e textos.
+              </p>
+              <ul class="lib-list">
+                <li><code>cgd:processo</code></li>
+                <li><code>cgd:ambiente</code></li>
+                <li><code>cgd:sistema</code></li>
+                <li><code>cgd:tempo</code></li>
+                <li><code>cgd:io</code></li>
+                <li><code>cgd:cli</code></li>
+                <li><code>cgd:log</code></li>
+                <li><code>cgd:caminhos</code></li>
+                <li><code>cgd:textos</code></li>
+                <li><code>cgd:colecoes</code></li>
+                <li><code>cgd:matematica</code></li>
+                <li><code>cgd:estatistica</code></li>
+                <li><code>cgd:algoritmos</code></li>
+                <li><code>cgd:nativo</code></li>
+              </ul>
+            </article>
+          </div>
+
+          <a class="text-link" href="livro/bibliotecas-cgd.html"
+            >Ver documentação das bibliotecas cgd:* no livro →</a
           >
         </section>
 
+        <!-- 06 EXEMPLOS -->
         <section class="doc-section" id="exemplos" aria-labelledby="examples-title">
-          <span class="eyebrow">// 04 — código que faz parte dos testes</span>
-          <h2 id="examples-title">Aprenda pelo executável.</h2>
+          <span class="eyebrow">// 06 — exemplos reais testados na suíte</span>
+          <h2 id="examples-title">Veja como o código fica na prática.</h2>
+          <p class="section-intro">
+            Todos os 136 exemplos do repositório são compilados e executados com e sem
+            <code>-o</code> nos testes automáticos. Aqui estão quatro pontos de partida para você
+            copiar e testar.
+          </p>
+
           <div class="doc-grid">
             <article class="doc-card">
-              <h3>Classes e interpolação</h3>
+              <h3>Classes, mescla e interpolação</h3>
               <div class="code-head">
                 <span>ola.delegua</span
                 ><button type="button" class="copy-button" data-copy="example-code">Copiar</button>
               </div>
-              <pre><code id="example-code">classe Pessoa {
+              <pre><code id="example-code">classe Etiquetavel {
+    prefixo: texto = "CGD:"
+    rotulo(nome: texto): texto { retorna "${isto.prefixo} ${nome}" }
+}
+
+classe Pessoa mescla Etiquetavel {
+    estatico criadas: inteiro = 0
     nome: texto
-    construtor(nome) { isto.nome = nome }
-    apresentar() {
-        retorna "Olá, ${isto.nome}!"
+
+    construtor(nome: texto) {
+        isto.nome = nome
+        Pessoa.criadas++
     }
 }
-escreva(Pessoa("Delégua").apresentar())</code></pre>
+
+const p: Pessoa = Pessoa("Ana")
+escreva(p.rotulo(p.nome), " | total:", Pessoa.criadas)</code></pre>
             </article>
+
             <article class="doc-card">
-              <h3>Exceções com limpeza</h3>
+              <h3>Tratamento de erros com limpeza</h3>
               <div class="code-head">
-                <span>excecoes.delegua</span
+                <span>erros.delegua</span
                 ><button type="button" class="copy-button" data-copy="exception-code">
                   Copiar
                 </button>
               </div>
-              <pre><code id="exception-code">tente {
-    falhar "erro proposital"
+              <pre><code id="exception-code">funcao dividir(a: numero, b: numero): numero {
+    se b == 0 {
+        falhar "Não dá para dividir por zero"
+    }
+    retorna a / b
+}
+
+tente {
+    escreva(dividir(10, 0))
 } pegue (erro: Excecao) {
-    escreva(erro.mensagem)
+    escreva("Capturado: ${erro.mensagem}")
 } finalmente {
-    escreva("limpeza executada")
+    escreva("Sempre executa na saída")
 }</code></pre>
             </article>
+
+            <article class="doc-card">
+              <h3>Rotinas paralelas + Canal</h3>
+              <div class="code-head">
+                <span>rotinas.delegua</span
+                ><button type="button" class="copy-button" data-copy="routine-code">Copiar</button>
+              </div>
+              <pre><code id="routine-code">funcao fib(n: inteiro): inteiro {
+    se n <= 1 { retorna n }
+    retorna fib(n - 1) + fib(n - 2)
+}
+
+assincrona funcao principal(): vazio {
+    // Roda em threads do pool com isolamento seguro
+    const t1: Tarefa&lt;inteiro&gt; = rotina fib(12)
+    const t2: Tarefa&lt;inteiro&gt; = rotina fib(14)
+    escreva(aguardar t1, " e ", aguardar t2)
+}
+
+principal()</code></pre>
+            </article>
+
+            <article class="doc-card">
+              <h3>Servidor HTTP nativo com JSON</h3>
+              <div class="code-head">
+                <span>api.delegua</span
+                ><button type="button" class="copy-button" data-copy="http-code">Copiar</button>
+              </div>
+              <pre><code id="http-code">const HTTP: qualquer = importar("cgd:servidor").HTTP
+
+funcao saudar(req: qualquer, res: qualquer): qualquer {
+    const nome: texto = req.parametro("nome", "mundo")
+    retorna res.json({ mensagem: "Olá, ${nome}!" })
+}
+
+const app: qualquer = HTTP()
+app.obter("/ola/:nome", saudar)
+app.escutar("127.0.0.1", 8080)</code></pre>
+            </article>
           </div>
-          <p>
-            O catálogo inclui exemplos históricos, tutoriais de linguagem, módulos e falhas
-            esperadas. Entrada padrão e diagnósticos também têm contratos de teste.
-          </p>
+
           <a
             class="text-link"
             href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/README.md"
-            >Abrir o catálogo de exemplos →</a
+            >Abrir o catálogo completo com 136 exemplos →</a
           >
         </section>
 
+        <!-- 07 LIMITES E SEGURANÇA -->
         <section class="doc-section" id="seguranca" aria-labelledby="security-title">
-          <span class="eyebrow">// 05 — limites explícitos</span>
-          <h2 id="security-title">Segurança faz parte do perfil.</h2>
+          <span class="eyebrow">// 07 — o que é bloqueado e o que ainda tem limite</span>
+          <h2 id="security-title">Regras claras, sem surpresa no meio do projeto.</h2>
+          <p class="section-intro">
+            Algumas coisas o CGD recusa de propósito para manter o código previsível e seguro.
+            Outras ainda estão em evolução e a gente deixa isso bem visível aqui.
+          </p>
+
           <div class="doc-grid">
             <article class="doc-card restricted">
-              <span class="tag tag-blocked">bloqueado por decisão de segurança</span>
-              <h3>Sem captura implícita</h3>
+              <span class="tag tag-blocked">recusado por contrato de segurança</span>
+              <h3>Sem captura implícita (upvalues)</h3>
               <p>
-                Upvalues, capturas de parâmetros/locais/globais e de isto por funções internas
-                recebem aviso e erro. Passe o estado por parâmetros ou por uma instância explícita.
+                Uma função interna não puxa variáveis de fora silenciosamente. Isso evita estados
+                escondidos e referências penduradas. Passe o valor por parâmetro ou use um método de
+                classe.
               </p>
-              <pre><code>funcao criar(valor) {
+              <pre><code>funcao criar(valor: inteiro) {
     retorna funcao() {
-        retorna valor // bloqueado: captura
+        retorna valor // erro E4001: captura bloqueada
     }
 }</code></pre>
             </article>
+
             <article class="doc-card restricted">
-              <span class="tag tag-blocked">bloqueado por decisão de segurança</span>
-              <h3>Sem código nativo arbitrário</h3>
+              <span class="tag tag-blocked">recusado por contrato de segurança</span>
+              <h3>Sem eval, NPM ou importação calculada</h3>
               <p>
-                FFI na linguagem, classes estrangeiras, ponteiros arbitrários, NPM, importação
-                calculada e avaliação dinâmica não são expostos. Módulos aceitos são fontes .delegua
-                conhecidas na compilação.
+                <code>importar(...)</code> exige texto literal conhecido na compilação — nada de
+                montar nome de arquivo em runtime nem baixar pacotes NPM. Em <code>cgd:</code>,
+                tentativas de travessia como <code>cgd:../segredo</code> são barradas com
+                <code>E2003</code>.
+              </p>
+              <p style="margin-top: 0.7rem">
+                <strong>Sobre FFI C:</strong> <code>classe estrangeira</code> com
+                <code>@definicao</code> é permitida de forma explícita para chamar bibliotecas C
+                confiáveis, mas não funciona como sandbox — se a assinatura C estiver errada, o
+                código nativo pode falhar.
               </p>
             </article>
           </div>
+
           <article class="doc-card limits">
-            <span class="tag tag-limited">limites atuais, distintos de insegurança</span>
-            <h3>O que ainda exige atenção</h3>
+            <span class="tag tag-limited">limites reais da versão 0.9.0</span>
+            <h3>O que vale saber antes de começar</h3>
             <ul>
               <li>
-                Linux x86_64 é o ambiente validado; Windows, macOS e cross-compilation não são
-                garantidos.
+                <strong>Plataforma:</strong> Linux x86_64 é o único alvo validado hoje. Windows,
+                macOS e cross-compilation ainda precisam de runtime e validação próprios.
               </li>
               <li>
-                Inteiros e longo usam 64 bits verificados; não há precisão arbitrária. Reais usam
-                precisão dupla.
+                <strong>Números:</strong> inteiros usam 64 bits com verificação de overflow (não há
+                BigInt); reais usam ponto flutuante de 64 bits.
               </li>
               <li>
-                Envelopes de decoradores em métodos e herança por alias dinâmico importado ainda não
-                são resolvidos.
+                <strong>Concorrência e async:</strong> <code>rotina</code> só transfere valores
+                seguros (<code>nulo</code>, lógico, inteiro, real, texto copiado) — coleções
+                mutáveis não atravessam threads. Classes locais dentro de funções
+                <code>assincrona</code> ainda recebem <code>E3305</code>.
               </li>
               <li>
-                A CTFE aceita um subconjunto da linguagem. Não há backend próprio LLVM/assembly nem
-                dialetos adicionais.
+                <strong>Pendências conhecidas:</strong> enums nominais separados de inteiro,
+                structs/callbacks compostos na ABI C e depurador passo a passo (DAP) ainda não estão
+                implementados.
               </li>
-              <li>O runtime usa uma thread; dicionários não prometem ordem de inserção.</li>
+              <li>
+                <strong>Exclusões definitivas:</strong> compatibilidade com JavaScript / classes de
+                host JS, múltiplos dialetos e herança entre interfaces não entrarão no CGD.
+              </li>
             </ul>
           </article>
-          <p>
-            Aridade, tipos, identidade de classes, privacidade e contratos de coleções também são
-            verificados em execução. Isso não equivale a uma prova formal de segurança ou a um
-            sandbox para programas não confiáveis.
-          </p>
-          <a
-            class="text-link"
-            href="https://github.com/FernandoTheDev/cgd/blob/dev/docs/seguranca.md"
-            >Ler o contrato de segurança →</a
+
+          <a class="text-link" href="livro/seguranca.html"
+            >Ler o contrato de segurança completo no livro →</a
           >
         </section>
 
+        <!-- 08 TESTES E REFERÊNCIAS -->
         <section class="doc-section" id="testes" aria-labelledby="tests-title">
-          <span class="eyebrow">// 06 — verificar, não presumir</span>
-          <h2 id="tests-title">A mesma fonte em DMD e LDC2.</h2>
+          <span class="eyebrow">// 08 — validação reproduzível e referências</span>
+          <h2 id="tests-title">Teste você mesmo em DMD, LDC2, Clang e GCC.</h2>
           <p class="section-intro">
-            A matriz compila o frontend em debug e release, gera programas com Clang e GCC e executa
-            integração, exemplos e instalação isolada. Uma dependência ausente falha explicitamente.
+            Todo recurso novo vem acompanhado de testes unitários em D, suítes de integração,
+            sanitizadores (ASan/UBSan/TSan) e contratos em cada exemplo.
           </p>
+
           <div class="code-head">
-            <span>validação reproduzível</span
+            <span>rodar as suítes localmente</span
             ><button type="button" class="copy-button" data-copy="test-code">Copiar</button>
           </div>
-          <pre><code id="test-code">dub test --compiler=dmd
-dub test --compiler=ldc2
+          <pre><code id="test-code">dub test --compiler=dmd --config=unittest
+dub test --compiler=ldc2 --config=unittest
 python3 testes/integracao.py
 python3 testes/exemplos.py
+python3 testes/formatador.py
+python3 testes/lsp.py
 python3 scripts/validar.py</code></pre>
+
           <div class="doc-grid">
             <article class="doc-card">
-              <h3>Contratos dos exemplos</h3>
-              <p>
-                <code>//!</code> define a saída. <code>//#</code> define o status.
-                <code>//?</code> fixa entrada, fase e mensagem do diagnóstico. Nenhum arquivo do
-                catálogo é ignorado pelo runner Python.
-              </p>
+              <h3>Referências do projeto CGD</h3>
+              <ul>
+                <li>
+                  <a href="livro/index.html">O Livro do CGD</a> — guia completo com busca e destaque
+                  de sintaxe Delégua
+                </li>
+                <li>
+                  <a href="linguagem.html">Guia em página única</a> — busca rápida e catálogo de
+                  diagnósticos
+                </li>
+                <li>
+                  <a
+                    href="https://github.com/FernandoTheDev/cgd/tree/dev"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Repositório CGD (branch dev)</a
+                  >
+                </li>
+                <li>
+                  <a
+                    href="https://github.com/FernandoTheDev/delegua-runtime/tree/dev"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Runtime gerenciado em C (delegua-runtime)</a
+                  >
+                </li>
+              </ul>
             </article>
+
             <article class="doc-card">
-              <h3>Verificações do runtime</h3>
-              <p>
-                Os testes C também podem rodar com NDEBUG, AddressSanitizer e
-                UndefinedBehaviorSanitizer. As opções necessárias para o GC estão documentadas no
-                vendor.
-              </p>
+              <h3>Referências da linguagem original</h3>
+              <ul>
+                <li>
+                  <a
+                    href="https://github.com/DesignLiquido/delegua"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Delégua — repositório oficial (Design Líquido)</a
+                  >
+                </li>
+                <li>
+                  <a
+                    href="https://github.com/DesignLiquido/delegua/wiki"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Wiki oficial da linguagem Delégua</a
+                  >
+                </li>
+                <li>
+                  <a href="livro/delegua-vs-cgd.html"
+                    >Comparação detalhada: Delégua original vs. CGD</a
+                  >
+                </li>
+                <li>
+                  <a
+                    href="https://github.com/FernandoTheDev/cgd/blob/dev/LICENSE"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Licença Apache-2.0</a
+                  >
+                </li>
+              </ul>
             </article>
           </div>
-          <a
-            class="text-link"
-            href="https://github.com/FernandoTheDev/cgd/blob/dev/docs/validacao.md"
-            >Consultar o registro de validação →</a
-          >
         </section>
       </div>
     </main>
+
     <p id="copy-status" class="sr-only" role="status" aria-live="polite"></p>
+
     <footer>
-      <p>
-        Desenvolvido com dedicação por Fernando.
-        <a href="https://github.com/FernandoTheDev/cgd/tree/dev"
-          >Código e documentação na branch dev.</a
-        >
-      </p>
+      <div class="footer-inner">
+        <p style="margin: 0">
+          CGD — Compilador Geral Delégua · Desenvolvido por Fernando · Linguagem original por
+          <a
+            href="https://github.com/DesignLiquido/delegua"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Design Líquido</a
+          >
+          · Licença Apache-2.0.
+        </p>
+        <div class="footer-links">
+          <a href="livro/index.html">Livro</a>
+          <a href="linguagem.html">Referência</a>
+          <a href="https://github.com/FernandoTheDev/cgd/tree/dev">GitHub</a>
+          <a href="https://github.com/DesignLiquido/delegua/wiki">Wiki Delégua</a>
+        </div>
+      </div>
     </footer>
   </body>
 </html>

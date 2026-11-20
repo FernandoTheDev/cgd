@@ -1,0 +1,85 @@
+@definicao(biblioteca = "cgd-runtime", abi = "delegua", prefixo = "delegua_rotina_")
+classe estrangeira RotinasAlgoritmos {
+    @definicao(simbolo = "crc32")
+    estatico crc32(dados: texto): Promessa<inteiro>;
+}
+
+// Busca em vetores numéricos ordenados em ordem crescente.
+classe Algoritmos {
+    estatico crc32Async(dados: texto): Promessa<inteiro> {
+        retorna RotinasAlgoritmos.crc32(dados)
+    }
+
+    estatico limiteInferior(valores: numero[], alvo: numero): inteiro {
+        var inicio: inteiro = 0
+        var fim: inteiro = tamanho(valores)
+        enquanto inicio < fim {
+            var meio: inteiro = inicio + (fim - inicio) \ 2
+            se valores[meio] < alvo {
+                inicio = meio + 1
+            } senao {
+                fim = meio
+            }
+        }
+        retorna inicio
+    }
+
+    estatico limiteSuperior(valores: numero[], alvo: numero): inteiro {
+        var inicio: inteiro = 0
+        var fim: inteiro = tamanho(valores)
+        enquanto inicio < fim {
+            var meio: inteiro = inicio + (fim - inicio) \ 2
+            se valores[meio] <= alvo {
+                inicio = meio + 1
+            } senao {
+                fim = meio
+            }
+        }
+        retorna inicio
+    }
+
+    estatico buscaBinaria(valores: numero[], alvo: numero): inteiro {
+        var posicao: inteiro = Algoritmos.limiteInferior(valores, alvo)
+        retorna posicao < tamanho(valores) e valores[posicao] == alvo ? posicao : -1
+    }
+
+    estatico estaOrdenado(valores: numero[]): logico {
+        para (var i: inteiro = 1; i < tamanho(valores); i++) {
+            se valores[i] < valores[i - 1] {
+                retorna falso
+            }
+        }
+        retorna verdadeiro
+    }
+
+    estatico ordenado(valores: numero[]): numero[] {
+        var copia: numero[] = clonar(valores)
+        copia.ordenar()
+        retorna copia
+    }
+
+    estatico intercalar(a: numero[], b: numero[]): numero[] {
+        var resultado: numero[] = []
+        var i: inteiro = 0
+        var j: inteiro = 0
+        enquanto i < tamanho(a) e j < tamanho(b) {
+            se a[i] <= b[j] {
+                resultado.adicionar(a[i]);
+                i++
+            }
+            senao {
+                resultado.adicionar(b[j]);
+                j++
+            }
+        }
+        enquanto i < tamanho(a) {
+            resultado.adicionar(a[i]);
+            i++
+        }
+        enquanto j < tamanho(b) {
+            resultado.adicionar(b[j]);
+            j++
+        }
+        retorna resultado
+    }
+}

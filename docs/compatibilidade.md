@@ -98,3 +98,47 @@ A revisão 0.5.0 acrescenta defaults tipados, inicialização de atributos por
 instância, comparação textual ordenada, dicas de inferência e diagnósticos
 visuais do runtime. A stdlib inclui Textos, Estatistica e Caminhos, além das
 expansões de Colecoes, Arquivo e Matematica.
+
+A expansão de sistema acrescenta Processo, Ambiente, Sistema, Tempo, IO,
+Algoritmos, CLI e Logger. Processos são síncronos com captura e limites; não há
+handle assíncrono. As primitivas novas dependem de Linux/glibc >= 2.34.
+Consulte [stdlib de sistema](stdlib-sistema.md) para as assinaturas e limites.
+
+## Servidor nativo
+
+`cgd:servidor` e `cgd:sockets` acrescentam servidor HTTP/1.1 sequencial e TCP
+IPv4 numérico no Linux. Rotas dos sete métodos, middleware sem captura, parâmetros,
+JSON e shutdown explícito estão disponíveis. Uma requisição por conexão, prazos
+absolutos e limites fixos/configuráveis: consulte [o contrato](servidor-http.md).
+UDP, sockets locais, DNS/IPv6, keep-alive, TLS, HTTP/2 e atendimento concorrente
+ainda não foram implementados. Cliente libcurl e sua API anterior permanecem.
+
+## Assincronismo, rotinas paralelas e revisão 0.9.0
+
+`assincrona`/`aguardar`, `Promessa<T>`, `rotina` e `Tarefa<T>` possuem lowering
+C99 stackless com vivacidade, handlers suspensos, `pegue`/`finalmente`, fluxo,
+coleções e pool de workers nativos com TLS por thread e auditoria transitiva de
+efeitos (`E3401`–`E3404`). E3305 restringe-se a classes locais em corpos
+assíncronos. Capturas continuam proibidas; construtores, destrutores, acessores,
+defaults e inicializadores não admitem `aguardar`.
+
+Microtasks, `entao`/`capturar`/`cancelar`/`concluida`/`cancelada`, combinadores
+estáticos de `Promessa`, `Canal` limitado e `GrupoTarefas` estão disponíveis em
+`cgd:assincrono`, junto a timers, HTTP com curl multi e TCP não bloqueante sobre
+epoll. Hostnames HTTP exigem c-ares e libcurl >= 8.8; não há fallback bloqueante.
+
+A revisão 0.9.0 acrescenta ainda:
+
+- **Linguagem**: campos estáticos tipados (`estatico campo: Tipo = valor`),
+  composição por mixins (`classe C mescla M1, M2`), envelopes de decoradores em
+  métodos de instância e estáticos, além de propagação de constantes tipadas e
+  dobras unárias/curto-circuito adicionais.
+- **Bibliotecas**: `cgd:bytes` (`Bytes`), `cgd:cripto` (`Cripto` sobre OpenSSL
+  `libcrypto`), `cgd:compressao` (`Compressao` gzip/deflate sobre `zlib` com
+  limite de descompressão), `cgd:sqlite` (`SQLite`/`BancoSQLite` com consultas
+  parametrizadas), `DataHora` em `cgd:tempo`, `SocketUDP`/`resolverDNS`/IPv6 em
+  `cgd:sockets` e `HTTP.escutarAsync` com atendimento concorrente e HTTP/1.1
+  keep-alive em `cgd:servidor`.
+
+Veja [assincronismo](assincronismo.md), [rotinas](rotinas.md) e
+[servidor HTTP](servidor-http.md).

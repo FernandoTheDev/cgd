@@ -1,0 +1,41 @@
+classe Ambiente {
+    estatico obter(nome: texto, alternativa: qualquer = nulo): qualquer {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        var valor: qualquer = nativo.sistemaAmbiente(nome)
+        retorna valor == nulo ? alternativa : valor
+    }
+
+    estatico contem(nome: texto): logico {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sistemaAmbiente(nome) != nulo
+    }
+
+    estatico diretorioAtual(): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sistemaDiretorio()
+    }
+
+    estatico diretorioTemporario(): texto {
+        var valor: qualquer = Ambiente.obter("TMPDIR", "")
+        retorna valor == "" ? "/tmp" : valor
+    }
+
+    estatico diretorioUsuario(): qualquer {
+        retorna Ambiente.obter("HOME")
+    }
+
+    estatico definir(nome: texto, valor: texto): vazio {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        nativo.sistemaDefinirAmbiente(nome, valor)
+    }
+
+    estatico remover(nome: texto): vazio {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        nativo.sistemaDefinirAmbiente(nome, nulo)
+    }
+
+    estatico variaveis(): dicionario {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sistemaVariaveis()
+    }
+}

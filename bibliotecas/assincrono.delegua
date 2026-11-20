@@ -1,0 +1,290 @@
+// Corrotinas stackless e operações controladas do loop nativo.
+@definicao(biblioteca = "cgd-runtime", abi = "delegua", prefixo = "delegua_async_")
+classe estrangeira OperacoesAssincronas {
+    @definicao(simbolo = "dormir")
+    estatico dormir(milisegundos: inteiro): Promessa<vazio>;
+    @definicao(simbolo = "http")
+    estatico http(url: texto, metodo: texto, corpo: texto, cabecalhos: texto[], timeout: inteiro,
+        limite: inteiro): Promessa<dicionario>;
+
+    @definicao(simbolo = "tcpConectar")
+    estatico tcpConectar(endereco: texto, porta: inteiro, timeout: inteiro): Promessa<qualquer>;
+    @definicao(simbolo = "tcpReceber")
+    estatico tcpReceber(recurso: qualquer, limite: inteiro, timeout: inteiro): Promessa<texto>;
+    @definicao(simbolo = "tcpEnviar")
+    estatico tcpEnviar(recurso: qualquer, dados: texto, timeout: inteiro): Promessa<inteiro>;
+    @definicao(simbolo = "tcpAceitar")
+    estatico tcpAceitar(recurso: qualquer, timeout: inteiro): Promessa<qualquer>;
+    @definicao(simbolo = "canalCriar")
+    estatico canalCriar(capacidade: inteiro): qualquer;
+    @definicao(simbolo = "canalEnviar")
+    estatico canalEnviar(canal: qualquer, valor: qualquer): Promessa<vazio>;
+    @definicao(simbolo = "canalTentarEnviar")
+    estatico canalTentarEnviar(canal: qualquer, valor: qualquer): logico;
+    @definicao(simbolo = "canalReceber")
+    estatico canalReceber(canal: qualquer): Promessa<qualquer>;
+    @definicao(simbolo = "canalTentarReceber")
+    estatico canalTentarReceber(canal: qualquer): dicionario;
+    @definicao(simbolo = "canalFechar")
+    estatico canalFechar(canal: qualquer): vazio;
+    @definicao(simbolo = "canalFechado")
+    estatico canalFechado(canal: qualquer): logico;
+    @definicao(simbolo = "canalTamanho")
+    estatico canalTamanho(canal: qualquer): inteiro;
+    @definicao(simbolo = "canalCapacidade")
+    estatico canalCapacidade(canal: qualquer): inteiro;
+}
+
+classe Tempo {
+    estatico dormir(milisegundos: inteiro): Promessa<vazio> {
+        retorna OperacoesAssincronas.dormir(milisegundos)
+    }
+}
+
+classe RespostaHTTP {
+    privado {
+        _dados: dicionario
+    }
+
+    construtor(dados: dicionario) {
+        isto._dados = dados
+    }
+
+    status(): inteiro {
+        retorna isto._dados["status"]
+    }
+
+    texto(): texto {
+        retorna isto._dados["corpo"]
+    }
+
+    url(): texto {
+        retorna isto._dados["url"]
+    }
+
+    tipoConteudo(): texto {
+        retorna isto._dados["tipoConteudo"]
+    }
+
+    sucesso(): logico {
+        retorna isto.status() >= 200 e isto.status() < 300
+    }
+
+    json(): qualquer {
+        retorna importar("cgd:json").JSON.analisar(isto.texto())
+    }
+}
+
+classe HTTP {
+    estatico assincrona requisitar(url: texto, metodo: texto = "GET", corpo: texto = "",
+        cabecalhos: texto[] = [], timeout: inteiro = 30000, limite: inteiro = 16777216): RespostaHTTP {
+        const operacao: Promessa<dicionario> = OperacoesAssincronas.http(url, metodo, corpo,
+            cabecalhos, timeout, limite)
+        tente {
+            retorna RespostaHTTP(aguardar operacao)
+        } pegue (erro: Excecao) {
+            operacao.cancelar()
+            tente {
+                aguardar operacao
+            } pegue (ignorado: Excecao) {
+            }
+            falhar erro
+        }
+    }
+
+    estatico assincrona obter(url: texto, timeout: inteiro = 30000, limite: inteiro = 16777216): RespostaHTTP {
+        const operacao: Promessa<RespostaHTTP> = HTTP.requisitar(url, "GET", "", [], timeout,
+            limite)
+        tente {
+            retorna aguardar operacao
+        } pegue (erro: Excecao) {
+            operacao.cancelar()
+            tente {
+                aguardar operacao
+            } pegue (ignorado: Excecao) {
+            }
+            falhar erro
+        }
+    }
+
+    estatico assincrona enviar(url: texto, corpo: texto, cabecalhos: texto[] = [], timeout: inteiro = 30000,
+        limite: inteiro = 16777216): RespostaHTTP {
+        const operacao: Promessa<RespostaHTTP> = HTTP.requisitar(url, "POST", corpo, cabecalhos,
+            timeout, limite)
+        tente {
+            retorna aguardar operacao
+        } pegue (erro: Excecao) {
+            operacao.cancelar()
+            tente {
+                aguardar operacao
+            } pegue (ignorado: Excecao) {
+            }
+            falhar erro
+        }
+    }
+}
+
+classe ConexaoTCP {
+    privado {
+        _recurso: qualquer
+    }
+
+    construtor(recurso: qualquer) {
+        isto._recurso = recurso
+    }
+
+    receber(limite: inteiro = 65536, timeout: inteiro = 30000): Promessa<texto> {
+        retorna OperacoesAssincronas.tcpReceber(isto._recurso, limite, timeout)
+    }
+
+    enviar(dados: texto, timeout: inteiro = 30000): Promessa<inteiro> {
+        retorna OperacoesAssincronas.tcpEnviar(isto._recurso, dados, timeout)
+    }
+
+    fechar(): vazio {
+        importar("cgd:nativo").Primitivas.socketFechar(isto._recurso)
+    }
+
+    destrutor(): vazio {
+        isto.fechar()
+    }
+}
+
+classe OuvinteTCP {
+    privado {
+        _recurso: qualquer
+    }
+
+    construtor(endereco: texto = "127.0.0.1", porta: inteiro = 0) {
+        isto._recurso = importar("cgd:nativo").Primitivas.socketAbrir(endereco, porta, verdadeiro,
+            30000)
+    }
+
+    assincrona aceitar(timeout: inteiro = 30000): ConexaoTCP {
+        const operacao: Promessa<qualquer> = OperacoesAssincronas.tcpAceitar(isto._recurso,
+            timeout)
+        tente {
+            retorna ConexaoTCP(aguardar operacao)
+        } pegue (erro: Excecao) {
+            operacao.cancelar()
+            tente {
+                const recurso: qualquer = aguardar operacao
+                importar("cgd:nativo").Primitivas.socketFechar(recurso)
+            } pegue (ignorado: Excecao) {
+            }
+            falhar erro
+        }
+    }
+
+    portaLocal(): inteiro {
+        retorna importar("cgd:nativo").Primitivas.socketPorta(isto._recurso)
+    }
+
+    fechar(): vazio {
+        importar("cgd:nativo").Primitivas.socketFechar(isto._recurso)
+    }
+
+    destrutor(): vazio {
+        isto.fechar()
+    }
+}
+
+classe TCP {
+    estatico assincrona conectar(endereco: texto, porta: inteiro, timeout: inteiro = 30000): ConexaoTCP {
+        const operacao: Promessa<qualquer> = OperacoesAssincronas.tcpConectar(endereco, porta,
+            timeout)
+        tente {
+            retorna ConexaoTCP(aguardar operacao)
+        } pegue (erro: Excecao) {
+            operacao.cancelar()
+            tente {
+                const recurso: qualquer = aguardar operacao
+                importar("cgd:nativo").Primitivas.socketFechar(recurso)
+            } pegue (ignorado: Excecao) {
+            }
+            falhar erro
+        }
+    }
+}
+
+classe Canal {
+    privado {
+        _recurso: qualquer
+    }
+
+    construtor(capacidade: inteiro = 16) {
+        isto._recurso = OperacoesAssincronas.canalCriar(capacidade)
+    }
+
+    enviar(valor: qualquer): Promessa<vazio> {
+        retorna OperacoesAssincronas.canalEnviar(isto._recurso, valor)
+    }
+
+    tentarEnviar(valor: qualquer): logico {
+        retorna OperacoesAssincronas.canalTentarEnviar(isto._recurso, valor)
+    }
+
+    receber(): Promessa<qualquer> {
+        retorna OperacoesAssincronas.canalReceber(isto._recurso)
+    }
+
+    tentarReceber(): dicionario {
+        retorna OperacoesAssincronas.canalTentarReceber(isto._recurso)
+    }
+
+    fechar(): vazio {
+        OperacoesAssincronas.canalFechar(isto._recurso)
+    }
+
+    fechado(): logico {
+        retorna OperacoesAssincronas.canalFechado(isto._recurso)
+    }
+
+    tamanho(): inteiro {
+        retorna OperacoesAssincronas.canalTamanho(isto._recurso)
+    }
+
+    capacidade(): inteiro {
+        retorna OperacoesAssincronas.canalCapacidade(isto._recurso)
+    }
+
+    destrutor(): vazio {
+        isto.fechar()
+    }
+}
+
+classe GrupoTarefas {
+    privado {
+        _itens: qualquer[]
+    }
+
+    construtor() {
+        isto._itens = []
+    }
+
+    adicionar(tarefa: qualquer): vazio {
+        isto._itens.adicionar(tarefa)
+    }
+
+    quantidade(): inteiro {
+        retorna isto._itens.tamanho()
+    }
+
+    cancelarTodas(): vazio {
+        para cada item: qualquer em isto._itens {
+            tente {
+                item.cancelar()
+            } pegue (ignorado: Excecao) {
+            }
+        }
+    }
+
+    assincrona aguardarTodas(): qualquer[] {
+        tente {
+            retorna aguardar Promessa.todas(isto._itens)
+        } pegue (erro: Excecao) {
+            isto.cancelarTodas()
+            falhar erro
+        }
+    }
+}

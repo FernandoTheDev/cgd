@@ -1,0 +1,8 @@
+//! 2.5\n2.5\n5
+var estatistica: qualquer = importar("cgd:estatistica").Estatistica
+var medidas: numero[] = [4, 1, 2, 3]
+escreva(estatistica.media(medidas))
+escreva(estatistica.mediana(medidas))
+escreva(estatistica.variancia([2, 4, 6, 8]))
+// Calcular a mediana não muda a ordem do vetor recebido.
+assercao(medidas[0] == 4)

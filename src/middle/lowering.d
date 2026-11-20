@@ -106,7 +106,11 @@ private:
                 ClassDecl c = cast(ClassDecl) node;
                 lowerDecorators(c.decorators);
                 foreach (ref ClassField field; c.fields)
+                {
+                    if (field.isStatic && field.value !is null)
+                        field.value = loweringExpr(field.value);
                     lowerDecorators(field.decorators);
+                }
                 foreach (ref FnDecl method; c.methods)
                     method = cast(FnDecl) loweringStmt(method);
                 return node;
@@ -193,6 +197,19 @@ private:
     {
         switch (node.kind)
         {
+            case NodeKind.AwaitExpr:
+                (cast(AwaitExpr) node).value = loweringExpr((cast(AwaitExpr) node).value);
+                return node;
+            case NodeKind.RoutineExpr:
+                RoutineExpr routine = cast(RoutineExpr) node;
+                if (routine.call !is null)
+                {
+                    if (!cast(Identifier) routine.call.fn)
+                        routine.call.fn = loweringExpr(routine.call.fn);
+                    foreach (ref Node arg; routine.call.args)
+                        arg = loweringExpr(arg);
+                }
+                return node;
             case NodeKind.AssignStmt:
                 return loweringStmt(node);
             case NodeKind.ConditionalExpr:

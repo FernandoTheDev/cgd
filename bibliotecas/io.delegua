@@ -1,0 +1,25 @@
+classe IO {
+    estatico escrever(valor: texto): inteiro {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sistemaEscrever(valor, falso)
+    }
+
+    estatico escreverLinha(valor: texto = ""): inteiro {
+        retorna IO.escrever(valor + "\n")
+    }
+
+    estatico erro(valor: texto): inteiro {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sistemaEscrever(valor, verdadeiro)
+    }
+
+    estatico erroLinha(valor: texto): inteiro {
+        retorna IO.erro(valor + "\n")
+    }
+
+    // Nulo é EOF; texto vazio é uma linha vazia, não uma falha.
+    estatico lerLinha(limite: inteiro = 1048576): qualquer {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sistemaLerLinha(limite)
+    }
+}

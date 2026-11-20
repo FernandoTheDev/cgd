@@ -1,4 +1,6 @@
 //# 1
+//? fase: compilacao
+//? erro: E3002
 funcao teste(n: inteiro): inteiro {
     retorne n
 }

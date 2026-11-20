@@ -1,4 +1,4 @@
-//# 0
+//! resultado: 0\np1: 0.3\np2: 0.4\nerro: 1\nresultado: 0\np1: 0.4\np2: 0.5\nerro: 1\nresultado: 1\np1: 0.5\np2: 0.6\nerro: 0
 
 var pesos: qualquer[] = [0.3, 0.4]
 var entrada: qualquer[] = [1, 1]

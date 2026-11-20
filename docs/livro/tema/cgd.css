@@ -1,0 +1,128 @@
+:root,
+.coal,
+.navy,
+.ayu,
+.light,
+.rust {
+  --bg: #050507;
+  --fg: #f1f2f7;
+  --sidebar-bg: #08080f;
+  --sidebar-fg: #b9bdd4;
+  --sidebar-non-existant: #646884;
+  --sidebar-active: #a78bfa;
+  --sidebar-spacer: #1c1b30;
+  --scrollbar: #2e2954;
+  --icons: #8b8fa8;
+  --icons-hover: #c4b5fd;
+  --links: #a78bfa;
+  --inline-code-color: #d8ccff;
+  --theme-popup-bg: #0c0c16;
+  --theme-popup-border: #2c2552;
+  --theme-hover: #17152b;
+  --quote-bg: #0d0b1a;
+  --quote-border: #5500fe;
+  --table-border-color: #211f38;
+  --table-header-bg: #110f24;
+  --table-alternate-bg: #0a0a13;
+  --searchbar-bg: #0e0e19;
+  --searchbar-fg: #f3f4f8;
+  --searchbar-shadow-color: rgba(85, 0, 254, 0.28);
+  --searchbar-border-color: #362c66;
+  --searchresults-header-fg: #a78bfa;
+  --searchresults-border-color: #252242;
+  --searchresults-li-bg: #121024;
+  --search-mark-bg: #5500fe;
+}
+
+body {
+  background-color: #050507;
+  color: #f1f2f7;
+}
+
+.content {
+  max-width: 880px;
+  line-height: 1.78;
+}
+
+.content a:hover {
+  color: #7dd3fc;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  color: #ffffff;
+}
+
+.content h1 {
+  border-bottom: 1px solid #211f38;
+  padding-bottom: 0.4rem;
+}
+
+.content blockquote {
+  border-left: 4px solid #5500fe;
+  border-radius: 0 8px 8px 0;
+  padding: 0.7rem 1rem;
+}
+
+.content pre {
+  background: #080811;
+  border: 1px solid #262244;
+  border-radius: 10px;
+}
+
+.content pre code {
+  line-height: 1.65;
+  background: transparent;
+}
+
+.content code {
+  background: rgba(139, 92, 246, 0.14);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+
+.content pre > code {
+  padding: 1rem;
+  background: transparent;
+}
+
+.hljs {
+  background: #080811;
+  color: #e8e9f2;
+}
+
+.hljs-keyword,
+.hljs-selector-tag {
+  color: #c084fc;
+  font-weight: 600;
+}
+
+.hljs-type,
+.hljs-built_in {
+  color: #7dd3fc;
+}
+
+.hljs-meta {
+  color: #a78bfa;
+}
+
+.hljs-string {
+  color: #fde68a;
+}
+
+.hljs-number,
+.hljs-literal {
+  color: #f9a8d4;
+}
+
+.hljs-comment {
+  color: #7f849e;
+  font-style: italic;
+}
+
+#menu-bar {
+  background-color: rgba(5, 5, 7, 0.92);
+  border-bottom: 1px solid #1e1d33;
+}

@@ -4,9 +4,7 @@ interface Medida {
 }
 
 classe abstrata Base {
-    abstrato
-
-    valor(): inteiro;
+    abstrato valor(): inteiro;
 }
 
 classe Concreta herda Base implementa Medida {
@@ -20,7 +18,7 @@ enum Estado {
 }
 
 var objeto: Medida = Concreta()
-var duplicar: funcao =(valor: inteiro): inteiro => valor * 2
+var duplicar: funcao = (valor: inteiro): inteiro => valor * 2
 escreva(objeto.valor())
 escreva(Estado.Final)
 escreva(duplicar(3))

@@ -2,11 +2,13 @@ module frontend.semantic.static_safety;
 
 import frontend;
 import frontend.semantic.constants;
+import frontend.semantic.members;
+import frontend.semantic.native_methods;
 import std.bigint : BigInt;
 import std.conv : to;
 import std.math : isFinite;
 import std.string : toStringz;
-import std.algorithm : any;
+import std.algorithm : any, canFind, levenshteinDistance;
 
 /// Provas locais, sem interpretar funções nem inferir conteúdos de objetos mutáveis.
 /// Falhas em código protegido por pegue são avisos: podem ser intencionais.
@@ -16,12 +18,99 @@ class StaticSafety
     private bool[Node] seen;
     private Node[Node] constants;
     private bool[Node] evaluating;
+    private bool[VarDecl] mutatedVars;
+    private ClassDecl[][ClassDecl] subclasses;
+    private bool programInfoCollected;
     private size_t protectedDepth;
     private FnDecl functionNode;
 
     this(Diagnostics diagnostics)
     {
         this.diagnostics = diagnostics;
+    }
+
+    private void collectProgramInfo(Node root)
+    {
+        bool[Node] visited;
+        void scan(Node node)
+        {
+            if (node is null || node in visited)
+                return;
+            visited[node] = true;
+            if (ClassDecl cls = cast(ClassDecl) node)
+            {
+                if (cls.superClass !is null)
+                    subclasses[cls.superClass] ~= cls;
+                foreach (ClassDecl iface; cls.interfaces)
+                    subclasses[iface] ~= cls;
+                foreach (ClassDecl mx; cls.mixins)
+                    subclasses[mx] ~= cls;
+            }
+            if (AssignStmt assign = cast(AssignStmt) node)
+            {
+                if (Identifier id = cast(Identifier) assign.left)
+                    if (id.variableRef !is null)
+                        mutatedVars[id.variableRef] = true;
+            }
+            if (UnaryExpr unary = cast(UnaryExpr) node)
+            {
+                if (unary.op == TokenKind.PPlus || unary.op == TokenKind.MMinus)
+                    if (Identifier id = cast(Identifier) unary.value)
+                        if (id.variableRef !is null)
+                            mutatedVars[id.variableRef] = true;
+            }
+            foreach (Node child; childNodes(node))
+                scan(child);
+        }
+
+        scan(root);
+        programInfoCollected = true;
+    }
+
+    private bool isExactInstance(Node node, ClassDecl decl, size_t depth = 0)
+    {
+        if (node is null || decl is null || depth > 16)
+            return false;
+        if (CallExpr call = cast(CallExpr) node)
+        {
+            if (Identifier fnId = cast(Identifier) call.fn)
+            {
+                if (fnId.classRef is decl)
+                    return true;
+                if (fnId.variableRef !is null && fnId.variableRef.isConst)
+                    if (MemberExpr initMember = cast(MemberExpr) fnId.variableRef.value)
+                        if (Identifier initRight = cast(Identifier) initMember.right)
+                            if (initRight.classRef is decl)
+                                return true;
+            }
+            if (MemberExpr m = cast(MemberExpr) call.fn)
+                if (Identifier r = cast(Identifier) m.right)
+                    if (r.classRef is decl)
+                        return true;
+        }
+        if (Identifier id = cast(Identifier) node)
+            if (id.variableRef !is null && (id.variableRef.isConst
+                    || (!id.variableRef.uninitialized && (id.variableRef !in mutatedVars))))
+                return isExactInstance(id.variableRef.value, decl, depth + 1);
+        return false;
+    }
+
+    private string closestName(string target, string[] candidates)
+    {
+        string best;
+        size_t bestDist = 3;
+        foreach (string cand; candidates)
+        {
+            if (cand == target || cand.length == 0 || cand[0] == '#')
+                continue;
+            size_t dist = levenshteinDistance(target, cand);
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                best = cand;
+            }
+        }
+        return best;
     }
 
     private void issue(Args...)(Node node, MessageSpec message, Args args)
@@ -63,7 +152,8 @@ class StaticSafety
                 break;
             case NodeKind.Identifier:
                 VarDecl declaration = (cast(Identifier) node).variableRef;
-                if (declaration !is null && declaration.isConst)
+                if (declaration !is null && (declaration.isConst || (!declaration.uninitialized
+                        && (declaration !in mutatedVars))))
                     value = constant(declaration.value);
                 break;
             case NodeKind.BinaryExpr:
@@ -273,12 +363,221 @@ class StaticSafety
             issue(binary, integerOverflow);
     }
 
+    private void checkMember(MemberExpr member)
+    {
+        Identifier right = cast(Identifier) member.right;
+        if (right is null || right.value == "#incompleto")
+            return;
+        string memberName = right.value.to!string;
+        static immutable string[] commonMethods = [
+            "tipo", "paraTexto", "eInstanciaDe", "éInstânciaDe", "respondeA"
+        ];
+        if (Node knownLeft = constant(member.left))
+            if (knownLeft.kind == NodeKind.NullLit && !commonMethods.canFind(memberName))
+            {
+                issue(member, nullOperation, "acesso a '" ~ memberName ~ "'");
+                return;
+            }
+        // Módulo importado
+        ModuleUnit importedModule;
+        if (ImportExpr directImport = cast(ImportExpr) member.left)
+            importedModule = directImport.target;
+        else if (Identifier leftId = cast(Identifier) member.left)
+            if (leftId.variableRef !is null)
+                if (ImportExpr varImport = cast(ImportExpr) leftId.variableRef.value)
+                    importedModule = varImport.target;
+        if (importedModule !is null && importedModule.program !is null)
+        {
+            string[] exports;
+            foreach (Node exported; importedModule.program.body)
+            {
+                if (ClassDecl cls = cast(ClassDecl) exported)
+                {
+                    if (cls.name == right.value)
+                        return;
+                    exports ~= cls.name.to!string;
+                }
+                else if (FnDecl fn = cast(FnDecl) exported)
+                {
+                    if (fn.fn == right.value)
+                        return;
+                    exports ~= fn.fn.to!string;
+                }
+                else if (VarDecl varDecl = cast(VarDecl) exported)
+                {
+                    if (varDecl.name == right.value)
+                        return;
+                    exports ~= varDecl.name.to!string;
+                }
+            }
+            if (commonMethods.canFind(memberName))
+                return;
+            issue(right, unknownMember, memberName, "módulo");
+            string hint = closestName(memberName, exports);
+            if (hint.length)
+                diagnostics.hintCode(right.pos, suggestion, hint);
+            return;
+        }
+        // Classe gerenciada conhecida
+        ClassDecl decl;
+        bool isClassReceiver = false;
+        if (TypeSemaClass clsType = cast(TypeSemaClass) member.left.type_sema)
+            decl = clsType.declaration;
+        if (Identifier recv = cast(Identifier) member.left)
+        {
+            if (recv.classRef !is null)
+            {
+                decl = recv.classRef;
+                isClassReceiver = true;
+            }
+            else if (recv.lexicalClass !is null)
+                decl = recv.lexicalClass;
+            else if (recv.variableRef !is null && recv.variableRef.isConst)
+                if (MemberExpr initMember = cast(MemberExpr) recv.variableRef.value)
+                    if (Identifier initRight = cast(Identifier) initMember.right)
+                        if (initRight.classRef !is null)
+                        {
+                            decl = initRight.classRef;
+                            isClassReceiver = true;
+                        }
+        }
+        else if (MemberExpr leftMember = cast(MemberExpr) member.left)
+            if (Identifier leftRight = cast(Identifier) leftMember.right)
+                if (leftRight.classRef !is null)
+                {
+                    decl = leftRight.classRef;
+                    isClassReceiver = true;
+                }
+        if (decl !is null && !decl.signature.builtinName.length)
+        {
+            ClassMember found = resolveClassMember(decl, right.value);
+            if (found.owner !is null || commonMethods.canFind(memberName))
+                return;
+            bool allowPolymorphic = !isClassReceiver && !isExactInstance(member.left, decl);
+            bool[ClassDecl] seenSub;
+            bool foundInSubclass(ClassDecl cur)
+            {
+                ClassDecl[]* direct = cur in subclasses;
+                if (direct is null)
+                    return false;
+                foreach (ClassDecl sub; *direct)
+                {
+                    if (sub is null || sub in seenSub)
+                        continue;
+                    seenSub[sub] = true;
+                    if (resolveClassMember(sub, right.value).owner !is null)
+                        return true;
+                    if (foundInSubclass(sub))
+                        return true;
+                }
+                return false;
+            }
+
+            if (allowPolymorphic && foundInSubclass(decl))
+                return;
+            string[] candidates = commonMethods.dup;
+            bool[ClassDecl] visitedCls;
+            void gather(ClassDecl cur)
+            {
+                if (cur is null || cur in visitedCls)
+                    return;
+                visitedCls[cur] = true;
+                foreach (FnDecl m; cur.methods)
+                    if (m.fn != "construtor" && m.fn != "destrutor")
+                        candidates ~= m.fn.to!string;
+                foreach (ClassField f; cur.fields)
+                    candidates ~= f.name.to!string;
+                foreach (ClassDecl mx; cur.mixins)
+                    gather(mx);
+                gather(cur.superClass);
+            }
+
+            gather(decl);
+            if (allowPolymorphic)
+                foreach (ClassDecl sub; seenSub.byKey())
+                    gather(sub);
+            issue(right, unknownMember, memberName, decl.name.to!string);
+            string hint = closestName(memberName, candidates);
+            if (hint.length)
+                diagnostics.hintCode(right.pos, suggestion, hint);
+            return;
+        }
+        // Tipo primitivo, vetor, tupla, Promessa ou Tarefa conhecido
+        TypeSema recvType = member.left.type_sema;
+        if (recvType is null || recvType.isAny() || cast(TypeSemaClass) recvType)
+            return;
+        if (TypeSemaBuiltin builtin = cast(TypeSemaBuiltin) recvType)
+            if (builtin.base == TypeSemaBase.Map || builtin.base == TypeSemaBase.Any
+                    || builtin.base == TypeSemaBase.Function || builtin.base == TypeSemaBase.Void)
+                return;
+        string[] allowed = builtinMethods(recvType);
+        if (TypeSemaBuiltin builtin = cast(TypeSemaBuiltin) recvType)
+            if (builtin.base == TypeSemaBase.Tuple)
+                allowed ~= [
+                "primeiro", "segundo", "terceiro", "quarto", "quinto", "sexto", "setimo",
+                "sétimo", "oitavo", "nono", "decimo", "décimo"
+        ];
+        if (!allowed.canFind(memberName))
+        {
+            issue(right, unknownMember, memberName, recvType.toStr().to!string);
+            string hint = closestName(memberName, allowed);
+            if (hint.length)
+                diagnostics.hintCode(right.pos, suggestion, hint);
+        }
+    }
+
+    private TypeExpr arrayElementTypeExpr(Node arrayNode, Position pos)
+    {
+        if (arrayNode is null)
+            return null;
+        if (TypeExprArray arrExpr = cast(TypeExprArray) arrayNode.type_expr)
+            return arrExpr.base;
+        if (Identifier id = cast(Identifier) arrayNode)
+        {
+            if (id.variableRef !is null)
+                if (TypeExprArray varArr = cast(TypeExprArray) id.variableRef.type_expr)
+                    return varArr.base;
+            if (id.parameterRef !is null)
+                if (TypeExprArray paramArr = cast(TypeExprArray) id.parameterRef.type_expr)
+                    return paramArr.base;
+        }
+        if (TypeSemaArray arrSema = cast(TypeSemaArray) arrayNode.type_sema)
+            if (TypeSemaBuiltin elemBuiltin = cast(TypeSemaBuiltin) arrSema.base)
+                if (elemBuiltin.base != TypeSemaBase.Any)
+                    return new TypeExprNamed(elemBuiltin.base, pos);
+        return null;
+    }
+
     private void checkCall(CallExpr call)
     {
-        Identifier identifier = cast(Identifier) call.fn;
-        if (identifier is null || identifier.functionRef is null)
+        if (Node knownFn = constant(call.fn))
+        {
+            if (knownFn.kind == NodeKind.NullLit)
+            {
+                issue(call, nullOperation, "chamada de função");
+                return;
+            }
+            issue(call, notCallable, valueType(knownFn));
             return;
-        FnDecl fn = identifier.functionRef;
+        }
+        FnDecl fn;
+        if (Identifier identifier = cast(Identifier) call.fn)
+            fn = identifier.functionRef;
+        else if (MemberExpr member = cast(MemberExpr) call.fn)
+        {
+            if (Identifier right = cast(Identifier) member.right)
+            {
+                fn = right.functionRef;
+                // Verificar contrato de elemento ao chamar vetorTipado.adicionar(x) / empilhar(x)
+                if ((right.value == "adicionar" || right.value == "empilhar") && call.args.length == 1)
+                {
+                    if (TypeExpr elemType = arrayElementTypeExpr(member.left, call.pos))
+                        contract(call.args[0], elemType, call);
+                }
+            }
+        }
+        if (fn is null)
+            return;
         if (!call.args.any!((Node arg) => cast(SpreadExpr) arg !is null))
         {
             foreach (size_t i, Node arg; call.args)
@@ -319,6 +618,8 @@ class StaticSafety
     {
         if (node is null || node in seen)
             return;
+        if (!programInfoCollected)
+            collectProgramInfo(node);
         seen[node] = true;
         if (FnDecl fn = cast(FnDecl) node)
         {
@@ -453,8 +754,21 @@ class StaticSafety
                 foreach (Node value; values.elements)
                     contract(value, comprehension.bindingType, comprehension);
         if (AssignStmt assignment = cast(AssignStmt) node)
+        {
             if (assignment.op == TokenKind.Equals)
                 contract(assignment.value, assignment.left.type_expr, node);
+            if (IndexExpr idxAssign = cast(IndexExpr) assignment.left)
+            {
+                if (TypeSemaBuiltin targetType = cast(TypeSemaBuiltin) idxAssign.value.type_sema)
+                    if (targetType.base == TypeSemaBase.String || targetType.base == TypeSemaBase.Tuple)
+                        issue(node, immutableMutation, targetType.toStr().to!string);
+                if (assignment.op == TokenKind.Equals)
+                    if (TypeExpr elemType = arrayElementTypeExpr(idxAssign.value, node.pos))
+                        contract(assignment.value, elemType, node);
+            }
+        }
+        if (MemberExpr member = cast(MemberExpr) node)
+            checkMember(member);
         if (ReturnStmt ret = cast(ReturnStmt) node)
             if (functionNode !is null && !ret.collectionReturn)
                 contract(ret.val, functionNode.type_expr, node);
@@ -471,6 +785,9 @@ class StaticSafety
                     issue(node, invalidSlice);
         if (IndexExpr index = cast(IndexExpr) node)
         {
+            if (Node knownVal = constant(index.value))
+                if (knownVal.kind == NodeKind.NullLit)
+                    issue(node, nullOperation, "indexação");
             IntLit idx = cast(IntLit) constant(index.idx);
             long length = -1;
             if (ArrayLit literal = cast(ArrayLit) index.value)

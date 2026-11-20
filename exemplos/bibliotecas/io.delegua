@@ -1,0 +1,8 @@
+//! Olá, Ana!\nEOF
+//? entrada: Ana\n
+var io: qualquer = importar("cgd:io").IO
+var nome: qualquer = io.lerLinha()
+io.escreverLinha("Olá, ${nome}!")
+se io.lerLinha() == nulo {
+    io.escreverLinha("EOF")
+}

@@ -1,0 +1,173 @@
+classe Tempo {
+    estatico dormirAsync(milisegundos: inteiro): Promessa<vazio> {
+        retorna importar("cgd:assincrono").OperacoesAssincronas.dormir(milisegundos)
+    }
+
+    estatico monotonico(): real {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sistemaRelogio(verdadeiro)
+    }
+
+    estatico unix(): real {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sistemaRelogio(falso)
+    }
+
+    estatico dormir(milisegundos: inteiro): vazio {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        nativo.sistemaDormir(milisegundos)
+    }
+}
+
+classe Cronometro {
+    privado {
+        _inicio: real
+    }
+
+    construtor() {
+        isto.reiniciar()
+    }
+
+    reiniciar(): vazio {
+        isto._inicio = Tempo.monotonico()
+    }
+
+    segundos(): real {
+        retorna Tempo.monotonico() - isto._inicio
+    }
+
+    milisegundos(): real {
+        retorna isto.segundos() * 1000
+    }
+}
+
+classe Duracao {
+    privado {
+        _ms: real
+    }
+
+    construtor(milisegundos: real) {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        se !nativo.numeroFinito(milisegundos) ou milisegundos < 0 {
+            falhar "Duração exige milissegundos finitos e não negativos"
+        }
+        isto._ms = milisegundos
+    }
+
+    emMilisegundos(): real {
+        retorna isto._ms
+    }
+
+    emSegundos(): real {
+        retorna isto._ms / 1000.0
+    }
+
+    somar(outra: Duracao): Duracao {
+        retorna Duracao(isto._ms + outra.emMilisegundos())
+    }
+
+    dormirAsync(): Promessa<vazio> {
+        retorna Tempo.dormirAsync(inteiro(isto._ms))
+    }
+
+    dormir(): vazio {
+        Tempo.dormir(inteiro(isto._ms))
+    }
+}
+
+funcao doisDigitos(valor: inteiro): texto {
+    var s: texto = texto(valor)
+    se valor >= 0 e valor < 10 {
+        retorna "0" + s
+    }
+
+    retorna s
+}
+
+funcao quatroDigitos(valor: inteiro): texto {
+    var s: texto = texto(valor)
+    enquanto tamanho(s) < 4 {
+        s = "0" + s
+    }
+
+    retorna s
+}
+
+classe DataHora {
+    privado {
+        _dados: dicionario
+    }
+
+    construtor(dados: dicionario) {
+        isto._dados = dados
+    }
+
+    estatico agora(utc: logico = verdadeiro): DataHora {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        var seg: inteiro = inteiro(nativo.sistemaRelogio(falso))
+        retorna DataHora(nativo.sistemaDataHora(seg, utc))
+    }
+
+    estatico deUnix(segundos: inteiro, utc: logico = verdadeiro): DataHora {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna DataHora(nativo.sistemaDataHora(segundos, utc))
+    }
+
+    estatico deUTC(ano: inteiro, mes: inteiro, dia: inteiro, hora: inteiro = 0, minuto: inteiro = 0,
+        segundo: inteiro = 0): DataHora {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        var ts: inteiro = nativo.sistemaTimestamp(ano, mes, dia, hora, minuto, segundo)
+        retorna DataHora(nativo.sistemaDataHora(ts, verdadeiro))
+    }
+
+    ano(): inteiro {
+        retorna isto._dados["ano"]
+    }
+
+    mes(): inteiro {
+        retorna isto._dados["mes"]
+    }
+
+    dia(): inteiro {
+        retorna isto._dados["dia"]
+    }
+
+    hora(): inteiro {
+        retorna isto._dados["hora"]
+    }
+
+    minuto(): inteiro {
+        retorna isto._dados["minuto"]
+    }
+
+    segundo(): inteiro {
+        retorna isto._dados["segundo"]
+    }
+
+    diaSemana(): inteiro {
+        retorna isto._dados["diaSemana"]
+    }
+
+    diaAno(): inteiro {
+        retorna isto._dados["diaAno"]
+    }
+
+    unix(): inteiro {
+        retorna isto._dados["unix"]
+    }
+
+    utc(): logico {
+        retorna isto._dados["utc"]
+    }
+
+    adicionarSegundos(delta: inteiro): DataHora {
+        retorna DataHora.deUnix(isto.unix() + delta, isto.utc())
+    }
+
+    formatarISO(): texto {
+        var sufixo: texto = isto.utc() ? "Z" : ""
+        retorna quatroDigitos(isto.ano()) + "-" + doisDigitos(isto.mes()) + "-"
+        +doisDigitos(isto.dia()) + "T" + doisDigitos(isto.hora()) + ":"
+        +doisDigitos(isto.minuto()) + ":" + doisDigitos(isto.segundo()) + sufixo
+    }
+}

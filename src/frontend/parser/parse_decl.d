@@ -164,6 +164,16 @@ public:
         node.isForeign = isForeign;
         if (isInterface && parent.length)
             p.err.error(name.pos, "Herança de interfaces ainda não é suportada.");
+        if (p.match(TokenKind.Mixins))
+        {
+            if (isInterface || isForeign)
+                p.err.error(name.pos, "Composição mescla exige uma classe gerenciada.");
+            do
+            {
+                node.mixinNames ~= p.consume(TokenKind.Identifier, "Esperado nome da classe em mescla.").value.s;
+            }
+            while (p.match(TokenKind.Comma));
+        }
         if (p.match(TokenKind.Implements))
         {
             do
@@ -203,13 +213,17 @@ public:
             Decorator[] decorators = p.parseDecorators();
             bool abstractMethod = p.match(TokenKind.Abstract) || node.isInterface;
             bool isStatic = p.match(TokenKind.Static);
+            bool isAsync = p.match(TokenKind.Async);
             Token name = p.consumeName("Esperado propriedade ou método.");
             if (p.match(TokenKind.Colon))
             {
                 TypeExpr type = p.parseType.parse();
-                if (isStatic)
+                if (isStatic && (node.isInterface || node.isForeign))
                     p.err.errorCode(name.pos, unsupportedStaticField);
+                if (isAsync)
+                    p.err.errorCode(name.pos, asyncContext);
                 ClassField field = ClassField(name.value.s, type, access, name.pos);
+                field.isStatic = isStatic;
                 if (p.match(TokenKind.Equals))
                 {
                     field.value = p.parseExpr.parse();
@@ -266,6 +280,7 @@ public:
                 }
                 FnDecl method = cast(FnDecl) parseFnDecl(name, abstractMethod || node.isForeign);
                 method.isAbstract = abstractMethod;
+                method.isAsync = isAsync;
                 if (abstractMethod && (!node.isAbstract || access == 1 || isStatic
                         || name.value.s == "construtor" || name.value.s == "destrutor"))
                     p.err.error(name.pos, "Método abstrato exige classe abstrata/interface e não pode ser estático ou de ciclo de vida.");
@@ -340,6 +355,11 @@ public:
                 return parseClass(true);
             case TokenKind.Enum:
                 return parseEnum();
+            case TokenKind.Async:
+                p.consume(TokenKind.Fn, "Esperado função após assincrona.");
+                FnDecl asynchronous = cast(FnDecl) parseFnDecl();
+                asynchronous.isAsync = true;
+                return asynchronous;
             case TokenKind.Fn:
                 bool envelope = p.match(TokenKind.Of);
                 if (envelope)

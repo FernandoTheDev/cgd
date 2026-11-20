@@ -1,0 +1,497 @@
+<!DOCTYPE HTML>
+<html lang="pt-BR" class="coal sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Stdlib sistema - O livro do CGD</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="tema/cgd.css">
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "coal";
+            const default_dark_theme = "coal";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('coal')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">O livro do CGD</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/FernandoTheDev/cgd" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="programas-que-conversam-com-o-sistema"><a class="header" href="#programas-que-conversam-com-o-sistema">Programas que conversam com o sistema</a></h1>
+<p>Você já pode receber argumentos, chamar outro programa, ler stdin, escrever em
+stderr e medir quanto uma tarefa levou. Estas bibliotecas usam a mesma sintaxe das
+demais: importe um módulo <code>cgd:</code> e use suas classes.</p>
+<p>A implementação desta etapa é para <strong>Linux x86_64 com glibc &gt;= 2.34</strong>. Ela usa
+<code>posix_spawn</code>, grupos de processos, <code>poll</code>, <code>waitid</code> e <code>waitpid</code>. Não foi validada em
+Windows, macOS ou musl. Os exemplos também usam <code>/bin/printf</code> e os testes usam
+Python 3. Não há dependência nova de execução para além da libc do sistema.</p>
+<h2 id="processo-argumentos-reais"><a class="header" href="#processo-argumentos-reais">Processo: argumentos reais</a></h2>
+<pre><code class="language-delegua">var P: qualquer = importar("cgd:processo").Processo
+escreva(P.argc())
+escreva(P.argv())
+escreva(P.argumentos())
+</code></pre>
+<div class="table-wrapper"><table><thead><tr><th>Método estático</th><th>Retorno e significado</th></tr></thead><tbody>
+<tr><td><code>argv(): texto[]</code></td><td>Cópia nova do argv original, incluindo argv[0]. Preserva ordem, espaços, argumento vazio e Unicode.</td></tr>
+<tr><td><code>argc(): inteiro</code></td><td>Quantidade de itens de argv, incluindo argv[0].</td></tr>
+<tr><td><code>argumentos(): texto[]</code></td><td>Cópia dos argumentos da aplicação, sem argv[0].</td></tr>
+<tr><td><code>quantidadeArgumentos(): inteiro</code></td><td>Quantidade de argumentos da aplicação.</td></tr>
+<tr><td><code>executavel(): texto</code></td><td>argv[0] como foi recebido: pode ser relativo ou só um nome. Não promete caminho canônico.</td></tr>
+<tr><td><code>identificador(): inteiro</code></td><td>PID do processo atual.</td></tr>
+</tbody></table>
+</div>
+<p>Esses dados vêm de <code>program_context</code>, preenchido pelo <code>main</code> do runtime. Não há
+uma variável Delégua global que o programa possa alterar para falsificar argv.
+Mudar o vetor devolvido não altera as chamadas seguintes. O contexto C pode ser
+vazio em consumidores que não usem o ponto de entrada padrão; nesse caso argv é
+vazio, argc é zero e executavel devolve texto vazio.</p>
+<h2 id="executar-outro-programa"><a class="header" href="#executar-outro-programa">Executar outro programa</a></h2>
+<pre><code class="language-delegua">var P: qualquer = importar("cgd:processo").Processo
+var resultado: qualquer = P.executar("git", ["--version"])
+resultado.exigirSucesso()
+escreva(resultado.saidaPadrao())
+</code></pre>
+<p>A assinatura completa é:</p>
+<pre><code class="language-delegua">Processo.executar(
+    programa: texto,
+    argumentos: texto[] = [],
+    diretorio: texto = "",
+    ambiente: dicionario = {},
+    timeout: inteiro = 30000,
+    limite: inteiro = 16777216,
+    entrada: texto = ""
+): ResultadoProcesso
+</code></pre>
+<p>Cada item de <code>argumentos</code> vira <strong>um argumento</strong>, sem separar por espaços, expandir
+<code>*</code>, substituir <code>$HOME</code> ou interpretar <code>;</code>. O programa é executado diretamente.
+Arquivos sem formato executável e sem shebang falham; não há fallback para shell.
+Isso evita interpretação de comandos, mas não torna os argumentos seguros para
+qualquer programa: o programa chamado ainda interpreta suas próprias opções.</p>
+<p><code>diretorio</code> vazio herda o diretório atual. Outro caminho muda apenas o filho.
+O ambiente é herdado, com sobrescritas do dicionário: valores precisam ser texto;
+<code>nulo</code> remove a variável no filho. O pai não é alterado. O <code>PATH</code> utilizado na
+procura de <code>programa</code> é o do <strong>pai</strong>, conforme <code>posix_spawnp</code>. Para escolher um
+executável sem depender dessa procura, passe seu caminho absoluto.</p>
+<p><code>timeout</code> é em milissegundos, de 1 a 86400000. Ele inclui inicialização e espera
+por EOF dos pipes, mesmo quando o filho terminou mas algum descendente manteve
+uma saída aberta. <code>limite</code> é a soma dos bytes capturados de stdout e stderr,
+de 1 a 67108864. Quando ultrapassado, o resultado contém o prefixo capturado até
+o limite. As duas saídas não têm uma ordem global preservada entre si.</p>
+<p><code>entrada</code> é enviada ao stdin do filho e fechada ao terminar; o limite é 64 MiB.
+Se o filho fechar stdin antes, o pai continua e coleta o resultado. Sem entrada,
+o filho recebe EOF, em vez de ler acidentalmente o terminal do chamador.</p>
+<h3 id="resultadoprocesso"><a class="header" href="#resultadoprocesso">ResultadoProcesso</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Método de instância</th><th>Contrato</th></tr></thead><tbody>
+<tr><td><code>codigoSaida(): qualquer</code></td><td>Inteiro quando terminou normalmente; nulo quando terminou por sinal. Zero não é presumido para falhas.</td></tr>
+<tr><td><code>sinal(): qualquer</code></td><td>Número do sinal ou nulo se terminou normalmente.</td></tr>
+<tr><td><code>saidaPadrao(): texto</code></td><td>Bytes capturados de stdout, preservando NUL.</td></tr>
+<tr><td><code>saidaErro(): texto</code></td><td>Bytes capturados de stderr, preservando NUL.</td></tr>
+<tr><td><code>expirou(): logico</code></td><td>O prazo foi atingido.</td></tr>
+<tr><td><code>excedeuLimite(): logico</code></td><td>A captura ultrapassou o limite configurado.</td></tr>
+<tr><td><code>sucesso(): logico</code></td><td>Código zero, sem timeout nem excesso de saída.</td></tr>
+<tr><td><code>exigirSucesso(): ResultadoProcesso</code></td><td>Devolve o mesmo resultado ou lança com código, sinal, flags e stderr.</td></tr>
+</tbody></table>
+</div>
+<p>As saídas usam o tipo texto existente, que armazena bytes e tamanho. Não há
+conversão de encoding nem validação automática de UTF-8. Operações Unicode sobre
+saídas binárias, ou sobre um prefixo cortado no meio de um caractere, não devem
+ser usadas como se os dados fossem texto UTF-8 válido. Um buffer binário próprio
+é uma etapa posterior, não um vetor de números apresentado como equivalente.</p>
+<p>Falhas ao iniciar, caminhos inválidos, permissões e erros de sistema lançam
+exceção com errno e mensagem nativa. Código de saída diferente de zero é um
+resultado; use exigirSucesso se quiser tratá-lo como exceção. Argumentos, nomes
+de ambiente e caminhos com NUL são rejeitados antes da aquisição de recursos.</p>
+<p>O runtime drena stdout e stderr e envia stdin com <code>poll</code>, sem esperar uma saída
+terminar para ler a outra. Em timeout/limite ele envia SIGKILL ao grupo criado,
+fecha os descritores e recolhe o filho direto. O PID fica reservado até a coleta,
+para não sinalizar um grupo de PID reutilizado. Descritores além de 0/1/2 não são
+herdados pelo filho. Não é um sandbox: descendentes podem escapar do grupo, e o
+runtime não promete controlar ou recolher processos que não sejam seus filhos.
+A memória de captura também ocupa espaço: o limite de saída não é um limite de
+memória total da aplicação.</p>
+<h3 id="configuração-reutilizável"><a class="header" href="#configuração-reutilizável">Configuração reutilizável</a></h3>
+<pre><code class="language-delegua">var Comando: qualquer = importar("cgd:processo").Comando
+var comando: qualquer = Comando("git", ["status", "--short"])
+    .diretorio("/caminho/do/projeto")
+    .timeout(5000)
+    .limite(1048576)
+var resultado: qualquer = comando.executar()
+</code></pre>
+<p><code>Comando(programa: texto, argumentos: texto[] = [])</code> copia os argumentos. Seus
+métodos <code>argumento(texto)</code>, <code>diretorio(texto)</code>, <code>ambiente(texto, qualquer)</code>,
+<code>timeout(inteiro)</code>, <code>limite(inteiro)</code> e <code>entrada(texto)</code> devolvem o próprio comando.
+<code>executar(): ResultadoProcesso</code> inicia um novo filho a cada chamada. Não há handle
+persistente nem necessidade de destrutor para essa configuração.</p>
+<h3 id="shell-explícito"><a class="header" href="#shell-explícito">Shell explícito</a></h3>
+<p><code>Processo.executarShell(comando: texto, diretorio: texto = "", ambiente: dicionario = {}, timeout: inteiro = 30000, limite: inteiro = 16777216, entrada: texto = "")</code>
+devolve ResultadoProcesso e chama <code>/bin/sh -c</code>. <strong>Não concatene dados não
+confiáveis nessa string.</strong> Prefira executar com argumentos separados. Esta API
+existe para quando a interpretação de shell é justamente o que você deseja.</p>
+<p><code>iniciar</code>, espera assíncrona e streams persistentes não são oferecidos nesta etapa.
+Eles precisam de um dono para o handle, políticas de cancelamento e coleta,
+limpeza em exceções e um mecanismo real de acompanhamento. Uma chamada síncrona
+com outro nome não substitui esse trabalho.</p>
+<h2 id="ambiente"><a class="header" href="#ambiente">Ambiente</a></h2>
+<p><code>importar("cgd:ambiente").Ambiente</code> oferece métodos estáticos:</p>
+<div class="table-wrapper"><table><thead><tr><th>Assinatura</th><th>O que faz</th></tr></thead><tbody>
+<tr><td><code>obter(nome: texto, alternativa: qualquer = nulo): qualquer</code></td><td>Texto ou alternativa se ausente. Valor vazio é preservado.</td></tr>
+<tr><td><code>contem(nome: texto): logico</code></td><td>Distingue ausência de texto vazio.</td></tr>
+<tr><td><code>variaveis(): dicionario</code></td><td>Snapshot do ambiente atual. Mudar o mapa não altera o ambiente.</td></tr>
+<tr><td><code>definir(nome: texto, valor: texto): vazio</code></td><td>Altera explicitamente o ambiente do processo atual.</td></tr>
+<tr><td><code>remover(nome: texto): vazio</code></td><td>Remove a variável atual; ausência não é erro.</td></tr>
+<tr><td><code>diretorioAtual(): texto</code></td><td>Consulta getcwd; lança em falha, inclusive diretório removido.</td></tr>
+<tr><td><code>diretorioTemporario(): texto</code></td><td>TMPDIR não vazio ou /tmp. Não cria nem verifica a pasta.</td></tr>
+<tr><td><code>diretorioUsuario(): qualquer</code></td><td>HOME ou nulo. Não garante que o caminho exista.</td></tr>
+</tbody></table>
+</div>
+<p>Nome vazio, <code>=</code> e NUL são recusados; valores com NUL também. As alterações valem
+para futuros filhos, não para processos já iniciados. Ambiente não é armazenamento
+confidencial; não coloque sua enumeração em logs. Esta etapa não oferece um
+contrato de sincronização com threads nativas externas alterando environ.</p>
+<h2 id="sistema"><a class="header" href="#sistema">Sistema</a></h2>
+<p><code>importar("cgd:sistema").Sistema</code> consulta <code>uname</code> e o PID, sem executar comandos.
+<code>nome(): texto</code>, <code>arquitetura(): texto</code>, <code>versao(): texto</code> e <code>informacoes(): dicionario</code> devolvem dados reais. O mapa tem nome, arquitetura, versao e pid.
+<code>separadorCaminho(): texto</code> é <code>/</code>; <code>separadorBusca(): texto</code> é <code>:</code> nesta implementação.
+<code>capacidades(): dicionario</code> informa processos, shell, ambiente e relógio monotônico
+presentes; processos persistentes estão ausentes. A plataforma validada é
+informada separadamente da arquitetura detectada. Falha de uname lança exceção.</p>
+<h2 id="tempo-e-durações"><a class="header" href="#tempo-e-durações">Tempo e durações</a></h2>
+<p><code>importar("cgd:tempo")</code> fornece Tempo, Duracao e Cronometro:</p>
+<ul>
+<li><code>Tempo.monotonico(): real</code>: segundos de CLOCK_MONOTONIC, para medir intervalos.
+A origem não é uma data nem um valor para persistir entre reinicializações.</li>
+<li><code>Tempo.unix(): real</code>: segundos de CLOCK_REALTIME desde a época Unix. O relógio
+civil pode ser ajustado; não o use para medir o timeout de uma operação.</li>
+<li><code>Tempo.dormir(milisegundos: inteiro): vazio</code>: 0..86400000 ms; retoma a espera
+restante após EINTR. O agendador pode fazer a espera durar mais.</li>
+<li><code>Duracao(milisegundos: real)</code>: exige valor finito e não negativo.
+<code>emMilisegundos(): real</code>, <code>emSegundos(): real</code>, <code>somar(outra: Duracao): Duracao</code>
+e <code>dormir(): vazio</code>. A espera trunca a parte fracionária de milissegundos e
+respeita os mesmos limites de Tempo.dormir.</li>
+<li><code>Cronometro()</code>: inicia uma medição. <code>reiniciar(): vazio</code>, <code>segundos(): real</code> e
+<code>milisegundos(): real</code> consultam o tempo decorrido.</li>
+</ul>
+<p>Não há promises de precisão de nanossegundos, calendário, fusos horários ou
+formatação de datas. Falhas dos relógios e durações inválidas lançam exceção.</p>
+<h2 id="io-de-console"><a class="header" href="#io-de-console">IO de console</a></h2>
+<p><code>importar("cgd:io").IO</code> opera sobre os streams padrão já abertos:</p>
+<div class="table-wrapper"><table><thead><tr><th>Assinatura</th><th>Contrato</th></tr></thead><tbody>
+<tr><td><code>escrever(valor: texto): inteiro</code></td><td>Escreve sem quebra em stdout e faz flush; retorna bytes escritos.</td></tr>
+<tr><td><code>escreverLinha(valor: texto = ""): inteiro</code></td><td>Acrescenta LF.</td></tr>
+<tr><td><code>erro(valor: texto): inteiro</code></td><td>Escreve em stderr e faz flush.</td></tr>
+<tr><td><code>erroLinha(valor: texto): inteiro</code></td><td>Acrescenta LF em stderr.</td></tr>
+<tr><td><code>lerLinha(limite: inteiro = 1048576): qualquer</code></td><td>Texto sem LF/CRLF, inclusive texto vazio; nulo em EOF sem dados. Limite em bytes de 1 a 64 MiB.</td></tr>
+</tbody></table>
+</div>
+<p>Leitura é bloqueante. Falha não retorna EOF falso: lança exceção. Excesso de linha
+lança depois de consumir parte da entrada; não é uma operação com rollback.
+Escrita pode ter sido parcial antes de falhar. O tipo texto preserva NUL, mas não
+substitui uma API de buffer binário. IO não fecha stdin/stdout/stderr; eles
+pertencem ao processo. Sinais como SIGPIPE continuam sujeitos às regras Unix.
+Não há streams de arquivos com handles expostos nesta etapa.</p>
+<h2 id="algoritmos-numéricos"><a class="header" href="#algoritmos-numéricos">Algoritmos numéricos</a></h2>
+<p><code>importar("cgd:algoritmos").Algoritmos</code> complementa Colecoes e as operações nativas.
+Todos os métodos são estáticos e recebem <code>numero[]</code>:</p>
+<ul>
+<li><code>limiteInferior(valores, alvo: numero): inteiro</code>: primeira posição com valor
+maior ou igual ao alvo; tamanho do vetor se não existir.</li>
+<li><code>limiteSuperior(valores, alvo: numero): inteiro</code>: primeira posição estritamente maior.</li>
+<li><code>buscaBinaria(valores, alvo: numero): inteiro</code>: primeira ocorrência ou -1.</li>
+<li><code>estaOrdenado(valores): logico</code>: verifica ordem crescente, permitindo repetições.</li>
+<li><code>ordenado(valores): numero[]</code>: cópia ordenada, sem alterar o original.</li>
+<li><code>intercalar(a: numero[], b: numero[]): numero[]</code>: intercala dois vetores já
+ordenados, mantendo repetições e preferindo a esquerda nos empates.</li>
+</ul>
+<p>Busca e limites são O(log n) e <strong>exigem entrada ordenada com valores comparáveis,
+sem NaN</strong>. Não verificam essa precondição percorrendo o vetor inteiro. Intercalar
+é O(n+m). Para reduzir, particionar, agrupar ou combinar, use Colecoes: não foram
+criadas cópias dessas APIs neste módulo. Comparadores personalizados e iteradores
+lazy ficam para uma etapa que consiga preservar seus contratos.</p>
+<h2 id="cli"><a class="header" href="#cli">CLI</a></h2>
+<pre><code class="language-delegua">var CLI: qualquer = importar("cgd:cli").CLI
+var parser: qualquer = CLI("Conversor")
+    .opcao("ajuda", "h", falso, "Mostra esta ajuda")
+    .opcao("saida", "s", verdadeiro, "Arquivo de destino")
+var argumentos: qualquer = parser.atual()
+se argumentos.tem("ajuda") { escreva(parser.ajuda()) }
+</code></pre>
+<p><code>CLI(descricao: texto = "")</code> cria um parser. <code>opcao(nome: texto, curto: texto = "", exigeValor: logico = falso, descricao: texto = ""): CLI</code> registra a opção.
+Nomes/aliases duplicados e nomes inválidos lançam. <code>analisar(argumentos: texto[]): ResultadoCLI</code> permite entradas explícitas; <code>atual(): ResultadoCLI</code> usa
+<strong>Processo.argumentos()</strong>, sem outro acesso nativo ao argv. <code>ajuda(): texto</code> segue
+a ordem de registro; imprimir ajuda é decisão da aplicação.</p>
+<p>Aceita <code>--nome=valor</code>, <code>--nome valor</code>, <code>-n valor</code>, flags <code>--ajuda</code>/<code>-h</code>, posicionais
+e <code>--</code> para encerrar as opções. Um valor pode ser vazio ou começar com <code>-</code>.
+Opções desconhecidas, repetidas ou sem valor, assim como valor em flag booleana,
+lançam. Flags curtas agrupadas, subcomandos e conversão automática de números não
+fazem parte desta API. Não há abreviações implícitas ou execução de argumentos.</p>
+<p>ResultadoCLI oferece <code>tem(nome: texto): logico</code>, <code>valor(nome: texto, alternativa: qualquer = nulo): qualquer</code> e <code>posicionais(): texto[]</code>. Flags presentes devolvem
+verdadeiro; opções com valor devolvem texto. Ausência devolve a alternativa.
+Posicionais são copiados ao consultar.</p>
+<h2 id="log"><a class="header" href="#log">Log</a></h2>
+<p><code>importar("cgd:log").Logger</code> é uma instância reutilizável. Seu construtor é
+<code>Logger(nome: texto = "", minimo: inteiro = 1, usarErro: logico = verdadeiro, timestamp: logico = verdadeiro)</code>.</p>
+<p>Os níveis são <code>Logger.Nivel.Depuracao</code> (0), Informacao (1), Aviso (2) e Erro (3).
+<code>registrar(nivel: inteiro, mensagem: texto): vazio</code> filtra pelo mínimo; <code>depurar</code>,
+<code>info</code>, <code>aviso</code> e <code>erro</code> recebem texto e devolvem vazio. O destino padrão é stderr;
+<code>usarErro = falso</code> escolhe stdout. O timestamp é Unix em segundos; pode ser
+desligado para saídas reproduzíveis. Nível fora de 0..3 e falhas de IO lançam.</p>
+<p>O formato é <code>[NIVEL] nome: mensagem</code>, precedido pelo timestamp quando ativado.
+Não há arquivos de log, rotação, formatação de calendário ou sincronização entre
+threads. Quebras de linha e controles da mensagem são preservados: trate dados
+não confiáveis antes de registrar algo que possa imitar outra linha de log.</p>
+<h2 id="ctfe-arquitetura-e-próximos-passos"><a class="header" href="#ctfe-arquitetura-e-próximos-passos">CTFE, arquitetura e próximos passos</a></h2>
+<p>Estas bibliotecas não liberam OS na VM. Processos, ambiente, IO, relógios e logs
+são dependentes do sistema e/ou têm efeitos; ficam fora de CTFE. Algoritmos e
+parsing de CLI são determinísticos para a mesma entrada, mas usam classes,
+coleções e métodos que não são aprovados pelo subconjunto CTFE atual. Duracao
+representa valores, mas também é uma classe e não recebe promessa de CTFE.</p>
+<p>A camada Delégua compõe a API e os resultados. As primitivas ficam em
+<code>sistema_posix.c</code>, <code>processo_posix.c</code> e <code>io_posix.c</code>; o compilador apenas acrescenta
+os nomes dos módulos à resolução estática. Não há palavras-chave novas, lexer
+especial para bibliotecas ou relaxamento de pureza/capturas. Os módulos antigos
+e seus entry points C foram preservados.</p>
+<p>Esta entrega conclui o núcleo síncrono P0 e acrescenta Algoritmos, CLI e Log.
+A expansão completa de diretórios/atomicidade/permissões, buffer de bytes,
+codificações, regex, hashes e iteradores incrementais continua pendente. Regex
+precisa de um mecanismo consolidado e dependência escolhida; criptografia não
+será inventada aqui. URI já tem primitivas em Rede/libcurl e deve ser construída
+sobre elas, sem outro parser concorrente. Processos persistentes precisam de
+ownership/cancelamento próprios. Compressão, concorrência, datas e configuração
+serão avaliadas após esses fundamentos; não há módulos vazios com esses nomes.</p>
+<h3 id="critérios-para-as-próximas-fases"><a class="header" href="#critérios-para-as-próximas-fases">Critérios para as próximas fases</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Área</th><th>Dependência ou decisão antes de implementar</th><th>Aceitação mínima</th></tr></thead><tbody>
+<tr><td>Arquivos e diretórios</td><td>Definir seguir/não seguir symlinks, sobrescrita, atomicidade e descritores de diretório. Reutilizar Arquivo.</td><td>Testar falhas de permissão, links, troca concorrente de caminhos, interrupção e limpeza de temporários.</td></tr>
+<tr><td>Bytes/codificação</td><td>Avaliar um buffer GC de bytes separado de texto, com índices em bytes e integração de tipos/ABI.</td><td>Round-trip de todos os 256 valores, NUL, limites, endian e rejeição de encoding inválido. Não chamar vetor de números de buffer eficiente.</td></tr>
+<tr><td>Regex</td><td>Escolher um motor consolidado; PCRE2 é um candidato, com limites de trabalho e regras UTF explícitas.</td><td>Capturas/substituição Unicode, sintaxe inválida, limites de complexidade e limpeza do handle. Sem compatibilidade anunciada antes de validar.</td></tr>
+<tr><td>Iteradores</td><td>Protocolos de parada, avaliação preguiçosa e efeitos; callbacks continuam sem captura.</td><td>Consumir parcialmente sem avaliar o restante, propagar falhas e fechar recursos no cancelamento.</td></tr>
+<tr><td>Hash/digests</td><td>Separar hashing de coleções de digest criptográfico. Para digest, usar biblioteca consolidada e comparar implementações.</td><td>Vetores oficiais, entrada binária completa e limites; nenhuma criptografia criada à mão.</td></tr>
+<tr><td>Compressão</td><td>Biblioteca consolidada e buffer de bytes, com limite de expansão.</td><td>Round-trip e rejeição de dados truncados, corrupção e expansão excessiva.</td></tr>
+<tr><td>Criptografia</td><td>Fonte de aleatoriedade do OS, biblioteca auditada e contrato de chaves.</td><td>Vetores oficiais e revisão de ownership/segredos; não compor protocolos próprios.</td></tr>
+<tr><td>Concorrência</td><td>Rever contexto do runtime, exceções, GC e dados compartilhados; hoje não há esse contrato.</td><td>Testes de corrida, cancelamento, propagação de erro e encerramento limpo.</td></tr>
+<tr><td>Sincronização</td><td>Depende do contrato de concorrência.</td><td>Ownership, deadlocks, reentrada e destruição com participantes ativos.</td></tr>
+<tr><td>Terminal</td><td>Detecção de TTY e capacidades, preservando IO como base.</td><td>Pipes sem escapes inesperados e restauração do terminal após falha.</td></tr>
+<tr><td>Configuração</td><td>Compor Arquivo/JSON/Ambiente; decidir precedência e formato.</td><td>Precedência reproduzível, chaves inválidas e mensagens com origem.</td></tr>
+<tr><td>Datas</td><td>Separar instante, calendário, timezone e duração; escolher fonte de fusos.</td><td>Transições de horário, datas inválidas e round-trip.</td></tr>
+<tr><td>Serialização</td><td>JSON já existe; outro formato precisa de uso concreto e schema/versionamento.</td><td>Ciclos, aliases, evolução de formato, limites e dados inválidos.</td></tr>
+</tbody></table>
+</div>
+<p>Timeout não é uma garantia de tempo real: o prazo é verificado pelo loop de
+acompanhamento, e a inicialização síncrona da libc ou um estado ininterruptível do
+kernel podem atrasar o retorno. A coleta do filho ainda é necessária para evitar
+zumbis. Estas bibliotecas não fornecem isolamento de segurança de subprocessos.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="evolucao-linguagem.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="servidor-http.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="evolucao-linguagem.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="servidor-http.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="tema/delegua.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

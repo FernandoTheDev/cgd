@@ -60,6 +60,8 @@ private:
             case NodeKind.SwitchStmt:
             case NodeKind.LoopExpr:
             case NodeKind.TypeOfExpr:
+            case NodeKind.AwaitExpr:
+            case NodeKind.RoutineExpr:
             case NodeKind.ModuleUnit:
             case NodeKind.ImportExpr:
             case NodeKind.TryStmt:
@@ -74,8 +76,7 @@ private:
             case NodeKind.DoStmt:
             case NodeKind.BreakStmt:
             case NodeKind.ContinueStmt:
-                err.error(node.pos,
-                        "Esse recurso ainda não é suportado na avaliação em tempo de compilação.");
+                err.error(node.pos, "Esse recurso ainda não é suportado na avaliação em tempo de compilação.");
                 return false;
             case NodeKind.Identifier:
                 Identifier identifier = cast(Identifier) node;

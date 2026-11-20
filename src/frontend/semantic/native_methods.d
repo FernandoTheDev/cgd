@@ -11,6 +11,8 @@ string[] builtinMethods(TypeSema receiver)
     if (receiver is null)
         return [];
     string[] names = ["tipo", "paraTexto", "eInstanciaDe", "éInstânciaDe", "respondeA"];
+    if (cast(TypeSemaPromise) receiver || cast(TypeSemaTask) receiver)
+        return names ~ ["entao", "capturar", "cancelar", "concluida", "cancelada"];
     if (receiver.isArray())
         return names ~ [
         "adicionar", "empilhar", "tamanho", "inclui", "contem", "contém", "fatiar", "mapear",
@@ -43,6 +45,22 @@ FnDecl builtinMethod(TypeSema receiver, string name)
 {
     if (receiver is null)
         return null;
+    if (cast(TypeSemaPromise) receiver || cast(TypeSemaTask) receiver)
+    {
+        if (name == "cancelar" || name == "concluida" || name == "cancelada")
+        {
+            FnDecl method = new FnDecl(name.to!dstring, [], new TypeExprNamed("logico", null), [], 0, null);
+            method.type_sema = new TypeSemaBuiltin(TypeSemaBase.Bool);
+            return method;
+        }
+        if (name != "entao" && name != "capturar")
+            return builtinMethod(new TypeSemaBuiltin(TypeSemaBase.Any), name);
+        FnArg callback = new FnArg("callback", new TypeExprNamed("funcao", null), null, null);
+        FnDecl method = new FnDecl(name.to!dstring, [callback],
+                new TypeExprPromise(new TypeExprNamed("qualquer", null), null), [], 0, null);
+        method.type_sema = new TypeSemaPromise(new TypeSemaBuiltin(TypeSemaBase.Any));
+        return method;
+    }
     string family = receiver.isArray() ? "vetor" : "objeto";
     if (TypeSemaBuiltin type = cast(TypeSemaBuiltin) receiver)
         family = type.base.to!string;

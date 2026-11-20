@@ -2,21 +2,23 @@
 """Protocolo LSP real por stdio: frontend persistente, UTF-16, overlays e cache."""
 
 import json
-import subprocess
-from pathlib import Path
-import tempfile
+import os
 import select
+import subprocess
+import tempfile
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class Client:
-    def __init__(self):
+    def __init__(self, env=None):
         self.process = subprocess.Popen(
             [str(ROOT / "cgd"), "--lsp"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=env,
             bufsize=0,
         )
         self.sequence = 0
@@ -455,7 +457,174 @@ with tempfile.TemporaryDirectory(prefix="cgd lsp ") as directory:
             {"textDocument": {"uri": uri}, "position": {"line": line, "character": column}},
         )["items"]
         assert {"A", "B"} == {item["label"] for item in items}, items
+    async_source = (
+        "assincrona funcao produzir(): inteiro { retorna 1 }\n"
+        "const futuro = produzir()\n"
+        "assincrona funcao consumir(): vazio { const valor = aguardar produzir(); escreva(valor) }\n"
+    )
+    client.send(
+        "textDocument/didChange",
+        {"textDocument": {"uri": uri, "version": 23}, "contentChanges": [{"text": async_source}]},
+    )
+    hover = client.request(
+        "textDocument/hover",
+        {"textDocument": {"uri": uri}, "position": {"line": 0, "character": 21}},
+    )
+    assert (
+        "assincrona" in hover["contents"]["value"]
+        and "Promessa<inteiro>" in hover["contents"]["value"]
+    ), hover
+    hints = client.request(
+        "textDocument/inlayHint",
+        {
+            "textDocument": {"uri": uri},
+            "range": {"start": {"line": 0, "character": 0}, "end": {"line": 3, "character": 0}},
+        },
+    )
+    assert any(hint["position"]["line"] == 1 and "Promessa<" in hint["label"] for hint in hints), (
+        hints
+    )
+    client.send(
+        "textDocument/didChange",
+        {
+            "textDocument": {"uri": uri, "version": 24},
+            "contentChanges": [{"text": async_source + "futuro."}],
+        },
+    )
+    items = client.request(
+        "textDocument/completion",
+        {"textDocument": {"uri": uri}, "position": {"line": 3, "character": 7}},
+    )["items"]
+    labels = {item["label"] for item in items}
+    assert {"entao", "capturar"} <= labels and "adicionar" not in labels, items
+    # Enhanced inference: rotina -> Tarefa<T>, uniform arrays, index, ternary, coalesce, mixins.
+    inferred_source = (
+        "funcao somar(a: inteiro, b: inteiro): inteiro { retorna a + b }\n"
+        "classe Mix { saudar(): texto { retorna 'oi' } }\n"
+        "classe Pessoa mescla Mix { nome: texto }\n"
+        "assincrona funcao rodar(): vazio {\n"
+        "    const t = rotina somar(1, 2)\n"
+        "    const r = aguardar t\n"
+        "    const lista = [1, 2, 3]\n"
+        "    const primeiro = lista[0]\n"
+        "    const p = Pessoa()\n"
+        "    escreva(r, primeiro, p.saudar())\n"
+        "}\n"
+    )
+    client.send(
+        "textDocument/didChange",
+        {
+            "textDocument": {"uri": uri, "version": 25},
+            "contentChanges": [{"text": inferred_source}],
+        },
+    )
+    hints = client.request(
+        "textDocument/inlayHint",
+        {
+            "textDocument": {"uri": uri},
+            "range": {"start": {"line": 0, "character": 0}, "end": {"line": 11, "character": 0}},
+        },
+    )
+    hint_map = {h["position"]["line"]: h["label"] for h in hints}
+    assert hint_map.get(4) in (": Tarefa<inteiro>", ": Tarefa<numero>"), hint_map
+    assert hint_map.get(5) in (": inteiro", ": numero"), hint_map
+    assert hint_map.get(6) in (": inteiro[]", ": numero[]"), hint_map
+    assert hint_map.get(7) in (": inteiro", ": numero"), hint_map
+    assert hint_map.get(8) == ": Pessoa", hint_map
+    hover_mix = client.request(
+        "textDocument/hover",
+        {"textDocument": {"uri": uri}, "position": {"line": 9, "character": 28}},
+    )
+    assert hover_mix and "saudar" in hover_mix["contents"]["value"], hover_mix
     client.send("textDocument/didClose", {"textDocument": {"uri": untitled}})
     client.send("textDocument/didClose", {"textDocument": {"uri": uri}})
     client.close()
+
+    # Dynamic cgd: discovery and completion directly from ~/.delegua/cgd (isolated via HOME).
+    custom_libs = Path(directory) / ".delegua" / "cgd"
+    (custom_libs / "sub").mkdir(parents=True, exist_ok=True)
+    extra_lib = custom_libs / "extra.delegua"
+    extra_lib.write_text('funcao saudacao(): texto { retorna "ola" }\n')
+    (custom_libs / "sub" / "util.delegua").write_text(
+        "funcao dobro(n: inteiro): inteiro { retorna n * 2 }\n"
+    )
+    iso_env = {**os.environ, "HOME": directory}
+    iso_env.pop("CGD_LIBS_DIR", None)
+    lib_client = Client(env=iso_env)
+    lib_client.request(
+        "initialize", {"processId": None, "rootUri": Path(directory).as_uri(), "capabilities": {}}
+    )
+    lib_doc = (Path(directory) / "usa_cgd.delegua").as_uri()
+    lib_client.send(
+        "textDocument/didOpen",
+        {
+            "textDocument": {
+                "uri": lib_doc,
+                "languageId": "cgd",
+                "version": 1,
+                "text": 'const M = importar("cgd:")\n',
+            }
+        },
+    )
+    cgd_items = lib_client.request(
+        "textDocument/completion",
+        {
+            "textDocument": {"uri": lib_doc},
+            "position": {"line": 0, "character": len('const M = importar("cgd:')},
+        },
+    )["items"]
+    cgd_labels = {item["label"]: item for item in cgd_items}
+    assert "cgd:extra" in cgd_labels and "cgd:sub/util" in cgd_labels, cgd_labels
+    assert cgd_labels["cgd:extra"]["kind"] == 9, cgd_labels["cgd:extra"]
+    assert cgd_labels["cgd:extra"]["textEdit"]["newText"] == "cgd:extra", cgd_labels["cgd:extra"]
+    assert cgd_labels["cgd:extra"]["textEdit"]["range"]["start"] == {
+        "line": 0,
+        "character": len('const M = importar("'),
+    }, cgd_labels["cgd:extra"]
+    # Prefix filter inside importar("cgd:ex")
+    lib_client.send(
+        "textDocument/didChange",
+        {
+            "textDocument": {"uri": lib_doc, "version": 2},
+            "contentChanges": [{"text": 'const M = importar("cgd:ex")\n'}],
+        },
+    )
+    filtered = lib_client.request(
+        "textDocument/completion",
+        {
+            "textDocument": {"uri": lib_doc},
+            "position": {"line": 0, "character": len('const M = importar("cgd:ex')},
+        },
+    )["items"]
+    assert [item["label"] for item in filtered] == ["cgd:extra"], filtered
+    # Dynamic import from ~/.delegua/cgd resolves members and definition directly to that file.
+    lib_client.send(
+        "textDocument/didChange",
+        {
+            "textDocument": {"uri": lib_doc, "version": 3},
+            "contentChanges": [{"text": 'const M = importar("cgd:extra")\nM.saudacao()\n'}],
+        },
+    )
+    defn = lib_client.request(
+        "textDocument/definition",
+        {"textDocument": {"uri": lib_doc}, "position": {"line": 1, "character": 3}},
+    )
+    assert defn["uri"] == extra_lib.resolve().as_uri(), defn
+    # Path traversal in cgd: is rejected with E2003.
+    lib_client.send(
+        "textDocument/didChange",
+        {
+            "textDocument": {"uri": lib_doc, "version": 4},
+            "contentChanges": [{"text": 'const M = importar("cgd:../extra")\n'}],
+        },
+    )
+    lib_client.request("cgd/status")
+    last_diag = [
+        ev["params"]
+        for ev in lib_client.events
+        if ev.get("method") == "textDocument/publishDiagnostics"
+    ][-1]
+    assert any(d["code"] == "E2003" for d in last_diag["diagnostics"]), last_diag
+    lib_client.send("textDocument/didClose", {"textDocument": {"uri": lib_doc}})
+    lib_client.close()
 print("LSP: stdio, hover, definição, referências, rename, tokens, cache e UTF-16 passaram.")

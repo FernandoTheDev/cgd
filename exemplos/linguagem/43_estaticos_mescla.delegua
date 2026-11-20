@@ -1,0 +1,36 @@
+//! 2\nEtiqueta:Ana\nverdadeiro\n30
+funcao de decorador triplicar(original: funcao): funcao {
+    retorna funcao(alvo: qualquer, x: inteiro): inteiro {
+        retorna x * 3
+    }
+}
+
+classe Etiquetavel {
+    prefixo: texto = "Etiqueta:"
+
+    rotulo(nome: texto): texto {
+        retorna isto.prefixo + nome
+    }
+}
+
+classe Registro mescla Etiquetavel {
+    estatico criados: inteiro = 0
+    nome: texto
+
+    construtor(nome: texto) {
+        isto.nome = nome
+        Registro.criados = Registro.criados + 1
+    }
+
+    @triplicar
+    escalar(x: inteiro): inteiro {
+        retorna x
+    }
+}
+
+const a: Registro = Registro("Ana")
+const b: Registro = Registro("Bia")
+escreva(Registro.criados)
+escreva(a.rotulo(a.nome))
+escreva(b.eInstanciaDe(Etiquetavel))
+escreva(a.escalar(10))

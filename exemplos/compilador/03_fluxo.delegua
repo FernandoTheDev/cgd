@@ -2,7 +2,7 @@
 // --verificar avisa sobre a cauda inalcançável; finalmente permanece em -o.
 funcao resultado(): qualquer {
     tente {
-        retorna(2 + 3) * 4
+        retorna (2 + 3) * 4
         escreva("inalcançável")
     } finalmente {
         escreva("limpeza")
