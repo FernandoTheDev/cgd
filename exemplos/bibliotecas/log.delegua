@@ -1,0 +1,6 @@
+//! [INFO] app: pronto
+var Logger: qualquer = importar("cgd:log").Logger
+// O último argumento desliga o timestamp para tornar o exemplo reproduzível.
+var logger: qualquer = Logger("app", 1, falso, falso)
+logger.depurar("não aparece abaixo do nível mínimo")
+logger.info("pronto")

@@ -1,0 +1,141 @@
+classe ResultadoProcesso {
+    privado {
+        _dados: dicionario
+    }
+
+    construtor(dados: dicionario) {
+        isto._dados = dados
+    }
+
+    codigoSaida(): qualquer {
+        retorna isto._dados["codigo"]
+    }
+
+    sinal(): qualquer {
+        retorna isto._dados["sinal"]
+    }
+
+    expirou(): logico {
+        retorna isto._dados["timeout"]
+    }
+
+    excedeuLimite(): logico {
+        retorna isto._dados["limite"]
+    }
+
+    saidaPadrao(): texto {
+        retorna isto._dados["stdout"]
+    }
+
+    saidaErro(): texto {
+        retorna isto._dados["stderr"]
+    }
+
+    sucesso(): logico {
+        retorna !isto.expirou() e !isto.excedeuLimite() e isto.codigoSaida() == 0
+    }
+
+    exigirSucesso(): ResultadoProcesso {
+        se !isto.sucesso() {
+            falhar "Processo falhou: codigo=${isto.codigoSaida()}, sinal=${isto.sinal()}, timeout=${isto.expirou()}, limite=${isto.excedeuLimite()}\n${isto.saidaErro()}"
+        }
+        retorna isto
+    }
+}
+
+classe Processo {
+    estatico argv(): texto[] {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sistemaArgumentos()
+    }
+
+    estatico argc(): inteiro {
+        retorna tamanho(Processo.argv())
+    }
+
+    // Argumentos da aplicação, sem argv[0]. Cada chamada devolve um novo vetor.
+    estatico argumentos(): texto[] {
+        retorna Processo.argv().fatiar(1)
+    }
+
+    estatico quantidadeArgumentos(): inteiro {
+        retorna tamanho(Processo.argumentos())
+    }
+
+    estatico executavel(): texto {
+        var valores: texto[] = Processo.argv()
+        retorna tamanho(valores) == 0 ? "": valores[0]
+    }
+
+    estatico identificador(): inteiro {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sistemaInfo()["pid"]
+    }
+
+    estatico executar(programa: texto, argumentos: texto[] = [], diretorio: texto = "", ambiente: dicionario = {},
+        timeout: inteiro = 30000, limite: inteiro = 16777216, entrada: texto = ""): ResultadoProcesso {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna ResultadoProcesso(nativo.sistemaExecutar(programa, argumentos, diretorio,
+            ambiente, timeout, limite, entrada))
+    }
+
+    // O comando é interpretado por /bin/sh. Não concatene dados não confiáveis.
+    estatico executarShell(comando: texto, diretorio: texto = "", ambiente: dicionario = {},
+        timeout: inteiro = 30000, limite: inteiro = 16777216, entrada: texto = ""): ResultadoProcesso {
+        retorna Processo.executar("/bin/sh", ["-c", comando], diretorio, ambiente, timeout,
+            limite, entrada)
+    }
+}
+
+// Comando é configuração reutilizável; executar inicia um novo filho a cada chamada.
+classe Comando {
+    privado {
+        _programa: texto
+        _argumentos: texto[]
+        _diretorio: texto = ""
+        _ambiente: dicionario
+        _timeout: inteiro = 30000
+        _limite: inteiro = 16777216
+        _entrada: texto = ""
+    }
+
+    construtor(programa: texto, argumentos: texto[] = []) {
+        isto._programa = programa
+        isto._argumentos = clonar(argumentos)
+    }
+
+    argumento(valor: texto): Comando {
+        isto._argumentos.adicionar(valor);
+        retorna isto
+    }
+
+    diretorio(caminho: texto): Comando {
+        isto._diretorio = caminho;
+        retorna isto
+    }
+
+    ambiente(nome: texto, valor: qualquer): Comando {
+        isto._ambiente[nome] = valor;
+        retorna isto
+    }
+
+    timeout(milisegundos: inteiro): Comando {
+        isto._timeout = milisegundos;
+        retorna isto
+    }
+
+    limite(bytes: inteiro): Comando {
+        isto._limite = bytes;
+        retorna isto
+    }
+
+    entrada(dados: texto): Comando {
+        isto._entrada = dados;
+        retorna isto
+    }
+
+    executar(): ResultadoProcesso {
+        retorna Processo.executar(isto._programa, isto._argumentos, isto._diretorio, isto._ambiente,
+            isto._timeout, isto._limite, isto._entrada)
+    }
+}

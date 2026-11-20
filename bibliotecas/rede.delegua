@@ -288,3 +288,18 @@ classe ClienteHTTP {
         retorna isto.requisitar(caminho, "DELETE")
     }
 }
+
+funcao requisitarAsync(url: texto, metodo: texto = "GET", corpo: texto = "", cabecalhos: texto[] = [],
+    timeout: inteiro = 30000, limite: inteiro = 16777216): Promessa < dicionario > {
+    retorna importar("cgd:assincrono").OperacoesAssincronas.http(url, metodo, corpo, cabecalhos,
+        timeout, limite)
+}
+
+funcao obterAsync(url: texto, timeout: inteiro = 30000, limite: inteiro = 16777216): Promessa < dicionario > {
+    retorna requisitarAsync(url, "GET", "", [], timeout, limite)
+}
+
+funcao enviarAsync(url: texto, corpo: texto, cabecalhos: texto[] = [], timeout: inteiro = 30000,
+    limite: inteiro = 16777216): Promessa < dicionario > {
+    retorna requisitarAsync(url, "POST", corpo, cabecalhos, timeout, limite)
+}

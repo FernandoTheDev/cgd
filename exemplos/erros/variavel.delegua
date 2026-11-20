@@ -1,4 +1,6 @@
 //# 1
+//? fase: compilacao
+//? erro: A variavel 'x' já existe.
 
 var x: inteiro = 10;
 var x: inteiro = 67;

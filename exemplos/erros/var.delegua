@@ -1,3 +1,5 @@
 //# 1
+//? fase: compilacao
+//? erro: E3002
 
 var nome: texto = 10

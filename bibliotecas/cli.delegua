@@ -1,0 +1,124 @@
+classe ResultadoCLI {
+    privado {
+        _opcoes: dicionario;
+        _posicionais: texto[]
+    }
+
+    construtor(opcoes: dicionario, posicionais: texto[]) {
+        isto._opcoes = opcoes
+        isto._posicionais = posicionais
+    }
+
+    tem(nome: texto): logico {
+        retorna isto._opcoes.contemChave(nome)
+    }
+
+    valor(nome: texto, alternativa: qualquer = nulo): qualquer {
+        retorna isto._opcoes.obter(nome, alternativa)
+    }
+
+    posicionais(): texto[] {
+        retorna clonar(isto._posicionais)
+    }
+}
+
+classe CLI {
+    privado {
+        _descricao: texto;
+        _opcoes: dicionario;
+        _curtos: dicionario;
+        _ordem: texto[]
+    }
+
+    construtor(descricao: texto = "") {
+        isto._descricao = descricao
+    }
+
+    opcao(nome: texto, curto: texto = "", exigeValor: logico = falso, descricao: texto = ""): CLI {
+        se nome == "" ou nome[0] == "-" ou nome.contem("=") ou nome.contem(" ") ou nome.contem("\n") {
+            falhar "CLI: nome de opção inválido"
+        }
+        se tamanho(curto) > 1 ou curto == "-" ou curto == "=" ou curto == " " {
+            falhar "CLI: alias curto inválido"
+        }
+        se isto._opcoes.contemChave(nome) ou(curto != "" e isto._curtos.contemChave(curto)) {
+            falhar "CLI: opção ou alias repetido"
+        }
+        isto._opcoes[nome] = { exigeValor: exigeValor, descricao: descricao, curto: curto }
+        se curto != "" {
+            isto._curtos[curto] = nome
+        }
+        isto._ordem.adicionar(nome)
+        retorna isto
+    }
+
+    atual(): ResultadoCLI {
+        var processo: qualquer = importar("cgd:processo").Processo
+        retorna isto.analisar(processo.argumentos())
+    }
+
+    analisar(argumentos: texto[]): ResultadoCLI {
+        var valores: dicionario = {}
+        var posicionais: texto[] = []
+        var somentePosicionais: logico = falso
+        para (var i: inteiro = 0; i < tamanho(argumentos); i++) {
+            var argumento: texto = argumentos[i]
+            se somentePosicionais ou argumento == "" ou argumento == "-" ou argumento[0] != "-" {
+                posicionais.adicionar(argumento)
+            } senao se argumento == "--" {
+                somentePosicionais = verdadeiro
+            }
+            senao {
+                var nome: texto = ""
+                var valor: texto = ""
+                var embutido: logico = falso
+                se tamanho(argumento) > 2 e argumento[1] == "-" {
+                    var partes: texto[] = argumento.fatiar(2).dividir("=")
+                    nome = partes[0]
+                    embutido = tamanho(partes) > 1
+                    se embutido {
+                        valor = partes.fatiar(1).juntar("=")
+                    }
+                } senao {
+                    se tamanho(argumento) != 2 {
+                        falhar "CLI: flags curtas agrupadas não são aceitas"
+                    }
+                    nome = isto._curtos.obter(argumento[1], "")
+                }
+                se !isto._opcoes.contemChave(nome) {
+                    falhar "CLI: opção desconhecida: ${argumento}"
+                }
+                se valores.contemChave(nome) {
+                    falhar "CLI: opção repetida: ${nome}"
+                }
+                se isto._opcoes[nome]["exigeValor"] {
+                    se !embutido {
+                        i++
+                        se i >= tamanho(argumentos) {
+                            falhar "CLI: falta valor para ${nome}"
+                        }
+                        valor = argumentos[i]
+                    }
+                    valores[nome] = valor
+                } senao {
+                    se embutido {
+                        falhar "CLI: flag não recebe valor: ${nome}"
+                    }
+                    valores[nome] = verdadeiro
+                }
+            }
+        }
+        retorna ResultadoCLI(valores, posicionais)
+    }
+
+    ajuda(): texto {
+        var linhas: texto[] = [isto._descricao]
+        para cada nome: texto em isto._ordem {
+            var item: dicionario = isto._opcoes[nome]
+            var prefixo: texto = item["curto"] == "" ? "": "-${item['curto']}, "
+            var valor: texto = item["exigeValor"] ? " <valor>": ""
+            linhas.adicionar("  ${prefixo}--${nome}${valor}  ${item['descricao']}")
+        }
+        retorna linhas.juntar("\n")
+    }
+}

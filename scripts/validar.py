@@ -82,6 +82,14 @@ for compiler in args.compilers:
         command(f"{compiler}/{build}/LSP", [sys.executable, "testes/lsp.py"])
         command(f"{compiler}/{build}/bibliotecas", [sys.executable, "testes/bibliotecas.py"])
         command(f"{compiler}/{build}/expansão", [sys.executable, "testes/expansao.py"])
+        command(f"{compiler}/{build}/sistema e processos", [sys.executable, "testes/processo.py"])
+        command(f"{compiler}/{build}/servidor HTTP", [sys.executable, "testes/servidor.py"])
+        command(f"{compiler}/{build}/sockets", [sys.executable, "testes/sockets.py"])
+        command(f"{compiler}/{build}/rotinas paralelas", [sys.executable, "testes/rotinas.py"])
+        command(f"{compiler}/{build}/linguagem nova", [sys.executable, "testes/linguagem_nova.py"])
+        command(
+            f"{compiler}/{build}/stdlib avançada", [sys.executable, "testes/stdlib_avancada.py"]
+        )
         command(f"{compiler}/{build}/enums", [sys.executable, "testes/enums.py"])
         command(f"{compiler}/{build}/stdlib", [sys.executable, "testes/stdlib.py"])
         command(
@@ -91,6 +99,11 @@ for compiler in args.compilers:
 
         for cc in args.c_compilers:
             environment = {**os.environ, "CC": cc}
+            command(
+                f"{compiler}/{build}/{cc}/assincronismo",
+                [sys.executable, "testes/async_linguagem.py"],
+                environment,
+            )
             command(
                 f"{compiler}/{build}/{cc}/integração",
                 [sys.executable, "testes/integracao.py"],

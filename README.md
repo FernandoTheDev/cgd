@@ -2,15 +2,16 @@
 
 # CGD — Compilador Geral Delégua
 
-Frontend em **D**, saída **C99**, executáveis nativos e runtime gerenciado em C.
-O CGD implementa um perfil compilado de
-[Delégua, da Design Líquido](https://github.com/DesignLiquido/delegua), mantendo
-sua referência à [wiki oficial](https://github.com/DesignLiquido/delegua/wiki).
-Este repositório é uma implementação própria, com limites documentados; não é o
-interpretador original nem oferece todos os seus ambientes e extensões.
+Escreva em Delégua e gere um programa nativo. O CGD analisa o seu código,
+traduz para C99 e deixa a compilação final com Clang ou GCC. O runtime cuida da
+memória, das coleções e das operações da biblioteca padrão.
+
+A linguagem vem de [Delégua, da Design Líquido](https://github.com/DesignLiquido/delegua).
+Este compilador segue um recorte próprio, descrito no livro: você encontra ali o
+que funciona, exemplos para experimentar e os limites que precisa conhecer.
 
 **[Website](https://fernandothedev.github.io/cgd/)** ·
-**[Guia da linguagem e compatibilidade](https://fernandothedev.github.io/cgd/linguagem.html)** ·
+**[Guia da linguagem e compatibilidade](https://fernandothedev.github.io/cgd/livro/)** ·
 [Exemplos executáveis](exemplos/README.md) ·
 [Desenvolvimento e passes](docs/desenvolvimento.md) ·
 [Contexto para agentes](AGENTS.md)
@@ -150,3 +151,37 @@ A [referência web própria](docs/linguagem.html) cobre instalação, linguagem,
 runtime e biblioteca padrão. [Bibliotecas e ferramentas](docs/ferramentas.md)
 detalha APIs e limites. Compatibilidade JS, herança de interfaces e múltiplos
 dialetos são exclusões definitivas do projeto.
+
+## Cuidar da documentação
+
+O [livro](https://fernandothedev.github.io/cgd/livro/) usa mdBook, como os livros
+do Rust, com um tema verde/escuro e destaque próprio para Delégua.
+
+```sh
+cargo install mdbook --version 0.4.52 --locked
+python3 scripts/gerar_referencia.py
+python3 scripts/gerar_livro.py
+```
+
+O conteúdo vem de `docs/linguagem.json`, dos guias Markdown e dos exemplos reais.
+Edite essas fontes; o comando gera `docs/livro` para o GitHub Pages de `dev/docs`.
+A página `linguagem.html` continua disponível para links antigos.
+
+## Argumentos, processos e ferramentas de terminal
+
+`cgd:processo` lê argc/argv reais e executa programas com argumentos separados,
+stdin, stdout/stderr, timeout e limites. `cgd:ambiente`, `cgd:sistema`, `cgd:tempo`
+e `cgd:io` completam a base de sistema. CLI, Logger e Algoritmos ajudam a montar
+aplicações por cima dela. Veja [APIs e exemplos](docs/stdlib-sistema.md), incluindo
+a diferença entre execução direta e shell e os limites Linux/glibc desta etapa.
+
+O CGD também pode receber HTTP diretamente no executável com `cgd:servidor` e
+abrir conexões TCP com `cgd:sockets`. Veja o [guia do servidor](docs/servidor-http.md)
+para rotas, middleware, limites e encerramento. Esta versão atende um cliente por
+vez, usa HTTP/1.1 com fechamento por requisição e não oferece TLS ou HTTP/2.
+
+O [assincronismo experimental](docs/assincronismo.md) já possui assincrona/aguardar,
+Promessa<T>, microtasks, cancelamento e tratamento de suspensão na mesma thread.
+`cgd:assincrono` acrescenta timers, HTTP e TCP por reactor Linux. As mudanças
+mais recentes aguardam testes; [rotinas paralelas](docs/rotinas.md) estão na fase
+de contrato e transferência interna de valores.

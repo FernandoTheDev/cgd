@@ -1,5 +1,5 @@
 //$
-//# 0
+//! Resultado principal: 2204.1\nResultado secundario: 1813.8\nTotal: 4017.9\nPrimo 97? verdadeiro\nPalindromo 909? verdadeiro
 
 //>puro
 funcao eh_par(n: qualquer): qualquer {

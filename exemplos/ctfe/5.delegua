@@ -1,5 +1,5 @@
 //$
-//# 0
+//! 100\n19\n160\n42\n14\n2423\n-31303\n5736025
 //>puro
 funcao dobro(x: qualquer): qualquer {
     retorne x * 2

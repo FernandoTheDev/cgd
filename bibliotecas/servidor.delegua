@@ -1,0 +1,441 @@
+// HTTP/1.1 sequencial: o runtime cuida do transporte e framing; aqui ficam as rotas.
+classe Requisicao {
+    metodo: texto
+    caminho: texto
+    alvo: texto
+    cabecalhos: dicionario
+    consulta: dicionario
+    parametros: dicionario
+    contexto: dicionario
+
+    privado {
+        _corpo: texto
+    }
+
+    construtor(dados: dicionario) {
+        isto.metodo = dados["metodo"]
+        isto.caminho = dados["caminho"]
+        isto.alvo = dados["alvo"]
+        isto.cabecalhos = dados["cabecalhos"]
+        isto.consulta = dados["consulta"]
+        isto._corpo = dados["corpo"]
+    }
+
+    texto(): texto {
+        retorna isto._corpo
+    }
+
+    json(): qualquer {
+        var json: qualquer = importar("cgd:json")
+        retorna json.analisar(isto._corpo)
+    }
+
+    parametro(nome: texto, alternativa: qualquer = nulo): qualquer {
+        retorna isto.parametros.obter(nome, alternativa)
+    }
+
+    query(nome: texto, alternativa: qualquer = nulo): qualquer {
+        var valores: qualquer = isto.consulta.obter(nome, nulo)
+        se valores == nulo {
+            retorna alternativa
+        }
+        retorna valores[0]
+    }
+}
+
+classe Resposta {
+    privado {
+        _status: inteiro = 200
+        _cabecalhos: dicionario = { "content-type": "text/plain; charset=utf-8" }
+        _corpo: texto
+        _definida: logico
+        _parar: logico
+    }
+
+    status(codigo: inteiro): Resposta {
+        se codigo < 200 ou codigo > 599 {
+            falhar "HTTP: status final deve ser 200..599"
+        }
+        isto._status = codigo
+        retorna isto
+    }
+
+    cabecalho(nome: texto, valor: texto): Resposta {
+        isto._cabecalhos[nome.minusculo()] = valor
+        retorna isto
+    }
+
+    enviar(corpo: texto = ""): Resposta {
+        isto._corpo = corpo
+        isto._definida = verdadeiro
+        retorna isto
+    }
+
+    json(valor: qualquer): Resposta {
+        var json: qualquer = importar("cgd:json")
+        isto.cabecalho("content-type", "application/json; charset=utf-8")
+        retorna isto.enviar(json.serializar(valor))
+    }
+
+    definida(): logico {
+        retorna isto._definida
+    }
+
+    pararServidor(): Resposta {
+        isto._parar = verdadeiro
+        retorna isto
+    }
+
+    deveParar(): logico {
+        retorna isto._parar
+    }
+
+    transmitir(conexao: qualquer, head: logico, timeout: inteiro): vazio {
+        conexao.responderHTTP(isto._status, isto._cabecalhos, isto._corpo, head, timeout)
+    }
+
+    formatar(head: logico, keepAlive: logico = falso): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.httpFormatarResposta(isto._status, isto._cabecalhos, isto._corpo,
+            head, keepAlive)
+    }
+}
+
+classe HTTP {
+    privado {
+        _rotas: dicionario[]
+        _middleware: funcao[]
+        _ouvinte: qualquer
+        _ativo: logico
+        _maxCabecalhos: inteiro
+        _maxCorpo: inteiro
+        _leitura: inteiro
+        _escrita: inteiro
+    }
+
+    construtor(maxCabecalhos: inteiro = 16384, maxCorpo: inteiro = 1048576, leitura: inteiro = 10000,
+        escrita: inteiro = 10000) {
+        se maxCabecalhos < 256 ou maxCabecalhos > 65536 ou maxCorpo < 0 ou maxCorpo > 16777216 ou leitura < 1 ou leitura > 86400000 ou escrita < 1 ou escrita > 86400000 {
+            falhar "HTTP: limites inválidos"
+        }
+        isto._maxCabecalhos = maxCabecalhos
+        isto._maxCorpo = maxCorpo
+        isto._leitura = leitura
+        isto._escrita = escrita
+    }
+
+    rota(metodo: texto, caminho: texto, tratar: funcao): HTTP {
+        se !(metodo em ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]) {
+            falhar "HTTP: método de rota não suportado"
+        }
+        se caminho == "" ou(caminho[0] != "/" e caminho != "*") ou caminho.contem("?") ou caminho.contem("#") {
+            falhar "HTTP: caminho de rota inválido"
+        }
+        var nomes: dicionario = {}
+        para cada segmento: texto em caminho.dividir("/") {
+            se segmento != "" e segmento[0] == ":" {
+                var nome: texto = segmento.fatiar(1)
+                se nome == "" ou nomes.contemChave(nome) {
+                    falhar "HTTP: parâmetro de rota vazio ou repetido"
+                }
+                nomes[nome] = verdadeiro
+            }
+        }
+        para cada rota: dicionario em isto._rotas {
+            se rota["metodo"] == metodo e rota["caminho"] == caminho {
+                falhar "HTTP: rota repetida"
+            }
+        }
+        isto._rotas.adicionar({ metodo: metodo, caminho: caminho, tratar: tratar })
+        retorna isto
+    }
+
+    get(caminho: texto, tratar: funcao): HTTP {
+        retorna isto.rota("GET", caminho, tratar)
+    }
+
+    post(caminho: texto, tratar: funcao): HTTP {
+        retorna isto.rota("POST", caminho, tratar)
+    }
+
+    put(caminho: texto, tratar: funcao): HTTP {
+        retorna isto.rota("PUT", caminho, tratar)
+    }
+
+    patch(caminho: texto, tratar: funcao): HTTP {
+        retorna isto.rota("PATCH", caminho, tratar)
+    }
+
+    delete(caminho: texto, tratar: funcao): HTTP {
+        retorna isto.rota("DELETE", caminho, tratar)
+    }
+
+    head(caminho: texto, tratar: funcao): HTTP {
+        retorna isto.rota("HEAD", caminho, tratar)
+    }
+
+    options(caminho: texto, tratar: funcao): HTTP {
+        retorna isto.rota("OPTIONS", caminho, tratar)
+    }
+
+    usar(tratar: funcao): HTTP {
+        isto._middleware.adicionar(tratar)
+        retorna isto
+    }
+
+    abrir(endereco: texto = "127.0.0.1", porta: inteiro = 8080): HTTP {
+        se isto._ativo {
+            falhar "HTTP: servidor já aberto"
+        }
+        var sockets: qualquer = importar("cgd:sockets")
+        isto._ouvinte = sockets.OuvinteTCP(endereco, porta)
+        isto._ativo = verdadeiro
+        retorna isto
+    }
+
+    ativo(): logico {
+        retorna isto._ativo
+    }
+
+    portaLocal(): inteiro {
+        se !isto._ativo {
+            falhar "HTTP: servidor fechado"
+        }
+        retorna isto._ouvinte.portaLocal()
+    }
+
+    // Comparação por segmentos; :nome captura um segmento, nunca caminhos de arquivo.
+    parametros(modelo: texto, caminho: texto): qualquer {
+        var esperado: texto[] = modelo.dividir("/")
+        var recebido: texto[] = caminho.dividir("/")
+        se tamanho(esperado) != tamanho(recebido) {
+            retorna nulo
+        }
+        var parametros: dicionario = {}
+        para (var i: inteiro = 0; i < tamanho(esperado); i++) {
+            var parte: texto = esperado[i]
+            se tamanho(parte) > 1 e parte[0] == ":" {
+                se recebido[i] == "" {
+                    retorna nulo
+                }
+                parametros[parte.fatiar(1)] = recebido[i]
+            } senao se parte != recebido[i] {
+                retorna nulo
+            }
+        }
+        retorna parametros
+    }
+
+    despachar(req: Requisicao, res: Resposta): vazio {
+        para cada tratar: funcao em isto._middleware {
+            tratar(req, res)
+            se res.definida() {
+                retorna
+            }
+        }
+        var caminhoExiste: logico = falso
+        var permitidos: texto[] = []
+        para cada rota: dicionario em isto._rotas {
+            var parametros: qualquer = isto.parametros(rota["caminho"], req.caminho)
+            se parametros != nulo {
+                caminhoExiste = verdadeiro
+                permitidos.adicionar(rota["metodo"])
+                se rota["metodo"] == req.metodo {
+                    req.parametros = parametros
+                    var tratar: funcao = rota["tratar"]
+                    tratar(req, res)
+                    se !res.definida() {
+                        res.status(204).enviar()
+                    }
+                    retorna
+                }
+            }
+        }
+        se caminhoExiste {
+            res.cabecalho("allow", permitidos.juntar(", ")).status(405).enviar("Método não permitido")
+        } senao {
+            res.status(404).enviar("Rota não encontrada")
+        }
+    }
+
+    atenderUma(timeout: inteiro = 1000): logico {
+        se !isto._ativo {
+            falhar "HTTP: servidor fechado"
+        }
+        var conexao: qualquer = isto._ouvinte.aceitar(timeout)
+        se conexao == nulo {
+            retorna falso
+        }
+        var parar: logico = falso
+        tente {
+            var dados: dicionario = conexao.lerHTTP(isto._maxCabecalhos, isto._maxCorpo,
+                isto._leitura)
+            var res: Resposta = Resposta()
+            var head: logico = dados.obter("metodo", "") == "HEAD"
+            se dados["erro"] != 0 {
+                res.status(dados["erro"]).enviar("Requisição HTTP inválida")
+            } senao {
+                tente {
+                    isto.despachar(Requisicao(dados), res)
+                } pegue (erro) {
+                    res = Resposta()
+                    res.status(500).enviar("Erro interno do servidor")
+                }
+            }
+            parar = res.deveParar()
+            tente {
+                res.transmitir(conexao, head, isto._escrita)
+            } pegue (erro) {
+                // Se a validação falhou antes do envio, ainda podemos responder 500.
+                tente {
+                    var falha: Resposta = Resposta()
+                    falha.status(500).enviar("Erro interno do servidor").transmitir(conexao,
+                        head, isto._escrita)
+                } pegue (desconectado) {
+                    // O transporte já fechou a conexão; finally continua obrigatório.
+                }
+            }
+        } finalmente {
+            conexao.fechar()
+            se parar {
+                isto.fechar()
+            }
+        }
+        retorna verdadeiro
+    }
+
+    escutar(endereco: texto = "127.0.0.1", porta: inteiro = 8080): vazio {
+        isto.abrir(endereco, porta)
+        tente {
+            enquanto isto._ativo {
+                isto.atenderUma()
+            }
+        } finalmente {
+            isto.fechar()
+        }
+    }
+
+    // Atendimento assíncrono concorrente sobre epoll com suporte a HTTP/1.1 keep-alive.
+    assincrona atenderConexaoAsync(conexao: qualquer, maxRequisicoes: inteiro = 100): vazio {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        var buffer: texto = ""
+        var atendidas: inteiro = 0
+        var parar: logico = falso
+        tente {
+            enquanto atendidas < maxRequisicoes e isto._ativo {
+                var dados: dicionario = nativo.httpAnalisarTexto(buffer, isto._maxCabecalhos,
+                    isto._maxCorpo)
+                var erroParse: inteiro = dados.obter("erro", 0)
+                var incompleto: logico = dados.obter("incompleto", falso)
+                enquanto erroParse == 0 e incompleto {
+                    var pedaco: texto = ""
+                    tente {
+                        pedaco = aguardar conexao.receberAsync(65536, isto._leitura)
+                    } pegue (falhaLeitura: Excecao) {
+                        retorna
+                    }
+                    se tamanho(pedaco) == 0 {
+                        retorna
+                    }
+                    buffer = buffer + pedaco
+                    dados = nativo.httpAnalisarTexto(buffer, isto._maxCabecalhos, isto._maxCorpo)
+                    erroParse = dados.obter("erro", 0)
+                    incompleto = dados.obter("incompleto", falso)
+                }
+                var res: Resposta = Resposta()
+                var head: logico = dados.obter("metodo", "") == "HEAD"
+                var manterConexao: logico = falso
+                se erroParse != 0 {
+                    res.status(erroParse).enviar("Requisição HTTP inválida")
+                } senao {
+                    var consumido: inteiro = dados.obter("consumido", 0)
+                    var bytesResto: qualquer = importar("cgd:bytes").Bytes.deTexto(buffer)
+                    buffer = bytesResto.fatiar(consumido, bytesResto.tamanho()).paraTexto()
+                    var cabecalhos: dicionario = dados["cabecalhos"]
+                    var connHeader: texto = texto(cabecalhos.obter("connection", "")).minusculo()
+                    manterConexao = connHeader != "close" e(atendidas + 1) < maxRequisicoes
+                    tente {
+                        isto.despachar(Requisicao(dados), res)
+                    } pegue (erroRota: Excecao) {
+                        res = Resposta()
+                        res.status(500).enviar("Erro interno do servidor")
+                        manterConexao = falso
+                    }
+                }
+                parar = res.deveParar()
+                se parar {
+                    manterConexao = falso
+                }
+                var pacote: texto = ""
+                tente {
+                    pacote = res.formatar(head, manterConexao)
+                } pegue (erroResp: Excecao) {
+                    var falha: Resposta = Resposta()
+                    pacote = falha.status(500).enviar("Erro interno do servidor").formatar(head,
+                        falso)
+                    manterConexao = falso
+                }
+                tente {
+                    aguardar conexao.enviarAsync(pacote, isto._escrita)
+                } pegue (erroEnvio: Excecao) {
+                    retorna
+                }
+                atendidas = atendidas + 1
+                se !manterConexao ou erroParse != 0 {
+                    sustar
+                }
+            }
+        } finalmente {
+            conexao.fechar()
+            se parar {
+                isto.fechar()
+            }
+        }
+    }
+
+    assincrona escutarAsync(endereco: texto = "127.0.0.1", porta: inteiro = 8080, maxRequisicoesPorConexao: inteiro = 100): vazio {
+        isto.abrir(endereco, porta)
+        var tarefas: qualquer[] = []
+        tente {
+            enquanto isto._ativo {
+                tente {
+                    var conexao: qualquer = aguardar isto._ouvinte.aceitarAsync(1000)
+                    var tarefa: Promessa < vazio > = isto.atenderConexaoAsync(conexao, maxRequisicoesPorConexao)
+                    tarefas.adicionar(tarefa)
+                    se tamanho(tarefas) > 64 {
+                        var ativas: qualquer[] = []
+                        para cada pendente: qualquer em tarefas {
+                            se !pendente.concluida() {
+                                ativas.adicionar(pendente)
+                            }
+                        }
+                        tarefas = ativas
+                    }
+                } pegue (erroAceite: Excecao) {
+                    se !isto._ativo {
+                        sustar
+                    }
+                }
+            }
+            para cada tarefa: qualquer em tarefas {
+                tente {
+                    aguardar tarefa
+                } pegue (ignorado: Excecao) {
+                }
+            }
+        } finalmente {
+            isto.fechar()
+        }
+    }
+
+    fechar(): vazio {
+        se isto._ativo {
+            isto._ativo = falso
+            isto._ouvinte.fechar()
+        }
+    }
+
+    destrutor(): vazio {
+        isto.fechar()
+    }
+}

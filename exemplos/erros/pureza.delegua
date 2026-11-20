@@ -1,5 +1,7 @@
 //$
 //# 1
+//? fase: compilacao
+//? erro: A função 'escreva' não é marcada pura.
 //>puro
 funcao teste(mensagem: texto): qualquer {
     escreva(mensagem)

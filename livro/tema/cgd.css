@@ -1,0 +1,50 @@
+.navy {
+  --bg: #101b17;
+  --fg: #dce8df;
+  --sidebar-bg: #0b1410;
+  --sidebar-fg: #b8cbbd;
+  --sidebar-active: #78dc9c;
+  --links: #78dc9c;
+  --inline-code-color: #a0e7b7;
+  --quote-bg: #192a21;
+  --table-border-color: #30483a;
+  --table-header-bg: #20392b;
+  --table-alternate-bg: #14251b;
+  --searchbar-bg: #15251c;
+  --searchbar-fg: #dce8df;
+  --searchbar-border-color: #385744;
+}
+.content {
+  max-width: 860px;
+  line-height: 1.75;
+}
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+}
+.content pre {
+  border: 1px solid #385744;
+  border-radius: 8px;
+}
+.content pre code {
+  line-height: 1.65;
+}
+.hljs-keyword,
+.hljs-selector-tag {
+  color: #82dfa0;
+}
+.hljs-type,
+.hljs-built_in {
+  color: #91cfff;
+}
+.hljs-meta {
+  color: #dfb6ff;
+}
+.hljs-string {
+  color: #e6cf93;
+}
+.hljs-comment {
+  color: #91a698;
+  font-style: italic;
+}

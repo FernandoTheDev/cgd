@@ -1,4 +1,4 @@
-//# 0
+//! 0\n1\n1\n2\n3\n5
 
 funcao fibonacci(n: qualquer): qualquer {
     se (n == 0) {

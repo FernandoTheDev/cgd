@@ -2,10 +2,10 @@
 """Protocolo LSP real por stdio: frontend persistente, UTF-16, overlays e cache."""
 
 import json
-import subprocess
-from pathlib import Path
-import tempfile
 import select
+import subprocess
+import tempfile
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -455,6 +455,46 @@ with tempfile.TemporaryDirectory(prefix="cgd lsp ") as directory:
             {"textDocument": {"uri": uri}, "position": {"line": line, "character": column}},
         )["items"]
         assert {"A", "B"} == {item["label"] for item in items}, items
+    async_source = (
+        "assincrona funcao produzir(): inteiro { retorna 1 }\n"
+        "const futuro = produzir()\n"
+        "assincrona funcao consumir(): vazio { const valor = aguardar produzir(); escreva(valor) }\n"
+    )
+    client.send(
+        "textDocument/didChange",
+        {"textDocument": {"uri": uri, "version": 23}, "contentChanges": [{"text": async_source}]},
+    )
+    hover = client.request(
+        "textDocument/hover",
+        {"textDocument": {"uri": uri}, "position": {"line": 0, "character": 21}},
+    )
+    assert (
+        "assincrona" in hover["contents"]["value"]
+        and "Promessa<inteiro>" in hover["contents"]["value"]
+    ), hover
+    hints = client.request(
+        "textDocument/inlayHint",
+        {
+            "textDocument": {"uri": uri},
+            "range": {"start": {"line": 0, "character": 0}, "end": {"line": 3, "character": 0}},
+        },
+    )
+    assert any(hint["position"]["line"] == 1 and "Promessa<" in hint["label"] for hint in hints), (
+        hints
+    )
+    client.send(
+        "textDocument/didChange",
+        {
+            "textDocument": {"uri": uri, "version": 24},
+            "contentChanges": [{"text": async_source + "futuro."}],
+        },
+    )
+    items = client.request(
+        "textDocument/completion",
+        {"textDocument": {"uri": uri}, "position": {"line": 3, "character": 7}},
+    )["items"]
+    labels = {item["label"] for item in items}
+    assert {"entao", "capturar"} <= labels and "adicionar" not in labels, items
     client.send("textDocument/didClose", {"textDocument": {"uri": untitled}})
     client.send("textDocument/didClose", {"textDocument": {"uri": uri}})
     client.close()

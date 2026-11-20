@@ -148,7 +148,8 @@ unittest
     assert(!analyzed("classe A{estatico dobro(x:inteiro):inteiro{retorna x*2}} var a:inteiro=A.dobro(2)").hasErrors());
     assert(analyzed("classe A{estatico erro():qualquer{retorna isto}}").hasErrors());
     assert(analyzed("classe A{estatico construtor(){}}").entries.any!((const(Diagnostic) d) => d.code == "E3012"));
-    assert(analyzed("classe A{estatico contador:inteiro}").entries.any!((const(Diagnostic) d) => d.code == "E3011"));
+    assert(!analyzed("classe A{estatico contador:inteiro}").hasErrors());
+    assert(analyzed("interface I{estatico contador:inteiro}").entries.any!((const(Diagnostic) d) => d.code == "E3011"));
     assert(!analyzed("para cada valor:inteiro em [1,2]{escreva(valor)}").hasErrors());
 }
 

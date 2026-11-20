@@ -1,3 +1,9 @@
+@definicao(biblioteca = "cgd-runtime", abi = "delegua", prefixo = "delegua_rotina_")
+classe estrangeira RotinasArquivo {
+    @definicao(simbolo = "arquivoLer")
+    estatico ler(caminho: texto, limite: inteiro): Promessa < texto >;
+}
+
 // I/O controlado de arquivos regulares. Cada operação fecha seu descritor nativo.
 classe Arquivo {
     privado {
@@ -28,6 +34,10 @@ classe Arquivo {
             falhar "Arquivo não encontrado: ${isto._caminho}"
         }
         retorna info.obter("tamanho")
+    }
+
+    lerAsync(limite: inteiro = 8388608): Promessa < texto > {
+        retorna RotinasArquivo.ler(isto._caminho, limite)
     }
 
     ler(limite: inteiro = 16777216): texto {

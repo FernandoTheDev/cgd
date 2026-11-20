@@ -1,4 +1,6 @@
 //# 1
+//? fase: compilacao
+//? erro: E3017
 var n: inteiro = 0
 n++++
 escreva(n)

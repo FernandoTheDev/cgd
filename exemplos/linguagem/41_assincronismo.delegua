@@ -1,0 +1,15 @@
+//! raiz\ninício\ncontinua\n11
+assincrona funcao maisUm(valor: inteiro): inteiro {
+    retorna valor + 1
+}
+
+assincrona funcao mostrar(): vazio {
+    escreva("início")
+    const futuro: Promessa < inteiro > = maisUm(10)
+    const resultado = aguardar futuro
+    escreva(resultado)
+}
+
+escreva("raiz")
+mostrar()
+escreva("continua")

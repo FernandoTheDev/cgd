@@ -1,3 +1,3 @@
-//# 0
+//!
 var nome: texto = "Fernando"
 var calculo: numero = 2 + 4 * 10

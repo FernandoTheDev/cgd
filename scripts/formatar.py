@@ -31,7 +31,9 @@ def files(folder):
         {
             folder / os.fsdecode(path)
             for path in output.split(b"\0")
-            if path and (folder / os.fsdecode(path)).is_file()
+            if path
+            and not os.fsdecode(path).startswith("docs/livro/")
+            and (folder / os.fsdecode(path)).is_file()
         }
     )
 

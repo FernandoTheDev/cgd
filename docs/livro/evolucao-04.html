@@ -1,0 +1,323 @@
+<!DOCTYPE HTML>
+<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Contratos, arrows e FFI C - O livro do CGD</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="tema/cgd.css">
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "navy";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('navy')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">O livro do CGD</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/FernandoTheDev/cgd" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="contratos-arrows-e-ffi-c"><a class="header" href="#contratos-arrows-e-ffi-c">Contratos, arrows e FFI C</a></h1>
+<p>Interfaces descrevem o que uma classe oferece; classes abstratas ajudam a compartilhar uma base. Completam este capítulo os enums, as arrows e a ligação explícita com funções C.</p>
+<h2 id="contratos-explícitos"><a class="header" href="#contratos-explícitos">Contratos explícitos</a></h2>
+<p>Interfaces descrevem campos e métodos públicos; classes usam implementa para satisfazer o contrato, inclusive com membros herdados. Implementações mantêm assinatura explícita. Classe abstrata não pode ser instanciada e pode declarar métodos abstratos. Não há herança entre interfaces: foi excluída por decisão de escopo, não adiada.</p>
+<pre><code class="language-delegua">interface Nomeavel { nome(): texto; }
+classe Pessoa implementa Nomeavel {
+    nome(): texto { retorna "Ana" }
+}
+enum Estado { Inicial, Final = 7 }
+</code></pre>
+<h2 id="enums-e-arrows"><a class="header" href="#enums-e-arrows">Enums e arrows</a></h2>
+<p>Enum é um namespace congelado de inteiros com incremento implícito e diagnóstico de duplicatas/overflow. Seu nome como tipo é alias de inteiro; não há enum nominal ou união algébrica. Arrows reutilizam funções anônimas sem captura. São escolhas do perfil CGD, não uma declaração de equivalência com todos os ambientes Delégua.</p>
+<h2 id="ffi-e-fronteira-de-confiança"><a class="header" href="#ffi-e-fronteira-de-confiança">FFI e fronteira de confiança</a></h2>
+<p>@definicao declara biblioteca, prefixo e símbolo; a ABI C escalar usa numero/real como double, inteiro/longo como int64_t, logico como bool e texto como const char*. Não presuma int C de 32 bits quando o contrato diz inteiro de 64 bits. Textos com zero interno são recusados nessa ABI. A ABI gerenciada delegua passa delegua_value e valida contratos. Assinaturas erradas e código nativo podem corromper o processo: FFI não é sandbox. Callbacks/structs/variádicos arbitrários não são representados por conversões presumidas.</p>
+<h2 id="enums-em-escopos-locais-e-classes"><a class="header" href="#enums-em-escopos-locais-e-classes">Enums em escopos locais e classes</a></h2>
+<p>Enums são açúcar para constantes inteiras agrupadas num namespace imutável. Podem ser declarados em módulos, funções, métodos, blocos de controle, callbacks e corpos de classe/interface; não exigem um contexto global. O alias numérico tem escopo lexical e não vaza ao sair do bloco. Nomes locais podem reaparecer em blocos independentes.</p>
+<p>Dentro de classes, Classe.Enum e isto.Enum acessam o mesmo namespace, inclusive por herança, respeitando privado/protegido. O enum não ocupa um campo de cada instância nem habilita campos estáticos mutáveis. Dentro do corpo da classe o nome serve como alias inteiro; fora dele, anote valores como inteiro. Interfaces podem conter constantes sem exigir sua redeclaração na implementação.</p>
+<p>Acesso conhecido a um membro resolve para o inteiro, inclusive em funções sem captura e em CTFE. Capturar um namespace local inteiro como valor continua sujeito às regras de captura; CTFE representa os membros escalares, não mapas. Receptores com efeitos, como criar().Estado.Fim, continuam sendo avaliados uma vez. Os enums continuam numéricos, sem identidade nominal ou restrição aos membros declarados.</p>
+<pre><code class="language-delegua">funcao estado(): inteiro {
+    enum Estado { Inicio, Final=7 }
+    var atual: Estado = Estado.Final
+    retorna atual
+}
+classe Maquina {
+    enum Estado { Inicio, Final=4 }
+    atual: Estado = isto.Estado.Final
+}
+escreva(Maquina.Estado.Final)
+</code></pre>
+<h2 id="experimente-38_contratos"><a class="header" href="#experimente-38_contratos">Experimente: 38_contratos</a></h2>
+<pre><code class="language-delegua">interface Medida {
+    valor(): inteiro;
+}
+
+classe abstrata Base {
+    abstrato
+
+    valor(): inteiro;
+}
+
+classe Concreta herda Base implementa Medida {
+    valor(): inteiro {
+        retorna 5
+    }
+}
+
+enum Estado {
+    Inicial, Final = 7
+}
+
+var objeto: Medida = Concreta()
+var duplicar: funcao =(valor: inteiro): inteiro =&gt; valor * 2
+escreva(objeto.valor())
+escreva(Estado.Final)
+escreva(duplicar(3))
+</code></pre>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/38_contratos.delegua">Ver exemplo completo e teste</a></p>
+<h2 id="experimente-matematica"><a class="header" href="#experimente-matematica">Experimente: matematica</a></h2>
+<pre><code class="language-delegua">var biblioteca: qualquer = importar("cgd:matematica")
+escreva(biblioteca.Matematica.cosseno(0))
+escreva(biblioteca.Matematica.raizQuadrada(9))
+</code></pre>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/matematica.delegua">Ver exemplo completo e teste</a></p>
+<h2 id="experimente-40_enums_escopos"><a class="header" href="#experimente-40_enums_escopos">Experimente: 40_enums_escopos</a></h2>
+<pre><code class="language-delegua">funcao estado(): inteiro {
+    enum Estado {
+        Inicio, Final = 7
+    }
+
+    var atual: Estado = Estado.Final
+    retorna atual
+}
+
+classe Maquina {
+    enum Estado {
+        Inicio, Final = 4
+    }
+
+    atual: Estado = isto.Estado.Final
+}
+
+var vetor: funcao =(x: inteiro) =&gt; [x, x + 1]
+escreva(estado())
+escreva(Maquina.Estado.Final)
+escreva(vetor(2))
+</code></pre>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/40_enums_escopos.delegua">Ver exemplo completo e teste</a></p>
+<p>Enums são namespaces congelados e alias inteiro; interfaces exigem assinaturas explícitas. FFI exige código nativo confiável. Composição mescla permanece fora desta versão; integração JS é excluída; consulte docs/evolucao-linguagem.md.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="metodos-estaticos.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="decisoes.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="metodos-estaticos.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="decisoes.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="tema/delegua.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

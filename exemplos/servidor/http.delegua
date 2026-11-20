@@ -1,0 +1,22 @@
+//# 0
+//? fase: compilacao
+// Servidor local: execute e acesse http://127.0.0.1:8080/.
+// GET /parar encerra este exemplo; não exponha essa rota em aplicações públicas.
+const Servidor: qualquer = importar("cgd:servidor")
+var app: qualquer = Servidor.HTTP()
+app.get("/", funcao(req: qualquer, res: qualquer): vazio {
+    res.enviar("Olá, CGD!\n")
+})
+app.get("/usuarios/:nome", funcao(req: qualquer, res: qualquer): vazio {
+    res.json({ nome: req.parametro("nome"), pagina: req.query("pagina", "1") })
+})
+app.post("/api/eco", funcao(req: qualquer, res: qualquer): vazio {
+    res.status(201).json(req.json())
+})
+app.head("/", funcao(req: qualquer, res: qualquer): vazio {
+    res.enviar("Olá, CGD!\n")
+})
+app.get("/parar", funcao(req: qualquer, res: qualquer): vazio {
+    res.enviar("Até logo!\n").pararServidor()
+})
+app.escutar("127.0.0.1", 8080)

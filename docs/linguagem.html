@@ -110,9 +110,8 @@
         <span class="status-badge status-parcial">Com limites</span>
         <h2 id="title-inicio">Comece aqui: instalar, escrever e executar</h2>
         <p>
-          CGD compila um perfil próprio de Delégua para C99 e usa memória gerenciada. Esta
-          documentação descreve o compilador, suas bibliotecas e ferramentas; o interpretador
-          original não é uma dependência de execução.
+          Vamos sair do arquivo vazio e chegar a um programa rodando. Você vai instalar as
+          ferramentas, escrever as primeiras linhas e conhecer os comandos que usará no dia a dia.
         </p>
         <h3>Ambiente e construção</h3>
         <p>
@@ -160,8 +159,8 @@ escreva(&quot;Olá, ${nome}!&quot;)</code></pre>
         <span class="status-badge status-parcial">Com limites</span>
         <h2 id="title-editor">Editor: arquivos, cores, inferência e hover</h2>
         <p>
-          A extensão VS Code usa um LSP local persistente. A edição não dispara build, linker, rede
-          ou execução do programa.
+          Abra um arquivo .delegua no VS Code e deixe o editor ajudar com tipos, nomes e erros. O
+          servidor roda na sua máquina; editar o texto não compila nem executa o programa.
         </p>
         <h3>Instalação e identidade visual</h3>
         <p>
@@ -220,9 +219,8 @@ var explicito: inteiro = 3</code></pre>
         <span class="status-badge status-parcial">Com limites</span>
         <h2 id="title-valores">Valores, tipos e variáveis</h2>
         <p>
-          Use var para variáveis e const para vínculos constantes. As anotações aparecem após
-          dois-pontos. Nulo, lógicos, números, textos, coleções, objetos e funções são valores
-          gerenciados.
+          Uma variável guarda um valor; uma anotação diz qual valor você espera receber. Veja quando
+          usar var ou const e o que acontece quando você deixa o tipo por conta do compilador.
         </p>
         <h3>Declarações e inferência</h3>
         <p>
@@ -360,8 +358,8 @@ escreva(criar()(4))</code></pre>
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-operadores">Operadores e ordem de avaliação</h2>
         <p>
-          Aritmética, potência, divisão inteira, bits, comparações, pertencimento, atribuições
-          compostas e incremento. Os argumentos e índices são avaliados na ordem da fonte.
+          Some, compare e combine valores. Além da conta em si, importa a ordem: argumentos e
+          índices são avaliados na ordem em que aparecem no código.
         </p>
         <h3>Comparações textuais</h3>
         <p>
@@ -425,8 +423,8 @@ escreva(++ a + 1)</code></pre>
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-controle">Condições, escolha e laços</h2>
         <p>
-          se/senão, ternário, escolha/caso/padrão, enquanto, fazer/enquanto, para, para cada, sustar
-          e continua controlam o fluxo.
+          Seu programa precisa escolher caminhos e repetir tarefas. Comece com se e enquanto; depois
+          experimente escolha, para cada e as formas de encerrar uma repetição.
         </p>
         <h3>Blocos e desvios</h3>
         <p>
@@ -532,8 +530,8 @@ escreva(terceiro)</code></pre>
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-coletores">Laços como expressões</h2>
         <p>
-          Um laço usado como expressão constrói um vetor. retorna dentro do coletor contribui um
-          valor ao resultado; o compilador distingue esse retorno do retorno da função.
+          Às vezes o resultado de um laço é justamente a lista que ele produz. Um coletor permite
+          escrever essa transformação sem montar o vetor à mão.
         </p>
         <h3>Construir um vetor com um laço</h3>
         <p>
@@ -583,9 +581,8 @@ escreva(pares)</code></pre>
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-funcoes">Funções e parâmetros</h2>
         <p>
-          Declare funções nomeadas ou anônimas; passe funções como argumentos, retorne funções sem
-          captura e use métodos ligados. Valores padrão são avaliados no chamado e podem usar
-          parâmetros anteriores. ... recebe argumentos variáveis.
+          Dê nome a uma operação para usá-la de novo. Depois, passe funções como argumentos e
+          experimente valores padrão, argumentos variáveis e callbacks sem captura.
         </p>
         <h3>Parâmetros e retornos</h3>
         <p>
@@ -604,6 +601,21 @@ var duplicar: funcao = (x: inteiro): inteiro =&gt; x * 2</code></pre>
           externo: passe os dados por parâmetros. Capturas geram aviso e erro. Métodos ligados
           mantêm seu receptor explicitamente gerenciado. Esta decisão evita introduzir um ambiente
           de closures com semântica parcial.
+        </p>
+        <h3>Assincronismo experimental do CGD</h3>
+        <p>
+          assincrona funcao f(): T inicia imediatamente e devolve Promessa&lt;T&gt;. aguardar
+          suspende apenas o corpo assíncrono atual e retoma por uma microtask, inclusive para
+          resultados prontos. O runtime drena essas continuações depois da raiz síncrona. Não há
+          threads paralelas.
+        </p>
+        <p>
+          Funções e métodos assíncronos aceitam tente/pegue/finalmente, laços, escolha, compreensões
+          e spread. Classes locais em corpos assíncronos recebem E3305. Promessa oferece
+          combinadores e cancelamento cooperativo. O módulo cgd:assincrono fornece temporizadores,
+          cliente HTTP e TCP sobre o reactor Linux. As bibliotecas Tempo, Rede e Processo mantêm
+          suas operações síncronas. Os contratos e limites experimentais estão em
+          docs/assincronismo.md.
         </p>
         <details>
           <summary>linguagem/07_funcoes.delegua</summary>
@@ -650,6 +662,29 @@ escreva(mapear([1, 2, 3], funcao(x: qualquer): qualquer {
     retorna x * 3
 }))</code></pre>
         </details>
+        <details>
+          <summary>linguagem/41_assincronismo.delegua</summary>
+          <p>
+            <a
+              href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/41_assincronismo.delegua"
+              >Abrir fonte e contrato de teste</a
+            >
+          </p>
+          <pre><code>assincrona funcao maisUm(valor: inteiro): inteiro {
+    retorna valor + 1
+}
+
+assincrona funcao mostrar(): vazio {
+    escreva(&quot;início&quot;)
+    const futuro: Promessa &lt; inteiro &gt; = maisUm(10)
+    const resultado = aguardar futuro
+    escreva(resultado)
+}
+
+escreva(&quot;raiz&quot;)
+mostrar()
+escreva(&quot;continua&quot;)</code></pre>
+        </details>
 
         <p class="callout">
           Capturas de variáveis externas são bloqueadas. Passe o estado explicitamente por
@@ -665,8 +700,8 @@ escreva(mapear([1, 2, 3], funcao(x: qualquer): qualquer {
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-vetores">Vetores, compreensão e fatias</h2>
         <p>
-          Vetores são mutáveis. Há índices negativos, espalhamento, compreensão com filtro e
-          fatiamento com passo. Contratos de tipos continuam válidos através de aliases.
+          Vetores guardam uma sequência que pode mudar. Você pode acessar posições, percorrer os
+          elementos, escolher uma fatia ou construir outro vetor com uma compreensão.
         </p>
         <h3>Literais, spread e compreensão</h3>
         <p>
@@ -769,8 +804,9 @@ escreva([1, 2, 3].filtrarPor(funcao(x: qualquer): qualquer {
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-dicionarios">Dicionários, tuplas e clonagem</h2>
         <p>
-          Dicionários associam chaves a valores; tuplas são imutáveis. Desestruture propriedades e
-          use propriedades ordinais de tuplas. clonar copia grafos e preserva ciclos.
+          Use um dicionário para procurar um valor pela chave, e uma tupla para reunir valores sem
+          mudar sua estrutura. Neste capítulo, você também verá como copiar coleções sem perder suas
+          relações.
         </p>
         <h3>Chaves, pares e presença</h3>
         <p>
@@ -893,8 +929,9 @@ escreva(tamanho(dados))</code></pre>
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-texto">Texto, Unicode e interpolação</h2>
         <p>
-          Textos usam UTF-8. Tamanho, índices e fatias contam pontos de código. Interpole expressões
-          com ${...} e use escapes; mudanças de caixa seguem as tabelas Unicode do runtime.
+          Acentos e outros caracteres fazem parte do texto. O CGD usa UTF-8 e conta posições por
+          pontos de código; vamos ver o que isso significa ao medir, percorrer e recortar uma
+          string.
         </p>
         <h3>Unicode e índices</h3>
         <p>
@@ -962,18 +999,19 @@ escreva(&quot;ABC&quot;.tudoMaiusculo(), &quot;abc&quot;.tudoMinusculo())</code>
         <span class="status-badge status-parcial">Com limites</span>
         <h2 id="title-classes">Classes, herança e acessores</h2>
         <p>
-          Declare campos e métodos; inicialize com construtor, acesse o receptor por isto e a
-          implementação herdada por super. Visibilidades público, privado e protegido usam a classe
-          lexical.
+          Use classes para reunir os dados e as operações de uma mesma ideia. Vamos começar com
+          atributos, métodos e valores iniciais; depois veremos herança e controle de acesso.
         </p>
         <h3>Atributos e inicializadores</h3>
         <p>
-          Atributos têm tipo e podem ter valor na própria classe. Cada instância recebe seus
-          próprios defaults e coleções; a expressão explícita é reavaliada para cada objeto.
-          Primeiro são inicializados os campos da base, depois os da derivada, em ordem de
-          declaração; em seguida executa o construtor selecionado. isto permite ler membros já
-          inicializados. O inicializador escreve o armazenamento inicial diretamente, sem disparar
-          um setter customizado.
+          Você pode dar um valor ao atributo na própria classe. Ele será calculado a cada objeto
+          criado: dois objetos não compartilham o mesmo vetor só porque o atributo foi declarado uma
+          vez. Primeiro vêm os atributos da base, depois os da classe derivada, sempre na ordem da
+          declaração. O construtor roda em seguida, com esses valores já disponíveis.
+        </p>
+        <p>
+          Se um inicializador usa outro atributo, declare esse atributo antes. A inicialização grava
+          o valor inicial diretamente, sem chamar um setter personalizado.
         </p>
         <pre><code>classe Contador {
     valor: inteiro = 1
@@ -1195,8 +1233,9 @@ escreva(ch &gt;= &#x27;0&#x27; e ch &lt;= &#x27;9&#x27;, &quot;ação&quot; &gt;
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-excecoes">Exceções e limpeza</h2>
         <p>
-          Use tente, pegue, finalmente e falhar. Excecao possui mensagem; subclasses podem ser
-          tratadas por tipo. Finalmente executa também em retornos e desvios de laços.
+          Uma operação pode falhar, e seu programa pode se preparar para isso. Use tente e pegue
+          para tratar a falha, e finalmente para fazer a limpeza que precisa acontecer em qualquer
+          caminho.
         </p>
         <h3>Lançar, capturar e limpar</h3>
         <p>
@@ -1303,8 +1342,8 @@ pegue {
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-modulos">Módulos estáticos</h2>
         <p>
-          importar recebe caminho literal .delegua, relativo ao módulo que importa. O loader
-          canonicaliza, reutiliza unidades, mostra a cadeia de ciclos e impõe limites de recursos.
+          Quando o programa crescer, divida o código em arquivos. A importação usa caminhos
+          conhecidos na compilação e resolve cada caminho a partir do arquivo que o declara.
         </p>
         <h3>Importação literal e namespace</h3>
         <p>
@@ -1363,9 +1402,8 @@ escreva(primeiro.dobro(2 + 2))</code></pre>
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-biblioteca">Biblioteca nativa e entrada/saída</h2>
         <p>
-          escreva, leia, tamanho, inteiro, numero/número, real, texto, tupla, clonar, aleatorio,
-          aleatorioEntre, mapear, filtrar, ordenar, paraCada e todosEmCondicao compõem a biblioteca
-          global.
+          Você não precisa começar tudo do zero. Estas funções já estão disponíveis para escrever na
+          tela, ler uma entrada, converter valores e trabalhar com coleções.
         </p>
         <h3>Entrada e saída básicas</h3>
         <p>
@@ -1458,9 +1496,8 @@ escreva(&quot;intervalos validados&quot;)</code></pre>
         <span class="status-badge status-parcial">Com limites</span>
         <h2 id="title-metadados">Decoradores e asserções</h2>
         <p>
-          Decoradores registram metadados; decoradores(valor) devolve cópias desses dados. Envelopes
-          de funções livres podem trocar a função, desde que não capturem ambiente. Asserções lançam
-          exceções tratáveis.
+          Metadados descrevem uma declaração; asserções verificam uma condição durante a execução.
+          Conheça as duas ferramentas antes de usar os decoradores mais avançados.
         </p>
         <h3>Metadados declarativos</h3>
         <p>
@@ -1546,9 +1583,8 @@ pegue (erro) {
         <span class="status-badge status-parcial">Com limites</span>
         <h2 id="title-otimizacoes">Otimização e avaliação em compilação</h2>
         <p>
-          -o habilita passes até ponto fixo. Literais, constantes por identidade, ramos mortos e
-          curto-circuito são simplificados preservando efeitos. //&gt;puro habilita CTFE em uma VM
-          com orçamento.
+          Um programa correto deve continuar correto depois de otimizado. Veja o que a opção -o
+          permite simplificar e quando uma chamada pode ser calculada ainda na compilação.
         </p>
         <h3>Optar por CTFE</h3>
         <p>
@@ -1764,10 +1800,8 @@ escreva(incrementar(2.5))</code></pre>
         <span class="status-badge status-parcial">Com limites</span>
         <h2 id="title-diagnosticos">Diagnósticos e ferramentas</h2>
         <p>
-          --verificar analisa sem gerar binário. --emitir-c gera C99 sem exigir linker/runtime
-          instalado. --diagnosticos=json produz JSON Lines em stderr, com código, severidade,
-          mensagem, explicação e intervalo. --explicar E3101 consulta o catálogo central sem
-          compilar.
+          Encontrou um erro? Comece pela mensagem, pelo código e pelo trecho marcado. Você também
+          pode pedir uma explicação ou verificar o arquivo sem gerar um executável.
         </p>
         <h3>Encontrar a causa</h3>
         <p>
@@ -2045,6 +2079,101 @@ tente {
                 </td>
               </tr>
               <tr>
+                <td><code>E3301</code></td>
+                <td>Construção assíncrona fora de um contexto permitido.</td>
+                <td>
+                  Aguardar exige corpo assincrono. Defaults, inicializadores, acessores, ciclo de
+                  vida e assinaturas FFI são síncronos.
+                </td>
+              </tr>
+              <tr>
+                <td><code>E3302</code></td>
+                <td>
+                  Aguardar exige Promessa&lt;T&gt; ou Tarefa&lt;T&gt;; recebeu &#x27;%s&#x27;.
+                </td>
+                <td>
+                  Uma operação síncrona não se torna assíncrona por aguardar. Use uma função
+                  assincrona ou rotina.
+                </td>
+              </tr>
+              <tr>
+                <td><code>E3303</code></td>
+                <td>Função assíncrona não aceita avaliação pura/CTFE.</td>
+                <td>
+                  O loop e as continuações só executam no programa nativo, nunca no compilador ou
+                  editor.
+                </td>
+              </tr>
+              <tr>
+                <td><code>E3304</code></td>
+                <td>Método não preserva o efeito assíncrono do contrato.</td>
+                <td>
+                  Implementação e override devem manter assincrona e o tipo de resultado declarado.
+                </td>
+              </tr>
+              <tr>
+                <td><code>E3305</code></td>
+                <td>Construção ainda não suportada no lowering assíncrono: %s.</td>
+                <td>
+                  A implementação incremental rejeita esta construção explicitamente; não há
+                  fallback bloqueante.
+                </td>
+              </tr>
+              <tr>
+                <td><code>E3306</code></td>
+                <td>Resultado vazio de aguardar não pode ser usado como valor.</td>
+                <td>Use aguardar como comando quando a Promise é Promessa&lt;vazio&gt;.</td>
+              </tr>
+              <tr>
+                <td><code>E3307</code></td>
+                <td>Limite de recursos da IR assíncrona excedido.</td>
+                <td>
+                  Divida a função: até 100000 instruções/slots, 2000000 fatos de vivacidade e
+                  50000000 visitas de instrução/fato por análise.
+                </td>
+              </tr>
+              <tr>
+                <td><code>E3401</code></td>
+                <td>
+                  Rotina exige chamada direta a função de topo ou método estático conhecido, sem
+                  captura.
+                </td>
+                <td>
+                  Chame diretamente uma função declarada no módulo ou método estático de classe
+                  gerenciada.
+                </td>
+              </tr>
+              <tr>
+                <td><code>E3402</code></td>
+                <td>Função &#x27;%s&#x27; não é segura para execução paralela em rotina: %s.</td>
+                <td>
+                  Rotinas não podem acessar globais mutáveis, FFI, I/O síncrono ou chamadas
+                  indiretas sem contrato.
+                </td>
+              </tr>
+              <tr>
+                <td><code>E3403</code></td>
+                <td>
+                  Rotina aceita apenas argumentos e retorno transferíveis (nulo, lógico, inteiro,
+                  real ou texto); recebeu &#x27;%s&#x27;.
+                </td>
+                <td>
+                  Transfira apenas valores escalares ou textos copiados; coleções e objetos mutáveis
+                  não atravessam threads.
+                </td>
+              </tr>
+              <tr>
+                <td><code>E3404</code></td>
+                <td>
+                  Função assíncrona não pode ser iniciada diretamente com rotina; use chamada normal
+                  e aguardar.
+                </td>
+                <td>
+                  Corrotinas assíncronas executam no loop cooperativo da thread principal, não no
+                  pool paralelo.
+                </td>
+              </tr>
+              <tr>
                 <td><code>E4001</code></td>
                 <td>A captura foi bloqueada; passe o valor como parâmetro explícito.</td>
                 <td>Capturas de ambiente são excluídas deliberadamente do perfil compilado.</td>
@@ -2128,8 +2257,8 @@ tente {
         <span class="status-badge status-excluido">Fora do perfil</span>
         <h2 id="title-exclusoes">Exclusões de segurança</h2>
         <p>
-          Upvalues/capturas de estado externo, ponteiros crus, eval, carregamento dinâmico e NPM não
-          são expostos. Esses exemplos devem falhar e fazem parte dos testes.
+          Alguns recursos ficam de fora para manter os limites desta implementação claros. Aqui
+          estão os casos recusados e exemplos que mostram como o compilador responde.
         </p>
         <h3>Capturas e execução dinâmica</h3>
         <p>
@@ -2213,8 +2342,8 @@ var modulo: qualquer = importar(caminho)</code></pre>
         <span class="status-badge status-parcial">Com limites</span>
         <h2 id="title-plataformas">Plataformas e limites da implementação</h2>
         <p>
-          Linux x86_64 é a plataforma validada com DMD e LDC2, Clang e GCC. A CLI permite configurar
-          target, sysroot, compilador e runtime separadamente para preparar builds cruzados.
+          Hoje, a plataforma testada é Linux x86_64. Há opções para selecionar compilador C, alvo e
+          runtime, mas configurar outro alvo não significa que ele já foi validado.
         </p>
         <h3>Alvo validado e configuração</h3>
         <p>
@@ -2245,9 +2374,8 @@ var modulo: qualquer = importar(caminho)</code></pre>
         <span class="status-badge status-parcial">Com limites</span>
         <h2 id="title-bibliotecas-cgd">JSON, rede, arquivos e coleções do CGD</h2>
         <p>
-          Namespaces cgd:json, cgd:rede, cgd:arquivos, cgd:colecoes, cgd:matematica, cgd:textos,
-          cgd:estatistica e cgd:caminhos fornecem classes de biblioteca. cgd:nativo é a ponte de
-          implementação.
+          Para ler arquivos, conversar por HTTP ou trabalhar com JSON, importe uma das bibliotecas
+          cgd:. Cada módulo reúne classes voltadas para uma tarefa.
         </p>
         <h3>Escolher uma biblioteca</h3>
         <div class="table-wrap">
@@ -2354,7 +2482,17 @@ escreva(tamanho(rede.opcoes()) &gt; 100)</code></pre>
           </p>
           <pre><code>var biblioteca = importar(&quot;../../bibliotecas/colecoes.delegua&quot;)
 escreva(biblioteca.Colecoes.unicos([1, 2, 1, 3, 2]))
-escreva(biblioteca.Colecoes.intervalo(5, 0, - 2))</code></pre>
+escreva(biblioteca.Colecoes.intervalo(5, 0, - 2))
+
+var colecoes: qualquer = importar(&quot;cgd:colecoes&quot;).Colecoes
+funcao par(valor: inteiro): logico {
+    retorna valor % 2 == 0
+}
+
+var grupos: tupla = colecoes.particionar([1, 2, 3, 4], par)
+escreva(grupos[0])
+escreva(grupos[1])
+escreva(colecoes.blocos([1, 2, 3, 4, 5], 2))</code></pre>
         </details>
         <details>
           <summary>bibliotecas/json_navegacao.delegua</summary>
@@ -2404,11 +2542,8 @@ escreva(arquivo.caminho())</code></pre>
         <span class="status-badge status-parcial">Com limites</span>
         <h2 id="title-metodos-estaticos">Métodos estáticos e ferramentas do editor</h2>
         <p>
-          estatico declara método sem isto, herdado e acessível pela classe ou instância. O LSP
-          local oferece completion por tipo, signature help e formatador com quatro espaços.
-          Ctrl+Shift+I formata no VS Code; --formatar formata pela CLI.
-          Construtor/destrutor/estatico são palavras-chave. Hover oferece prévia CTFE limitada para
-          expressões constantes e chamadas puras, sem compilar por edição.
+          Um método estático pertence à classe e não recebe isto. Veja como declará-lo e como o
+          editor ajuda a encontrar os membros disponíveis em cada receptor.
         </p>
         <h3>Receptor e visibilidade</h3>
         <p>
@@ -2465,8 +2600,8 @@ escreva(calculadora.dobro(5))</code></pre>
         <span class="status-badge status-parcial">Com limites</span>
         <h2 id="title-evolucao-04">Contratos, arrows e FFI C</h2>
         <p>
-          Classes abstratas, interfaces explícitas, enums numéricos e arrow functions sem captura.
-          Classes estrangeiras usam @definicao com ABI C escalar ou gerenciada.
+          Interfaces descrevem o que uma classe oferece; classes abstratas ajudam a compartilhar uma
+          base. Completam este capítulo os enums, as arrows e a ligação explícita com funções C.
         </p>
         <h3>Contratos explícitos</h3>
         <p>
@@ -2619,8 +2754,8 @@ escreva(vetor(2))</code></pre>
         <span class="status-badge status-parcial">Com limites</span>
         <h2 id="title-decisoes">Decisões de escopo: o que não fará parte da linguagem</h2>
         <p>
-          O CGD é uma linguagem compilada para C99 com referência em Delégua. Estas decisões são
-          parte de seu contrato, não promessas para uma versão futura.
+          Por que esta linguagem funciona assim? Estas escolhas explicam o recorte do CGD, incluindo
+          os recursos que não serão adicionados e as diferenças em relação ao interpretador Delégua.
         </p>
         <h3>Exclusões definitivas</h3>
         <div class="table-wrap">
@@ -2688,8 +2823,9 @@ escreva(vetor(2))</code></pre>
         <span class="status-badge status-suportado">Disponível</span>
         <h2 id="title-runtime-erros">Erros do programa: apresentação e localização</h2>
         <p>
-          Falhas não capturadas usam a mesma estrutura visual dos diagnósticos do compilador, sem
-          formatação adicional no caminho de sucesso.
+          Quando uma falha escapa dos seus tratadores, o programa mostra a mensagem e aponta o
+          trecho de origem. Saiba ler esse diagnóstico e o que ainda aparece quando o arquivo já não
+          está disponível.
         </p>
         <h3>Ler um diagnóstico</h3>
         <p>
@@ -2733,9 +2869,9 @@ escreva(vetor(2))</code></pre>
           Biblioteca padrão: textos, estatística, caminhos e coleções
         </h2>
         <p>
-          Classes próprias agrupam operações úteis, com tipos explícitos, limites e comportamento
-          definido para entradas vazias. As importações são estáticas e nenhum método é executado
-          pelo editor.
+          Precisa preencher um código com zeros, resumir uma amostra ou montar o caminho de um
+          arquivo? Estas classes cuidam dessas tarefas sem espalhar pequenos utilitários pelo seu
+          programa.
         </p>
         <h3>Textos — cgd:textos</h3>
         <p>
@@ -2813,6 +2949,74 @@ escreva(caminhos.extensao(&quot;a.tar.gz&quot;))</code></pre>
           C (metades para longe de zero); resto usa fmod, distinto do operador inteiro %. A ABI
           permanece explícita e validada.
         </p>
+        <details>
+          <summary>bibliotecas/textos.delegua</summary>
+          <p>
+            <a
+              href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/textos.delegua"
+              >Abrir fonte e contrato de teste</a
+            >
+          </p>
+          <pre><code>var textos: qualquer = importar(&quot;cgd:textos&quot;).Textos
+// Preencha códigos sem perder o zero à esquerda.
+escreva(textos.preencherInicio(&quot;7&quot;, 3, &quot;0&quot;))
+escreva(textos.digitos(&quot;012345&quot;))
+// A inversão trabalha com pontos de código Unicode.
+escreva(textos.inverter(&quot;aç💚&quot;))</code></pre>
+        </details>
+        <details>
+          <summary>bibliotecas/estatistica.delegua</summary>
+          <p>
+            <a
+              href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/estatistica.delegua"
+              >Abrir fonte e contrato de teste</a
+            >
+          </p>
+          <pre><code>var estatistica: qualquer = importar(&quot;cgd:estatistica&quot;).Estatistica
+var medidas: numero[] = [4, 1, 2, 3]
+escreva(estatistica.media(medidas))
+escreva(estatistica.mediana(medidas))
+escreva(estatistica.variancia([2, 4, 6, 8]))
+// Calcular a mediana não muda a ordem do vetor recebido.
+assercao(medidas[0] == 4)</code></pre>
+        </details>
+        <details>
+          <summary>bibliotecas/caminhos.delegua</summary>
+          <p>
+            <a
+              href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/caminhos.delegua"
+              >Abrir fonte e contrato de teste</a
+            >
+          </p>
+          <pre><code>var caminhos: qualquer = importar(&quot;cgd:caminhos&quot;).Caminhos
+var destino: texto = caminhos.juntar([&quot;dados&quot;, &quot;temporario&quot;, &quot;..&quot;, &quot;saida.json&quot;])
+escreva(destino)
+escreva(caminhos.extensao(destino))
+escreva(caminhos.nome(destino))
+// Normalizar um caminho não consulta o disco nem resolve links simbólicos.</code></pre>
+        </details>
+        <details>
+          <summary>bibliotecas/colecoes.delegua</summary>
+          <p>
+            <a
+              href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/bibliotecas/colecoes.delegua"
+              >Abrir fonte e contrato de teste</a
+            >
+          </p>
+          <pre><code>var biblioteca = importar(&quot;../../bibliotecas/colecoes.delegua&quot;)
+escreva(biblioteca.Colecoes.unicos([1, 2, 1, 3, 2]))
+escreva(biblioteca.Colecoes.intervalo(5, 0, - 2))
+
+var colecoes: qualquer = importar(&quot;cgd:colecoes&quot;).Colecoes
+funcao par(valor: inteiro): logico {
+    retorna valor % 2 == 0
+}
+
+var grupos: tupla = colecoes.particionar([1, 2, 3, 4], par)
+escreva(grupos[0])
+escreva(grupos[1])
+escreva(colecoes.blocos([1, 2, 3, 4, 5], 2))</code></pre>
+        </details>
 
         <p class="callout">
           APIs matemáticas seguem libm: domínios inválidos podem produzir valores não finitos.

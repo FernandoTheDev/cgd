@@ -1,3 +1,571 @@
+# Revisão 0.9.0 — Rotinas paralelas, linguagem, stdlib avançada e refatoração — 20/11/2026
+
+Solicitação ativa: melhorar o compilador e implementar os recursos pendentes
+documentados em `docs/` e `AGENTS.md`, com autorização explícita do usuário para
+executar todos os testes necessários, commitar e publicar em `dev` (runtime e
+CGD) e reinstalar o binário e a extensão VS Code. Sem subagentes.
+
+## Implementação entregue
+
+- **Rotinas paralelas e isolamento por thread**:
+  - Runtime C (`delegua_rt.h`, `excecoes.c`, `valores.c`, `delegua_rt.c`):
+    `DELEGUA_NORETURN` nos helpers de pânico (eliminando avisos GCC `-O2` em
+    todo o runtime, inclusive `rede.c`/`textos.c`), otimização de
+    `create_text_concat`, TLS por thread (`__thread`) para exceções,
+    profundidade de chamadas e localização, `pthread_once` para classes núcleo
+    (`Objeto`/`Excecao`), e registro de threads de workers no Boehm GC
+    (`GC_THREADS`/`GC_NO_THREAD_REDIRECTS`, `GC_allow_register_threads`, hooks
+    de ciclo de vida em `rotinas_pool.c` mantendo o pool isolado para TSan).
+  - Tags `DELEGUA_T_TAREFA`, `DELEGUA_T_CANAL`, `DELEGUA_T_BYTES` e
+    `DELEGUA_T_SQLITE` ao fim de `enum delegua_type` (ABI anterior preservada).
+  - `delegua_rotina_iniciar` em `rotinas_reactor.c`: executa funções Delégua
+    compiladas em workers com fronteira TLS de exceção, propagando rejeições e
+    cancelamento para a thread principal via epoll.
+  - Frontend/backend/LSP: palavra-chave `rotina`, tipo paramétrico `Tarefa<T>`,
+    `aguardar` aceitando `Promessa<T>` e `Tarefa<T>`, métodos
+    `concluida`/`cancelada`, auditoria transitiva de efeitos em
+    `src/frontend/semantic/routine_validation.d` (`E3401`–`E3404`).
+  - `assincrono_canal.c` e `cgd:assincrono`: `Canal` limitado com backpressure
+    assíncrono sobre valores transferíveis e `GrupoTarefas`.
+- **Recursos pendentes da linguagem**:
+  - Campos estáticos tipados (`estatico campo: Tipo = valor`) com defaults,
+    visibilidade, herança, contratos de escrita no runtime e bloqueio em
+    rotinas (`E3402`).
+  - Composição por mixins (`classe C mescla M1, M2`) com precedência,
+    encapsulamento privado/protegido por dono, inicializadores de campos,
+    `eInstanciaDe` e satisfação de interfaces.
+  - Envelopes de decoradores em métodos de instância e estáticos (com ajuste de
+    aridade do receptor `delegua_ajustar_metodo_envelope`).
+  - Otimizador (`opt/constant_folding.d`): propagação de constantes tipadas
+    quando o literal já satisfaz o tipo primitivo, dobras unárias (`-real`,
+    `+real`, `~inteiro`) e simplificações de curto-circuito (`verdadeiro e x`,
+    `falso ou x`).
+- **Stdlib avançada e servidor HTTP concorrente**:
+  - Novos módulos: `cgd:bytes` (`Bytes`), `cgd:cripto` (`Cripto` sobre OpenSSL
+    `libcrypto.so.3`), `cgd:compressao` (`Compressao` gzip/deflate sobre
+    `libz.so.1` com limite contra bombas de descompressão) e `cgd:sqlite`
+    (`SQLite`/`BancoSQLite` sobre `libsqlite3.so.0` com consultas parametrizadas
+    e transações).
+  - Expansões: `DataHora` em `cgd:tempo`, `SocketUDP`/`resolverDNS`/IPv6 em
+    `cgd:sockets`, e `HTTP.escutarAsync`/`atenderConexaoAsync` com atendimento
+    concorrente sobre epoll e HTTP/1.1 keep-alive em `cgd:servidor`.
+- **Refatoração e organização**:
+  - Separação de `src/middle/async_ir.d` e `src/middle/async_lower.d`;
+    extração de `src/backend/c/async_codegen.d`, `src/backend/c/descriptors.d`
+    e `src/lsp/features.d`; remoção de binários soltos (`http`, `minigpt`) na
+    raiz; atualização de gramáticas TextMate/mdBook, exemplos 42/43 e
+    `bytes_cripto_sqlite`, referência web e livro (39 páginas).
+
+## Testes realmente executados
+
+- Builds: `CC=gcc CFLAGS="-O2" ./build-runtime` (zero avisos em todo o
+  runtime), `./build-runtime` (Clang C99 estrito), `dub build` LDC2 release e
+  debug.
+- Unitários D: DMD e LDC2 (10 módulos cada) passaram.
+- Núcleo async e rotinas: `python3 testes/assincronismo.py` passou em Clang,
+  GCC, ASan/UBSan e TSan (pool isolado).
+- Linguagem e bibliotecas (Clang e GCC, com e sem `-o`): `driver.py` (26),
+  `lsp.py`, `bibliotecas.py` (342), `expansao.py`, `enums.py`, `stdlib.py`
+  (114), `runtime_diagnosticos.py`, `processo.py`, `servidor.py`, `sockets.py`,
+  `http_parser.py` (50000 entradas ASan/UBSan), `async_linguagem.py` (30, normal
+  e `--sanitizadores` ASan/UBSan + GCC), `rotinas.py` (15, Clang e GCC),
+  `linguagem_nova.py` (8, Clang e GCC), `stdlib_avancada.py` (11, Clang e GCC),
+  `integracao.py` (407) e `exemplos.py` (136 exemplos / 272 verificações, 0
+  falhas).
+- Sanitizadores: `scripts/sanitizadores.py --rede` (API C, parser HTTP,
+  servidor e sockets com NDEBUG + ASan/UBSan; runtime normal restaurado).
+- Instalação isolada (`scripts/validar_instalacao.py`), formatador
+  (`testes/formatador.py`: 160 arquivos idempotentes e 136 exemplos / 272
+  verificações preservados), documentação e estilo:
+  `gerar_referencia.py --check`, `gerar_livro.py --check`, `testes/livro.py`
+  (39 páginas), `testes/site.py --static-only`, `scripts/formatar.py --check` e
+  `scripts/verificar_tipos.py` passaram.
+- Limites conhecidos: Linux x86_64 é a única plataforma validada; enums
+  nominais, structs/callbacks compostos na ABI C, classes locais em corpos
+  async (`E3305`) e DAP permanecem pendentes.
+
+---
+
+# Integração do pool de rotinas com o reactor — 18/11/2026
+
+A solicitação é completar as rotinas e deixar a execução dos testes com o usuário.
+Implementada a ponte C interna em `rotinas_reactor.c`: submissão limitada,
+notificação por epoll, resolução e rejeição na thread principal, cancelamento
+cooperativo e join no fechamento do reactor ocioso. Workers podem produzir
+pacotes escalares e texto copiado. A ponte mantém raízes fortes até a entrega.
+
+Foram preparados cenários de cancelamento em execução, pressão de GC, conclusão
+em lotes, retorno com byte NUL e falhas de transferência. Builds com GCC e Clang
+passaram e ambos aceitaram a fonte C da regressão com `-fsyntax-only`.
+O executável isolado do pool para ThreadSanitizer foi vinculado com Clang.
+O GCC local não dispõe de libtsan; a suíte usa o runtime de TSan do Clang.
+Nenhuma suíte executada. A execução de Delégua em workers permanece condicionada
+à validação do pool e do assincronismo. Faltam isolamento do contexto de execução,
+auditoria transitiva de efeitos, frontend e emissão de `rotina` / `Tarefa<T>`.
+Canais e grupos dependem do pool validado.
+
+Comandos de validação na raiz: `./build-runtime`,
+`python3 testes/assincronismo.py`, `python3 scripts/validar.py`,
+`python3 scripts/sanitizadores.py`, `python3 testes/livro.py` e `python3 testes/site.py`.
+
+---
+
+# Continuação das rotinas — 18/11/2026
+
+Implementado o pool interno de workers C no runtime Linux, com fila FIFO,
+capacidade limitada até o consumo da conclusão, cancelamento cooperativo,
+eventfd e encerramento com join. Contrato de posse em `docs/rotinas.md`.
+A submissão aceita callbacks C internos sobre pacotes exclusivos. Ainda falta
+ligar a conclusão ao reactor, auditar efeitos, isolar o estado por thread e
+implementar a expressão Delégua e o tipo Tarefa.
+
+Builds executados com sucesso: `CC=gcc ./build-runtime` e `./build-runtime`
+(Clang). Regressão preparada em `vendor/delegua-runtime/tests/assincrono.c`
+para fila cheia, cancelamento em fila, prontidão do descritor e posse do pacote.
+Nenhum teste funcional executado nesta continuação. A suspensão mais recente
+continua vigente. Após liberação, executar `python3 testes/assincronismo.py` e
+`python3 testes/async_linguagem.py` antes de habilitar execução Delégua em threads.
+
+---
+
+# Assincronismo completo e início das rotinas — 18/11/2026
+
+Solicitação ativa: concluir as partes restantes do assincronismo e começar as
+corrotinas/rotinas previstas no projeto. O usuário suspendeu explicitamente os
+testes: NÃO executar suítes, exemplos, programas de amostra ou benchmarks até
+nova ordem. Builds e formatação continuam permitidos; não equivalem a testes.
+Não publicar/instalar sem autorização desta etapa; sem subagentes.
+
+Prioridade de implementação: handlers/finalmente na IR stackless, demais formas
+de fluxo/coleção, cancelamento cooperativo, temporizadores e reactor/I/O real,
+API nativa de Promessas e combinadores. Iniciar paralelismo pela definição dos
+valores transferíveis e isolamento do runtime; não expor mutação compartilhada
+ou declarar estabilidade sem validação autorizada. Não confundir as corrotinas
+stackless já em construção com threads paralelas.
+
+Checkpoint anterior: havia build LDC release em andamento quando o pedido novo
+chegou; nenhum teste novo foi iniciado após esta instrução. Antes da suspensão,
+passaram unitários DMD/LDC (10 módulos), núcleo C/API anterior em Clang/GCC e
+ASan/UBSan, 407 integrações, 132 exemplos/264 verificações e LSP expandido.
+O novo exemplo 41 e as últimas alterações ainda precisam da rodada final;
+não reutilizar resultados anteriores para afirmar validação do estado atual.
+
+Implementado nesta continuação, ainda sem validação funcional:
+
+- IR stackless com arestas excepcionais, pegue tipado e finalmente suspenso;
+  limpezas em retorno/erro/break/continue, snapshot de retorno antes da limpeza
+  e contrato após ela. Locais C volatile para a fronteira setjmp viva por ativação.
+- Lowering de para cada, escolha, compreensões, laços coletores, destructuring e
+  spread; E3305 agora se restringe a classes locais em corpos async. Parser aceita
+  finalmente vazio. Vivacidade inclui arestas excepcionais e preserva valores
+  anteriores quando uma operação falha antes de concluir sua definição.
+- Cancelamento cooperativo de tarefas com job de controle pré-alocado, máscara
+  durante limpezas, remoção de waiter sem cancelar produtores compartilhados e
+  marcador nativo de cancelamento. Exceções conservam a primeira origem.
+- API estática Promessa.resolvida/rejeitada/todas/corrida/qualquer/todasResolvidas,
+  resultados ordenados, agregação de erros e cancelamento de consumidores.
+- Reactor epoll em assincrono_io.c: heap monotônico de timers, limites, raízes
+  fortes, lotes e cleanup de watchers; sem sleep/busy-wait/thread por operação.
+- HTTP real em assincrono_http.c: curl multi + waitfds (runtime >=8.8), DNS somente
+  c-ares ou IP numérico, sem proxy/redirect, TLS verificado, limites de memória,
+  callbacks sem longjmp atravessando libcurl e cancelamento da requisição.
+- TCP real em assincrono_sockets.c: conectar/aceitar/receber/enviar, IPv4 numérico,
+  FD nonblocking, prazos/cancelamento, uma operação por handle, fechamento em falha
+  de conexão/escrita parcial; aceite cancelado preserva ouvinte. Helpers internos
+  do socket síncrono rejeitam uso enquanto ocupado; fechamento notifica operação.
+- Módulo bibliotecas/assincrono.delegua: Tempo, HTTP/RespostaHTTP, TCP/ConexaoTCP e
+  OuvinteTCP, com tipos explícitos e API estrangeira gerenciada controlada.
+- Fronteira externa captura falhas da raiz/drain; shutdown cancela produtores,
+  protege dependências de finally já suspenso, permite trabalho novo só em limpeza
+  e reporta erro original mesmo se drenagem falhar. O prazo de drenagem foi acrescentado na continuação abaixo.
+- Início concreto das rotinas: docs/rotinas.md define expressão rotina/Tarefa,
+  isolamento, pool fixo e gates antes de executar Delégua em workers. Módulo C
+  rotinas_transferencia implementa pacotes exclusivos sem referências ao GC,
+  nulo/lógico/inteiro/real/texto copiado, até 4096 itens/16 MiB. Sem sintaxe rotina,
+  workers, canais, grupos, TLS de execução ou registro de threads no GC ainda.
+- Regressões preparadas em testes/async_linguagem.py (finally, catch, fluxo,
+  combinadores, timers, cancelamento e TCP loopback) e runtime/tests/assincrono.c
+  (transferência, rejeição de mutáveis, cópia binária/GC). Removidas expectativas
+  antigas de E3305 para finally. NÃO EXECUTADAS nesta continuação.
+- README/compatibilidade/referência e livro atualizados; livro inclui rotinas.
+
+Builds reais desta continuação: ./build-runtime (Clang/C99 estrito) passou;
+dub build --compiler=ldc2 --build=debug passou, com rebuild após ajustes da emissão;
+dub build --compiler=dmd --build=debug passou. Formatação C/dfmt/Ruff/Prettier e
+formatador Delégua foram aplicados; geradores de referência e mdBook passaram.
+Esses builds não demonstram correção funcional dos novos caminhos. Nenhuma suíte,
+exemplo, smoke, benchmark ou binário de regressão foi executado após a suspensão.
+
+Continuação de 18/11: HTTP.enviar passou a encaminhar o limite opcional de
+resposta (padrão preservado de 16 MiB). O buffer inicial de recepção agora
+respeita limites menores que 4 KiB. Preparado cenário POST em loopback com
+resposta de seis bytes em UTF-8, aceita com limite seis e recusada com cinco.
+Build do runtime, verificação de formatação Delégua e compilação sintática do
+arquivo Python passaram. A suspensão de execução das suítes continua vigente.
+Após liberação, executar `python3 testes/async_linguagem.py`.
+
+Continuação de 18/11 — encerramento após erro: depois do cancelamento inicial,
+o runtime concede cinco segundos de relógio monotônico às limpezas. A drenagem
+verifica o prazo entre reações e limita a espera do epoll. O caminho normal
+mantém a drenagem FIFO. Preparada regressão com finalmente aguardando 60 s,
+falha da raiz e timeout externo de 15 s, nos dois modos de otimização.
+Build do runtime e compilação sintática da suíte Python concluídos. A regressão
+funcional aguarda liberação para rodar `python3 testes/async_linguagem.py`.
+
+Pendências: quando o usuário liberar, validar primeiro handlers/finalmente e
+cancelamento com/sem otimização e sanitizadores; depois reactor/timers, TCP e
+HTTP em loopback, falhas/parcial/limites, encerramento e API C anterior. Preparar
+mais cenários HTTP e stress/GC; executar integração/exemplos/LSP e matriz conforme
+resultados. Só depois habilitar workers, após isolar exceções/localização/caches
+por thread e definir efeitos seguros. A infraestrutura async continua experimental;
+não chamar estabilidade ou paralelismo de concluídos. Sem commits/push/instalação.
+Próximos comandos permitidos agora: formatação e builds. Comandos de testes ficam
+pendentes de ordem explícita, sem iniciar automaticamente.
+
+---
+
+# Assincronismo nativo — Etapa 2 em validação (17/11/2026)
+
+O usuário pediu continuidade da Etapa 1 e reiterou continuar durante o trabalho.
+Implementação local em andamento; sem subagentes/commit/push. As alterações
+preexistentes de servidor/bibliotecas/livro permanecem preservadas.
+
+Implementados tokens/parser/AST de assincrona/aguardar e Promessa<T>, contexto
+semântico, resultado da chamada separado do retorno interno, contratos e efeitos
+em interfaces/overrides. Criados middle/async_ir.d (CFG normalizado e vivacidade)
+e semantic/async_validation.d (limites temporários compartilhados CLI/LSP).
+Backend emite wrapper e step C99, mantendo em frame somente slots vivos nas
+suspensões; argumentos são consumidos na entrada síncrona, sem guardar argv.
+Runtime ganhou tag ao fim da enumeração, descritor estrutural e contratos de
+resultado, tarefas com fronteira C válida por ativação, retomadas por microtask,
+drenagem após a raiz e reporte de rejeições não observadas. entao/capturar usam
+callbacks sem captura, com adoção quando devolvem Promise. Sem paralelismo/I/O.
+
+Limites explícitos desta etapa: tente/pegue/finalmente, para cada, escolha,
+compreensões, laços-coletores, spread e classes locais dentro de async recebem
+E3305; não são convertidos em chamadas bloqueantes. Cancelamento, I/O e API
+estática de Promessa ainda pendem. Tratadores suspensos exigem IR própria e não
+reutilizam jmp_buf. Exceções não tratadas no topo síncrono ainda encerram pelo
+caminho antigo. Não considerar o modelo assíncrono estável/completo.
+
+Verificações intermediárias reais: build C99/Clang normal e LDC debug passaram;
+smoke em C gerado produziu A/B/C/17 com suspensão em laço. Unitários LDC passaram
+(10 módulos, incluindo frontend/IR); testes C da Etapa 1/API anterior passaram em
+Clang, GCC (núcleo O2) e NDEBUG/ASan/UBSan após corrigir qualifiers volatile no
+caminho de setjmp. Suíte de linguagem com/sem otimização passou antes da última
+ampliação entao/capturar; rodada ampliada está em execução. Ainda validar DMD,
+editor, integração/exemplos e final sanitizado. Não anunciar resultados pendentes.
+
+Próximos comandos: python3 testes/async_linguagem.py; python3 testes/assincronismo.py;
+dub test em DMD/LDC; testes/lsp.py, integracao.py, exemplos.py e rodada sanitizada
+de async. Documentar resultados reais/limites ao encerrar. Sem publicação remota.
+
+---
+
+# Assincronismo nativo — Etapa 2 em implementação (17/11/2026)
+
+Continuidade autorizada pelo usuário. Trabalho local sem publicação/subagentes;
+fontes anteriores preservados. Frontend já tem assincrona/aguardar e Promessa<T>,
+contexto e tipos separados entre retorno interno e resultado da chamada. Nova
+middle/async_ir.d normaliza avaliação, controla ramos/laços, calcula vivacidade e
+seleciona slots persistentes. Backend emite wrapper e step com switch(pc).
+Runtime ganhou tag ao fim da enumeração, descritor de Promise, tarefas stackless
+e drenagem do loop após a raiz síncrona. Programa de verificação A/B/C/17 passou
+com await em laço; isso não é ainda aprovação da etapa.
+
+Em curso: regressões de linguagem, contratos dinâmicos, métodos, sombras,
+ordem de efeitos, parâmetros opcionais e análise de slots. Tente/pegue/finalmente,
+para cada, escolha, compreensões e spread ainda recebem E3305 dentro de async;
+não implementar fallback bloqueante. Cancelamento, I/O e Promessa.entao na
+linguagem seguem para etapas posteriores. LSP deve exibir Promessa<T> e palavras
+novas sem build por edição.
+
+Testes desta implementação ainda em andamento: build LDC debug e runtime C99
+passaram; suíte C passou em Clang, mas GCC/O2 encontrou avisos legítimos de
+clobber nos novos parâmetros modificados após setjmp em settle. Parâmetros
+marcados volatile; repetir teste focado após fechar regressões. Não atribuir
+os resultados da Etapa 1 ao código novo sem reexecutar.
+
+---
+
+# Assincronismo nativo — Etapa 1 concluída (17/11/2026)
+
+O usuário pediu continuidade após a especificação do anexo a9825980.
+Implementado núcleo C de Promessas e microtasks, sem I/O, sintaxe nova ou
+paralelismo. Criados no Git do vendor src/assincrono.h, src/assincrono.c e
+tests/assincrono.c; atualizado tests/run.sh do vendor para incluir a suíte nova
+na validação C/sanitizada. Runner isolado testes/assincronismo.py no CGD. Atualizada
+seção 14 de docs/assincronismo.md com API, verificação e limites reais.
+Alterações locais anteriores foram preservadas; sem commit/push/subagentes.
+
+Implementado: conclusão única, adoção/ciclos e limite de cadeia, encadeamento,
+FIFO com reserva por reação, fronteira de exceção por checkpoint e restauração
+de localização/profundidade/handler externo, raiz forte no GC, observação e
+encaminhamento de rejeições, reconhecimento pelo reporter, quotas transacionais
+e fechamento explícito. Localização do erro é copiada, inclusive da API legada.
+Não alterados tag/ABI pública anterior, main, D/CLI ou LSP. API C opaca interna,
+uso monothread, sem exposição de ponteiros à linguagem.
+
+Testes realmente executados: python3 testes/assincronismo.py passou em Clang
+normal, GCC com núcleo/teste O2 e Clang O1 NDEBUG/ASan/UBSan. Em cada variante, passaram
+a suíte nova (incluindo 20000 ciclos sob quota pequena e 12000 reações pendentes)
+e API C anterior com 23 modos de erro R0001. Coleta forçada, contextos vivos,
+ordem, adoção pendente/pronta, resolução dupla, ciclos, exceções, localização,
+limites/observação e reentrada têm regressões. Relatório completo:
+out/assincronismo/resultado.json. Objetos/binaries/FFI de teste ficam em out;
+libdelegua_rt.o normal e instalação do usuário não foram substituídos.
+
+Limites da verificação: GCC/O2 integral encontrou avisos nos fontes anteriores
+rede/textos, com helpers panic sem noreturn; nessa variante só núcleo/teste novos
+estão em O2, legados em O0. Sem suprimir warnings ou alterar essas fontes. A
+primeira rodada ASan da API antiga falhou no mapa após GC com fake stack;
+runner adotou detect_stack_use_after_return=0 e detect_leaks=0, como o runner
+sanitizado já existente do projeto; rodada final passou. Isso não prova ausência
+universal de vazamentos. Sem teste de longa duração, I/O, LSP ou async da linguagem.
+Clang-format, Ruff e Prettier passaram nos arquivos/seções desta etapa; shfmt
+e sh -n passaram no runner do runtime. A inclusão no runner foi conferida
+estaticamente; as execuções C acima usaram o runner isolado em Python.
+
+Próxima etapa: tipos Promessa<T>/assinaturas e frontend/IR/frame de suspensão
+(Etapa 2). Acrescentar tag só ao integrar valores da linguagem; o núcleo atual
+usa rt_promise opaco e resultados delegua_value. Depois, timers/epoll/curl multi,
+DNS não bloqueante, cancelamento, finally e shutdown integrado. Sem combinadores
+ou identificação de ciclos arbitrários entre callbacks nesta etapa. Não iniciar
+rotinas/threads/canais antes da matriz de estabilidade. Não publicar sem autorização.
+
+---
+
+# Histórico: Assincronismo nativo — Etapa 0 (17/11/2026)
+
+Solicitação ativa: anexo a9825980, projeto de assincronismo e paralelismo nativo.
+A instrução inicial pede começar exclusivamente pela Etapa 0: auditoria profunda
+e especificação. Entrega atual limitada a essa etapa; não implementar rotinas,
+workers, canais ou scheduler M:N antes de concluir/validar o assincronismo.
+Sem publicação remota e sem subagentes. Alterações locais do servidor HTTP,
+bibliotecas, livro, runtime e demais fontes foram preservadas.
+
+Criado docs/assincronismo.md, proposta técnica, ainda sem recurso executável:
+
+- Auditoria rastreável de lexer/parser/AST/tipos, semântica/fluxo/pureza, módulos,
+  lowering/backend C99, ABI de funções/métodos/FFI, exceções, GC e bibliotecas
+  tempo/rede/processos/sockets. Base CGD abe4290/runtime 7833699 mais alterações
+  locais; hashes isolados não reproduzem o estado auditado.
+- Gramática assincrona/aguardar e tipo intrínseco Promessa<T>; retorno declarado
+  T versus chamada Promessa<T>, contextos proibidos, métodos e contratos.
+- Máquina stackless com CFG e vivacidade, avaliação ordenada e slots que cruzam
+  suspensão. Não guardar argv do chamador nem jmp_buf entre steps.
+- Promise com transição única, adoção/reações, microtasks FIFO, reactor epoll,
+  timers monotônicos, cancelamento cooperativo, finally suspenso, observação de
+  rejeições e encerramento/falta de progresso. APIs síncronas continuam síncronas;
+  proposta usa módulos separados para I/O async.
+- Riscos concretos: longjmp/estado global, callbacks externos sem saltos,
+  rastreamento dos frames e filas pelo GC, posse de recursos e eventos obsoletos.
+  curl_multi atual ainda espera o lote; precisa integração socket/timer e auditoria
+  do resolvedor DNS efetivo. APIs atuais de dormir/processos também bloqueiam.
+- Estratégia de testes por etapa e gate de estabilidade antes do paralelismo.
+  Pendências de engenharia explícitas: budgets/códigos, descritores/assinaturas,
+  backend DNS carregado, verificador IR e nomes definitivos da biblioteca async.
+
+Verificações desta etapa: leitura de fontes e documentação primária (Boehm,
+libcurl, ECMAScript e epoll); pkg-config informou GC 8.2.6 e headers libcurl
+8.22.0-DEV, sem verificar a versão carregada ou resolver. Prettier --write/--check passou no documento novo e na seção nova de
+continuidade (formatada isoladamente para preservar o histórico preexistente).
+Revisão textual e conferência dos caminhos principais concluídas. Nenhum build, suíte funcional, benchmark,
+programa de amostra ou teste do editor foi executado; não reaproveitar resultados
+anteriores como validação de async. Nenhuma alteração no compilador/runtime.
+
+Próxima etapa: implementar Etapa 1, núcleo C de Promessas/reações/filas e testes
+sem I/O, seguindo docs/assincronismo.md. Antes do frontend (Etapa 2), fixar
+representação paramétrica/assinaturas, inventário de travessias e verificador da
+IR. Não iniciar integração HTTP sem validar DNS não bloqueante e callbacks.
+Não publicar sem autorização. O trabalho anterior continua registrado abaixo.
+
+---
+
+# Servidor HTTP nativo — 17/11/2026
+
+Solicitação ativa: novo anexo c654117f, auditoria e implementação de cgd:servidor
+primeiro, com sockets opacos, HTTP/1.1, limites, rotas e documentação. Preservar
+as oito bibliotecas da etapa anterior, o livro e alterações locais. Sem push.
+O novo anexo solicita testes por etapa; a autorização de execução será usada
+apenas na validação específica desta implementação, sem repetir a matriz geral.
+
+Auditoria: cgd:rede é cliente libcurl; não fornece servidor. ABI gerenciada usa
+valores tagged e GC Boehm; curl já usa recurso opaco com finalizador de segurança.
+Não reutilizar a tag de curl para sockets. Adicionar tag no fim da enumeração,
+preservando valores da ABI anterior. Destrutores são explícitos: close idempotente
+é obrigatório e finalização GC é apenas contingência. Exceções usam longjmp:
+nenhum recurso temporário sem dono pode sobreviver a uma alocação que lança.
+Runtime atual não garante segurança entre threads: servidor inicial sequencial,
+sem prometer concorrência, TLS, HTTP/2 ou shutdown por sinais globais.
+
+Implementação entregue nesta etapa (fases 1–3 do novo anexo):
+
+- Transporte POSIX em vendor/delegua-runtime/src/sockets_posix.c e contrato
+  sockets_interno.h. Tag opaca própria adicionada ao fim da enumeração da ABI,
+  preservando tags antigas. Budget explícito de 128 sockets, nonblocking/CLOEXEC,
+  poll com prazo monotônico, envio sem SIGPIPE, fechamento idempotente e
+  finalizador GC apenas como contingência. TCP IPv4 numérico, sem DNS implícito.
+- Parser puro em http_parser.c/http_interno.h; adaptação gerenciada em
+  http_servidor.c. Headers/corpo com limites antes de alocar; uma requisição por
+  conexão; rejeição de CL repetido/inválido, TE, Expect, folding, Host inválido,
+  controles, caminhos/escapes proibidos. Date UTC, CL em bytes, HEAD sem corpo,
+  status sem corpo e headers de transporte reservados. Não há arquivos servidos.
+- bibliotecas/sockets.delegua: Conexao, OuvinteTCP e conectar. Sem FD público.
+- bibliotecas/servidor.delegua: HTTP, Requisicao, Resposta, sete métodos, rotas
+  por segmento, query com valores repetidos, middleware síncrono sem captura,
+  JSON, 404/405/500, abrir/atenderUma/ativo/escutar/fechar e shutdown após resposta.
+  Callback que lança não expõe sua mensagem ao cliente. Resposta inválida tenta
+  500; conexão interrompida não encerra o listener. Conexões fechadas em finally.
+- Registro estático via frontend/modules.d e assinaturas de Primitivas; nenhuma
+  mudança em lexer, parser da linguagem, análise semântica ou CTFE.
+- testes/servidor.py, sockets.py e http_parser.c/http_parser.py. Matriz recebe os
+  contratos HTTP/TCP; scripts/sanitizadores.py --rede permite validar apenas API C
+  e rede e sempre restaurar o runtime normal. Relatório próprio, sem sobrescrever
+  o resultado da suíte completa anterior interrompida. Wrapper CC passa argv por
+  execvp Python, sem construir comando de shell.
+- scripts/benchmark_http.py: várias rodadas, conexões novas, latência/RPS, CPU,
+  RSS de pico, inicialização e recuperação após mensagem inválida. Smoke test
+  de duas rodadas/12 requisições/4 clientes passou; não é prova de desempenho.
+- docs/servidor-http.md integra o livro (37 páginas); exemplo real em
+  exemplos/servidor/http.delegua tem contrato de compilação. Teste dedicado faz
+  end-to-end. README, compatibilidade e índice de exemplos apontam para o guia.
+
+Testes realmente executados nesta etapa:
+
+- Runtime C99/Clang com warnings estritos e CGD LDC release: builds passaram.
+- HTTP e sockets reais com/sem otimização: passaram. Incluem requisições parciais,
+  framing hostil, header injection, 408/413/417/431, EOF, fechamento repetido,
+  reuso de porta, teto de 128 recursos, desconexões, 16 clientes simultâneos
+  atendidos sequencialmente e shutdown. Não afirmam atendimento concorrente.
+- Parser puro: regressões e 50000 entradas pseudoaleatórias limitadas com
+  ASan/UBSan passaram. Corpus determinístico não substitui fuzzing contínuo.
+- scripts/sanitizadores.py --rede: API C antiga, parser puro e contratos HTTP/TCP
+  passaram com ASan/UBSan; runtime normal restaurado. LeakSanitizer desabilitado
+  por causa do GC; não afirmar ausência de vazamentos comprovada universalmente.
+- 407 verificações de integração e 132 exemplos/264 verificações passaram.
+- Livro: 37 páginas, links, recursos e índice de busca passaram. Ruff nos scripts
+  novos/runner sanitizado passou. Não foi repetida a matriz completa DMD/LDC2 ×
+  debug/release × GCC/Clang nem o navegador Chrome nesta etapa.
+
+Instalação autorizada: CGD 0.8.0 em ~/.local/bin/cgd (prefixo
+~/.local/share/cgd), runtime normal e 19 bibliotecas. Extensão
+fernandothedev.cgd 0.8.0 com LSP local/bibliotecas/runtime, pacote
+out/cgd-0.8.0.vsix e associação \*.delegua. Recarregar a janela do VS Code para
+substituir o processo LSP já aberto. Nenhum commit/push/publicação remota.
+
+Pendências reais do novo anexo (não entregues como APIs fictícias): UDP/sockets
+locais, DNS/IPv6 do transporte, keep-alive/chunked/streaming/WebSocket/SSE,
+multipart/upload/TLS/HTTP2/compressão e atendimento simultâneo. O servidor é
+sequencial e não garante proteção contra inundação/distribuição de conexões.
+Shutdown é explícito, sem instalação global de signal handlers ou threads.
+Fase 4: ampliar Tempo com calendário, logs estruturados (reusar cgd:log, evitando
+namespace duplicado), fluxos/bytes e criptografia com biblioteca auditada.
+Ambiente básico já existe. OpenSSL 3.5.8, SQLite 3.51.2 e zlib foram encontrados,
+mas nenhuma dependência/API dessas bibliotecas foi acrescentada nesta etapa.
+Fase 5 e demais módulos prioritários seguem pendentes. Concorrência exige estudo
+Boehm/longjmp/estado global: não expor threads sobre valores compartilhados sem
+contrato. Não considerar o documento inteiro concluído só pelo MVP HTTP.
+
+Próximos comandos úteis:
+python3 testes/servidor.py; python3 testes/sockets.py;
+python3 testes/http_parser.py; python3 scripts/sanitizadores.py --rede;
+python3 scripts/benchmark_http.py --rodadas 5 --requisicoes 200 --clientes 8.
+A publicação continua dependendo de autorização explícita neste novo pedido.
+
+Etapa anterior: oito módulos (Processo/Ambiente/Sistema/Tempo/IO/Algoritmos/CLI/Log),
+17 bibliotecas ao todo. Antes da interrupção do usuário, passaram os testes de
+processos, oito exemplos (16 verificações) e unitários DMD/LDC2 (9 módulos cada).
+Sanitizadores foram interrompidos a pedido: API C e integração 407 passaram,
+mas a suíte completa não terminou. Não afirmar aprovação total. Instalação final
+precisa ser refeita após incorporar os novos módulos.
+
+---
+
+# Stdlib de sistema — 17/11/2026
+
+Pedido ativo: documento anexado de expansão arquitetural, começando por auditoria
+e implementação funcional de Processo/Ambiente, com fundamentos nativos necessários.
+
+Auditoria antes das alterações: módulos cgd: são resolvidos estaticamente em
+frontend/modules.d, hoje com whitelist de nove módulos. Bibliotecas já usam
+Primitivas via ABI gerenciada explícita: nenhuma mudança lexical é necessária.
+main do runtime já preserva argc/argv em program_context; reutilizar esse contexto,
+sem outro global público. Valores usam Boehm GC; recursos POSIX exigem fechamento
+antes de construir resultados/lançar, pois exceções fazem longjmp. Destrutores
+são explícitos, não callbacks do GC. Arquivo já lê/escreve/remove arquivos regulares;
+Rede já encapsula libcurl e URI. Textos/coleções/matemática/estatística/caminhos são
+reutilizáveis. Texto armazena bytes com tamanho mas seus índices são Unicode;
+não apresentar vetor de inteiros como buffer nativo eficiente. CTFE aceita funções
+marcadas e subconjunto primitivo: FFI/OS continuam fora da VM. Linux x86_64 é o
+único alvo validado; APIs POSIX novas ficarão em módulos C próprios. Não alegar
+Windows/macOS. Testes reais compilam amostras nos dois modos; exemplos têm contratos.
+
+Decisão inicial: Processo síncrono com argv separado, poll simultâneo em stdout,
+stderr e stdin, timeout e limite de bytes; shell separado e explícito. Ambiente
+isolado no filho por sobrescritas, sem mudar o ambiente do pai. Processo persistente
+será avaliado; não criar iniciar falsamente bloqueante. Preservar trabalho anterior
+do livro e exemplos; nenhuma publicação autorizada nesta etapa.
+
+---
+
+# Livro e expansão dos exemplos — 17/11/2026
+
+Solicitação ativa: fortalecer exemplos e contratos; recriar a documentação com um
+livro no estilo Rust, syntax highlighting Delégua e textos mais naturais no guia,
+site e README. Usado mdBook 0.4.52, já instalado; sem migração de hospedagem.
+
+Implementado:
+
+- Livro em docs/livro, configuração/tema em livro; capítulos preparados pelo
+  scripts/gerar_livro.py a partir de linguagem.json, guias e exemplos reais.
+- Busca, sumário, temas, navegação, cópia e impressão do mdBook; tema verde/escuro
+  preservado. Gramática própria Delégua, sem aproximar pela gramática JavaScript.
+- Conteúdo introdutório reescrito nos 25 capítulos, README e trechos do site;
+  explicação de atributos/classes revisada. Catálogo de diagnósticos no livro.
+- Novos exemplos Textos, Estatistica e Caminhos; Colecoes ampliado preservando
+  os exemplos anteriores. Índice 36–40 e aviso antigo de suspensão corrigidos.
+- Contratos históricos positivos agora verificam saída, negativos fixam fase e
+  diagnóstico. E0001 genérico usa mensagem específica para não aceitar outra falha.
+- Build reproduzível com --check; fontes intermediárias ficam em out. Recursos
+  gerados pelo mdBook não são formatados/editados manualmente.
+
+Validação final:
+
+- 123 exemplos, 246 verificações com/sem otimização: sem falhas.
+- Teste de cópias formatadas: 132 arquivos idempotentes e os 246 contratos passaram.
+- Livro: 35 páginas, links/âncoras/recursos locais e índice de busca conferidos.
+- Chrome desktop/mobile: busca real do livro, sumário, destaque Delégua, ausência
+  de overflow e demais checks do site passaram. Capturas em out/site/livro-\*.png.
+- --check do livro reconstrói em pasta temporária e compara todos os arquivos;
+  saída determinística confirmada. Referência antiga sincronizada, política de
+  tipos, formatadores próprios e git diff --check passaram.
+- Não houve mudança no compilador/runtime; matriz e sanitizadores não foram
+  repetidos. MiniGPT continua explicitamente com contrato de compilação/vínculo,
+  sem afirmar validação do treino completo.
+
+Nenhum push nesta etapa. Fontes e saída do livro estão prontas para o Pages em
+`dev/docs`, preservando a página antiga e seus links. Próximos comandos úteis:
+python3 scripts/gerar_livro.py --check; python3 testes/livro.py;
+python3 testes/site.py. Para atualizar conteúdo, edite as fontes, regenere
+referência/livro e valide; não edite docs/livro manualmente.
+
+---
+
+# Avaliação dos exemplos — 17/11/2026
+
+Pedido: avaliar o catálogo existente. Inspeção estática de organização, contratos,
+runner e amostras; nenhuma suíte repetida e nenhuma publicação nesta avaliação.
+Inventário: 120 fontes, 40 didáticos de linguagem, 15 de compilador, 13 CTFE,
+18 de erros/segurança, 7 de bibliotecas, 2 de módulos e demais aplicações/históricos.
+Pontos principais: aplicações maiores exercitam integração, mas não substituem
+regressões mínimas; contratos históricos por status precisam de fase/código;
+MiniGPT testa apenas compilação; README tem índice incompleto (36–40) e aviso
+obsoleto de testes suspensos. Bibliotecas recentes merecem exemplos dedicados.
+Resultados de 240 verificações pertencem à execução anterior, não a esta análise.
+
+---
+
 # Publicação solicitada — 17/11/2026
 
 Solicitação: incluir os novos exemplos nos testes e publicar runtime e CGD em dev.

@@ -1,0 +1,8 @@
+//! verdadeiro\nsaida.json\n[-arquivo]
+var CLI: qualquer = importar("cgd:cli").CLI
+var parser: qualquer = CLI("Conversor").opcao("ajuda", "h").opcao("saida", "s", verdadeiro)
+var resultado: qualquer = parser.analisar(["-h", "--saida=saida.json", "--", "-arquivo"])
+escreva(resultado.tem("ajuda"))
+escreva(resultado.valor("saida"))
+escreva(resultado.posicionais())
+// Em uma aplicação, parser.atual() lê Processo.argumentos().

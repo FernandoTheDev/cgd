@@ -1,0 +1,30 @@
+classe Sistema {
+    estatico informacoes(): dicionario {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sistemaInfo()
+    }
+
+    estatico nome(): texto {
+        retorna Sistema.informacoes()["nome"]
+    }
+
+    estatico arquitetura(): texto {
+        retorna Sistema.informacoes()["arquitetura"]
+    }
+
+    estatico versao(): texto {
+        retorna Sistema.informacoes()["versao"]
+    }
+
+    estatico separadorCaminho(): texto {
+        retorna "/"
+    }
+
+    estatico separadorBusca(): texto {
+        retorna ":"
+    }
+
+    estatico capacidades(): dicionario {
+        retorna { processos: verdadeiro, shell: verdadeiro, ambiente: verdadeiro, relogioMonotonico: verdadeiro, processosPersistentes: falso, plataformaValidada: "Linux x86_64" }
+    }
+}

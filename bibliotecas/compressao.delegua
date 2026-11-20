@@ -1,0 +1,22 @@
+// Compressão gzip e deflate sobre zlib com proteção contra bombas de descompressão.
+classe Compressao {
+    estatico gzipComprimir(dados: texto, nivel: inteiro = 6): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.compressaoGzipComprimir(dados, nivel)
+    }
+
+    estatico gzipDescomprimir(dados: texto, limite: inteiro = 16777216): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.compressaoGzipDescomprimir(dados, limite)
+    }
+
+    estatico deflateComprimir(dados: texto, nivel: inteiro = 6): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.compressaoDeflateComprimir(dados, nivel)
+    }
+
+    estatico deflateDescomprimir(dados: texto, limite: inteiro = 16777216): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.compressaoDeflateDescomprimir(dados, limite)
+    }
+}

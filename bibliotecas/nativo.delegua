@@ -63,4 +63,124 @@ classe estrangeira Primitivas {
     arquivoRemover(caminho: texto): logico;
     @definicao(simbolo = "delegua_ffi_cgdDicionarioItens")
     dicionarioItens(dicionario: dicionario): qualquer[];
+    @definicao(simbolo = "delegua_ffi_sistemaArgumentos")
+    sistemaArgumentos(): texto[];
+    @definicao(simbolo = "delegua_ffi_sistemaAmbiente")
+    sistemaAmbiente(nome: texto): qualquer;
+    @definicao(simbolo = "delegua_ffi_sistemaDiretorio")
+    sistemaDiretorio(): texto;
+    @definicao(simbolo = "delegua_ffi_sistemaInfo")
+    sistemaInfo(): dicionario;
+    @definicao(simbolo = "delegua_ffi_sistemaRelogio")
+    sistemaRelogio(monotonico: logico): real;
+    @definicao(simbolo = "delegua_ffi_sistemaDormir")
+    sistemaDormir(milisegundos: inteiro): vazio;
+    @definicao(simbolo = "delegua_ffi_sistemaExecutar")
+    sistemaExecutar(programa: texto, argumentos: texto[], diretorio: texto, ambiente: dicionario,
+        timeout: inteiro, limite: inteiro, entrada: texto): dicionario;
+    @definicao(simbolo = "delegua_ffi_sistemaEscrever")
+    sistemaEscrever(valor: texto, erro: logico): inteiro;
+    @definicao(simbolo = "delegua_ffi_sistemaLerLinha")
+    sistemaLerLinha(limite: inteiro): qualquer;
+    @definicao(simbolo = "delegua_ffi_sistemaDefinirAmbiente")
+    sistemaDefinirAmbiente(nome: texto, valor: qualquer): vazio;
+    @definicao(simbolo = "delegua_ffi_sistemaVariaveis")
+    sistemaVariaveis(): dicionario;
+    @definicao(simbolo = "delegua_ffi_socketAbrir")
+    socketAbrir(endereco: texto, porta: inteiro, servidor: logico, timeout: inteiro): qualquer;
+    @definicao(simbolo = "delegua_ffi_socketAceitar")
+    socketAceitar(servidor: qualquer, timeout: inteiro): qualquer;
+    @definicao(simbolo = "delegua_ffi_socketFechar")
+    socketFechar(socket: qualquer): vazio;
+    @definicao(simbolo = "delegua_ffi_socketPorta")
+    socketPorta(socket: qualquer): inteiro;
+    @definicao(simbolo = "delegua_ffi_socketReceber")
+    socketReceber(socket: qualquer, limite: inteiro, timeout: inteiro): texto;
+    @definicao(simbolo = "delegua_ffi_socketEnviar")
+    socketEnviar(socket: qualquer, dados: texto, timeout: inteiro): inteiro;
+    @definicao(simbolo = "delegua_ffi_httpReceber")
+    httpReceber(socket: qualquer, maxCabecalhos: inteiro, maxCorpo: inteiro, timeout: inteiro): dicionario;
+    @definicao(simbolo = "delegua_ffi_httpEnviar")
+    httpEnviar(socket: qualquer, status: inteiro, cabecalhos: dicionario, corpo: texto, head: logico,
+        timeout: inteiro): vazio;
+    @definicao(simbolo = "delegua_ffi_httpAnalisarTexto")
+    httpAnalisarTexto(bruto: texto, maxCabecalhos: inteiro, maxCorpo: inteiro): dicionario;
+    @definicao(simbolo = "delegua_ffi_httpFormatarResposta")
+    httpFormatarResposta(status: inteiro, cabecalhos: dicionario, corpo: texto, head: logico,
+        keepAlive: logico): texto;
+    @definicao(simbolo = "delegua_ffi_socketUdpAbrir")
+    socketUdpAbrir(endereco: texto, porta: inteiro): qualquer;
+    @definicao(simbolo = "delegua_ffi_socketUdpEnviar")
+    socketUdpEnviar(socket: qualquer, dados: texto, endereco: texto, porta: inteiro): inteiro;
+    @definicao(simbolo = "delegua_ffi_socketUdpReceber")
+    socketUdpReceber(socket: qualquer, limite: inteiro, timeout: inteiro): dicionario;
+    @definicao(simbolo = "delegua_ffi_socketResolverDns")
+    socketResolverDns(host: texto, familia: texto): texto[];
+    @definicao(simbolo = "delegua_ffi_sistemaDataHora")
+    sistemaDataHora(segundos: inteiro, utc: logico): dicionario;
+    @definicao(simbolo = "delegua_ffi_sistemaTimestamp")
+    sistemaTimestamp(ano: inteiro, mes: inteiro, dia: inteiro, hora: inteiro, minuto: inteiro,
+        segundo: inteiro): inteiro;
+    @definicao(simbolo = "delegua_ffi_bytesCriar")
+    bytesCriar(tamanho: inteiro): qualquer;
+    @definicao(simbolo = "delegua_ffi_bytesDeTexto")
+    bytesDeTexto(valor: texto): qualquer;
+    @definicao(simbolo = "delegua_ffi_bytesDeVetor")
+    bytesDeVetor(valores: inteiro[]): qualquer;
+    @definicao(simbolo = "delegua_ffi_bytesDeHex")
+    bytesDeHex(hex: texto): qualquer;
+    @definicao(simbolo = "delegua_ffi_bytesDeBase64")
+    bytesDeBase64(b64: texto): qualquer;
+    @definicao(simbolo = "delegua_ffi_bytesTamanho")
+    bytesTamanho(buffer: qualquer): inteiro;
+    @definicao(simbolo = "delegua_ffi_bytesObter")
+    bytesObter(buffer: qualquer, indice: inteiro): inteiro;
+    @definicao(simbolo = "delegua_ffi_bytesDefinir")
+    bytesDefinir(buffer: qualquer, indice: inteiro, valor: inteiro): vazio;
+    @definicao(simbolo = "delegua_ffi_bytesFatiar")
+    bytesFatiar(buffer: qualquer, inicio: inteiro, fim: inteiro): qualquer;
+    @definicao(simbolo = "delegua_ffi_bytesConcatenar")
+    bytesConcatenar(a: qualquer, b: qualquer): qualquer;
+    @definicao(simbolo = "delegua_ffi_bytesParaTexto")
+    bytesParaTexto(buffer: qualquer): texto;
+    @definicao(simbolo = "delegua_ffi_bytesParaHex")
+    bytesParaHex(buffer: qualquer): texto;
+    @definicao(simbolo = "delegua_ffi_bytesParaBase64")
+    bytesParaBase64(buffer: qualquer): texto;
+    @definicao(simbolo = "delegua_ffi_bytesParaVetor")
+    bytesParaVetor(buffer: qualquer): inteiro[];
+    @definicao(simbolo = "delegua_ffi_bytesIgual")
+    bytesIgual(a: qualquer, b: qualquer): logico;
+    @definicao(simbolo = "delegua_ffi_bytesEncontrar")
+    bytesEncontrar(buffer: qualquer, alvo: qualquer, inicio: inteiro): inteiro;
+    @definicao(simbolo = "delegua_ffi_criptoSha256")
+    criptoSha256(dados: texto): texto;
+    @definicao(simbolo = "delegua_ffi_criptoSha512")
+    criptoSha512(dados: texto): texto;
+    @definicao(simbolo = "delegua_ffi_criptoHmacSha256")
+    criptoHmacSha256(chave: texto, dados: texto): texto;
+    @definicao(simbolo = "delegua_ffi_criptoBytesAleatorios")
+    criptoBytesAleatorios(quantidade: inteiro): texto;
+    @definicao(simbolo = "delegua_ffi_criptoHexAleatorio")
+    criptoHexAleatorio(quantidade: inteiro): texto;
+    @definicao(simbolo = "delegua_ffi_criptoCompararConstante")
+    criptoCompararConstante(a: texto, b: texto): logico;
+    @definicao(simbolo = "delegua_ffi_compressaoGzipComprimir")
+    compressaoGzipComprimir(dados: texto, nivel: inteiro): texto;
+    @definicao(simbolo = "delegua_ffi_compressaoGzipDescomprimir")
+    compressaoGzipDescomprimir(dados: texto, limite: inteiro): texto;
+    @definicao(simbolo = "delegua_ffi_compressaoDeflateComprimir")
+    compressaoDeflateComprimir(dados: texto, nivel: inteiro): texto;
+    @definicao(simbolo = "delegua_ffi_compressaoDeflateDescomprimir")
+    compressaoDeflateDescomprimir(dados: texto, limite: inteiro): texto;
+    @definicao(simbolo = "delegua_ffi_sqliteAbrir")
+    sqliteAbrir(caminho: texto): qualquer;
+    @definicao(simbolo = "delegua_ffi_sqliteFechar")
+    sqliteFechar(conexao: qualquer): vazio;
+    @definicao(simbolo = "delegua_ffi_sqliteExecutar")
+    sqliteExecutar(conexao: qualquer, sql: texto, parametros: qualquer[]): inteiro;
+    @definicao(simbolo = "delegua_ffi_sqliteConsultar")
+    sqliteConsultar(conexao: qualquer, sql: texto, parametros: qualquer[]): dicionario[];
+    @definicao(simbolo = "delegua_ffi_sqliteUltimoId")
+    sqliteUltimoId(conexao: qualquer): inteiro;
 }

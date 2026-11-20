@@ -3,7 +3,7 @@
     "id": "inicio",
     "title": "Comece aqui: instalar, escrever e executar",
     "status": "parcial",
-    "description": "CGD compila um perfil próprio de Delégua para C99 e usa memória gerenciada. Esta documentação descreve o compilador, suas bibliotecas e ferramentas; o interpretador original não é uma dependência de execução.",
+    "description": "Vamos sair do arquivo vazio e chegar a um programa rodando. Você vai instalar as ferramentas, escrever as primeiras linhas e conhecer os comandos que usará no dia a dia.",
     "topics": [
       {
         "title": "Ambiente e construção",
@@ -40,7 +40,7 @@
     "id": "editor",
     "title": "Editor: arquivos, cores, inferência e hover",
     "status": "parcial",
-    "description": "A extensão VS Code usa um LSP local persistente. A edição não dispara build, linker, rede ou execução do programa.",
+    "description": "Abra um arquivo .delegua no VS Code e deixe o editor ajudar com tipos, nomes e erros. O servidor roda na sua máquina; editar o texto não compila nem executa o programa.",
     "topics": [
       {
         "title": "Instalação e identidade visual",
@@ -83,7 +83,7 @@
     "id": "valores",
     "title": "Valores, tipos e variáveis",
     "status": "parcial",
-    "description": "Use var para variáveis e const para vínculos constantes. As anotações aparecem após dois-pontos. Nulo, lógicos, números, textos, coleções, objetos e funções são valores gerenciados.",
+    "description": "Uma variável guarda um valor; uma anotação diz qual valor você espera receber. Veja quando usar var ou const e o que acontece quando você deixa o tipo por conta do compilador.",
     "examples": [
       "linguagem/01_tipos.delegua",
       "linguagem/03_atribuicoes.delegua",
@@ -133,7 +133,7 @@
     "id": "operadores",
     "title": "Operadores e ordem de avaliação",
     "status": "suportado",
-    "description": "Aritmética, potência, divisão inteira, bits, comparações, pertencimento, atribuições compostas e incremento. Os argumentos e índices são avaliados na ordem da fonte.",
+    "description": "Some, compare e combine valores. Além da conta em si, importa a ordem: argumentos e índices são avaliados na ordem em que aparecem no código.",
     "examples": ["linguagem/02_operadores.delegua", "linguagem/35_bits_e_atribuicoes.delegua"],
     "notes": "e/ou retornam o valor selecionado. 0, texto vazio e coleções vazias são verdadeiros; falso e nulo são falsos. ?: troca somente nulo. Overflow e divisão por zero lançam exceção.",
     "topics": [
@@ -156,7 +156,7 @@
     "id": "controle",
     "title": "Condições, escolha e laços",
     "status": "suportado",
-    "description": "se/senão, ternário, escolha/caso/padrão, enquanto, fazer/enquanto, para, para cada, sustar e continua controlam o fluxo.",
+    "description": "Seu programa precisa escolher caminhos e repetir tarefas. Comece com se e enquanto; depois experimente escolha, para cada e as formas de encerrar uma repetição.",
     "examples": [
       "linguagem/04_condicionais.delegua",
       "linguagem/05_lacos.delegua",
@@ -183,7 +183,7 @@
     "id": "coletores",
     "title": "Laços como expressões",
     "status": "suportado",
-    "description": "Um laço usado como expressão constrói um vetor. retorna dentro do coletor contribui um valor ao resultado; o compilador distingue esse retorno do retorno da função.",
+    "description": "Às vezes o resultado de um laço é justamente a lista que ele produz. Um coletor permite escrever essa transformação sem montar o vetor à mão.",
     "examples": ["linguagem/06_lacos_resultado.delegua"],
     "notes": "",
     "topics": [
@@ -206,8 +206,12 @@
     "id": "funcoes",
     "title": "Funções e parâmetros",
     "status": "suportado",
-    "description": "Declare funções nomeadas ou anônimas; passe funções como argumentos, retorne funções sem captura e use métodos ligados. Valores padrão são avaliados no chamado e podem usar parâmetros anteriores. ... recebe argumentos variáveis.",
-    "examples": ["linguagem/07_funcoes.delegua", "linguagem/08_funcoes_valores.delegua"],
+    "description": "Dê nome a uma operação para usá-la de novo. Depois, passe funções como argumentos e experimente valores padrão, argumentos variáveis e callbacks sem captura.",
+    "examples": [
+      "linguagem/07_funcoes.delegua",
+      "linguagem/08_funcoes_valores.delegua",
+      "linguagem/41_assincronismo.delegua"
+    ],
     "notes": "Capturas de variáveis externas são bloqueadas. Passe o estado explicitamente por parâmetros; um método ligado mantém apenas seu receptor gerenciado.",
     "topics": [
       {
@@ -222,6 +226,13 @@
         "paragraphs": [
           "Funções e arrows podem ser valores e callbacks. Não carregam variáveis do ambiente externo: passe os dados por parâmetros. Capturas geram aviso e erro. Métodos ligados mantêm seu receptor explicitamente gerenciado. Esta decisão evita introduzir um ambiente de closures com semântica parcial."
         ]
+      },
+      {
+        "title": "Assincronismo experimental do CGD",
+        "paragraphs": [
+          "assincrona funcao f(): T inicia imediatamente e devolve Promessa<T>. aguardar suspende apenas o corpo assíncrono atual e retoma por uma microtask, inclusive para resultados prontos. O runtime drena essas continuações depois da raiz síncrona. Não há threads paralelas.",
+          "Funções e métodos assíncronos aceitam tente/pegue/finalmente, laços, escolha, compreensões e spread. Classes locais em corpos assíncronos recebem E3305. Promessa oferece combinadores e cancelamento cooperativo. O módulo cgd:assincrono fornece temporizadores, cliente HTTP e TCP sobre o reactor Linux. As bibliotecas Tempo, Rede e Processo mantêm suas operações síncronas. Os contratos e limites experimentais estão em docs/assincronismo.md."
+        ]
       }
     ]
   },
@@ -229,7 +240,7 @@
     "id": "vetores",
     "title": "Vetores, compreensão e fatias",
     "status": "suportado",
-    "description": "Vetores são mutáveis. Há índices negativos, espalhamento, compreensão com filtro e fatiamento com passo. Contratos de tipos continuam válidos através de aliases.",
+    "description": "Vetores guardam uma sequência que pode mudar. Você pode acessar posições, percorrer os elementos, escolher uma fatia ou construir outro vetor com uma compreensão.",
     "examples": [
       "linguagem/09_vetores.delegua",
       "linguagem/10_compreensao_fatias.delegua",
@@ -257,7 +268,7 @@
     "id": "dicionarios",
     "title": "Dicionários, tuplas e clonagem",
     "status": "suportado",
-    "description": "Dicionários associam chaves a valores; tuplas são imutáveis. Desestruture propriedades e use propriedades ordinais de tuplas. clonar copia grafos e preserva ciclos.",
+    "description": "Use um dicionário para procurar um valor pela chave, e uma tupla para reunir valores sem mudar sua estrutura. Neste capítulo, você também verá como copiar coleções sem perder suas relações.",
     "examples": [
       "linguagem/11_dicionarios.delegua",
       "linguagem/12_tuplas.delegua",
@@ -286,7 +297,7 @@
     "id": "texto",
     "title": "Texto, Unicode e interpolação",
     "status": "suportado",
-    "description": "Textos usam UTF-8. Tamanho, índices e fatias contam pontos de código. Interpole expressões com ${...} e use escapes; mudanças de caixa seguem as tabelas Unicode do runtime.",
+    "description": "Acentos e outros caracteres fazem parte do texto. O CGD usa UTF-8 e conta posições por pontos de código; vamos ver o que isso significa ao medir, percorrer e recortar uma string.",
     "examples": ["linguagem/13_texto_unicode.delegua", "linguagem/28_metodos_texto.delegua"],
     "notes": "Métodos: tamanho, inclui/contem/contém, fatiar/subtexto, aparar, apararInicio, apararFim, maiusculo/tudoMaiusculo, minusculo/tudoMinusculo, encontrar, dividir, substituir e concatenar. Pontos de código não equivalem a grafemas visuais.",
     "topics": [
@@ -315,7 +326,7 @@
     "id": "classes",
     "title": "Classes, herança e acessores",
     "status": "parcial",
-    "description": "Declare campos e métodos; inicialize com construtor, acesse o receptor por isto e a implementação herdada por super. Visibilidades público, privado e protegido usam a classe lexical.",
+    "description": "Use classes para reunir os dados e as operações de uma mesma ideia. Vamos começar com atributos, métodos e valores iniciais; depois veremos herança e controle de acesso.",
     "examples": [
       "linguagem/14_classes.delegua",
       "linguagem/15_heranca.delegua",
@@ -329,7 +340,8 @@
       {
         "title": "Atributos e inicializadores",
         "paragraphs": [
-          "Atributos têm tipo e podem ter valor na própria classe. Cada instância recebe seus próprios defaults e coleções; a expressão explícita é reavaliada para cada objeto. Primeiro são inicializados os campos da base, depois os da derivada, em ordem de declaração; em seguida executa o construtor selecionado. isto permite ler membros já inicializados. O inicializador escreve o armazenamento inicial diretamente, sem disparar um setter customizado."
+          "Você pode dar um valor ao atributo na própria classe. Ele será calculado a cada objeto criado: dois objetos não compartilham o mesmo vetor só porque o atributo foi declarado uma vez. Primeiro vêm os atributos da base, depois os da classe derivada, sempre na ordem da declaração. O construtor roda em seguida, com esses valores já disponíveis.",
+          "Se um inicializador usa outro atributo, declare esse atributo antes. A inicialização grava o valor inicial diretamente, sem chamar um setter personalizado."
         ],
         "code": "classe Contador {\n    valor: inteiro = 1\n    historico: inteiro[]\n    incrementar(): vazio { isto.valor++ }\n}\nvar a: Contador = Contador()\nvar b: Contador = Contador()\na.historico.adicionar(3) // b.historico continua vazio"
       },
@@ -351,7 +363,7 @@
     "id": "excecoes",
     "title": "Exceções e limpeza",
     "status": "suportado",
-    "description": "Use tente, pegue, finalmente e falhar. Excecao possui mensagem; subclasses podem ser tratadas por tipo. Finalmente executa também em retornos e desvios de laços.",
+    "description": "Uma operação pode falhar, e seu programa pode se preparar para isso. Use tente e pegue para tratar a falha, e finalmente para fazer a limpeza que precisa acontecer em qualquer caminho.",
     "examples": [
       "linguagem/17_excecoes.delegua",
       "linguagem/18_finalmente_retorno.delegua",
@@ -378,7 +390,7 @@
     "id": "modulos",
     "title": "Módulos estáticos",
     "status": "suportado",
-    "description": "importar recebe caminho literal .delegua, relativo ao módulo que importa. O loader canonicaliza, reutiliza unidades, mostra a cadeia de ciclos e impõe limites de recursos.",
+    "description": "Quando o programa crescer, divida o código em arquivos. A importação usa caminhos conhecidos na compilação e resolve cada caminho a partir do arquivo que o declara.",
     "examples": ["modulos/01_importacao.delegua", "compilador/08_otimizacao_modulos.delegua"],
     "notes": "Inicialização é única; se falhar, permite nova tentativa. Exportações não podem ser substituídas. Importação dinâmica, NPM e código estrangeiro são excluídos.",
     "topics": [
@@ -401,7 +413,7 @@
     "id": "biblioteca",
     "title": "Biblioteca nativa e entrada/saída",
     "status": "suportado",
-    "description": "escreva, leia, tamanho, inteiro, numero/número, real, texto, tupla, clonar, aleatorio, aleatorioEntre, mapear, filtrar, ordenar, paraCada e todosEmCondicao compõem a biblioteca global.",
+    "description": "Você não precisa começar tudo do zero. Estas funções já estão disponíveis para escrever na tela, ler uma entrada, converter valores e trabalhar com coleções.",
     "examples": [
       "linguagem/21_biblioteca.delegua",
       "linguagem/27_entrada.delegua",
@@ -429,7 +441,7 @@
     "id": "metadados",
     "title": "Decoradores e asserções",
     "status": "parcial",
-    "description": "Decoradores registram metadados; decoradores(valor) devolve cópias desses dados. Envelopes de funções livres podem trocar a função, desde que não capturem ambiente. Asserções lançam exceções tratáveis.",
+    "description": "Metadados descrevem uma declaração; asserções verificam uma condição durante a execução. Conheça as duas ferramentas antes de usar os decoradores mais avançados.",
     "examples": ["linguagem/23_decoradores.delegua", "linguagem/24_assercoes.delegua"],
     "notes": "Envelopes em métodos ainda são rejeitados. Metadados em métodos, classes e campos são suportados. Asserções não são removidas por -o.",
     "topics": [
@@ -459,7 +471,7 @@
     "id": "otimizacoes",
     "title": "Otimização e avaliação em compilação",
     "status": "parcial",
-    "description": "-o habilita passes até ponto fixo. Literais, constantes por identidade, ramos mortos e curto-circuito são simplificados preservando efeitos. //>puro habilita CTFE em uma VM com orçamento.",
+    "description": "Um programa correto deve continuar correto depois de otimizado. Veja o que a opção -o permite simplificar e quando uma chamada pode ser calculada ainda na compilação.",
     "examples": [
       "linguagem/26_ctfe.delegua",
       "compilador/01_constantes_escopos.delegua",
@@ -492,7 +504,7 @@
     "id": "diagnosticos",
     "title": "Diagnósticos e ferramentas",
     "status": "parcial",
-    "description": "--verificar analisa sem gerar binário. --emitir-c gera C99 sem exigir linker/runtime instalado. --diagnosticos=json produz JSON Lines em stderr, com código, severidade, mensagem, explicação e intervalo. --explicar E3101 consulta o catálogo central sem compilar.",
+    "description": "Encontrou um erro? Comece pela mensagem, pelo código e pelo trecho marcado. Você também pode pedir uma explicação ou verificar o arquivo sem gerar um executável.",
     "examples": [
       "compilador/05_diagnosticos.delegua",
       "compilador/06_sugestao.delegua",
@@ -521,7 +533,7 @@
     "id": "exclusoes",
     "title": "Exclusões de segurança",
     "status": "excluido",
-    "description": "Upvalues/capturas de estado externo, ponteiros crus, eval, carregamento dinâmico e NPM não são expostos. Esses exemplos devem falhar e fazem parte dos testes.",
+    "description": "Alguns recursos ficam de fora para manter os limites desta implementação claros. Aqui estão os casos recusados e exemplos que mostram como o compilador responde.",
     "examples": [
       "seguranca/01_captura_local.delegua",
       "seguranca/02_captura_global.delegua",
@@ -548,7 +560,7 @@
     "id": "plataformas",
     "title": "Plataformas e limites da implementação",
     "status": "parcial",
-    "description": "Linux x86_64 é a plataforma validada com DMD e LDC2, Clang e GCC. A CLI permite configurar target, sysroot, compilador e runtime separadamente para preparar builds cruzados.",
+    "description": "Hoje, a plataforma testada é Linux x86_64. Há opções para selecionar compilador C, alvo e runtime, mas configurar outro alvo não significa que ele já foi validado.",
     "examples": [],
     "notes": "Windows/macOS e executáveis cruzados ainda não foram validados. Instaladores são shell/Linux. Não há bigint, dialetos extras, threads da linguagem, debugger ou bibliotecas Node. Consulte o guia de desenvolvimento para configurar a toolchain.",
     "topics": [
@@ -570,7 +582,7 @@
     "id": "bibliotecas-cgd",
     "title": "JSON, rede, arquivos e coleções do CGD",
     "status": "parcial",
-    "description": "Namespaces cgd:json, cgd:rede, cgd:arquivos, cgd:colecoes, cgd:matematica, cgd:textos, cgd:estatistica e cgd:caminhos fornecem classes de biblioteca. cgd:nativo é a ponte de implementação.",
+    "description": "Para ler arquivos, conversar por HTTP ou trabalhar com JSON, importe uma das bibliotecas cgd:. Cada módulo reúne classes voltadas para uma tarefa.",
     "examples": [
       "bibliotecas/json_classe.delegua",
       "bibliotecas/rede.delegua",
@@ -622,7 +634,7 @@
     "id": "metodos-estaticos",
     "title": "Métodos estáticos e ferramentas do editor",
     "status": "parcial",
-    "description": "estatico declara método sem isto, herdado e acessível pela classe ou instância. O LSP local oferece completion por tipo, signature help e formatador com quatro espaços. Ctrl+Shift+I formata no VS Code; --formatar formata pela CLI. Construtor/destrutor/estatico são palavras-chave. Hover oferece prévia CTFE limitada para expressões constantes e chamadas puras, sem compilar por edição.",
+    "description": "Um método estático pertence à classe e não recebe isto. Veja como declará-lo e como o editor ajuda a encontrar os membros disponíveis em cada receptor.",
     "examples": ["estaticos.delegua"],
     "notes": "Campos estáticos e depurador/DAP não estão implementados. O editor analisa sem compilar/linkar por edição. Literais longos não são divididos pelo formatador. A prévia usa cópias e orçamento por revisão; falhas deixam o valor para execução. ",
     "topics": [
@@ -645,7 +657,7 @@
     "id": "evolucao-04",
     "title": "Contratos, arrows e FFI C",
     "status": "parcial",
-    "description": "Classes abstratas, interfaces explícitas, enums numéricos e arrow functions sem captura. Classes estrangeiras usam @definicao com ABI C escalar ou gerenciada.",
+    "description": "Interfaces descrevem o que uma classe oferece; classes abstratas ajudam a compartilhar uma base. Completam este capítulo os enums, as arrows e a ligação explícita com funções C.",
     "examples": [
       "linguagem/38_contratos.delegua",
       "bibliotecas/matematica.delegua",
@@ -687,7 +699,7 @@
     "id": "decisoes",
     "title": "Decisões de escopo: o que não fará parte da linguagem",
     "status": "parcial",
-    "description": "O CGD é uma linguagem compilada para C99 com referência em Delégua. Estas decisões são parte de seu contrato, não promessas para uma versão futura.",
+    "description": "Por que esta linguagem funciona assim? Estas escolhas explicam o recorte do CGD, incluindo os recursos que não serão adicionados e as diferenças em relação ao interpretador Delégua.",
     "topics": [
       {
         "title": "Exclusões definitivas",
@@ -731,7 +743,7 @@
     "id": "runtime-erros",
     "title": "Erros do programa: apresentação e localização",
     "status": "suportado",
-    "description": "Falhas não capturadas usam a mesma estrutura visual dos diagnósticos do compilador, sem formatação adicional no caminho de sucesso.",
+    "description": "Quando uma falha escapa dos seus tratadores, o programa mostra a mensagem e aponta o trecho de origem. Saiba ler esse diagnóstico e o que ainda aparece quando o arquivo já não está disponível.",
     "examples": [],
     "notes": "O código dinâmico permanece R0001. O formato humano não substitui um protocolo de depuração.",
     "topics": [
@@ -755,8 +767,13 @@
     "id": "stdlib-ampliada",
     "title": "Biblioteca padrão: textos, estatística, caminhos e coleções",
     "status": "suportado",
-    "description": "Classes próprias agrupam operações úteis, com tipos explícitos, limites e comportamento definido para entradas vazias. As importações são estáticas e nenhum método é executado pelo editor.",
-    "examples": [],
+    "description": "Precisa preencher um código com zeros, resumir uma amostra ou montar o caminho de um arquivo? Estas classes cuidam dessas tarefas sem espalhar pequenos utilitários pelo seu programa.",
+    "examples": [
+      "bibliotecas/textos.delegua",
+      "bibliotecas/estatistica.delegua",
+      "bibliotecas/caminhos.delegua",
+      "bibliotecas/colecoes.delegua"
+    ],
     "notes": "APIs matemáticas seguem libm: domínios inválidos podem produzir valores não finitos. Caminhos são POSIX lexicais, sem resolução de links.",
     "topics": [
       {

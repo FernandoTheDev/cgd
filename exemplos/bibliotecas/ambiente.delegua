@@ -1,0 +1,10 @@
+//! verdadeiro\nvalor
+var ambiente: qualquer = importar("cgd:ambiente").Ambiente
+escreva(tamanho(ambiente.diretorioAtual()) > 0)
+ambiente.definir("CGD_EXEMPLO_AMBIENTE", "valor")
+tente {
+    escreva(ambiente.obter("CGD_EXEMPLO_AMBIENTE"))
+}
+finalmente {
+    ambiente.remover("CGD_EXEMPLO_AMBIENTE")
+}

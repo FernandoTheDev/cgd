@@ -1,0 +1,42 @@
+// Primitivas criptográficas apoiadas pela OpenSSL libcrypto auditada do sistema.
+classe Cripto {
+    estatico sha256(dados: texto): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.criptoSha256(dados)
+    }
+
+    estatico sha512(dados: texto): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.criptoSha512(dados)
+    }
+
+    estatico hmacSha256(chave: texto, dados: texto): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.criptoHmacSha256(chave, dados)
+    }
+
+    estatico bytesAleatorios(quantidade: inteiro): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.criptoBytesAleatorios(quantidade)
+    }
+
+    estatico hexAleatorio(bytes: inteiro = 16): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.criptoHexAleatorio(bytes)
+    }
+
+    estatico compararConstante(a: texto, b: texto): logico {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.criptoCompararConstante(a, b)
+    }
+
+    estatico base64Codificar(dados: texto): texto {
+        var modBytes: qualquer = importar("cgd:bytes")
+        retorna modBytes.Bytes.deTexto(dados).paraBase64()
+    }
+
+    estatico base64Decodificar(valor: texto): texto {
+        var modBytes: qualquer = importar("cgd:bytes")
+        retorna modBytes.Bytes.deBase64(valor).paraTexto()
+    }
+}

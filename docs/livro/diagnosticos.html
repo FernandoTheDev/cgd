@@ -1,0 +1,332 @@
+<!DOCTYPE HTML>
+<html lang="pt-BR" class="navy sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Diagnósticos e ferramentas - O livro do CGD</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="tema/cgd.css">
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "navy";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('navy')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">O livro do CGD</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/FernandoTheDev/cgd" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="diagnósticos-e-ferramentas"><a class="header" href="#diagnósticos-e-ferramentas">Diagnósticos e ferramentas</a></h1>
+<p>Encontrou um erro? Comece pela mensagem, pelo código e pelo trecho marcado. Você também pode pedir uma explicação ou verificar o arquivo sem gerar um executável.</p>
+<h2 id="encontrar-a-causa"><a class="header" href="#encontrar-a-causa">Encontrar a causa</a></h2>
+<p>Diagnósticos incluem severidade, código, arquivo e intervalo. --diagnosticos=json serve ferramentas; --explicar CODIGO explica o catálogo. Falhas comprovadas em região protegida por pegue recebem avisos W31xx para preservar o tratamento deliberado. Dados externos continuam validados no runtime. R0001 é a categoria dinâmica genérica, não uma pilha completa de chamadas.</p>
+<pre><code class="language-sh">./cgd programa.delegua --verificar --diagnosticos=json
+./cgd --explicar E3101
+</code></pre>
+<h2 id="recuperação-e-limites"><a class="header" href="#recuperação-e-limites">Recuperação e limites</a></h2>
+<p>O parser tenta reportar erros independentes e o LSP tolera edições incompletas. Fontes, nós, profundidade e módulos têm orçamentos defensivos. Erros de tipos/escopo não são adiados até C para parecer que a análise passou. Avisos não equivalem a uma prova global de segurança.</p>
+<h2 id="experimente-05_diagnosticos"><a class="header" href="#experimente-05_diagnosticos">Experimente: 05_diagnosticos</a></h2>
+<pre><code class="language-delegua">// Dois erros independentes: o parser recupera e reporta os dois.
+var primeiro: qualquer =;
+var segundo: qualquer =;
+</code></pre>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/05_diagnosticos.delegua">Ver exemplo completo e teste</a></p>
+<h2 id="experimente-06_sugestao"><a class="header" href="#experimente-06_sugestao">Experimente: 06_sugestao</a></h2>
+<pre><code class="language-delegua">var mensagem: texto = "Olá"
+escreva(mensage)
+</code></pre>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/06_sugestao.delegua">Ver exemplo completo e teste</a></p>
+<h2 id="experimente-12_divisao_estatica"><a class="header" href="#experimente-12_divisao_estatica">Experimente: 12_divisao_estatica</a></h2>
+<pre><code class="language-delegua">const zero: inteiro = 3 - 3
+escreva(10 / zero)
+</code></pre>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/12_divisao_estatica.delegua">Ver exemplo completo e teste</a></p>
+<h2 id="experimente-13_indice_unicode"><a class="header" href="#experimente-13_indice_unicode">Experimente: 13_indice_unicode</a></h2>
+<pre><code class="language-delegua">// 'ação' tem quatro pontos de código; o maior índice positivo é 3.
+escreva("ação"[4])
+</code></pre>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/13_indice_unicode.delegua">Ver exemplo completo e teste</a></p>
+<h2 id="experimente-14_falha_tratada"><a class="header" href="#experimente-14_falha_tratada">Experimente: 14_falha_tratada</a></h2>
+<pre><code class="language-delegua">// Uma operação deliberadamente inválida dentro de pegue recebe aviso W3101.
+// A exceção continua tratável, e a localização não exige chamada por linha.
+tente {
+    escreva(1 / 0)
+} pegue (erro) {
+    escreva("tratado")
+}
+</code></pre>
+<p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/14_falha_tratada.delegua">Ver exemplo completo e teste</a></p>
+<h2 id="códigos-de-diagnóstico"><a class="header" href="#códigos-de-diagnóstico">Códigos de diagnóstico</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>Código</th><th>Mensagem</th><th>O que fazer</th></tr></thead><tbody>
+<tr><td>R0001</td><td>%s</td><td>Falha dinâmica do runtime; consulte a operação e a localização informadas. Tipos dinâmicos, aliases e entrada externa continuam validados em execução.</td></tr>
+<tr><td>E0001</td><td>%s</td><td>Diagnóstico legado; consulte a mensagem e a posição.</td></tr>
+<tr><td>W0001</td><td>%s</td><td>Aviso legado; consulte a mensagem e a posição.</td></tr>
+<tr><td>H0001</td><td>%s</td><td>Informação complementar de um diagnóstico.</td></tr>
+<tr><td>E0002</td><td>Limite de diagnósticos atingido; corrija os erros anteriores.</td><td>O limite protege contra uma cascata de erros.</td></tr>
+<tr><td>E9001</td><td>%s</td><td>Verifique arquivos, opções, dependências e a toolchain configurada.</td></tr>
+<tr><td>E2001</td><td>Ciclo de importação detectado: %s</td><td>Quebre a dependência circular mostrada pela cadeia de importação.</td></tr>
+<tr><td>E2002</td><td>Limite de recursos de carregamento de módulos excedido.</td><td>Divida o grafo; os limites de tamanho e quantidade são documentados.</td></tr>
+<tr><td>E2003</td><td>%s</td><td></td></tr>
+<tr><td>Importado por: %s</td><td>Confira o caminho literal relativo ao módulo que importa.</td><td></td></tr>
+<tr><td>W4002</td><td>Carregamento dinâmico/NPM/FFI não é suportado por segurança.</td><td>Use fontes .delegua conhecidas na compilação.</td></tr>
+<tr><td>E4002</td><td>Importe um módulo fonte .delegua.</td><td>Importação de código nativo ou carregado dinamicamente é excluída.</td></tr>
+<tr><td>E1000</td><td>Fim inesperado do arquivo; verifique delimitadores e expressões incompletas.</td><td>Feche os delimitadores e complete a última expressão.</td></tr>
+<tr><td>E1001</td><td>%s</td><td>A mensagem descreve o token ou expressão esperado; o parser tenta recuperar em outro comando.</td></tr>
+<tr><td>E3002</td><td>Incompatibilidade de tipo: era esperado '%s' mas foi recebido '%s'.</td><td>Use um tipo compatível com o contrato declarado.</td></tr>
+<tr><td>W4001</td><td>Captura externa de '%s' detectada: exigiria upvalues, recurso desabilitado por segurança.</td><td>Passe estado por parâmetros ou receptor explícito.</td></tr>
+<tr><td>E4001</td><td>A captura foi bloqueada; passe o valor como parâmetro explícito.</td><td>Capturas de ambiente são excluídas deliberadamente do perfil compilado.</td></tr>
+<tr><td>E1002</td><td>Arquivo fonte não contém UTF-8 válido.</td><td>Salve a fonte como UTF-8.</td></tr>
+<tr><td>E1003</td><td>Limite de aninhamento sintático excedido.</td><td>Divida expressões ou blocos profundamente aninhados.</td></tr>
+<tr><td>E1005</td><td>Literal numérico inválido ou fora do intervalo.</td><td>Literais inteiros exigem 64 bits; literais reais precisam ser finitos e representáveis em 64 bits.</td></tr>
+<tr><td>E1004</td><td>Limite estrutural da AST excedido; divida a expressão ou o módulo.</td><td>O frontend limita profundidade e quantidade de nós antes dos passes recursivos.</td></tr>
+<tr><td>E3001</td><td>O símbolo '%s' não foi declarado.</td><td>Verifique escopo e grafia; funções não capturam ambientes externos.</td></tr>
+<tr><td>E3011</td><td>Campos estáticos ainda não são suportados; declare um método estático.</td><td>Esta versão oferece campos de instância e métodos estáticos; a ausência de campos estáticos não é uma exclusão de segurança.</td></tr>
+<tr><td>E3012</td><td>Construtor não pode ser estático.</td><td>O construtor inicializa uma instância gerenciada e recebe isto; use outro nome para uma fábrica estática.</td></tr>
+<tr><td>H3001</td><td>Você quis dizer '%s'?</td><td>Sugestão determinística de nome visível no escopo.</td></tr>
+<tr><td>W3001</td><td>Código inalcançável após transferência de controle.</td><td>Remova ou reorganize a cauda que não executa.</td></tr>
+<tr><td>W3002</td><td>Função com retorno tipado pode terminar sem retornar valor; o retorno implícito é nulo.</td><td>Garanta um retorno nos caminhos relevantes.</td></tr>
+<tr><td>E3101</td><td>Divisão ou módulo por zero demonstrável em compilação.</td><td>O denominador é uma expressão constante igual a zero.</td></tr>
+<tr><td>E3102</td><td>Resultado inteiro fora do intervalo de 64 bits.</td><td>Altere o cálculo ou use valores reais quando apropriado.</td></tr>
+<tr><td>E3103</td><td>Índice constante inválido: %s.</td><td>Índices negativos são aceitos dentro dos limites da coleção.</td></tr>
+<tr><td>E3104</td><td>Incompatibilidade de tipo demonstrável: esperado '%s', recebido '%s'.</td><td>Contratos explícitos não são removidos pela otimização.</td></tr>
+<tr><td>E3105</td><td>Operação demonstravelmente inválida: %s.</td><td>Use os tipos e limites aceitos pelo runtime.</td></tr>
+<tr><td>E3106</td><td>Conversão literal inválida para '%s'.</td><td>Valide o texto de entrada ou trate dados recebidos em execução.</td></tr>
+<tr><td>E3107</td><td>Deslocamento constante fora do intervalo [0, 63].</td><td>A quantidade de bits precisa estar dentro dos limites de 64 bits.</td></tr>
+<tr><td>E3108</td><td>O passo constante de uma fatia não pode ser zero.</td><td>Use um passo positivo ou negativo diferente de zero.</td></tr>
+<tr><td>E3014</td><td>Membro '%s' não é acessível neste contexto.</td><td>Respeite a visibilidade público, protegido ou privado da declaração que oculta as herdadas.</td></tr>
+<tr><td>E3015</td><td>Membro '%s' exige uma instância.</td><td>Instancie a classe antes de acessar campos e métodos de instância.</td></tr>
+<tr><td>E3016</td><td>A função '%s' espera entre %s e %s argumentos; recebeu %s.</td><td>Respeite argumentos obrigatórios, opcionais e variáveis da função ou método.</td></tr>
+<tr><td>E3017</td><td>%s</td><td>O destino precisa ser modificável; funções, constantes e o receptor isto não podem ser reatribuídos.</td></tr>
+<tr><td>E3201</td><td>Função pura depende do estado externo '%s'.</td><td>Passe o valor por parâmetro; a CTFE não lê nem modifica variáveis externas à função.</td></tr>
+<tr><td>E3013</td><td>Destrutor deve ser público, de instância, sem parâmetros e retornar vazio.</td><td>Declare destrutor(): vazio e use destruir(objeto) em finalmente para liberar recursos explicitamente.</td></tr>
+<tr><td>E3301</td><td>Construção assíncrona fora de um contexto permitido.</td><td>Aguardar exige corpo assincrono. Defaults, inicializadores, acessores, ciclo de vida e assinaturas FFI são síncronos.</td></tr>
+<tr><td>E3302</td><td>Aguardar exige Promessa<T> ou Tarefa<T>; recebeu '%s'.</td><td>Uma operação síncrona não se torna assíncrona por aguardar. Use uma função assincrona ou rotina.</td></tr>
+<tr><td>E3303</td><td>Função assíncrona não aceita avaliação pura/CTFE.</td><td>O loop e as continuações só executam no programa nativo, nunca no compilador ou editor.</td></tr>
+<tr><td>E3304</td><td>Método não preserva o efeito assíncrono do contrato.</td><td>Implementação e override devem manter assincrona e o tipo de resultado declarado.</td></tr>
+<tr><td>E3305</td><td>Construção ainda não suportada no lowering assíncrono: %s.</td><td>A implementação incremental rejeita esta construção explicitamente; não há fallback bloqueante.</td></tr>
+<tr><td>E3306</td><td>Resultado vazio de aguardar não pode ser usado como valor.</td><td>Use aguardar como comando quando a Promise é Promessa<vazio>.</td></tr>
+<tr><td>E3307</td><td>Limite de recursos da IR assíncrona excedido.</td><td>Divida a função: até 100000 instruções/slots, 2000000 fatos de vivacidade e 50000000 visitas de instrução/fato por análise.</td></tr>
+<tr><td>E3401</td><td>Rotina exige chamada direta a função de topo ou método estático conhecido, sem captura.</td><td>Chame diretamente uma função declarada no módulo ou método estático de classe gerenciada.</td></tr>
+<tr><td>E3402</td><td>Função '%s' não é segura para execução paralela em rotina: %s.</td><td>Rotinas não podem acessar globais mutáveis, FFI, I/O síncrono ou chamadas indiretas sem contrato.</td></tr>
+<tr><td>E3403</td><td>Rotina aceita apenas argumentos e retorno transferíveis (nulo, lógico, inteiro, real ou texto); recebeu '%s'.</td><td>Transfira apenas valores escalares ou textos copiados; coleções e objetos mutáveis não atravessam threads.</td></tr>
+<tr><td>E3404</td><td>Função assíncrona não pode ser iniciada diretamente com rotina; use chamada normal e aguardar.</td><td>Corrotinas assíncronas executam no loop cooperativo da thread principal, não no pool paralelo.</td></tr>
+</tbody></table>
+</div>
+<p>O parser recupera erros independentes. A verificação estática antecipa divisão por zero, overflow, índices e contratos literais. Em regiões com pegue, falhas conhecidas geram avisos W31xx e continuam tratáveis. Dados dinâmicos, aliases e retornos de funções ainda exigem validação em execução. Diagnósticos legados usam E0001/W0001/H0001; LSP e fix-its não existem.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="otimizacoes.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="exclusoes.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="otimizacoes.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="exclusoes.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="tema/delegua.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

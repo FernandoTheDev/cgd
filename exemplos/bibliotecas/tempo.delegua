@@ -1,0 +1,7 @@
+//! 1.5\nverdadeiro
+var tempo: qualquer = importar("cgd:tempo")
+var duracao: qualquer = tempo.Duracao(1500)
+escreva(duracao.emSegundos())
+var cronometro: qualquer = tempo.Cronometro()
+tempo.Tempo.dormir(1)
+escreva(cronometro.milisegundos() >= 0)

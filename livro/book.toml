@@ -1,0 +1,16 @@
+[book]
+title = "O livro do CGD"
+authors = ["Contribuidores do CGD"]
+language = "pt-BR"
+src = "../out/livro-src"
+
+[build]
+build-dir = "../docs/livro"
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+additional-css = ["tema/cgd.css"]
+additional-js = ["tema/delegua.js"]
+git-repository-url = "https://github.com/FernandoTheDev/cgd"
+site-url = "/cgd/livro/"

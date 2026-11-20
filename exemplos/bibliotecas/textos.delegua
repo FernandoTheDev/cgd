@@ -1,0 +1,7 @@
+//! 007\nverdadeiro\n💚ça
+var textos: qualquer = importar("cgd:textos").Textos
+// Preencha códigos sem perder o zero à esquerda.
+escreva(textos.preencherInicio("7", 3, "0"))
+escreva(textos.digitos("012345"))
+// A inversão trabalha com pontos de código Unicode.
+escreva(textos.inverter("aç💚"))
