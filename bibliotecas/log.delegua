@@ -28,8 +28,8 @@ classe Logger {
             var io: qualquer = importar("cgd:io").IO
             var tempo: qualquer = importar("cgd:tempo").Tempo
             var nomes: texto[] = ["DEBUG", "INFO", "AVISO", "ERRO"]
-            var data: texto = isto._timestamp ? "${tempo.unix()} ": ""
-            var nome: texto = isto._nome == "" ? "": " ${isto._nome}"
+            var data: texto = isto._timestamp ? "${tempo.unix()} " : ""
+            var nome: texto = isto._nome == "" ? "" : " ${isto._nome}"
             var linha: texto = "${data}[${nomes[nivel]}]${nome}: ${mensagem}\n"
             se isto._usarErro {
                 io.erro(linha)

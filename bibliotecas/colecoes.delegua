@@ -17,7 +17,7 @@ classe Colecoes {
         }
         var resultado: inteiro[] = []
         var atual: inteiro = inicio
-        enquanto (passo > 0 e atual < fim) ou(passo < 0 e atual > fim) {
+        enquanto (passo > 0 e atual < fim) ou (passo < 0 e atual > fim) {
             se tamanho(resultado) >= 1000000 {
                 falhar "Intervalo excede um milhão de elementos"
             }
@@ -27,7 +27,7 @@ classe Colecoes {
                 se atual > 9223372036854775807 - passo {
                     sustar
                 }
-            } senao se atual <(- 9223372036854775807 - 1) - passo {
+            } senao se atual < (-9223372036854775807 - 1) - passo {
                 sustar
             }
             atual += passo
@@ -70,11 +70,11 @@ classe Colecoes {
     }
 
     estatico primeiro(valores: qualquer[], alternativa: qualquer = nulo): qualquer {
-        retorna tamanho(valores) == 0 ? alternativa: valores[0]
+        retorna tamanho(valores) == 0 ? alternativa : valores[0]
     }
 
     estatico ultimo(valores: qualquer[], alternativa: qualquer = nulo): qualquer {
-        retorna tamanho(valores) == 0 ? alternativa: valores[- 1]
+        retorna tamanho(valores) == 0 ? alternativa : valores[-1]
     }
 
     estatico encontrar(valores: qualquer[], predicado: funcao, alternativa: qualquer = nulo): qualquer {
@@ -107,12 +107,12 @@ classe Colecoes {
                 recusados.adicionar(valor)
             }
         }
-        retorna(aceitos, recusados)
+        retorna (aceitos, recusados)
     }
 
     estatico combinar(esquerda: qualquer[], direita: qualquer[]): tupla[] {
         var resultado: tupla[] = []
-        var limite: inteiro = tamanho(esquerda) < tamanho(direita) ? tamanho(esquerda): tamanho(direita)
+        var limite: inteiro = tamanho(esquerda) < tamanho(direita) ? tamanho(esquerda) : tamanho(direita)
         para (var i: inteiro = 0; i < limite; i++) {
             resultado.adicionar((esquerda[i], direita[i]))
         }
@@ -127,7 +127,7 @@ classe Colecoes {
         var inicio: inteiro = 0
         enquanto inicio < tamanho(valores) {
             var restante: inteiro = tamanho(valores) - inicio
-            var quantidade: inteiro = restante < tamanhoBloco ? restante: tamanhoBloco
+            var quantidade: inteiro = restante < tamanhoBloco ? restante : tamanhoBloco
             resultado.adicionar(valores.fatiar(inicio, inicio + quantidade))
             inicio += quantidade
         }
@@ -137,7 +137,7 @@ classe Colecoes {
     estatico frequencias(valores: qualquer[]): dicionario {
         var resultado: dicionario = {}
         para cada valor: qualquer em valores {
-            resultado[valor] = valor em resultado ? resultado[valor] + 1: 1
+            resultado[valor] = valor em resultado ? resultado[valor] + 1 : 1
         }
         retorna resultado
     }

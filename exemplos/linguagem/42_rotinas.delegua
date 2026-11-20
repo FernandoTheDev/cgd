@@ -8,9 +8,7 @@ funcao fib(n: inteiro): inteiro {
 }
 
 assincrona funcao produtor(canal: qualquer): vazio {
-    para var i: inteiro = 1;
-    i <= 5;
-    i++ {
+    para var i: inteiro = 1; i <= 5; i++ {
         aguardar canal.enviar(i * 10)
     }
 
@@ -19,13 +17,13 @@ assincrona funcao produtor(canal: qualquer): vazio {
 
 assincrona funcao principal(): vazio {
     const Async: qualquer = importar("cgd:assincrono")
-    const t1: Tarefa < inteiro > = rotina fib(10)
-    const t2: Tarefa < inteiro > = rotina fib(12)
+    const t1: Tarefa<inteiro> = rotina fib(10)
+    const t2: Tarefa<inteiro> = rotina fib(12)
     escreva(aguardar t1)
     escreva(aguardar t2)
 
     const ch: qualquer = Async.Canal(2)
-    const envio: Promessa < vazio > = produtor(ch)
+    const envio: Promessa<vazio> = produtor(ch)
     var soma: inteiro = 0
     enquanto verdadeiro {
         tente {

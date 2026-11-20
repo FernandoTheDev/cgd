@@ -206,7 +206,7 @@ escreva("Olá, ${nome}")
 </code></pre>
 <p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/27_entrada.delegua">Ver exemplo completo e teste</a></p>
 <h2 id="experimente-29_metodos_numero"><a class="header" href="#experimente-29_metodos_numero">Experimente: 29_metodos_numero</a></h2>
-<pre><code class="language-delegua">escreva((- 3).absoluto(), (2.3).arredondarParaCima(), 2.5.formatar(2))
+<pre><code class="language-delegua">escreva((-3).absoluto(), (2.3).arredondarParaCima(), 2.5.formatar(2))
 escreva(1234.5689.formatar({ minimoCasasDecimais: 2, maximoCasasDecimais: 3 }))
 </code></pre>
 <p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/29_metodos_numero.delegua">Ver exemplo completo e teste</a></p>
@@ -214,9 +214,9 @@ escreva(1234.5689.formatar({ minimoCasasDecimais: 2, maximoCasasDecimais: 3 }))
 <pre><code class="language-delegua">// A saída é determinística: verificamos os intervalos, não um valor sorteado.
 para (var i: numero = 0; i &lt; 100; i++) {
     var real: real = aleatorio()
-    var inteiro: numero = aleatorioEntre(- 3, 4)
+    var inteiro: numero = aleatorioEntre(-3, 4)
     assercao real &gt;= 0 e real &lt; 1
-    assercao inteiro &gt;= - 3 e inteiro &lt; 4
+    assercao inteiro &gt;= -3 e inteiro &lt; 4
 }
 
 escreva("intervalos validados")

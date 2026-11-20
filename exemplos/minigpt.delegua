@@ -8,7 +8,7 @@
 // Sem dependencias externas.
 
 funcao absoluto(x: numero): numero {
-    se (x < 0) retorna - x
+    se (x < 0) retorna -x
     retorna x
 }
 
@@ -22,14 +22,14 @@ funcao raiz(x: numero): numero {
     se (x <= 0) retorna 0
     var y: numero = x
     se (x < 1) y = 1
-    para (var i = 0; i < 25; i++) y =(y + x / y) / 2
+    para (var i = 0; i < 25; i++) y = (y + x / y) / 2
     retorna y
 }
 
 // Aproximacao estavel de exp(x) para x <= 0.
 // A softmax subtrai o maior logit, portanto recebe x <= 0.
 funcao exponencialNegativa(x: numero): numero {
-    se (x < - 30) retorna 0
+    se (x < -30) retorna 0
     const base = 1 + x / 1024
     var resultado: numero = base
     para (var i = 0; i < 10; i++) resultado *= resultado
@@ -38,7 +38,7 @@ funcao exponencialNegativa(x: numero): numero {
 
 // Log natural: reducao de escala + serie de atanh.
 funcao logaritmoPositivo(x: numero): numero {
-    se (x <= 0) retorna - 1000
+    se (x <= 0) retorna -1000
     var valor: numero = x
     var ajuste: numero = 0
     enquanto (valor > 2) {
@@ -51,7 +51,7 @@ funcao logaritmoPositivo(x: numero): numero {
         ajuste--
     }
 
-    const z =(valor - 1) /(valor + 1)
+    const z = (valor - 1) / (valor + 1)
     const z2 = z * z
     var termo: numero = z
     var soma: numero = 0
@@ -65,20 +65,20 @@ funcao logaritmoPositivo(x: numero): numero {
 
 funcao tanhAproximada(x: numero): numero {
     se (x >= 3) retorna 1
-    se (x <= - 3) retorna - 1
+    se (x <= -3) retorna -1
     const x2 = x * x
-    retorna x *(27 + x2) /(27 + 9 * x2)
+    retorna x * (27 + x2) / (27 + 9 * x2)
 }
 
 funcao derivadaTanh(x: numero): numero {
-    se (x >= 3 ou x <= - 3) retorna 0
+    se (x >= 3 ou x <= -3) retorna 0
     const x2 = x * x
-    retorna(729 - 162 * x2 + 9 * x2 * x2) /
-    ((27 + 9 * x2) *(27 + 9 * x2))
+    retorna (729 - 162 * x2 + 9 * x2 * x2) /
+    ((27 + 9 * x2) * (27 + 9 * x2))
 }
 
 funcao proximoEstado(seed: numero): numero {
-    retorna(seed * 16807) % 2147483647
+    retorna (seed * 16807) % 2147483647
 }
 
 classe RNG {
@@ -94,7 +94,7 @@ classe RNG {
     }
 
     intervalo(a: numero, b: numero): numero {
-        retorna a +(b - a) * isto.proximo()
+        retorna a + (b - a) * isto.proximo()
     }
 }
 
@@ -202,7 +202,7 @@ classe Valor {
                 const indiceSaida = nodo.alvo
                 const probSaida = nodo.probabilidades[indiceSaida]
                 para (var j = 0; j < nodo.anterior.tamanho(); j++) {
-                    var derivada: numero = - probSaida * nodo.probabilidades[j]
+                    var derivada: numero = -probSaida * nodo.probabilidades[j]
                     se (j == indiceSaida) {
                         derivada += probSaida
                     }
@@ -250,7 +250,7 @@ funcao probabilidadesSoftmax(logits: qualquer[]): numero[] {
 funcao crossEntropy(logits: qualquer[], alvo: numero): Valor {
     const probs = probabilidadesSoftmax(logits)
     const probAlvo = probs[alvo]
-    const perda = - logaritmoPositivo(probAlvo)
+    const perda = -logaritmoPositivo(probAlvo)
     const resultado = Valor(perda, logits, "cross_entropy")
     resultado.probabilidades = probs
     resultado.alvo = alvo
@@ -290,7 +290,7 @@ classe Linear {
         para (var i = 0; i < saidas; i++) {
             var linha: qualquer[] = []
             para (var j = 0; j < entradas; j++) {
-                linha.empilhar(Valor(rng.intervalo(- escala, escala)))
+                linha.empilhar(Valor(rng.intervalo(-escala, escala)))
             }
             isto.pesos.empilhar(linha)
             isto.bias.empilhar(Valor(0))
@@ -329,7 +329,7 @@ classe Embedding {
         para (var i = 0; i < vocabulario; i++) {
             var linha: qualquer[] = []
             para (var j = 0; j < dimensao; j++) {
-                linha.empilhar(Valor(rng.intervalo(- 0.2, 0.2)))
+                linha.empilhar(Valor(rng.intervalo(-0.2, 0.2)))
             }
             isto.tabela.empilhar(linha)
         }
@@ -540,12 +540,12 @@ classe Adam {
         isto.p2 *= isto.b2
         para (var i = 0; i < isto.parametros.tamanho(); i++) {
             const parametro = isto.parametros[i]
-            const g = limitar(parametro.gradiente, - 1, 1)
-            isto.m[i] = isto.b1 * isto.m[i] +(1 - isto.b1) * g
-            isto.v[i] = isto.b2 * isto.v[i] +(1 - isto.b2) * g * g
-            const mh = isto.m[i] /(1 - isto.p1)
-            const vh = isto.v[i] /(1 - isto.p2)
-            parametro.dado -= isto.taxa * mh /(raiz(vh) + 0.00000001)
+            const g = limitar(parametro.gradiente, -1, 1)
+            isto.m[i] = isto.b1 * isto.m[i] + (1 - isto.b1) * g
+            isto.v[i] = isto.b2 * isto.v[i] + (1 - isto.b2) * g * g
+            const mh = isto.m[i] / (1 - isto.p1)
+            const vh = isto.v[i] / (1 - isto.p2)
+            parametro.dado -= isto.taxa * mh / (raiz(vh) + 0.00000001)
         }
     }
 }
@@ -696,7 +696,7 @@ funcao treinar() {
     const quantidade = corpus.entradas.tamanho()
     para (var epoca = 0; epoca < 150; epoca++) {
         para (var i = 0; i < quantidade; i++) {
-            const posicao =(i + epoca * 13) % quantidade
+            const posicao = (i + epoca * 13) % quantidade
             const logits = modelo.frente(corpus.entradas[posicao])
             const perda = crossEntropy(logits, corpus.alvos[posicao])
             perda.backward()

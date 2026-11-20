@@ -1,5 +1,5 @@
 classe Tempo {
-    estatico dormirAsync(milisegundos: inteiro): Promessa < vazio > {
+    estatico dormirAsync(milisegundos: inteiro): Promessa<vazio> {
         retorna importar("cgd:assincrono").OperacoesAssincronas.dormir(milisegundos)
     }
 
@@ -66,7 +66,7 @@ classe Duracao {
         retorna Duracao(isto._ms + outra.emMilisegundos())
     }
 
-    dormirAsync(): Promessa < vazio > {
+    dormirAsync(): Promessa<vazio> {
         retorna Tempo.dormirAsync(inteiro(isto._ms))
     }
 
@@ -165,9 +165,9 @@ classe DataHora {
     }
 
     formatarISO(): texto {
-        var sufixo: texto = isto.utc() ? "Z": ""
+        var sufixo: texto = isto.utc() ? "Z" : ""
         retorna quatroDigitos(isto.ano()) + "-" + doisDigitos(isto.mes()) + "-"
-        + doisDigitos(isto.dia()) + "T" + doisDigitos(isto.hora()) + ":"
-        + doisDigitos(isto.minuto()) + ":" + doisDigitos(isto.segundo()) + sufixo
+        +doisDigitos(isto.dia()) + "T" + doisDigitos(isto.hora()) + ":"
+        +doisDigitos(isto.minuto()) + ":" + doisDigitos(isto.segundo()) + sufixo
     }
 }

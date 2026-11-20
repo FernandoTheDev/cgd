@@ -5,7 +5,7 @@ assincrona funcao maisUm(valor: inteiro): inteiro {
 
 assincrona funcao mostrar(): vazio {
     escreva("início")
-    const futuro: Promessa < inteiro > = maisUm(10)
+    const futuro: Promessa<inteiro> = maisUm(10)
     const resultado = aguardar futuro
     escreva(resultado)
 }

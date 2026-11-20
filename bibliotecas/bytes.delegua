@@ -52,9 +52,9 @@ classe Bytes {
         nativo.bytesDefinir(isto._recurso, indice, valor)
     }
 
-    fatiar(inicio: inteiro, fim: inteiro = - 1): Bytes {
+    fatiar(inicio: inteiro, fim: inteiro = -1): Bytes {
         var nativo: qualquer = importar("cgd:nativo").Primitivas
-        var limite: inteiro = fim < 0 ? isto.tamanho(): fim
+        var limite: inteiro = fim < 0 ? isto.tamanho() : fim
         retorna Bytes(nativo.bytesFatiar(isto._recurso, inicio, limite))
     }
 

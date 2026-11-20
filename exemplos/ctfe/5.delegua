@@ -22,7 +22,7 @@ funcao soma(a: qualquer, b: qualquer): qualquer {
 
 //>puro
 funcao media(a: qualquer, b: qualquer, c: qualquer): qualquer {
-    retorne(a + b + c) / 3
+    retorne (a + b + c) / 3
 }
 
 var x: numero = 5
@@ -35,7 +35,7 @@ escreva(cubo(x) + cubo(y) + cubo(z))
 
 x = 10
 y = x * 2 - 1
-z = quadrado(z) +(y - x)
+z = quadrado(z) + (y - x)
 
 escreva(soma(x, soma(y, z)))
 escreva(media(x, y, z))
@@ -45,6 +45,6 @@ y = cubo(x) - quadrado(y) + dobro(z)
 
 escreva(soma(x, y))
 
-z =(x + y) -(x * y)
+z = (x + y) - (x * y)
 escreva(z)
 escreva(quadrado(x - y))

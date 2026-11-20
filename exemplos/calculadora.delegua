@@ -86,7 +86,7 @@ classe Lexer {
                     isto.offset++
                 }
 
-                const valor = numero(isto.codigo[inicio: isto.offset])
+                const valor = numero(isto.codigo[inicio:isto.offset])
 
                 tokens.empilhar(Token(TokenKind.Number, valor, inicio))
 
@@ -98,7 +98,7 @@ classe Lexer {
                     isto.offset++
                 }
 
-                const nome = isto.codigo[inicio: isto.offset]
+                const nome = isto.codigo[inicio:isto.offset]
 
                 se (nome == "var") {
                     tokens.empilhar(Token(TokenKind.Var, nome, inicio))
@@ -722,7 +722,7 @@ classe VM {
             }
 
             se (op == OpCode.NEG) {
-                isto.push(- isto.pop())
+                isto.push(-isto.pop())
                 continua
             }
 

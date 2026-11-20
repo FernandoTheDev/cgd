@@ -8,12 +8,12 @@ classe Conexao {
         isto._recurso = recurso
     }
 
-    enviarAsync(dados: texto, timeout: inteiro = 30000): Promessa < inteiro > {
+    enviarAsync(dados: texto, timeout: inteiro = 30000): Promessa<inteiro> {
         retorna importar("cgd:assincrono").OperacoesAssincronas.tcpEnviar(isto._recurso,
             dados, timeout)
     }
 
-    receberAsync(limite: inteiro = 65536, timeout: inteiro = 30000): Promessa < texto > {
+    receberAsync(limite: inteiro = 65536, timeout: inteiro = 30000): Promessa<texto> {
         retorna importar("cgd:assincrono").OperacoesAssincronas.tcpReceber(isto._recurso,
             limite, timeout)
     }
@@ -64,7 +64,7 @@ classe OuvinteTCP {
         isto._recurso = nativo.socketAbrir(endereco, porta, verdadeiro, 30000)
     }
 
-    aceitarAsync(timeout: inteiro = 30000): Promessa < Conexao > {
+    aceitarAsync(timeout: inteiro = 30000): Promessa<Conexao> {
         retorna receberConexao(importar("cgd:assincrono").OperacoesAssincronas.tcpAceitar(isto._recurso,
             timeout))
     }
@@ -98,12 +98,12 @@ funcao conectar(endereco: texto, porta: inteiro, timeout: inteiro = 30000): Cone
     retorna Conexao(nativo.socketAbrir(endereco, porta, falso, timeout))
 }
 
-funcao conectarAsync(endereco: texto, porta: inteiro, timeout: inteiro = 30000): Promessa < Conexao > {
+funcao conectarAsync(endereco: texto, porta: inteiro, timeout: inteiro = 30000): Promessa<Conexao> {
     retorna receberConexao(importar("cgd:assincrono").OperacoesAssincronas.tcpConectar(endereco,
         porta, timeout))
 }
 
-assincrona funcao receberConexao(operacao: Promessa < qualquer >): Conexao {
+assincrona funcao receberConexao(operacao: Promessa<qualquer>): Conexao {
     tente {
         retorna Conexao(aguardar operacao)
     } pegue (erro: Excecao) {

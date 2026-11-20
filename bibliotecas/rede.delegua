@@ -16,7 +16,7 @@ classe Sessao {
     opcao(nome: texto, valor: qualquer): Sessao {
         var Primitivas: qualquer = importar("cgd:nativo").Primitivas
         se tipo de valor == "logico" {
-            valor = valor ? 1: 0
+            valor = valor ? 1 : 0
         }
         Primitivas.curlOpcao(isto._nativa, nome, valor);
         retorna isto
@@ -290,16 +290,16 @@ classe ClienteHTTP {
 }
 
 funcao requisitarAsync(url: texto, metodo: texto = "GET", corpo: texto = "", cabecalhos: texto[] = [],
-    timeout: inteiro = 30000, limite: inteiro = 16777216): Promessa < dicionario > {
+    timeout: inteiro = 30000, limite: inteiro = 16777216): Promessa<dicionario> {
     retorna importar("cgd:assincrono").OperacoesAssincronas.http(url, metodo, corpo, cabecalhos,
         timeout, limite)
 }
 
-funcao obterAsync(url: texto, timeout: inteiro = 30000, limite: inteiro = 16777216): Promessa < dicionario > {
+funcao obterAsync(url: texto, timeout: inteiro = 30000, limite: inteiro = 16777216): Promessa<dicionario> {
     retorna requisitarAsync(url, "GET", "", [], timeout, limite)
 }
 
 funcao enviarAsync(url: texto, corpo: texto, cabecalhos: texto[] = [], timeout: inteiro = 30000,
-    limite: inteiro = 16777216): Promessa < dicionario > {
+    limite: inteiro = 16777216): Promessa<dicionario> {
     retorna requisitarAsync(url, "POST", corpo, cabecalhos, timeout, limite)
 }

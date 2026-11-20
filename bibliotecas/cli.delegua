@@ -41,7 +41,7 @@ classe CLI {
         se tamanho(curto) > 1 ou curto == "-" ou curto == "=" ou curto == " " {
             falhar "CLI: alias curto inválido"
         }
-        se isto._opcoes.contemChave(nome) ou(curto != "" e isto._curtos.contemChave(curto)) {
+        se isto._opcoes.contemChave(nome) ou (curto != "" e isto._curtos.contemChave(curto)) {
             falhar "CLI: opção ou alias repetido"
         }
         isto._opcoes[nome] = { exigeValor: exigeValor, descricao: descricao, curto: curto }
@@ -115,8 +115,8 @@ classe CLI {
         var linhas: texto[] = [isto._descricao]
         para cada nome: texto em isto._ordem {
             var item: dicionario = isto._opcoes[nome]
-            var prefixo: texto = item["curto"] == "" ? "": "-${item['curto']}, "
-            var valor: texto = item["exigeValor"] ? " <valor>": ""
+            var prefixo: texto = item["curto"] == "" ? "" : "-${item['curto']}, "
+            var valor: texto = item["exigeValor"] ? " <valor>" : ""
             linhas.adicionar("  ${prefixo}--${nome}${valor}  ${item['descricao']}")
         }
         retorna linhas.juntar("\n")

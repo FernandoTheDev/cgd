@@ -1,12 +1,12 @@
 @definicao(biblioteca = "cgd-runtime", abi = "delegua", prefixo = "delegua_rotina_")
 classe estrangeira RotinasAlgoritmos {
     @definicao(simbolo = "crc32")
-    estatico crc32(dados: texto): Promessa < inteiro >;
+    estatico crc32(dados: texto): Promessa<inteiro>;
 }
 
 // Busca em vetores numéricos ordenados em ordem crescente.
 classe Algoritmos {
-    estatico crc32Async(dados: texto): Promessa < inteiro > {
+    estatico crc32Async(dados: texto): Promessa<inteiro> {
         retorna RotinasAlgoritmos.crc32(dados)
     }
 
@@ -14,7 +14,7 @@ classe Algoritmos {
         var inicio: inteiro = 0
         var fim: inteiro = tamanho(valores)
         enquanto inicio < fim {
-            var meio: inteiro = inicio +(fim - inicio) \ 2
+            var meio: inteiro = inicio + (fim - inicio) \ 2
             se valores[meio] < alvo {
                 inicio = meio + 1
             } senao {
@@ -28,7 +28,7 @@ classe Algoritmos {
         var inicio: inteiro = 0
         var fim: inteiro = tamanho(valores)
         enquanto inicio < fim {
-            var meio: inteiro = inicio +(fim - inicio) \ 2
+            var meio: inteiro = inicio + (fim - inicio) \ 2
             se valores[meio] <= alvo {
                 inicio = meio + 1
             } senao {
@@ -40,7 +40,7 @@ classe Algoritmos {
 
     estatico buscaBinaria(valores: numero[], alvo: numero): inteiro {
         var posicao: inteiro = Algoritmos.limiteInferior(valores, alvo)
-        retorna posicao < tamanho(valores) e valores[posicao] == alvo ? posicao: - 1
+        retorna posicao < tamanho(valores) e valores[posicao] == alvo ? posicao : -1
     }
 
     estatico estaOrdenado(valores: numero[]): logico {

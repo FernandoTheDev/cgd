@@ -74,7 +74,7 @@ classe Textos {
     }
 
     estatico inverter(valor: texto): texto {
-        retorna valor[: : - 1]
+        retorna valor[::-1]
     }
 
     estatico contar(valor: texto, trecho: texto): inteiro {

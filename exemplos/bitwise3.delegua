@@ -15,10 +15,10 @@ funcao add_bits(A: qualquer, B: qualquer): qualquer {
 
     var i: numero = 0
     enquanto (i < 32) {
-        var a_bits: qualquer =(A >> i) & 1
-        var b_bits: qualquer =(B >> i) & 1
+        var a_bits: qualquer = (A >> i) & 1
+        var b_bits: qualquer = (B >> i) & 1
         var sum_bit: qualquer = full_adder(a_bits, b_bits, carry)
-        resultado = resultado |(sum_bit << i++)
+        resultado = resultado | (sum_bit << i++)
     }
 
     retorne resultado

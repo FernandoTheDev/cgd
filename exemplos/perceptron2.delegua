@@ -30,7 +30,7 @@ funcao polinomio(x: numero): numero {
 }
 
 funcao absoluto(x: numero): numero {
-    se (x < 0) retorna - x
+    se (x < 0) retorna -x
     retorna x
 }
 
@@ -47,7 +47,7 @@ funcao raiz(x: numero): numero {
     se (x < 1) y = 1
 
     para (var i = 0; i < 24; i++) {
-        y =(y + x / y) / 2
+        y = (y + x / y) / 2
     }
 
     retorna y
@@ -65,28 +65,28 @@ funcao potenciaInteira(base: numero, expoente: numero): numero {
 
 funcao tanhAproximada(x: numero): numero {
     se (x >= 3) retorna 1
-    se (x <= - 3) retorna - 1
+    se (x <= -3) retorna -1
 
     const x2 = x * x
-    retorna x *(27 + x2) /(27 + 9 * x2)
+    retorna x * (27 + x2) / (27 + 9 * x2)
 }
 
 funcao derivadaTanh(x: numero): numero {
-    se (x >= 3 ou x <= - 3) retorna 0
+    se (x >= 3 ou x <= -3) retorna 0
 
     const x2 = x * x
     const x4 = x2 * x2
 
-    retorna(729 - 162 * x2 + 9 * x4) /
+    retorna (729 - 162 * x2 + 9 * x4) /
     quadrado(27 + 9 * x2)
 }
 
 funcao proximoEstado(seed: numero): numero {
-    retorna(seed * 16807) % 2147483647
+    retorna (seed * 16807) % 2147483647
 }
 
 funcao paridade2(a: numero, b: numero): numero {
-    retorna(a + b) % 2
+    retorna (a + b) % 2
 }
 
 // ============================================
@@ -146,7 +146,7 @@ classe RNG {
     }
 
     intervalo(a: numero, b: numero): numero {
-        retorna a +(b - a) * isto.proximo()
+        retorna a + (b - a) * isto.proximo()
     }
 }
 
@@ -356,7 +356,7 @@ funcao testarGradientes(testador: Testador) {
 
     const epsilon = 0.00001
 
-    para (var i = - 4; i <= 4; i++) {
+    para (var i = -4; i <= 4; i++) {
         const entrada = i * 0.25
 
         const x = Valor(entrada)
@@ -392,7 +392,7 @@ classe Neuronio {
         const escala = 1 / raiz(entradas)
 
         para (var i = 0; i < entradas; i++) {
-            isto.pesos.empilhar(Valor(rng.intervalo(- escala, escala)))
+            isto.pesos.empilhar(Valor(rng.intervalo(-escala, escala)))
         }
 
         isto.bias = Valor(0)
@@ -582,7 +582,7 @@ classe Adam {
         para (var i = 0; i < isto.parametros.tamanho(); i++) {
             const parametro = isto.parametros[i]
 
-            const gradiente = limitar(parametro.gradiente / batch, - 5, 5)
+            const gradiente = limitar(parametro.gradiente / batch, -5, 5)
 
             isto.momentos[i] =
             isto.beta1 * isto.momentos[i] +
@@ -596,7 +596,7 @@ classe Adam {
             const v = isto.variancias[i] / correcao2
 
             parametro.dado -=
-            isto.taxa * m /(raiz(v) + isto.epsilon)
+            isto.taxa * m / (raiz(v) + isto.epsilon)
         }
     }
 }
@@ -655,7 +655,7 @@ funcao treinarRede(testador: Testador) {
 
     para (var i = 0; i < dataset.entradas.tamanho(); i++) {
         const saida = rede.frente(dataset.entradas[i])
-        const probabilidade =(saida.dado + 1) / 2
+        const probabilidade = (saida.dado + 1) / 2
 
         var predicao: numero = 0
         se (probabilidade >= 0.5) predicao = 1

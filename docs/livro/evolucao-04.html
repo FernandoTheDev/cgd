@@ -214,9 +214,7 @@ escreva(Maquina.Estado.Final)
 }
 
 classe abstrata Base {
-    abstrato
-
-    valor(): inteiro;
+    abstrato valor(): inteiro;
 }
 
 classe Concreta herda Base implementa Medida {
@@ -230,7 +228,7 @@ enum Estado {
 }
 
 var objeto: Medida = Concreta()
-var duplicar: funcao =(valor: inteiro): inteiro =&gt; valor * 2
+var duplicar: funcao = (valor: inteiro): inteiro =&gt; valor * 2
 escreva(objeto.valor())
 escreva(Estado.Final)
 escreva(duplicar(3))
@@ -260,7 +258,7 @@ classe Maquina {
     atual: Estado = isto.Estado.Final
 }
 
-var vetor: funcao =(x: inteiro) =&gt; [x, x + 1]
+var vetor: funcao = (x: inteiro) =&gt; [x, x + 1]
 escreva(estado())
 escreva(Maquina.Estado.Final)
 escreva(vetor(2))

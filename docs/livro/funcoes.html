@@ -198,8 +198,8 @@ var duplicar: funcao = (x: inteiro): inteiro =&gt; x * 2
     retorna a + b
 }
 
-funcao reunir(primeiro: qualquer, ... resto: qualquer): qualquer {
-    retorna [primeiro, ... resto]
+funcao reunir(primeiro: qualquer, ...resto: qualquer): qualquer {
+    retorna [primeiro, ...resto]
 }
 
 escreva(soma(3))
@@ -233,7 +233,7 @@ escreva(mapear([1, 2, 3], funcao(x: qualquer): qualquer {
 
 assincrona funcao mostrar(): vazio {
     escreva("início")
-    const futuro: Promessa &lt; inteiro &gt; = maisUm(10)
+    const futuro: Promessa&lt;inteiro&gt; = maisUm(10)
     const resultado = aguardar futuro
     escreva(resultado)
 }

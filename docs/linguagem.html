@@ -388,7 +388,7 @@ escreva(&#x27;ação&#x27; &gt; &#x27;a&#x27;)</code></pre>
           </p>
           <pre><code>// Potência, divisão inteira, bits, comparação e curto-circuito.
 escreva(2 ** 5, 100 \ 3, 5 &amp; 3, 1 &lt;&lt; 0)
-escreva(3 != 4, falso e(1 / 0), nulo ?: 10)</code></pre>
+escreva(3 != 4, falso e (1 / 0), nulo ?: 10)</code></pre>
         </details>
         <details>
           <summary>linguagem/35_bits_e_atribuicoes.delegua</summary>
@@ -406,7 +406,7 @@ a -= 1
 a *= 2
 a /= 4
 a %= 3
-escreva(++ a + 1)</code></pre>
+escreva(++a + 1)</code></pre>
         </details>
 
         <p class="callout">
@@ -451,7 +451,7 @@ para cada valor: inteiro em valores { escreva(valor) }</code></pre>
             >
           </p>
           <pre><code>var idade: numero = 20
-escreva(idade &gt;= 18 ? &quot;adulto&quot;: &quot;menor&quot;)
+escreva(idade &gt;= 18 ? &quot;adulto&quot; : &quot;menor&quot;)
 escolha 2 {
     caso 1: escreva(&quot;um&quot;)
     caso 2:
@@ -629,8 +629,8 @@ var duplicar: funcao = (x: inteiro): inteiro =&gt; x * 2</code></pre>
     retorna a + b
 }
 
-funcao reunir(primeiro: qualquer, ... resto: qualquer): qualquer {
-    retorna [primeiro, ... resto]
+funcao reunir(primeiro: qualquer, ...resto: qualquer): qualquer {
+    retorna [primeiro, ...resto]
 }
 
 escreva(soma(3))
@@ -676,7 +676,7 @@ escreva(mapear([1, 2, 3], funcao(x: qualquer): qualquer {
 
 assincrona funcao mostrar(): vazio {
     escreva(&quot;início&quot;)
-    const futuro: Promessa &lt; inteiro &gt; = maisUm(10)
+    const futuro: Promessa&lt;inteiro&gt; = maisUm(10)
     const resultado = aguardar futuro
     escreva(resultado)
 }
@@ -743,7 +743,7 @@ escreva(removidos, valores)</code></pre>
           </p>
           <pre><code>var valores: qualquer[] = [1, 2, 3, 4, 5]
 escreva([x * 3 para cada x: inteiro em valores se x % 2 == 0])
-escreva(valores[: : - 1], valores[: : 2])</code></pre>
+escreva(valores[::-1], valores[::2])</code></pre>
         </details>
         <details>
           <summary>linguagem/22_contratos_aliases.delegua</summary>
@@ -836,7 +836,7 @@ para cada par: qualquer em dados { escreva(par[0], par[1]) }</code></pre>
           </p>
           <pre><code>var original: dicionario = { a: 1 }
 
-var dados: dicionario = { ... original, b: 2 }
+var dados: dicionario = { ...original, b: 2 }
 // dados.obter(&quot;b&quot;)
 
 const { a: qualquer, b: qualquer } = dados
@@ -965,7 +965,7 @@ escreva(&quot;ação&quot;[1])</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>escreva(tamanho(&quot;ação&quot;), &quot;ação&quot;[1], &quot;ação&quot;[1: 3])
+          <pre><code>escreva(tamanho(&quot;ação&quot;), &quot;ação&quot;[1], &quot;ação&quot;[1:3])
 escreva(&quot;  Olá árvore  &quot;.aparar().maiusculo())
 var n: numero = 2
 escreva(&quot;valor ${n + 1}&quot;)</code></pre>
@@ -1459,7 +1459,7 @@ escreva(&quot;Olá, ${nome}&quot;)</code></pre>
               >Abrir fonte e contrato de teste</a
             >
           </p>
-          <pre><code>escreva((- 3).absoluto(), (2.3).arredondarParaCima(), 2.5.formatar(2))
+          <pre><code>escreva((-3).absoluto(), (2.3).arredondarParaCima(), 2.5.formatar(2))
 escreva(1234.5689.formatar({ minimoCasasDecimais: 2, maximoCasasDecimais: 3 }))</code></pre>
         </details>
         <details>
@@ -1473,9 +1473,9 @@ escreva(1234.5689.formatar({ minimoCasasDecimais: 2, maximoCasasDecimais: 3 }))<
           <pre><code>// A saída é determinística: verificamos os intervalos, não um valor sorteado.
 para (var i: numero = 0; i &lt; 100; i++) {
     var real: real = aleatorio()
-    var inteiro: numero = aleatorioEntre(- 3, 4)
+    var inteiro: numero = aleatorioEntre(-3, 4)
     assercao real &gt;= 0 e real &lt; 1
-    assercao inteiro &gt;= - 3 e inteiro &lt; 4
+    assercao inteiro &gt;= -3 e inteiro &lt; 4
 }
 
 escreva(&quot;intervalos validados&quot;)</code></pre>
@@ -1668,7 +1668,7 @@ escreva(calcular() * 0)</code></pre>
           <pre><code>// --verificar avisa sobre a cauda inalcançável; finalmente permanece em -o.
 funcao resultado(): qualquer {
     tente {
-        retorna(2 + 3) * 4
+        retorna (2 + 3) * 4
         escreva(&quot;inalcançável&quot;)
     } finalmente {
         escreva(&quot;limpeza&quot;)
@@ -1689,7 +1689,7 @@ escreva(resultado())</code></pre>
     falhar &quot;Não deveria executar&quot;
 }
 
-escreva(verdadeiro ? 7: proibida(), falso e proibida(), verdadeiro ou proibida(), nulo ?: 8)</code></pre>
+escreva(verdadeiro ? 7 : proibida(), falso e proibida(), verdadeiro ou proibida(), nulo ?: 8)</code></pre>
         </details>
         <details>
           <summary>compilador/07_metodos_e_padroes.delegua</summary>
@@ -2504,7 +2504,7 @@ escreva(tamanho(rede.opcoes()) &gt; 100)</code></pre>
           </p>
           <pre><code>var biblioteca = importar(&quot;../../bibliotecas/colecoes.delegua&quot;)
 escreva(biblioteca.Colecoes.unicos([1, 2, 1, 3, 2]))
-escreva(biblioteca.Colecoes.intervalo(5, 0, - 2))
+escreva(biblioteca.Colecoes.intervalo(5, 0, -2))
 
 var colecoes: qualquer = importar(&quot;cgd:colecoes&quot;).Colecoes
 funcao par(valor: inteiro): logico {
@@ -2697,9 +2697,7 @@ escreva(Maquina.Estado.Final)</code></pre>
 }
 
 classe abstrata Base {
-    abstrato
-
-    valor(): inteiro;
+    abstrato valor(): inteiro;
 }
 
 classe Concreta herda Base implementa Medida {
@@ -2713,7 +2711,7 @@ enum Estado {
 }
 
 var objeto: Medida = Concreta()
-var duplicar: funcao =(valor: inteiro): inteiro =&gt; valor * 2
+var duplicar: funcao = (valor: inteiro): inteiro =&gt; valor * 2
 escreva(objeto.valor())
 escreva(Estado.Final)
 escreva(duplicar(3))</code></pre>
@@ -2755,7 +2753,7 @@ classe Maquina {
     atual: Estado = isto.Estado.Final
 }
 
-var vetor: funcao =(x: inteiro) =&gt; [x, x + 1]
+var vetor: funcao = (x: inteiro) =&gt; [x, x + 1]
 escreva(estado())
 escreva(Maquina.Estado.Final)
 escreva(vetor(2))</code></pre>
@@ -3027,7 +3025,7 @@ escreva(caminhos.nome(destino))
           </p>
           <pre><code>var biblioteca = importar(&quot;../../bibliotecas/colecoes.delegua&quot;)
 escreva(biblioteca.Colecoes.unicos([1, 2, 1, 3, 2]))
-escreva(biblioteca.Colecoes.intervalo(5, 0, - 2))
+escreva(biblioteca.Colecoes.intervalo(5, 0, -2))
 
 var colecoes: qualquer = importar(&quot;cgd:colecoes&quot;).Colecoes
 funcao par(valor: inteiro): logico {

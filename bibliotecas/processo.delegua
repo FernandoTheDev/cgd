@@ -64,7 +64,7 @@ classe Processo {
 
     estatico executavel(): texto {
         var valores: texto[] = Processo.argv()
-        retorna tamanho(valores) == 0 ? "": valores[0]
+        retorna tamanho(valores) == 0 ? "" : valores[0]
     }
 
     estatico identificador(): inteiro {

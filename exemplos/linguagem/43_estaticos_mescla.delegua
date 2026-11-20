@@ -14,8 +14,7 @@ classe Etiquetavel {
 }
 
 classe Registro mescla Etiquetavel {
-    estatico
-    criados: inteiro = 0
+    estatico criados: inteiro = 0
     nome: texto
 
     construtor(nome: texto) {

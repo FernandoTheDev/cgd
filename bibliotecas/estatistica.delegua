@@ -56,7 +56,7 @@ classe Estatistica {
     }
 
     estatico variancia(valores: numero[], amostral: logico = falso): real {
-        var minimo: inteiro = amostral ? 2: 1
+        var minimo: inteiro = amostral ? 2 : 1
         se tamanho(valores) < minimo {
             falhar "Amostra insuficiente para variância"
         }
@@ -67,9 +67,9 @@ classe Estatistica {
             quantidade += 1
             var diferenca: real = valor - media
             media += diferenca / quantidade
-            somaQuadrados += diferenca *(valor - media)
+            somaQuadrados += diferenca * (valor - media)
         }
-        retorna somaQuadrados /(quantidade -(amostral ? 1: 0))
+        retorna somaQuadrados / (quantidade - (amostral ? 1 : 0))
     }
 
     estatico desvioPadrao(valores: numero[], amostral: logico = falso): real {

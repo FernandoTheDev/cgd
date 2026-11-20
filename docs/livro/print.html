@@ -313,7 +313,7 @@ escreva('ação' &gt; 'a')
 <h2 id="experimente-02_operadores"><a class="header" href="#experimente-02_operadores">Experimente: 02_operadores</a></h2>
 <pre><code class="language-delegua">// Potência, divisão inteira, bits, comparação e curto-circuito.
 escreva(2 ** 5, 100 \ 3, 5 &amp; 3, 1 &lt;&lt; 0)
-escreva(3 != 4, falso e(1 / 0), nulo ?: 10)
+escreva(3 != 4, falso e (1 / 0), nulo ?: 10)
 </code></pre>
 <p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/02_operadores.delegua">Ver exemplo completo e teste</a></p>
 <h2 id="experimente-35_bits_e_atribuicoes"><a class="header" href="#experimente-35_bits_e_atribuicoes">Experimente: 35_bits_e_atribuicoes</a></h2>
@@ -325,7 +325,7 @@ a -= 1
 a *= 2
 a /= 4
 a %= 3
-escreva(++ a + 1)
+escreva(++a + 1)
 </code></pre>
 <p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/35_bits_e_atribuicoes.delegua">Ver exemplo completo e teste</a></p>
 <p>e/ou retornam o valor selecionado. 0, texto vazio e coleções vazias são verdadeiros; falso e nulo são falsos. ?: troca somente nulo. Overflow e divisão por zero lançam exceção.</p>
@@ -340,7 +340,7 @@ para cada valor: inteiro em valores { escreva(valor) }
 </code></pre>
 <h2 id="experimente-04_condicionais"><a class="header" href="#experimente-04_condicionais">Experimente: 04_condicionais</a></h2>
 <pre><code class="language-delegua">var idade: numero = 20
-escreva(idade &gt;= 18 ? "adulto": "menor")
+escreva(idade &gt;= 18 ? "adulto" : "menor")
 escolha 2 {
     caso 1: escreva("um")
     caso 2:
@@ -440,8 +440,8 @@ var duplicar: funcao = (x: inteiro): inteiro =&gt; x * 2
     retorna a + b
 }
 
-funcao reunir(primeiro: qualquer, ... resto: qualquer): qualquer {
-    retorna [primeiro, ... resto]
+funcao reunir(primeiro: qualquer, ...resto: qualquer): qualquer {
+    retorna [primeiro, ...resto]
 }
 
 escreva(soma(3))
@@ -475,7 +475,7 @@ escreva(mapear([1, 2, 3], funcao(x: qualquer): qualquer {
 
 assincrona funcao mostrar(): vazio {
     escreva("início")
-    const futuro: Promessa &lt; inteiro &gt; = maisUm(10)
+    const futuro: Promessa&lt;inteiro&gt; = maisUm(10)
     const resultado = aguardar futuro
     escreva(resultado)
 }
@@ -507,7 +507,7 @@ escreva(removidos, valores)
 <h2 id="experimente-10_compreensao_fatias"><a class="header" href="#experimente-10_compreensao_fatias">Experimente: 10_compreensao_fatias</a></h2>
 <pre><code class="language-delegua">var valores: qualquer[] = [1, 2, 3, 4, 5]
 escreva([x * 3 para cada x: inteiro em valores se x % 2 == 0])
-escreva(valores[: : - 1], valores[: : 2])
+escreva(valores[::-1], valores[::2])
 </code></pre>
 <p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/10_compreensao_fatias.delegua">Ver exemplo completo e teste</a></p>
 <h2 id="experimente-22_contratos_aliases"><a class="header" href="#experimente-22_contratos_aliases">Experimente: 22_contratos_aliases</a></h2>
@@ -555,7 +555,7 @@ para cada par: qualquer em dados { escreva(par[0], par[1]) }
 <h2 id="experimente-11_dicionarios"><a class="header" href="#experimente-11_dicionarios">Experimente: 11_dicionarios</a></h2>
 <pre><code class="language-delegua">var original: dicionario = { a: 1 }
 
-var dados: dicionario = { ... original, b: 2 }
+var dados: dicionario = { ...original, b: 2 }
 // dados.obter("b")
 
 const { a: qualquer, b: qualquer } = dados
@@ -622,7 +622,7 @@ escreva("ação"[1])
 <h2 id="métodos-de-texto"><a class="header" href="#métodos-de-texto">Métodos de texto</a></h2>
 <p>tamanho, inclui/contem/contém, fatiar/subtexto, aparar/apararInicio/apararFim, maiusculo/minusculo, tudoMaiusculo/tudoMinusculo, encontrar, dividir, substituir e concatenar compõem a API textual. Operações de caixa usam Unicode. Encontrar retorna posição por pontos de código. As comparações são lexicográficas; para ordens por idioma use uma biblioteca explicitamente adequada.</p>
 <h2 id="experimente-13_texto_unicode"><a class="header" href="#experimente-13_texto_unicode">Experimente: 13_texto_unicode</a></h2>
-<pre><code class="language-delegua">escreva(tamanho("ação"), "ação"[1], "ação"[1: 3])
+<pre><code class="language-delegua">escreva(tamanho("ação"), "ação"[1], "ação"[1:3])
 escreva("  Olá árvore  ".aparar().maiusculo())
 var n: numero = 2
 escreva("valor ${n + 1}")
@@ -915,7 +915,7 @@ escreva("Olá, ${nome}")
 </code></pre>
 <p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/27_entrada.delegua">Ver exemplo completo e teste</a></p>
 <h2 id="experimente-29_metodos_numero"><a class="header" href="#experimente-29_metodos_numero">Experimente: 29_metodos_numero</a></h2>
-<pre><code class="language-delegua">escreva((- 3).absoluto(), (2.3).arredondarParaCima(), 2.5.formatar(2))
+<pre><code class="language-delegua">escreva((-3).absoluto(), (2.3).arredondarParaCima(), 2.5.formatar(2))
 escreva(1234.5689.formatar({ minimoCasasDecimais: 2, maximoCasasDecimais: 3 }))
 </code></pre>
 <p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/linguagem/29_metodos_numero.delegua">Ver exemplo completo e teste</a></p>
@@ -923,9 +923,9 @@ escreva(1234.5689.formatar({ minimoCasasDecimais: 2, maximoCasasDecimais: 3 }))
 <pre><code class="language-delegua">// A saída é determinística: verificamos os intervalos, não um valor sorteado.
 para (var i: numero = 0; i &lt; 100; i++) {
     var real: real = aleatorio()
-    var inteiro: numero = aleatorioEntre(- 3, 4)
+    var inteiro: numero = aleatorioEntre(-3, 4)
     assercao real &gt;= 0 e real &lt; 1
-    assercao inteiro &gt;= - 3 e inteiro &lt; 4
+    assercao inteiro &gt;= -3 e inteiro &lt; 4
 }
 
 escreva("intervalos validados")
@@ -1030,7 +1030,7 @@ escreva(calcular() * 0)
 <pre><code class="language-delegua">// --verificar avisa sobre a cauda inalcançável; finalmente permanece em -o.
 funcao resultado(): qualquer {
     tente {
-        retorna(2 + 3) * 4
+        retorna (2 + 3) * 4
         escreva("inalcançável")
     } finalmente {
         escreva("limpeza")
@@ -1045,7 +1045,7 @@ escreva(resultado())
     falhar "Não deveria executar"
 }
 
-escreva(verdadeiro ? 7: proibida(), falso e proibida(), verdadeiro ou proibida(), nulo ?: 8)
+escreva(verdadeiro ? 7 : proibida(), falso e proibida(), verdadeiro ou proibida(), nulo ?: 8)
 </code></pre>
 <p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/04_curto_circuito.delegua">Ver exemplo completo e teste</a></p>
 <h2 id="experimente-07_metodos_e_padroes"><a class="header" href="#experimente-07_metodos_e_padroes">Experimente: 07_metodos_e_padroes</a></h2>
@@ -1296,7 +1296,7 @@ escreva(tamanho(rede.opcoes()) &gt; 100)
 <h2 id="experimente-colecoes"><a class="header" href="#experimente-colecoes">Experimente: colecoes</a></h2>
 <pre><code class="language-delegua">var biblioteca = importar("../../bibliotecas/colecoes.delegua")
 escreva(biblioteca.Colecoes.unicos([1, 2, 1, 3, 2]))
-escreva(biblioteca.Colecoes.intervalo(5, 0, - 2))
+escreva(biblioteca.Colecoes.intervalo(5, 0, -2))
 
 var colecoes: qualquer = importar("cgd:colecoes").Colecoes
 funcao par(valor: inteiro): logico {
@@ -1391,9 +1391,7 @@ escreva(Maquina.Estado.Final)
 }
 
 classe abstrata Base {
-    abstrato
-
-    valor(): inteiro;
+    abstrato valor(): inteiro;
 }
 
 classe Concreta herda Base implementa Medida {
@@ -1407,7 +1405,7 @@ enum Estado {
 }
 
 var objeto: Medida = Concreta()
-var duplicar: funcao =(valor: inteiro): inteiro =&gt; valor * 2
+var duplicar: funcao = (valor: inteiro): inteiro =&gt; valor * 2
 escreva(objeto.valor())
 escreva(Estado.Final)
 escreva(duplicar(3))
@@ -1437,7 +1435,7 @@ classe Maquina {
     atual: Estado = isto.Estado.Final
 }
 
-var vetor: funcao =(x: inteiro) =&gt; [x, x + 1]
+var vetor: funcao = (x: inteiro) =&gt; [x, x + 1]
 escreva(estado())
 escreva(Maquina.Estado.Final)
 escreva(vetor(2))
@@ -1532,7 +1530,7 @@ escreva(caminhos.nome(destino))
 <h2 id="experimente-colecoes-1"><a class="header" href="#experimente-colecoes-1">Experimente: colecoes</a></h2>
 <pre><code class="language-delegua">var biblioteca = importar("../../bibliotecas/colecoes.delegua")
 escreva(biblioteca.Colecoes.unicos([1, 2, 1, 3, 2]))
-escreva(biblioteca.Colecoes.intervalo(5, 0, - 2))
+escreva(biblioteca.Colecoes.intervalo(5, 0, -2))
 
 var colecoes: qualquer = importar("cgd:colecoes").Colecoes
 funcao par(valor: inteiro): logico {

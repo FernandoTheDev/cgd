@@ -128,7 +128,7 @@ classe HTTP {
         se !(metodo em ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]) {
             falhar "HTTP: método de rota não suportado"
         }
-        se caminho == "" ou(caminho[0] != "/" e caminho != "*") ou caminho.contem("?") ou caminho.contem("#") {
+        se caminho == "" ou (caminho[0] != "/" e caminho != "*") ou caminho.contem("?") ou caminho.contem("#") {
             falhar "HTTP: caminho de rota inválido"
         }
         var nomes: dicionario = {}
@@ -353,7 +353,7 @@ classe HTTP {
                     buffer = bytesResto.fatiar(consumido, bytesResto.tamanho()).paraTexto()
                     var cabecalhos: dicionario = dados["cabecalhos"]
                     var connHeader: texto = texto(cabecalhos.obter("connection", "")).minusculo()
-                    manterConexao = connHeader != "close" e(atendidas + 1) < maxRequisicoes
+                    manterConexao = connHeader != "close" e (atendidas + 1) < maxRequisicoes
                     tente {
                         isto.despachar(Requisicao(dados), res)
                     } pegue (erroRota: Excecao) {
@@ -400,7 +400,7 @@ classe HTTP {
             enquanto isto._ativo {
                 tente {
                     var conexao: qualquer = aguardar isto._ouvinte.aceitarAsync(1000)
-                    var tarefa: Promessa < vazio > = isto.atenderConexaoAsync(conexao, maxRequisicoesPorConexao)
+                    var tarefa: Promessa<vazio> = isto.atenderConexaoAsync(conexao, maxRequisicoesPorConexao)
                     tarefas.adicionar(tarefa)
                     se tamanho(tarefas) > 64 {
                         var ativas: qualquer[] = []

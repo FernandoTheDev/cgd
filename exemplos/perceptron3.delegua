@@ -13,7 +13,7 @@
 
 //>puro
 funcao absoluto(x: numero): numero {
-    se (x < 0) retorna - x
+    se (x < 0) retorna -x
     retorna x
 }
 
@@ -46,7 +46,7 @@ funcao raizQuadrada(x: numero): numero {
     se (x < 1) estimativa = 1
 
     para (var i = 0; i < 24; i++) {
-        estimativa =(estimativa + x / estimativa) / 2
+        estimativa = (estimativa + x / estimativa) / 2
     }
 
     retorna estimativa
@@ -66,14 +66,14 @@ funcao potenciaInteira(base: numero, expoente: numero): numero {
 //>puro
 funcao tanhAproximada(x: numero): numero {
     se (x >= 3) retorna 1
-    se (x <= - 3) retorna - 1
+    se (x <= -3) retorna -1
 
     const x2 = x * x
-    retorna x *(27 + x2) /(27 + 9 * x2)
+    retorna x * (27 + x2) / (27 + 9 * x2)
 }
 
 funcao derivadaTanh(x: numero): numero {
-    se (x >= 3 ou x <= - 3) retorna 0
+    se (x >= 3 ou x <= -3) retorna 0
 
     const x2 = x * x
     const x4 = x2 * x2
@@ -86,7 +86,7 @@ funcao derivadaTanh(x: numero): numero {
 
 //>puro
 funcao sigmoid(x: numero): numero {
-    retorna(tanhAproximada(x / 2) + 1) / 2
+    retorna (tanhAproximada(x / 2) + 1) / 2
 }
 
 funcao derivadaSigmoid(x: numero): numero {
@@ -106,7 +106,7 @@ funcao classificar(probabilidade: numero): numero {
 
 //>puro
 funcao proximoEstado(seed: numero): numero {
-    retorna(seed * 16807) % 2147483647
+    retorna (seed * 16807) % 2147483647
 }
 
 //>puro
@@ -117,12 +117,12 @@ funcao normalizarEstado(seed: numero): numero {
 // Paridade calculada sem operadores bitwise.
 //>puro
 funcao paridade3(a: numero, b: numero, c: numero): numero {
-    retorna(a + b + c) % 2
+    retorna (a + b + c) % 2
 }
 
 //>puro
 funcao paridade4(a: numero, b: numero, c: numero, d: numero): numero {
-    retorna(a + b + c + d) % 2
+    retorna (a + b + c + d) % 2
 }
 
 // ============================================
@@ -141,7 +141,7 @@ funcao testarMatematica() {
     // Diferencas finitas para validar derivadas.
     const epsilon = 0.00001
 
-    para (var i = - 2; i <= 2; i++) {
+    para (var i = -2; i <= 2; i++) {
         const x = i * 0.5
 
         const numerica =
@@ -171,7 +171,7 @@ classe RNG {
     }
 
     intervalo(a: numero, b: numero): numero {
-        retorna a +(b - a) * isto.proximo()
+        retorna a + (b - a) * isto.proximo()
     }
 
     indice(limite: numero): numero {
@@ -240,7 +240,7 @@ classe Camada {
             var variancia: numero[] = []
 
             para (var j = 0; j < entradas; j++) {
-                linha.empilhar(rng.intervalo(- escala, escala))
+                linha.empilhar(rng.intervalo(-escala, escala))
                 grad.empilhar(0)
                 momento.empilhar(0)
                 variancia.empilhar(0)
@@ -320,7 +320,7 @@ classe Camada {
     atualizar(taxa: numero, beta1: numero, beta2: numero, correcao1: numero, correcao2: numero,
         epsilon: numero, l2: numero, batch: numero, clip: numero) {
         para (var i = 0; i < isto.neuronios; i++) {
-            const gb = limitar(isto.gradBias[i] / batch, - clip, clip)
+            const gb = limitar(isto.gradBias[i] / batch, -clip, clip)
 
             isto.mBias[i] =
             beta1 * isto.mBias[i] +
@@ -334,12 +334,12 @@ classe Camada {
             const vb = isto.vBias[i] / correcao2
 
             isto.bias[i] -=
-            taxa * mb /(raizQuadrada(vb) + epsilon)
+            taxa * mb / (raizQuadrada(vb) + epsilon)
 
             para (var j = 0; j < isto.entradas; j++) {
                 const peso = isto.pesos[i][j]
 
-                const g = limitar(isto.gradPesos[i][j] / batch + l2 * peso, - clip, clip)
+                const g = limitar(isto.gradPesos[i][j] / batch + l2 * peso, -clip, clip)
 
                 isto.mPesos[i][j] =
                 beta1 * isto.mPesos[i][j] +
@@ -353,7 +353,7 @@ classe Camada {
                 const v = isto.vPesos[i][j] / correcao2
 
                 isto.pesos[i][j] -=
-                taxa * m /(raizQuadrada(v) + epsilon)
+                taxa * m / (raizQuadrada(v) + epsilon)
             }
         }
 

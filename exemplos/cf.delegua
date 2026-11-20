@@ -2,7 +2,7 @@
 //! real\nCGD\nNenhum\ny: 67
 variavel x: numero = 10
 fixo z: numero = 60
-var y: real = x * 10 - z *(1.0 * 76) + 4460.0 + 67
+var y: real = x * 10 - z * (1.0 * 76) + 4460.0 + 67
 
 escreva(tipo de 3.141592)
 

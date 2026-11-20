@@ -2,27 +2,27 @@
 @definicao(biblioteca = "cgd-runtime", abi = "delegua", prefixo = "delegua_async_")
 classe estrangeira OperacoesAssincronas {
     @definicao(simbolo = "dormir")
-    estatico dormir(milisegundos: inteiro): Promessa < vazio >;
+    estatico dormir(milisegundos: inteiro): Promessa<vazio>;
     @definicao(simbolo = "http")
     estatico http(url: texto, metodo: texto, corpo: texto, cabecalhos: texto[], timeout: inteiro,
-        limite: inteiro): Promessa < dicionario >;
+        limite: inteiro): Promessa<dicionario>;
 
     @definicao(simbolo = "tcpConectar")
-    estatico tcpConectar(endereco: texto, porta: inteiro, timeout: inteiro): Promessa < qualquer >;
+    estatico tcpConectar(endereco: texto, porta: inteiro, timeout: inteiro): Promessa<qualquer>;
     @definicao(simbolo = "tcpReceber")
-    estatico tcpReceber(recurso: qualquer, limite: inteiro, timeout: inteiro): Promessa < texto >;
+    estatico tcpReceber(recurso: qualquer, limite: inteiro, timeout: inteiro): Promessa<texto>;
     @definicao(simbolo = "tcpEnviar")
-    estatico tcpEnviar(recurso: qualquer, dados: texto, timeout: inteiro): Promessa < inteiro >;
+    estatico tcpEnviar(recurso: qualquer, dados: texto, timeout: inteiro): Promessa<inteiro>;
     @definicao(simbolo = "tcpAceitar")
-    estatico tcpAceitar(recurso: qualquer, timeout: inteiro): Promessa < qualquer >;
+    estatico tcpAceitar(recurso: qualquer, timeout: inteiro): Promessa<qualquer>;
     @definicao(simbolo = "canalCriar")
     estatico canalCriar(capacidade: inteiro): qualquer;
     @definicao(simbolo = "canalEnviar")
-    estatico canalEnviar(canal: qualquer, valor: qualquer): Promessa < vazio >;
+    estatico canalEnviar(canal: qualquer, valor: qualquer): Promessa<vazio>;
     @definicao(simbolo = "canalTentarEnviar")
     estatico canalTentarEnviar(canal: qualquer, valor: qualquer): logico;
     @definicao(simbolo = "canalReceber")
-    estatico canalReceber(canal: qualquer): Promessa < qualquer >;
+    estatico canalReceber(canal: qualquer): Promessa<qualquer>;
     @definicao(simbolo = "canalTentarReceber")
     estatico canalTentarReceber(canal: qualquer): dicionario;
     @definicao(simbolo = "canalFechar")
@@ -36,7 +36,7 @@ classe estrangeira OperacoesAssincronas {
 }
 
 classe Tempo {
-    estatico dormir(milisegundos: inteiro): Promessa < vazio > {
+    estatico dormir(milisegundos: inteiro): Promessa<vazio> {
         retorna OperacoesAssincronas.dormir(milisegundos)
     }
 }
@@ -78,8 +78,8 @@ classe RespostaHTTP {
 classe HTTP {
     estatico assincrona requisitar(url: texto, metodo: texto = "GET", corpo: texto = "",
         cabecalhos: texto[] = [], timeout: inteiro = 30000, limite: inteiro = 16777216): RespostaHTTP {
-        const operacao: Promessa < dicionario > = OperacoesAssincronas.http(url, metodo,
-            corpo, cabecalhos, timeout, limite)
+        const operacao: Promessa<dicionario> = OperacoesAssincronas.http(url, metodo, corpo,
+            cabecalhos, timeout, limite)
         tente {
             retorna RespostaHTTP(aguardar operacao)
         } pegue (erro: Excecao) {
@@ -93,7 +93,7 @@ classe HTTP {
     }
 
     estatico assincrona obter(url: texto, timeout: inteiro = 30000, limite: inteiro = 16777216): RespostaHTTP {
-        const operacao: Promessa < RespostaHTTP > = HTTP.requisitar(url, "GET", "", [], timeout,
+        const operacao: Promessa<RespostaHTTP> = HTTP.requisitar(url, "GET", "", [], timeout,
             limite)
         tente {
             retorna aguardar operacao
@@ -109,7 +109,7 @@ classe HTTP {
 
     estatico assincrona enviar(url: texto, corpo: texto, cabecalhos: texto[] = [], timeout: inteiro = 30000,
         limite: inteiro = 16777216): RespostaHTTP {
-        const operacao: Promessa < RespostaHTTP > = HTTP.requisitar(url, "POST", corpo, cabecalhos,
+        const operacao: Promessa<RespostaHTTP> = HTTP.requisitar(url, "POST", corpo, cabecalhos,
             timeout, limite)
         tente {
             retorna aguardar operacao
@@ -133,11 +133,11 @@ classe ConexaoTCP {
         isto._recurso = recurso
     }
 
-    receber(limite: inteiro = 65536, timeout: inteiro = 30000): Promessa < texto > {
+    receber(limite: inteiro = 65536, timeout: inteiro = 30000): Promessa<texto> {
         retorna OperacoesAssincronas.tcpReceber(isto._recurso, limite, timeout)
     }
 
-    enviar(dados: texto, timeout: inteiro = 30000): Promessa < inteiro > {
+    enviar(dados: texto, timeout: inteiro = 30000): Promessa<inteiro> {
         retorna OperacoesAssincronas.tcpEnviar(isto._recurso, dados, timeout)
     }
 
@@ -161,7 +161,7 @@ classe OuvinteTCP {
     }
 
     assincrona aceitar(timeout: inteiro = 30000): ConexaoTCP {
-        const operacao: Promessa < qualquer > = OperacoesAssincronas.tcpAceitar(isto._recurso,
+        const operacao: Promessa<qualquer> = OperacoesAssincronas.tcpAceitar(isto._recurso,
             timeout)
         tente {
             retorna ConexaoTCP(aguardar operacao)
@@ -191,8 +191,8 @@ classe OuvinteTCP {
 
 classe TCP {
     estatico assincrona conectar(endereco: texto, porta: inteiro, timeout: inteiro = 30000): ConexaoTCP {
-        const operacao: Promessa < qualquer > = OperacoesAssincronas.tcpConectar(endereco,
-            porta, timeout)
+        const operacao: Promessa<qualquer> = OperacoesAssincronas.tcpConectar(endereco, porta,
+            timeout)
         tente {
             retorna ConexaoTCP(aguardar operacao)
         } pegue (erro: Excecao) {
@@ -216,7 +216,7 @@ classe Canal {
         isto._recurso = OperacoesAssincronas.canalCriar(capacidade)
     }
 
-    enviar(valor: qualquer): Promessa < vazio > {
+    enviar(valor: qualquer): Promessa<vazio> {
         retorna OperacoesAssincronas.canalEnviar(isto._recurso, valor)
     }
 
@@ -224,7 +224,7 @@ classe Canal {
         retorna OperacoesAssincronas.canalTentarEnviar(isto._recurso, valor)
     }
 
-    receber(): Promessa < qualquer > {
+    receber(): Promessa<qualquer> {
         retorna OperacoesAssincronas.canalReceber(isto._recurso)
     }
 

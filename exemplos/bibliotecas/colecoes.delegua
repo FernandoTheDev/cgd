@@ -1,7 +1,7 @@
 //! [1, 2, 3]\n[5, 3, 1]\n[2, 4]\n[1, 3]\n[[1, 2], [3, 4], [5]]
 var biblioteca = importar("../../bibliotecas/colecoes.delegua")
 escreva(biblioteca.Colecoes.unicos([1, 2, 1, 3, 2]))
-escreva(biblioteca.Colecoes.intervalo(5, 0, - 2))
+escreva(biblioteca.Colecoes.intervalo(5, 0, -2))
 
 var colecoes: qualquer = importar("cgd:colecoes").Colecoes
 funcao par(valor: inteiro): logico {

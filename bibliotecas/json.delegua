@@ -142,7 +142,7 @@ classe LeitorJSON {
                         se baixo < 56320 ou baixo > 57343 {
                             isto.erro("Par substituto Unicode inválido")
                         }
-                        codigo = 65536 +(codigo - 55296) * 1024 + baixo - 56320
+                        codigo = 65536 + (codigo - 55296) * 1024 + baixo - 56320
                     } senao se codigo >= 56320 e codigo <= 57343 {
                         isto.erro("Substituto Unicode isolado")
                     }
@@ -199,7 +199,7 @@ classe LeitorJSON {
                 isto._pos += 1
             }
         }
-        retorna isto._caracteres[inicio: isto._pos].juntar("")
+        retorna isto._caracteres[inicio:isto._pos].juntar("")
     }
 
     numero(): qualquer {
@@ -215,7 +215,7 @@ classe LeitorJSON {
     }
 
     literal(lexema: texto, valor: qualquer): qualquer {
-        se isto._caracteres[isto._pos: isto._pos + tamanho(lexema)].juntar("") != lexema {
+        se isto._caracteres[isto._pos:isto._pos + tamanho(lexema)].juntar("") != lexema {
             isto.erro("Literal inválido")
         }
         isto._pos += tamanho(lexema)
@@ -360,7 +360,7 @@ funcao emitir(valor: qualquer, ancestrais: qualquer, profundidade: inteiro): tex
     }
 
     se categoria == "logico" {
-        retorna valor ? "true": "false"
+        retorna valor ? "true" : "false"
     }
 
     se categoria == "numero" ou categoria == "real" {
@@ -439,13 +439,13 @@ classe JSON {
             retorna chave em isto._valor
         }
         se categoria == "vetor" ou categoria == "tupla" {
-            retorna tipo de chave == "numero" e chave >= - tamanho(isto._valor) e chave < tamanho(isto._valor)
+            retorna tipo de chave == "numero" e chave >= -tamanho(isto._valor) e chave < tamanho(isto._valor)
         }
         retorna falso
     }
 
     obter(chave: qualquer, _padrao: qualquer = nulo): qualquer {
-        retorna isto.contem(chave) ? isto._valor[chave]: _padrao
+        retorna isto.contem(chave) ? isto._valor[chave] : _padrao
     }
 
     caminho(partes: qualquer[], _padrao: qualquer = nulo): qualquer {

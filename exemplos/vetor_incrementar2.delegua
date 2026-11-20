@@ -4,4 +4,4 @@ var x: qualquer[] = [[66]]
 var i: numero = 0
 var j: numero = 0
 
-escreva(++ x[i][j])
+escreva(++x[i][j])

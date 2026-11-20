@@ -10,7 +10,7 @@ classe Caminhos {
         para cada parte: texto em caminho.dividir("/") {
             se parte != "" e parte != "." {
                 se parte == ".." {
-                    se tamanho(partes) > 0 e partes[- 1] != ".." {
+                    se tamanho(partes) > 0 e partes[-1] != ".." {
                         partes.removerUltimo()
                     }
                     senao se !raiz {
@@ -25,7 +25,7 @@ classe Caminhos {
         se raiz {
             retorna "/" + resultado
         }
-        retorna resultado == "" ? ".": resultado
+        retorna resultado == "" ? "." : resultado
     }
 
     estatico juntar(partes: texto[]): texto {
@@ -35,7 +35,7 @@ classe Caminhos {
                 resultado = parte
             }
             senao se parte != "" {
-                resultado = resultado == "" ? parte: resultado + "/" + parte
+                resultado = resultado == "" ? parte : resultado + "/" + parte
             }
         }
         retorna Caminhos.normalizar(resultado)
@@ -47,7 +47,7 @@ classe Caminhos {
             retorna "/"
         }
         var partes: texto[] = normal.dividir("/")
-        retorna partes[- 1]
+        retorna partes[-1]
     }
 
     estatico diretorio(caminho: texto): texto {
@@ -59,20 +59,20 @@ classe Caminhos {
         partes.removerUltimo()
         var resultado: texto = partes.juntar("/")
         se resultado == "" {
-            retorna Caminhos.absoluto(normal) ? "/": "."
+            retorna Caminhos.absoluto(normal) ? "/" : "."
         }
         retorna resultado
     }
 
     estatico extensao(caminho: texto): texto {
         var nome: texto = Caminhos.nome(caminho)
-        var ultimo: inteiro = - 1
+        var ultimo: inteiro = -1
         para (var i: inteiro = 1; i < tamanho(nome); i++) {
             se nome[i] == "." {
                 ultimo = i
             }
         }
-        retorna ultimo < 0 ? "": nome.fatiar(ultimo, tamanho(nome))
+        retorna ultimo < 0 ? "" : nome.fatiar(ultimo, tamanho(nome))
     }
 
     estatico semExtensao(caminho: texto): texto {

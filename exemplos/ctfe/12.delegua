@@ -2,7 +2,7 @@
 //! Maior sequencia de Collatz ate 1000: 178
 //>puro
 funcao modulo_dois(n: qualquer): qualquer {
-    retorne(n & 1) == 0
+    retorne (n & 1) == 0
 }
 
 //>puro
@@ -11,7 +11,7 @@ funcao passo_collatz(n: qualquer): qualquer {
         retorne n / 2
     }
 
-    retorne(3 * n) + 1
+    retorne (3 * n) + 1
 }
 
 //>puro
