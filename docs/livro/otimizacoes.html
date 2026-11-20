@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Otimização (-o) e CTFE (//&gt;puro) - O livro do CGD</title>
+        <title>Otimização (-o) e CTFE (@puro) - O livro do CGD</title>
 
 
         <!-- Custom HTML head -->
@@ -179,11 +179,11 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="otimização--o-e-ctfe-puro"><a class="header" href="#otimização--o-e-ctfe-puro">Otimização (-o) e CTFE (//&gt;puro)</a></h1>
+                        <h1 id="otimização--o-e-ctfe-puro"><a class="header" href="#otimização--o-e-ctfe-puro">Otimização (-o) e CTFE (@puro)</a></h1>
 <p>Passar -o ativa otimizações do compilador e -O2 no Clang/GCC. Regra de ouro do CGD: otimizar nunca pode mudar o comportamento observável, apagar efeitos ou esconder exceções.</p>
-<h2 id="calculando-resultados-na-compilação-com-puro"><a class="header" href="#calculando-resultados-na-compilação-com-puro">Calculando resultados na compilação com //&gt;puro</a></h2>
-<p>Coloque //&gt;puro acima de uma função livre que só depende dos próprios parâmetros. Com -o, quando ela for chamada com valores constantes, a VM interna do CGD calcula o resultado durante a compilação e substitui direto no código C gerado.</p>
-<pre><code class="language-delegua">//&gt;puro
+<h2 id="calculando-resultados-na-compilação-com-puro"><a class="header" href="#calculando-resultados-na-compilação-com-puro">Calculando resultados na compilação com @puro</a></h2>
+<p>Coloque o decorador @puro acima de uma função livre ou de um método estático que só depende dos próprios parâmetros. Com -o, quando ela for chamada com valores constantes, a VM interna do CGD calcula o resultado durante a compilação e substitui direto no código C gerado. A sintaxe antiga //&gt;puro segue aceita por compatibilidade, mas @puro é a forma recomendada.</p>
+<pre><code class="language-delegua">@puro
 funcao fatorial(n: inteiro): inteiro {
     se n &lt;= 1 { retorna 1 }
     retorna n * fatorial(n - 1)
@@ -318,7 +318,7 @@ escreva(incrementar(2.5))
 </code></pre>
 <p><a href="https://github.com/FernandoTheDev/cgd/blob/dev/exemplos/compilador/11_ctfe_contrato.delegua">Ver exemplo completo e contrato de teste no GitHub</a></p>
 <blockquote>
-<p>Se uma função //&gt;puro ultrapassar o limite de passos na compilação ou lançar erro, o CGD simplesmente mantém a chamada normal em runtime.</p>
+<p>Se uma função @puro ultrapassar o limite de passos na compilação ou lançar erro, o CGD simplesmente mantém a chamada normal em runtime. A sintaxe antiga //&gt;puro continua funcionando por compatibilidade.</p>
 </blockquote>
 
                     </main>

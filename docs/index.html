@@ -255,9 +255,7 @@ cgd ola.delegua -o -s ola && ./ola</code></pre>
                 </tr>
                 <tr>
                   <td><code>-o / --otimizar</code></td>
-                  <td>
-                    Ativa otimizações, CTFE (<code>//&gt;puro</code>) e <code>-O2</code> em C.
-                  </td>
+                  <td>Ativa otimizações, CTFE (<code>@puro</code>) e <code>-O2</code> em C.</td>
                 </tr>
                 <tr>
                   <td><code>--verificar</code></td>
@@ -404,8 +402,9 @@ cgd ola.delegua -o -s ola && ./ola</code></pre>
                   módulos prontos (servidor HTTP, SQLite, Cripto, Sockets, Processos, Bytes...).
                 </li>
                 <li>
-                  <strong>CTFE e análise estática:</strong> funções <code>//&gt;puro</code> na
-                  compilação e diagnósticos <code>E3101</code>–<code>E3112</code>.
+                  <strong>CTFE e análise estática:</strong> funções e métodos estáticos
+                  <code>@puro</code> na compilação e diagnósticos
+                  <code>E3101</code>–<code>E3112</code>.
                 </li>
                 <li>
                   <strong>Enums, arrows, <code>destruir()</code>, LSP e formatador:</strong>
@@ -532,7 +531,7 @@ cgd ola.delegua -o -s ola && ./ola</code></pre>
               <b>03</b>
               <strong>CTFE e lowering</strong>
               <span
-                >Otimização <code>-o</code> com VM <code>//&gt;puro</code> e máquina de estados para
+                >Otimização <code>-o</code> com VM <code>@puro</code> e máquina de estados para
                 <code>assincrona</code>.</span
               >
             </li>
@@ -686,8 +685,8 @@ cgd ola.delegua -o -s ola && ./ola</code></pre>
                 <tr class="feature-row">
                   <td>Decoradores, CTFE e FFI C</td>
                   <td>
-                    Metadados <code>@nome</code>, envelopes em funções e métodos, funções puras
-                    <code>//&gt;puro</code> e <code>classe estrangeira</code> com
+                    Metadados <code>@nome</code>, envelopes em funções e métodos, funções e métodos
+                    estáticos <code>@puro</code> e <code>classe estrangeira</code> com
                     <code>@definicao</code>.
                   </td>
                   <td><a href="livro/metadados.html">metadados →</a></td>

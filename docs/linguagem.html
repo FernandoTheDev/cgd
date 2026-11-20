@@ -88,7 +88,7 @@
           ><a href="#modulos">Módulos estáticos e ~/.delegua/cgd</a
           ><a href="#biblioteca">Funções nativas e entrada/saída</a
           ><a href="#metadados">Decoradores e asserções</a
-          ><a href="#otimizacoes">Otimização (-o) e CTFE (//&gt;puro)</a
+          ><a href="#otimizacoes">Otimização (-o) e CTFE (@puro)</a
           ><a href="#diagnosticos">Diagnósticos, códigos de erro e CLI</a
           ><a href="#exclusoes">Exclusões de segurança</a
           ><a href="#plataformas">Plataformas e toolchain C</a
@@ -232,11 +232,11 @@ cgd ola.delegua --emitir-c -s out/ola</code></pre>
                 </td>
               </tr>
               <tr>
-                <td>Segurança estática (E3101–E3112) e CTFE (//&gt;puro)</td>
+                <td>Segurança estática (E3101–E3112) e CTFE (@puro)</td>
                 <td>
                   Detecta erros antes de rodar (divisão por zero, overflow, membro inexistente,
-                  mutação de tupla/texto, operações em nulo) e calcula funções puras ainda na
-                  compilação com -o.
+                  mutação de tupla/texto, operações em nulo) e calcula funções e métodos estáticos
+                  @puro ainda na compilação com -o.
                 </td>
               </tr>
               <tr>
@@ -354,9 +354,9 @@ const dados: dicionario = JSON.analisar(&#x27;{&quot;ok&quot;: true}&#x27;)</cod
           alterar o seu arquivo. Se você já anotou o tipo, a dica não aparece repetida.
         </p>
         <p>
-          Ao passar o mouse sobre uma função marcada com //&gt;puro, o hover avisa se a pureza foi
-          comprovada e mostra a prévia do valor calculado (lembrando que a substituição real no
-          executável acontece com -o).
+          Ao passar o mouse sobre uma função ou método estático marcado explicitamente com @puro (ou
+          o legado //&gt;puro), o hover mostra a confirmação de pureza e a prévia do valor calculado
+          (substituído no binário com -o). Funções comuns não poluem o hover com avisos de CTFE.
         </p>
         <pre><code>const lista = [1, 2, 3]
 const primeiro = lista[0]
@@ -1884,18 +1884,20 @@ escreva(a.escalar(10))</code></pre>
         aria-labelledby="title-otimizacoes"
       >
         <span class="status-badge status-parcial">Com limites</span>
-        <h2 id="title-otimizacoes">Otimização (-o) e CTFE (//&gt;puro)</h2>
+        <h2 id="title-otimizacoes">Otimização (-o) e CTFE (@puro)</h2>
         <p class="section-intro">
           Passar -o ativa otimizações do compilador e -O2 no Clang/GCC. Regra de ouro do CGD:
           otimizar nunca pode mudar o comportamento observável, apagar efeitos ou esconder exceções.
         </p>
-        <h3>Calculando resultados na compilação com //&gt;puro</h3>
+        <h3>Calculando resultados na compilação com @puro</h3>
         <p>
-          Coloque //&gt;puro acima de uma função livre que só depende dos próprios parâmetros. Com
-          -o, quando ela for chamada com valores constantes, a VM interna do CGD calcula o resultado
-          durante a compilação e substitui direto no código C gerado.
+          Coloque o decorador @puro acima de uma função livre ou de um método estático que só
+          depende dos próprios parâmetros. Com -o, quando ela for chamada com valores constantes, a
+          VM interna do CGD calcula o resultado durante a compilação e substitui direto no código C
+          gerado. A sintaxe antiga //&gt;puro segue aceita por compatibilidade, mas @puro é a forma
+          recomendada.
         </p>
-        <pre><code>//&gt;puro
+        <pre><code>@puro
 funcao fatorial(n: inteiro): inteiro {
     se n &lt;= 1 { retorna 1 }
     retorna n * fatorial(n - 1)
@@ -2089,8 +2091,9 @@ escreva(incrementar(2.5))</code></pre>
         </details>
 
         <p class="callout">
-          Se uma função //&gt;puro ultrapassar o limite de passos na compilação ou lançar erro, o
-          CGD simplesmente mantém a chamada normal em runtime.
+          Se uma função @puro ultrapassar o limite de passos na compilação ou lançar erro, o CGD
+          simplesmente mantém a chamada normal em runtime. A sintaxe antiga //&gt;puro continua
+          funcionando por compatibilidade.
         </p>
       </section>
       <section
@@ -3087,7 +3090,7 @@ classe Pessoa implementa Nomeavel {
         <p>
           Você pode declarar enum no módulo, dentro de funções, blocos ou classes. Os valores
           incrementam automaticamente a partir de 0 (ou do número que você definir), são imutáveis e
-          funcionam inclusive dentro de funções //&gt;puro (CTFE).
+          funcionam inclusive dentro de funções @puro (CTFE).
         </p>
         <pre><code>enum Estado { Inicio, Rodando, Final = 7 }
 var atual: Estado = Estado.Final</code></pre>

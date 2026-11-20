@@ -1,3 +1,48 @@
+# Hover limpo no LSP e decorador `@puro` para CTFE — 20/11/2026
+
+Solicitação ativa: remover ruído de pureza/CTFE do hover do LSP para funções
+comuns (exibir somente quando a função/método for explicitamente marcado como
+puro) e adicionar o decorador `@puro` como forma padrão recomendada para marcar
+funções e métodos estáticos puros, preservando `//>puro` por compatibilidade.
+
+## Implementação entregue
+
+- **Decorador `@puro` (mantendo `//>puro`)**:
+  - `src/frontend/parser/parser.d` e `src/frontend/parser/parse_decl.d`:
+    `@puro` ativa `CTFEFlags.Pure` em funções livres e métodos estáticos,
+    rejeita argumentos em `@puro(...)` e rejeita uso em classes/campos.
+  - `src/frontend/semantic/purity.d`, `src/ctfe/evaluation.d` e
+    `src/ctfe/compile.d`: `pureCallTarget()` resolve chamadas diretas a funções
+    livres e métodos estáticos puros (`Classe.metodo(...)`), habilitando CTFE e
+    dobra em `-o` também para métodos estáticos `@puro` (rejeitando métodos de
+    instância/estrangeiros/abstratos com mensagem clara).
+- **Hover limpo no LSP (`src/lsp/server.d`)**:
+  - Informações de pureza e CTFE só aparecem no hover quando a função/método
+    foi explicitamente marcado com `@puro` (ou `//>puro`). Funções e chamadas
+    comuns exibem apenas assinatura/tipo, sem avisos de "Pureza: não comprovada"
+    ou "Comptime nesta chamada: não pré-computada".
+- **Snippet e documentação**:
+  - `extensao-vscode/snippets/delegua.json` atualizado para `@puro`.
+  - `docs/index.html`, `docs/linguagem.json`, `docs/linguagem.html` e
+    `docs/livro/` atualizados recomendando `@puro` (mantendo `//>puro`
+    documentado como compatibilidade).
+
+## Testes realmente executados
+
+- Unitários D: DMD e LDC2 (10 módulos cada, incluindo testes de `@puro` em
+  função livre, método estático, rejeição em método de instância/classe/args e
+  compatibilidade com `//>puro` em `testes/unit/expansion.d`).
+- Build release LDC2 (`./cgd`).
+- `testes/lsp.py` (confirmando hover limpo sem ruído CTFE em funções/chamadas
+  comuns, e hover com pureza + prévia CTFE em `@puro` livre e estático e em
+  `//>puro`).
+- `testes/expansao.py`, `testes/enums.py`, `testes/integracao.py` (409),
+  `testes/livro.py` (40 páginas), `testes/site.py --static-only`,
+  `scripts/verificar_tipos.py`, `scripts/gerar_referencia.py --check`,
+  `scripts/gerar_livro.py --check` e `scripts/formatar.py --check`.
+
+---
+
 # Recriação do site e da documentação (tema preto + roxo/azul) — 20/11/2026
 
 Solicitação ativa: recriar todo o site e reescrever a documentação do CGD de

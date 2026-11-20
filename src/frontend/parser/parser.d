@@ -5,6 +5,7 @@ import std.stdio;
 
 import frontend.parser;
 import frontend.lexer;
+import ctfe.ctfe_flags : CTFEFlags;
 import frontend;
 
 class ParseException : Exception
@@ -276,6 +277,16 @@ public:
             Decorator[] decorators = parseDecorators();
             node = parseIntern();
             node.decorators = decorators;
+            foreach (Decorator d; decorators)
+                if (d.name == "puro")
+                {
+                    if (d.keys.length)
+                        err.error(node.pos, "O decorador @puro não aceita argumentos.");
+                    if (FnDecl fn = cast(FnDecl) node)
+                        fn.ctfe_flags |= CTFEFlags.Pure;
+                    else
+                        err.error(node.pos, "O decorador @puro exige uma função ou método estático.");
+                }
             return node;
         }
         if (isDecl())

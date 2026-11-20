@@ -8,6 +8,7 @@ import std.conv : to;
 import frontend.parser;
 import frontend.type_expr;
 import ctfe;
+import ctfe.evaluation : pureCallTarget;
 
 final class CTFECompile
 {
@@ -119,7 +120,9 @@ final class CTFECompile
 
             case NodeKind.CallExpr:
                 CallExpr call = cast(CallExpr) node;
-                dstring name = (cast(Identifier) call.fn).functionRef.linkName;
+                FnDecl target = pureCallTarget(call);
+                enforce(target !is null, "Chamada não suportada na avaliação em tempo de compilação.");
+                dstring name = target.linkName;
 
                 size_t[] arguments;
                 foreach (Node child; call.args)

@@ -193,7 +193,7 @@ const dados: dicionario = JSON.analisar('{"ok": true}')
 </code></pre>
 <h2 id="dicas-virtuais-de-tipo-e-prévia-de-funções-puras"><a class="header" href="#dicas-virtuais-de-tipo-e-prévia-de-funções-puras">Dicas virtuais de tipo e prévia de funções puras</a></h2>
 <p>Se você escrever const lista = [1, 2, 3] ou const t = rotina fib(10), o VS Code exibe os tipos inferidos (: numero[], : Tarefa<numero>) como dicas visuais cinzentas, sem alterar o seu arquivo. Se você já anotou o tipo, a dica não aparece repetida.</p>
-<p>Ao passar o mouse sobre uma função marcada com //&gt;puro, o hover avisa se a pureza foi comprovada e mostra a prévia do valor calculado (lembrando que a substituição real no executável acontece com -o).</p>
+<p>Ao passar o mouse sobre uma função ou método estático marcado explicitamente com @puro (ou o legado //&gt;puro), o hover mostra a confirmação de pureza e a prévia do valor calculado (substituído no binário com -o). Funções comuns não poluem o hover com avisos de CTFE.</p>
 <pre><code class="language-delegua">const lista = [1, 2, 3]
 const primeiro = lista[0]
 var explicito: inteiro = 3

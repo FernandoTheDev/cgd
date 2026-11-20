@@ -191,7 +191,7 @@
 <tr><td>Rotinas paralelas (rotina / Tarefa<T> / Canal / GrupoTarefas)</td><td>Execução paralela real em pool de threads C com TLS por thread, registro no Boehm GC e transferência segura de valores.</td></tr>
 <tr><td>Bibliotecas cgd:* em ~/.delegua/cgd</td><td>24 módulos padrão (servidor HTTP, SQLite, Cripto/OpenSSL, Compressão/zlib, Bytes, Sockets, Processos, JSON, Rede, Tempo...) carregados diretamente de ~/.delegua/cgd — sem lista hardcoded e sem NPM.</td></tr>
 <tr><td>Runtime próprio em C (delegua-runtime)</td><td>Valores tipados, UTF-8, Boehm GC, diagnósticos visuais R0001 com trecho do arquivo, epoll e pool de threads.</td></tr>
-<tr><td>Segurança estática (E3101–E3112) e CTFE (//&gt;puro)</td><td>Detecta erros antes de rodar (divisão por zero, overflow, membro inexistente, mutação de tupla/texto, operações em nulo) e calcula funções puras ainda na compilação com -o.</td></tr>
+<tr><td>Segurança estática (E3101–E3112) e CTFE (@puro)</td><td>Detecta erros antes de rodar (divisão por zero, overflow, membro inexistente, mutação de tupla/texto, operações em nulo) e calcula funções e métodos estáticos @puro ainda na compilação com -o.</td></tr>
 <tr><td>Extensão VS Code, LSP próprio e formatador nativo</td><td>Autocomplete direto de ~/.delegua/cgd em importar("cgd:"), dicas virtuais de tipo, prévia de CTFE no hover e formatador próprio de 4 espaços.</td></tr>
 </tbody></table>
 </div>

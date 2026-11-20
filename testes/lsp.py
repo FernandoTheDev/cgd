@@ -86,6 +86,11 @@ with tempfile.TemporaryDirectory(prefix="cgd lsp ") as directory:
     params = {"textDocument": {"uri": uri}, "position": {"line": 1, "character": 10}}
     hover = client.request("textDocument/hover", params)
     assert "dobro" in hover["contents"]["value"], hover
+    assert (
+        "Pureza" not in hover["contents"]["value"]
+        and "CTFE" not in hover["contents"]["value"]
+        and "Comptime" not in hover["contents"]["value"]
+    ), f"Hover de função comum não deve poluir com CTFE/Pureza: {hover}"
     definition = client.request("textDocument/definition", params)
     assert definition["range"]["start"] == {"line": 0, "character": 7}, definition
     references = client.request("textDocument/references", params)
@@ -536,6 +541,42 @@ with tempfile.TemporaryDirectory(prefix="cgd lsp ") as directory:
         {"textDocument": {"uri": uri}, "position": {"line": 9, "character": 28}},
     )
     assert hover_mix and "saudar" in hover_mix["contents"]["value"], hover_mix
+    # @puro decorator on free functions and static methods works and avoids CTFE noise on normal functions.
+    puro_source = (
+        "funcao normal(n: inteiro): inteiro { retorna n + 1 }\n"
+        "@puro\nfuncao triplicar(n: inteiro): inteiro { retorna n * 3 }\n"
+        "classe Calc { @puro\nestatico quadrado(n: inteiro): inteiro { retorna n * n } }\n"
+        "var a = normal(4)\nvar b = triplicar(4)\nvar c = Calc.quadrado(5)\n"
+    )
+    client.send(
+        "textDocument/didChange",
+        {"textDocument": {"uri": uri, "version": 26}, "contentChanges": [{"text": puro_source}]},
+    )
+    hover_normal = client.request(
+        "textDocument/hover",
+        {"textDocument": {"uri": uri}, "position": {"line": 5, "character": 10}},
+    )
+    assert (
+        "normal" in hover_normal["contents"]["value"]
+        and "Pureza" not in hover_normal["contents"]["value"]
+        and "Comptime" not in hover_normal["contents"]["value"]
+    ), hover_normal
+    hover_puro = client.request(
+        "textDocument/hover",
+        {"textDocument": {"uri": uri}, "position": {"line": 6, "character": 11}},
+    )
+    assert (
+        "Pureza: comprovada" in hover_puro["contents"]["value"]
+        and "12" in hover_puro["contents"]["value"]
+    ), hover_puro
+    hover_static_puro = client.request(
+        "textDocument/hover",
+        {"textDocument": {"uri": uri}, "position": {"line": 7, "character": 15}},
+    )
+    assert (
+        "Pureza: comprovada" in hover_static_puro["contents"]["value"]
+        and "25" in hover_static_puro["contents"]["value"]
+    ), hover_static_puro
     client.send("textDocument/didClose", {"textDocument": {"uri": untitled}})
     client.send("textDocument/didClose", {"textDocument": {"uri": uri}})
     client.close()

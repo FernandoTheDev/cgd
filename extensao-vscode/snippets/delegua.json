@@ -22,12 +22,12 @@
   "CTFE": {
     "prefix": "puro",
     "body": [
-      "//>puro",
+      "@puro",
       "funcao ${1:nome}(${2:valor: inteiro}): ${3:inteiro} {",
       "    retorna ${0:valor}",
       "}"
     ],
-    "description": "Função pura com prévia no hover para argumentos constantes"
+    "description": "Função pura com avaliação em tempo de compilação (-o) e prévia no hover"
   },
   "Arquivo": {
     "prefix": "cgdArquivo",

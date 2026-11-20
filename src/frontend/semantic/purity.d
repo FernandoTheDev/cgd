@@ -26,14 +26,21 @@ private:
         foreach (Decorator d; fn.decorators)
             if (d.envelope !is null)
             {
-                err.error(fn.pos, "Função com envelope de decorador não aceita avaliação //>puro.");
+                err.error(fn.pos, "Função com envelope de decorador não aceita avaliação @puro / //>puro.");
                 return false;
             }
+        bool allowedTarget = !fn.isMethod || (fn.isStatic && !fn.isAbstract && !fn.accessor
+                && !fn.foreignSymbol.length && (fn.ownerClass is null || !fn.ownerClass.isForeign));
+        if (!allowedTarget)
+        {
+            err.error(fn.pos, "Apenas funções livres e métodos estáticos gerenciados aceitam @puro.");
+            return false;
+        }
         locals = null;
         foreach (FnArg arg; fn.args)
             locals[arg] = true;
         collectLocals(fn.body);
-        bool status = !fn.isMethod && nodeAnalysisBlockStmt(fn.body);
+        bool status = nodeAnalysisBlockStmt(fn.body);
         dstring name = fn.fn;
         if (status)
             validFunctions ~= fn;
@@ -201,15 +208,15 @@ private:
 
     bool nodeAnalysisCallExpr(CallExpr node)
     {
-        Identifier identifier = cast(Identifier) node.fn;
-        if (identifier is null || identifier.functionRef is null)
+        import ctfe.evaluation : pureCallTarget;
+
+        FnDecl target = pureCallTarget(node);
+        if (target is null)
         {
-            err.error(node.pos,
-                    "Chamada indireta/método ainda não é suportada na avaliação em tempo de compilação.");
+            err.error(node.pos, "Chamada indireta ou método de instância ainda não é suportado na avaliação em tempo de compilação.");
             return false;
         }
-        FnDecl target = identifier.functionRef;
-        dstring name = identifier.value;
+        dstring name = target.fn;
         if (target.ctfe_flags & CTFEFlags.Pure)
         {
             bool valid = true;

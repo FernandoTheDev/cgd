@@ -229,4 +229,19 @@ unittest
     ConstantPreview preview = new ConstantPreview(result.pureFunctions);
     IntLit value = cast(IntLit) preview.evaluate((cast(VarDecl) result.program.body[$ - 1]).value);
     assert(value !is null && value.value == 14);
+
+    // Decorador @puro em função livre e método estático (mantendo //>puro por compatibilidade)
+    AnalysisResult decorPure = analyzed("@puro\nfuncao triplo(x: inteiro): inteiro { retorna x * 3 }\n"
+            ~ "classe Mat { @puro\nestatico quadrado(x: inteiro): inteiro { retorna x * x } }\n"
+            ~ "var r1: inteiro = triplo(4)\nvar r2: inteiro = Mat.quadrado(5)");
+    assert(!decorPure.diagnostics.hasErrors());
+    assert(decorPure.pureFunctions.length == 2);
+    ConstantPreview decorPreview = new ConstantPreview(decorPure.pureFunctions);
+    IntLit f1 = cast(IntLit) decorPreview.evaluate((cast(VarDecl) decorPure.program.body[2]).value);
+    IntLit f2 = cast(IntLit) decorPreview.evaluate((cast(VarDecl) decorPure.program.body[3]).value);
+    assert(f1 !is null && f1.value == 12);
+    assert(f2 !is null && f2.value == 25);
+    assert(analyzed("classe A { @puro\ninstancia(x: inteiro): inteiro { retorna x } }").diagnostics.hasErrors());
+    assert(analyzed("@puro(x=1)\nfuncao f(x: inteiro): inteiro { retorna x }").diagnostics.hasErrors());
+    assert(analyzed("@puro\nclasse A {}").diagnostics.hasErrors());
 }

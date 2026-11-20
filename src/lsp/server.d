@@ -253,6 +253,9 @@ class LanguageServer
             return completions(doc, params);
         if (method == "textDocument/hover")
         {
+            import ctfe.ctfe_flags : CTFEFlags;
+            import ctfe.evaluation : pureCallTarget;
+
             string content = selected is null ? "" : "```delegua\n" ~ selected.detail ~ "\n```";
             JSONValue hoverRange = selected is null ? JSONValue.init
                 : doc.positionRange(selected.position, selected.name.to!dstring.length);
@@ -260,31 +263,33 @@ class LanguageServer
             if (selected !is null && (selected.kind == "function" || selected.kind == "method"))
                 if (FnDecl* functionNode = selected.key in doc.functions)
                     target = *functionNode;
-            if (target !is null && target.classFactory is null)
+            if (target !is null && target.classFactory is null && (target.ctfe_flags & CTFEFlags.Pure))
             {
                 bool proven;
                 foreach (FnDecl pureFunction; doc.analysis.pureFunctions)
                     proven = proven || pureFunction is target;
-                content ~= proven ? "\n\nPureza: comprovada para CTFE."
-                    : "\n\nPureza: não comprovada para CTFE (sem anotação aprovada ou recurso não suportado).";
-                content ~= "\n\nComptime: exige função aprovada, argumentos constantes e otimização `-o`; sem `-o`, a chamada executa em runtime.";
+                content ~= proven ? "\n\nPureza: comprovada para CTFE (`@puro`). Com `-o` e argumentos constantes, pode ser avaliada em tempo de compilação." : "\n\nPureza: marcada com `@puro`, mas não comprovada para CTFE (verifique os diagnósticos).";
             }
+            Node previewExpr = doc.previewAt(get(params, "position"));
+            CallExpr previewCall = cast(CallExpr) previewExpr;
+            FnDecl callTarget = previewCall !is null ? pureCallTarget(previewCall) : null;
+            bool isPureCall = callTarget !is null && (callTarget.ctfe_flags & CTFEFlags.Pure);
             bool computed;
-            if (!doc.analysis.diagnostics.hasErrors())
-                if (Node expression = doc.previewAt(get(params, "position")))
+            if (!doc.analysis.diagnostics.hasErrors() && previewExpr !is null && (previewCall is null || isPureCall))
+            {
+                if (doc.constantPreview is null)
+                    doc.constantPreview = new ConstantPreview(doc.analysis.pureFunctions);
+                if (Node value = doc.constantPreview.evaluate(previewExpr))
                 {
-                    if (doc.constantPreview is null)
-                        doc.constantPreview = new ConstantPreview(doc.analysis.pureFunctions);
-                    if (Node value = doc.constantPreview.evaluate(expression))
-                    {
-                        computed = true;
-                        content ~= "\n\nResultado em tempo de compilação:\n\n```delegua\n" ~ previewText(value)
-                            ~ "\n```\n\nComptime: pré-computação comprovada; substituição habilitada com `-o`.";
-                        hoverRange = doc.positionRange(expression.pos);
-                    }
+                    computed = true;
+                    content ~= "\n\nResultado em tempo de compilação:\n\n```delegua\n" ~ previewText(
+                            value)
+                        ~ "\n```\n\nComptime: pré-computação comprovada; substituição habilitada com `-o`.";
+                    hoverRange = doc.positionRange(previewExpr.pos);
                 }
-            if (!computed && cast(CallExpr) doc.previewAt(position))
-                content ~= "\n\nComptime nesta chamada: não pré-computada (sem prova de pureza, argumentos dinâmicos, falha ou limite da avaliação).";
+            }
+            if (!computed && isPureCall)
+                content ~= "\n\nComptime nesta chamada (`@puro`): argumentos dinâmicos ou limite da avaliação; executa em runtime.";
             if (!content.length)
                 return JSONValue.init;
             return JSONValue([

@@ -73,8 +73,8 @@
             "Valores tipados, UTF-8, Boehm GC, diagnósticos visuais R0001 com trecho do arquivo, epoll e pool de threads."
           ],
           [
-            "Segurança estática (E3101–E3112) e CTFE (//>puro)",
-            "Detecta erros antes de rodar (divisão por zero, overflow, membro inexistente, mutação de tupla/texto, operações em nulo) e calcula funções puras ainda na compilação com -o."
+            "Segurança estática (E3101–E3112) e CTFE (@puro)",
+            "Detecta erros antes de rodar (divisão por zero, overflow, membro inexistente, mutação de tupla/texto, operações em nulo) e calcula funções e métodos estáticos @puro ainda na compilação com -o."
           ],
           [
             "Extensão VS Code, LSP próprio e formatador nativo",
@@ -142,7 +142,7 @@
         "title": "Dicas virtuais de tipo e prévia de funções puras",
         "paragraphs": [
           "Se você escrever const lista = [1, 2, 3] ou const t = rotina fib(10), o VS Code exibe os tipos inferidos (: numero[], : Tarefa<numero>) como dicas visuais cinzentas, sem alterar o seu arquivo. Se você já anotou o tipo, a dica não aparece repetida.",
-          "Ao passar o mouse sobre uma função marcada com //>puro, o hover avisa se a pureza foi comprovada e mostra a prévia do valor calculado (lembrando que a substituição real no executável acontece com -o)."
+          "Ao passar o mouse sobre uma função ou método estático marcado explicitamente com @puro (ou o legado //>puro), o hover mostra a confirmação de pureza e a prévia do valor calculado (substituído no binário com -o). Funções comuns não poluem o hover com avisos de CTFE."
         ],
         "code": "const lista = [1, 2, 3]\nconst primeiro = lista[0]\nvar explicito: inteiro = 3"
       },
@@ -536,7 +536,7 @@
   },
   {
     "id": "otimizacoes",
-    "title": "Otimização (-o) e CTFE (//>puro)",
+    "title": "Otimização (-o) e CTFE (@puro)",
     "status": "parcial",
     "description": "Passar -o ativa otimizações do compilador e -O2 no Clang/GCC. Regra de ouro do CGD: otimizar nunca pode mudar o comportamento observável, apagar efeitos ou esconder exceções.",
     "examples": [
@@ -550,14 +550,14 @@
       "compilador/10_ctfe_excecao.delegua",
       "compilador/11_ctfe_contrato.delegua"
     ],
-    "notes": "Se uma função //>puro ultrapassar o limite de passos na compilação ou lançar erro, o CGD simplesmente mantém a chamada normal em runtime.",
+    "notes": "Se uma função @puro ultrapassar o limite de passos na compilação ou lançar erro, o CGD simplesmente mantém a chamada normal em runtime. A sintaxe antiga //>puro continua funcionando por compatibilidade.",
     "topics": [
       {
-        "title": "Calculando resultados na compilação com //>puro",
+        "title": "Calculando resultados na compilação com @puro",
         "paragraphs": [
-          "Coloque //>puro acima de uma função livre que só depende dos próprios parâmetros. Com -o, quando ela for chamada com valores constantes, a VM interna do CGD calcula o resultado durante a compilação e substitui direto no código C gerado."
+          "Coloque o decorador @puro acima de uma função livre ou de um método estático que só depende dos próprios parâmetros. Com -o, quando ela for chamada com valores constantes, a VM interna do CGD calcula o resultado durante a compilação e substitui direto no código C gerado. A sintaxe antiga //>puro segue aceita por compatibilidade, mas @puro é a forma recomendada."
         ],
-        "code": "//>puro\nfuncao fatorial(n: inteiro): inteiro {\n    se n <= 1 { retorna 1 }\n    retorna n * fatorial(n - 1)\n}\nconst resultado: inteiro = fatorial(6) // já vira 720 com -o"
+        "code": "@puro\nfuncao fatorial(n: inteiro): inteiro {\n    se n <= 1 { retorna 1 }\n    retorna n * fatorial(n - 1)\n}\nconst resultado: inteiro = fatorial(6) // já vira 720 com -o"
       },
       {
         "title": "O que o otimizador simplifica com segurança",
@@ -752,7 +752,7 @@
       {
         "title": "Enums numéricos em qualquer escopo",
         "paragraphs": [
-          "Você pode declarar enum no módulo, dentro de funções, blocos ou classes. Os valores incrementam automaticamente a partir de 0 (ou do número que você definir), são imutáveis e funcionam inclusive dentro de funções //>puro (CTFE)."
+          "Você pode declarar enum no módulo, dentro de funções, blocos ou classes. Os valores incrementam automaticamente a partir de 0 (ou do número que você definir), são imutáveis e funcionam inclusive dentro de funções @puro (CTFE)."
         ],
         "code": "enum Estado { Inicio, Rodando, Final = 7 }\nvar atual: Estado = Estado.Final"
       },

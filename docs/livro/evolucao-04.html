@@ -191,7 +191,7 @@ classe Pessoa implementa Nomeavel {
 }
 </code></pre>
 <h2 id="enums-numéricos-em-qualquer-escopo"><a class="header" href="#enums-numéricos-em-qualquer-escopo">Enums numéricos em qualquer escopo</a></h2>
-<p>Você pode declarar enum no módulo, dentro de funções, blocos ou classes. Os valores incrementam automaticamente a partir de 0 (ou do número que você definir), são imutáveis e funcionam inclusive dentro de funções //&gt;puro (CTFE).</p>
+<p>Você pode declarar enum no módulo, dentro de funções, blocos ou classes. Os valores incrementam automaticamente a partir de 0 (ou do número que você definir), são imutáveis e funcionam inclusive dentro de funções @puro (CTFE).</p>
 <pre><code class="language-delegua">enum Estado { Inicio, Rodando, Final = 7 }
 var atual: Estado = Estado.Final
 </code></pre>

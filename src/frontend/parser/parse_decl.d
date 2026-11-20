@@ -5,6 +5,7 @@ import std.stdio;
 import frontend.parser;
 import frontend.lexer;
 import frontend;
+import ctfe.ctfe_flags : CTFEFlags;
 
 class ParseDecl
 {
@@ -267,6 +268,9 @@ public:
                     p.consume(TokenKind.RBrace, "Esperado '}' após acessores.");
                 }
                 field.decorators = decorators;
+                foreach (Decorator d; decorators)
+                    if (d.name == "puro")
+                        p.err.error(name.pos, "O decorador @puro exige uma função ou método estático.");
                 node.fields ~= field;
                 p.match(TokenKind.Semicolon);
             }
@@ -298,6 +302,13 @@ public:
                 method.ownerClass = node;
                 method.access = access;
                 method.decorators = decorators;
+                foreach (Decorator d; decorators)
+                    if (d.name == "puro")
+                    {
+                        if (d.keys.length)
+                            p.err.error(name.pos, "O decorador @puro não aceita argumentos.");
+                        method.ctfe_flags |= CTFEFlags.Pure;
+                    }
                 node.methods ~= method;
             }
         }
