@@ -147,11 +147,14 @@ public:
             c.body = p.parseBody();
             catches ~= c;
         }
-        if (p.match(TokenKind.Finally))
+        bool hasFinally = p.match(TokenKind.Finally);
+        if (hasFinally)
             finalBody = p.parseBody();
-        if (!catches.length && !finalBody.length)
+        if (!catches.length && !hasFinally)
             p.err.error(pos, "Tente exige pegue ou finalmente.");
-        return new TryStmt(body, catches, finalBody, pos);
+        TryStmt result = new TryStmt(body, catches, finalBody, pos);
+        result.hasFinally = hasFinally;
+        return result;
     }
 
     Node parse()

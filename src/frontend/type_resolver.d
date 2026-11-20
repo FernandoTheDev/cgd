@@ -43,6 +43,10 @@ public:
                     named.classLinkName = c.declaration.signature.linkName;
                 return *tsema;
 
+            case TypeExprKind.Promise:
+                return new TypeSemaPromise(resolver((cast(TypeExprPromise) type).result));
+            case TypeExprKind.Task:
+                return new TypeSemaTask(resolver((cast(TypeExprTask) type).result));
             case TypeExprKind.Tuple:
                 return new TypeSemaBuiltin(TypeSemaBase.Tuple);
             case TypeExprKind.Array:

@@ -94,16 +94,42 @@ enum MessageSpec invalidDestructor = MessageSpec("E3013",
             "Destrutor deve ser público, de instância, sem parâmetros e retornar vazio.",
             "Declare destrutor(): vazio e use destruir(objeto) em finalmente para liberar recursos explicitamente.");
 
+enum MessageSpec asyncContext = MessageSpec("E3301", "Construção assíncrona fora de um contexto permitido.", "Aguardar exige corpo assincrono. Defaults, inicializadores, acessores, ciclo de vida e assinaturas FFI são síncronos.");
+enum MessageSpec awaitOperand = MessageSpec("E3302", "Aguardar exige Promessa<T> ou Tarefa<T>; recebeu '%s'.",
+            "Uma operação síncrona não se torna assíncrona por aguardar. Use uma função assincrona ou rotina.");
+enum MessageSpec asyncPure = MessageSpec("E3303", "Função assíncrona não aceita avaliação pura/CTFE.",
+            "O loop e as continuações só executam no programa nativo, nunca no compilador ou editor.");
+enum MessageSpec asyncEffect = MessageSpec("E3304", "Método não preserva o efeito assíncrono do contrato.",
+            "Implementação e override devem manter assincrona e o tipo de resultado declarado.");
+enum MessageSpec asyncUnsupported = MessageSpec("E3305",
+            "Construção ainda não suportada no lowering assíncrono: %s.",
+            "A implementação incremental rejeita esta construção explicitamente; não há fallback bloqueante.");
+enum MessageSpec asyncVoid = MessageSpec("E3306", "Resultado vazio de aguardar não pode ser usado como valor.",
+            "Use aguardar como comando quando a Promise é Promessa<vazio>.");
+enum MessageSpec asyncBudget = MessageSpec("E3307", "Limite de recursos da IR assíncrona excedido.", "Divida a função: até 100000 instruções/slots, 2000000 fatos de vivacidade e 50000000 visitas de instrução/fato por análise.");
+enum MessageSpec routineTarget = MessageSpec("E3401",
+            "Rotina exige chamada direta a função de topo ou método estático conhecido, sem captura.",
+            "Chame diretamente uma função declarada no módulo ou método estático de classe gerenciada.");
+enum MessageSpec routineEffect = MessageSpec("E3402",
+            "Função '%s' não é segura para execução paralela em rotina: %s.",
+            "Rotinas não podem acessar globais mutáveis, FFI, I/O síncrono ou chamadas indiretas sem contrato.");
+enum MessageSpec routineTransfer = MessageSpec("E3403",
+            "Rotina aceita apenas argumentos e retorno transferíveis (nulo, lógico, inteiro, real ou texto); recebeu '%s'.",
+            "Transfira apenas valores escalares ou textos copiados; coleções e objetos mutáveis não atravessam threads.");
+enum MessageSpec routineAsync = MessageSpec("E3404",
+            "Função assíncrona não pode ser iniciada diretamente com rotina; use chamada normal e aguardar.",
+            "Corrotinas assíncronas executam no loop cooperativo da thread principal, não no pool paralelo.");
 immutable MessageSpec[] messages = [
-    runtimeError, genericError, genericWarning, genericHint, diagnosticLimit, driverFailure,
-    moduleCycle, moduleBudget, moduleLoad, dynamicWarning, dynamicError, unexpectedEnd,
-    expectedToken, incompatibleTypes, captureWarning,
-    captureError, invalidUTF8, syntaxDepth, invalidNumericLiteral, astLimit, missingSymbol,
-    unsupportedStaticField, staticConstructor, suggestion, unreachable, implicitReturn,
-    zeroDivision, integerOverflow, invalidIndex, typeContract,
-    invalidOperation, invalidConversion,
-    invalidShift, invalidSlice, impureState, invalidDestructor, inaccessibleMember, instanceMember,
-    invalidArity, invalidAssignment
+    routineTarget, routineEffect, routineTransfer, routineAsync, asyncBudget, asyncVoid,
+    asyncContext, awaitOperand, asyncPure,
+    asyncEffect, asyncUnsupported, runtimeError, genericError, genericWarning, genericHint,
+    diagnosticLimit, driverFailure, moduleCycle, moduleBudget, moduleLoad, dynamicWarning,
+    dynamicError, unexpectedEnd, expectedToken, incompatibleTypes, captureWarning, captureError,
+    invalidUTF8, syntaxDepth, invalidNumericLiteral, astLimit, missingSymbol,
+    unsupportedStaticField, staticConstructor, suggestion, unreachable,
+    implicitReturn, zeroDivision, integerOverflow, invalidIndex, typeContract, invalidOperation,
+    invalidConversion, invalidShift, invalidSlice, impureState, invalidDestructor,
+    inaccessibleMember, instanceMember, invalidArity, invalidAssignment
 ];
 
 const(MessageSpec)* lookupMessage(string code)

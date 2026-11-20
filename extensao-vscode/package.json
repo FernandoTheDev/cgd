@@ -2,7 +2,7 @@
   "name": "cgd",
   "displayName": "CGD — Delégua compilada",
   "description": "LSP local do CGD, tokens semânticos, navegação e compilação explícita de Delégua.",
-  "version": "0.7.0",
+  "version": "0.9.0",
   "publisher": "fernandothedev",
   "license": "Apache-2.0",
   "repository": {

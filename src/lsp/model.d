@@ -286,7 +286,8 @@ class Document
                     ? "qualquer" : arg.type_expr.toStr().to!string) ~ (arg.value is null ? "" : " = …");
         string result = fn.classFactory !is null ? fn.classFactory.name.to!string
             : fn.type_expr is null ? "qualquer" : fn.type_expr.toStr().to!string;
-        return fn.fn.to!string ~ "(" ~ args.join(", ") ~ "): " ~ result;
+        return (fn.isAsync ? "assincrona " : "") ~ fn.fn.to!string ~ "(" ~ args.join(
+                ", ") ~ "): " ~ result ~ (fn.isAsync ? " → Promessa<" ~ result ~ ">" : "");
     }
 
     TypeSema expressionType(Node node, size_t depth = 0)
@@ -311,10 +312,12 @@ class Document
         if (CallExpr call = cast(CallExpr) node)
         {
             if (FnDecl* method = call.fn in expressionFunctions)
-                return (*method).type_sema;
+                return (*method).isAsync && (*method).type_sema !is null
+                    ? new TypeSemaPromise((*method).type_sema) : (*method).type_sema;
             if (Identifier id = cast(Identifier) call.fn)
                 if (id.functionRef !is null)
-                    return id.functionRef.type_sema;
+                    return id.functionRef.isAsync
+                        ? new TypeSemaPromise(id.functionRef.type_sema) : id.functionRef.type_sema;
             if (MemberExpr member = cast(MemberExpr) call.fn)
                 if (Identifier name = cast(Identifier) member.right)
                 {

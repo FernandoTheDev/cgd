@@ -36,6 +36,20 @@ public:
             case Fn:
                 return new TypeExprNamed("funcao", tk.pos);
             case Identifier:
+                if (tk.value.s == "Promessa")
+                {
+                    p.consume(TokenKind.LThan, "Promessa exige um tipo de resultado: Promessa<T>.");
+                    TypeExpr result = parse();
+                    p.consumeTypeClose();
+                    return new TypeExprPromise(result, tk.pos);
+                }
+                if (tk.value.s == "Tarefa")
+                {
+                    p.consume(TokenKind.LThan, "Tarefa exige um tipo de resultado: Tarefa<T>.");
+                    TypeExpr result = parse();
+                    p.consumeTypeClose();
+                    return new TypeExprTask(result, tk.pos);
+                }
                 return new TypeExprNamed(tk.value.s, tk.pos);
 
             default:
@@ -46,6 +60,9 @@ public:
 
     TypeExpr parse()
     {
+        p.enterSyntax();
+        scope (exit)
+            p.leaveSyntax();
         TypeExpr type = parsePrimary();
         while (p.match(TokenKind.LBracket))
         {

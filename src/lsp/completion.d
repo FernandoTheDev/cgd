@@ -136,8 +136,10 @@ JSONValue completions(Document doc, JSONValue params)
                     classReceiver = classReceiver || receiver.classRef !is null;
                 }
                 bool[ClassDecl] seen;
-                for (ClassDecl current = cls; current !is null && current !in seen; current = current.superClass)
+                void visitClass(ClassDecl current)
                 {
+                    if (current is null || current in seen)
+                        return;
                     seen[current] = true;
                     foreach (FnDecl method; current.methods)
                     {
@@ -156,12 +158,17 @@ JSONValue completions(Document doc, JSONValue params)
                         if (name in names)
                             continue;
                         names[name] = true;
-                        if ((!classReceiver || field.isEnum) && !superReceiver
+                        if ((!classReceiver || field.isEnum || field.isStatic) && !superReceiver
                                 && resolveClassMember(cls, field.name).visibleFrom(caller))
                             items ~= completionItem(name, "property",
                                     "campo " ~ name ~ ": " ~ field.type.toStr().to!string);
                     }
+                    foreach_reverse (ClassDecl mixinClass; current.mixins)
+                        visitClass(mixinClass);
+                    visitClass(current.superClass);
                 }
+
+                visitClass(cls);
                 return JSONValue(["isIncomplete": JSONValue(false), "items": arrayJSON(items)]);
             }
         }
@@ -207,6 +214,7 @@ JSONValue completions(Document doc, JSONValue params)
                     items ~= completionItem(name.to!string, "function", doc.signature(fn));
                 }
             }
+    items ~= completionItem("Promessa", "class", "tipo intrínseco Promessa<T>; sem construção implícita");
     foreach (dstring name, TokenKind kind; keywords)
         items ~= completionItem(name.to!string, "keyword", "palavra-chave");
     return JSONValue(["isIncomplete": JSONValue(false), "items": arrayJSON(items)]);

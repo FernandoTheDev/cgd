@@ -80,7 +80,13 @@ class ModuleLoader
             string path = literal.value.to!string;
             if (path == "cgd:json" || path == "cgd:rede" || path == "cgd:colecoes" || path == "cgd:arquivos"
                     || path == "cgd:matematica" || path == "cgd:nativo" || path == "cgd:textos"
-                    || path == "cgd:estatistica" || path == "cgd:caminhos")
+                    || path == "cgd:estatistica" || path == "cgd:caminhos"
+                    || path == "cgd:processo" || path == "cgd:ambiente" || path == "cgd:sistema"
+                    || path == "cgd:tempo" || path == "cgd:sockets"
+                    || path == "cgd:assincrono" || path == "cgd:servidor" || path == "cgd:io"
+                    || path == "cgd:algoritmos" || path == "cgd:cli"
+                    || path == "cgd:log" || path == "cgd:bytes" || path == "cgd:cripto"
+                    || path == "cgd:compressao" || path == "cgd:sqlite")
                 path = buildPath(dirName(thisExePath()), "bibliotecas", path[4 .. $] ~ ".delegua");
             else if (path.startsWith("cgd:"))
             {

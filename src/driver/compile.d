@@ -13,6 +13,7 @@ import driver.toolchain;
 import frontend.semantic.pipeline;
 import frontend.validation;
 import middle.lowering;
+import middle.async_ir : AsyncLimitException;
 import driver.args;
 import driver.time;
 import frontend;
@@ -101,7 +102,15 @@ void compile(CGDArguments args, string filename)
 
     BackendC cg = new BackendC();
     timer.start("Gerando código C");
-    dstring code = cg.compile(program);
+    dstring code;
+    try
+        code = cg.compile(program);
+    catch (AsyncLimitException failure)
+    {
+        diag.errorCode(failure.position, asyncBudget);
+        verificar_erros(diag);
+        return;
+    }
     timer.show();
 
     if (args.showDebug)

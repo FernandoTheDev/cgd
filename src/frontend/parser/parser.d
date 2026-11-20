@@ -128,6 +128,18 @@ public:
         throw new ParseException;
     }
 
+    void consumeTypeClose()
+    {
+        if (check(TokenKind.BITSR) || check(TokenKind.GEquals))
+        {
+            Token token = peek();
+            tokens[offset] = new Token(token.kind == TokenKind.BITSR ? TokenKind.GThan
+                    : TokenKind.Equals, TokenRaw.init, token.pos);
+            return;
+        }
+        consume(TokenKind.GThan, "Esperado '>' após resultado de Promessa.");
+    }
+
     Token consumeName(string message)
     {
         Token token = advance();
@@ -196,6 +208,7 @@ public:
             case Var:
             case Const:
             case Fn:
+            case Async:
                 return true;
             default:
                 return false;

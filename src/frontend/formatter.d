@@ -130,9 +130,11 @@ string formatDelegua(string source)
         if (classBodies.length && classBodies[$ - 1] && !parens && !compactDepth && index + 1 < pieces.length)
         {
             string next = pieces[index + 1].text;
-            bool modifier = text == "estatico" || text == "estático" || text == "abstrato";
+            bool modifier = (text == "estatico" || text == "estático" || text == "abstrato" || text == "assincrona")
+                && previous != "estatico" && previous != "estático" && previous != "abstrato"
+                && previous != "assincrona";
             bool method = next == "(" && previous != "@" && previous != "estatico"
-                && previous != "estático" && previous != "abstrato";
+                && previous != "estático" && previous != "abstrato" && previous != "assincrona";
             bool field = next == ":" && previous != "var" && previous != "const" && previous != ",";
             bool visibility = text == "privado" || text == "protegido" || text == "publico" || text == "público";
             if (modifier || method || field || visibility)

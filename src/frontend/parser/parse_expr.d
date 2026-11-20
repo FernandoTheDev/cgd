@@ -195,6 +195,24 @@ public:
                 if (p.match(TokenKind.Dot))
                     name = p.consumeMemberName(tk.pos).value.s;
                 return new SuperExpr(name, tk.pos);
+            case TokenKind.Await:
+                Node awaited = parse(Precedence.Unary);
+                return new AwaitExpr(awaited, p.getPos(tk.pos, awaited.pos));
+            case TokenKind.Routine:
+                Node spawned = parse(Precedence.Unary);
+                CallExpr invocation = cast(CallExpr) spawned;
+                if (invocation is null)
+                {
+                    p.err.errorCode(tk.pos, routineTarget);
+                    return new NaN(tk.pos);
+                }
+                return new RoutineExpr(invocation, p.getPos(tk.pos, invocation.pos));
+            case TokenKind.Async:
+                p.consume(TokenKind.Fn, "Esperado função após assincrona.");
+                Token anonymousName = new Token(TokenKind.Identifier, TokenRaw._s("anonima"), tk.pos);
+                FnDecl asynchronous = cast(FnDecl) p.parseDecl.parseFnDecl(anonymousName);
+                asynchronous.isAsync = true;
+                return new FunctionExpr(asynchronous);
             case TokenKind.Fn:
                 Token name = new Token(TokenKind.Identifier, TokenRaw._s("anonima"), tk.pos);
                 return new FunctionExpr(cast(FnDecl) p.parseDecl.parseFnDecl(name));

@@ -44,6 +44,8 @@ enum NodeKind : ubyte
     ArrayLit,
 
     BinaryExpr,
+    AwaitExpr,
+    RoutineExpr,
     UnaryExpr,
     CallExpr,
     TypeOfExpr,
@@ -349,6 +351,7 @@ class FnDecl : Node
     dstring builtinName;
     dstring foreignSymbol;
     bool foreignManaged;
+    bool isAsync;
     bool analyzed, isMethod, isStatic, accessor, anonymous, decoratorEnvelope, isAbstract;
     ClassDecl ownerClass, classFactory;
     int access;
@@ -845,6 +848,10 @@ Node[] childNodes(Node node)
         return [n.value];
     if (BinaryExpr n = cast(BinaryExpr) node)
         return [n.left, n.right];
+    if (AwaitExpr n = cast(AwaitExpr) node)
+        return [n.value];
+    if (RoutineExpr n = cast(RoutineExpr) node)
+        return [n.call];
     if (UnaryExpr n = cast(UnaryExpr) node)
         return [n.value];
     if (CallExpr n = cast(CallExpr) node)
@@ -884,7 +891,7 @@ struct ClassField
     TypeExpr type;
     int access;
     Position pos;
-    bool customAccess, readable, writable, isEnum;
+    bool customAccess, readable, writable, isEnum, isStatic;
     FnDecl getter, setter, initializer;
     Node value;
     Decorator[] decorators;
@@ -898,6 +905,8 @@ class ClassDecl : Node
     dstring foreignLibrary;
     dstring[] interfaceNames;
     ClassDecl[] interfaces;
+    dstring[] mixinNames;
+    ClassDecl[] mixins;
     ClassField[] fields;
     FnDecl[] methods;
     FnDecl signature;
@@ -942,6 +951,7 @@ struct CatchClause
 
 class TryStmt : Node
 {
+    bool hasFinally;
     Node[] body, finalBody;
     CatchClause[] catches;
     this(Node[] body, CatchClause[] catches, Node[] finalBody, Position pos)
@@ -1137,5 +1147,40 @@ class TupleLit : ArrayLit
     {
         super(elements, pos);
         kind = NodeKind.TupleLit;
+    }
+}
+
+class AwaitExpr : Node
+{
+    Node value;
+    this(Node value, Position pos)
+    {
+        super(NodeKind.AwaitExpr, pos);
+        this.value = value;
+    }
+
+    override void print(uint indent = 0)
+    {
+        writeln("AwaitExpr");
+        value.print(indent + 1);
+    }
+}
+
+class RoutineExpr : Node
+{
+    CallExpr call;
+    FnDecl target;
+    TypeExpr resultType;
+    this(CallExpr call, Position pos)
+    {
+        super(NodeKind.RoutineExpr, pos);
+        this.call = call;
+    }
+
+    override void print(uint indent = 0)
+    {
+        writeln("RoutineExpr");
+        if (call !is null)
+            call.print(indent + 1);
     }
 }

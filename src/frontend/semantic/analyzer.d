@@ -30,6 +30,7 @@ private:
     Diagnostics err;
     size_t loopDepth, functionDepth, switchDepth, collectionDepth;
     TypeSema[] returnTypes;
+    bool asyncBody;
     ClassDecl methodOwner, lexicalOwner;
 
     TypeSema anyType()
@@ -137,6 +138,24 @@ private:
 
         switch (node.kind)
         {
+            case NodeKind.AwaitExpr:
+                AwaitExpr awaited = cast(AwaitExpr) node;
+                if (!asyncBody)
+                    err.errorCode(node.pos, asyncContext);
+                awaited.value = analyze(awaited.value);
+                if (TypeSemaPromise promise = cast(TypeSemaPromise) awaited.value.type_sema)
+                    node.type_sema = promise.result;
+                else if (TypeSemaTask task = cast(TypeSemaTask) awaited.value.type_sema)
+                    node.type_sema = task.result;
+                else
+                {
+                    node.type_sema = anyType();
+                    if (!awaited.value.type_sema.isAny())
+                        err.errorCode(node.pos, awaitOperand, awaited.value.type_sema.toStr());
+                }
+                return node;
+            case NodeKind.RoutineExpr:
+                return analyzeRoutineExpr(cast(RoutineExpr) node);
             case NodeKind.SequenceStmt:
                 SequenceStmt sequence = cast(SequenceStmt) node;
                 foreach (ref Node child; sequence.body)
@@ -382,6 +401,10 @@ private:
     bool[ClassDecl] classesAnalyzed, classesActive;
     Node analyzeClass(ClassDecl node)
     {
+        bool previousAsync = asyncBody;
+        asyncBody = false;
+        scope (exit)
+            asyncBody = previousAsync;
         if (node.signature.builtinName.length || node in classesAnalyzed)
             return node;
         if (node in classesActive)
@@ -391,6 +414,23 @@ private:
             return node;
         }
         classesActive[node] = true;
+        foreach (dstring name; node.mixinNames)
+        {
+            Symbol* symbol = context.get(name);
+            if (symbol is null || !symbol.isFn() || (cast(SymbolFn*) symbol).node.classFactory is null)
+                err.error(node.pos, "Classe de mescla não encontrada: " ~ name.to!string);
+            else
+            {
+                ClassDecl mixinClass = (cast(SymbolFn*) symbol).node.classFactory;
+                if (mixinClass.isInterface || mixinClass.isForeign)
+                    err.error(node.pos, "Composição mescla exige classe gerenciada: " ~ name.to!string);
+                else
+                {
+                    analyzeClass(mixinClass);
+                    node.mixins ~= mixinClass;
+                }
+            }
+        }
         foreach (dstring name; node.interfaceNames)
         {
             Symbol* symbol = context.get(name);
@@ -440,6 +480,14 @@ private:
             TypeSema fieldType = resolver.resolver(field.type);
             if (field.isEnum)
                 field.value = analyze(field.value);
+            else if (field.isStatic)
+            {
+                Node initial = field.value is null ? defaultValue(fieldType, field.pos) : field.value;
+                if (initial is null)
+                    initial = new NullLit(field.pos);
+                field.value = analyze(initial);
+                checkTypes(field.pos, fieldType, field.value.type_sema);
+            }
             else if (!node.isInterface && !node.isForeign)
             {
                 Node initial = field.value is null ? defaultValue(fieldType, field.pos) : field.value;
@@ -557,7 +605,7 @@ private:
                     err.errorCode(name.pos, inaccessibleMember, name.value);
                 Identifier receiver = cast(Identifier) node.left;
                 if (receiver !is null && receiver.classRef !is null && (member.method is null
-                        ? !member.field.isEnum : !member.method.isStatic))
+                        ? (!member.field.isEnum && !member.field.isStatic) : !member.method.isStatic))
                     err.errorCode(name.pos, instanceMember, name.value);
                 if (member.method !is null)
                 {
@@ -720,7 +768,8 @@ private:
         if (sym.isParam())
         {
             node.parameterRef = (cast(SymbolParam*) sym).node;
-            node.type_expr = node.parameterRef.type_expr;
+            node.type_expr = node.parameterRef.rest ? new TypeExprArray(node.parameterRef.type_expr,
+                    node.pos) : node.parameterRef.type_expr;
         }
         if (node.value == "isto")
             node.lexicalClass = methodOwner;
@@ -741,6 +790,31 @@ private:
             node._else = as!IfStmt(analyzeIfStmt(node._else));
 
         return node;
+    }
+
+    TypeSema callResult(FnDecl declaration)
+    {
+        TypeSema result = resolver.resolver(declaration.type_expr);
+        return declaration.isAsync ? new TypeSemaPromise(result) : result;
+    }
+
+    FnDecl knownCallable(Node expression, size_t depth = 0)
+    {
+        if (expression is null || depth > 32)
+            return null;
+        if (FunctionExpr functionValue = cast(FunctionExpr) expression)
+            return functionValue.declaration;
+        if (MemberExpr member = cast(MemberExpr) expression)
+            if (Identifier name = cast(Identifier) member.right)
+                return name.functionRef;
+        if (Identifier name = cast(Identifier) expression)
+        {
+            if (name.functionRef !is null)
+                return name.functionRef;
+            if (name.variableRef !is null && name.variableRef.isConst)
+                return knownCallable(name.variableRef.value, depth + 1);
+        }
+        return null;
     }
 
     Node analyzeCallExpr(CallExpr node)
@@ -767,8 +841,7 @@ private:
                     err.error(node.pos, "Classe abstrata/interface não pode ser instanciada.");
             }
             node.builtinCall = (cast(SymbolFn*) sym).isRuntime;
-            node.type_sema = fn.classFactory is null ? resolver.resolver(
-                    fn.type_expr) : new TypeSemaClass(fn.classFactory);
+            node.type_sema = fn.classFactory is null ? callResult(fn) : new TypeSemaClass(fn.classFactory);
             foreach (ref Node arg; node.args)
                 arg = analyze(arg);
             if (id.value != "escreva")
@@ -784,12 +857,68 @@ private:
                 if (name.functionRef !is null)
                 {
                     FnDecl target = name.functionRef;
-                    node.type_sema = target.type_sema is null ? resolver.resolver(target.type_expr) : target.type_sema;
+                    node.type_sema = callResult(target);
                     validateArguments(target, node);
                 }
+        FnDecl known = knownCallable(node.fn);
+        if (known !is null && (known.isAsync || cast(TypeExprPromise) known.type_expr) && !cast(MemberExpr) node.fn)
+        {
+            node.type_sema = callResult(known);
+            validateArguments(known, node);
+        }
         if (node.fn.type_sema !is null && !node.fn.type_sema.isAny()
                 && node.fn.type_sema.toStr() != TypeSemaBase.Function)
             err.error(node.pos, "O valor chamado não é uma função.");
+        return node;
+    }
+
+    private bool isTransferableType(TypeSema type)
+    {
+        if (type is null)
+            return true;
+        if (TypeSemaBuiltin builtin = cast(TypeSemaBuiltin) type)
+            return builtin.base == TypeSemaBase.Int || builtin.base == TypeSemaBase.Double
+                || builtin.base == TypeSemaBase.Bool || builtin.base == TypeSemaBase.String
+                || builtin.base == TypeSemaBase.Void || builtin.base == TypeSemaBase.Any;
+        return false;
+    }
+
+    Node analyzeRoutineExpr(RoutineExpr node)
+    {
+        node.call = cast(CallExpr) analyzeCallExpr(node.call);
+        FnDecl target = knownCallable(node.call.fn);
+        if (target is null || node.call.builtinCall || target.classFactory !is null || (target.isMethod
+                && !target.isStatic) || target.accessor || target.isAbstract
+                || target.foreignSymbol.length || !target.linkName.length
+                || node.call.args.any!((Node a) => a.kind == NodeKind.SpreadExpr))
+        {
+            err.errorCode(node.pos, catalog.routineTarget);
+            node.type_sema = new TypeSemaTask(anyType());
+            return node;
+        }
+        if (target.isAsync)
+        {
+            err.errorCode(node.pos, catalog.routineAsync);
+            node.type_sema = new TypeSemaTask(anyType());
+            return node;
+        }
+        foreach (size_t i, Node arg; node.call.args)
+        {
+            if (!isTransferableType(arg.type_sema))
+                err.errorCode(arg.pos, catalog.routineTransfer, arg.type_sema.toStr());
+            else if (i < target.args.length)
+            {
+                TypeSema paramType = resolver.resolver(target.args[i].type_expr);
+                if (!isTransferableType(paramType))
+                    err.errorCode(arg.pos, catalog.routineTransfer, paramType.toStr());
+            }
+        }
+        TypeSema retType = resolver.resolver(target.type_expr);
+        if (!isTransferableType(retType))
+            err.errorCode(node.pos, catalog.routineTransfer, retType.toStr());
+        node.target = target;
+        node.resultType = target.type_expr;
+        node.type_sema = new TypeSemaTask(retType);
         return node;
     }
 
@@ -834,7 +963,18 @@ private:
         if (node.analyzed)
             return node;
         node.analyzed = true;
-        analyzeDecorators(node.decorators, node.pos, !node.isMethod);
+        bool previousAsync = asyncBody;
+        asyncBody = false;
+        scope (exit)
+            asyncBody = previousAsync;
+        if (node.isAsync && (node.accessor || node.foreignSymbol.length || node.fn == "construtor"
+                || node.fn == "destrutor"))
+            err.errorCode(node.pos, asyncContext);
+        if (node.isAsync && node.ctfe_flags)
+            err.errorCode(node.pos, asyncPure);
+        bool allowEnvelopes = !node.isMethod || (!node.accessor && !node.isAbstract
+                && !node.foreignSymbol.length && node.fn != "construtor" && node.fn != "destrutor");
+        analyzeDecorators(node.decorators, node.pos, allowEnvelopes);
         if (named && context.scopes.length > 2)
         {
             Symbol* existing = context.getLocal(node.fn);
@@ -875,6 +1015,7 @@ private:
                 err.error(arg.pos, format("Parâmetro '%s' duplicado.", arg.name));
         }
 
+        asyncBody = node.isAsync;
         predeclare(node.body);
         for (uint i; i < node.body.length; i++)
             node.body[i] = analyze(node.body[i]);
