@@ -12,9 +12,18 @@ que funciona, exemplos para experimentar e os limites que precisa conhecer.
 
 **[Website](https://fernandothedev.github.io/cgd/)** ·
 **[Guia da linguagem e compatibilidade](https://fernandothedev.github.io/cgd/livro/)** ·
+**[DCC (compilador C em Delégua)](https://github.com/FernandoTheDev/dcc)** ·
 [Exemplos executáveis](exemplos/README.md) ·
 [Desenvolvimento e passes](docs/desenvolvimento.md) ·
 [Contexto para agentes](AGENTS.md)
+
+## Prova de uso real — DCC (Delégua C Compiler)
+
+O maior projeto construído sobre o CGD é o **[DCC — Delégua C Compiler](https://github.com/FernandoTheDev/dcc)** (`FernandoTheDev/dcc`), um compilador **ISO C99 / GNU99** nativo para Linux x86-64 escrito em Delégua e compilado pelo CGD.
+
+- **Pipeline completo em Delégua**: pré-processador compatível com cabeçalhos reais da glibc (`/usr/include`), lexer, parser, análise semântica LP64, IR SSA com otimizador e verificador, backend x86-64 (System V AMD64 ABI), emissor ELF64 (`.o`) e **linker nativo próprio** (interoperável nos dois sentidos com GCC e Clang).
+- **Bootstrap indireto comprovado**: o DCC compila o próprio código C99 gerado pelo CGD (~71 mil linhas, >1,3 milhão de tokens, 1.048 funções) em objeto ELF64 nativo (`dcc-self.o`), gerando um binário auto-compilado funcional capaz de compilar programas C reais.
+- **Estresse real da biblioteca padrão e do runtime**: usa em produção `cgd:memoria` (`Arena`, `FatiaBytes`, `FatiaInt64`, controle fino de Boehm GC), `cgd:bytes` (incluindo buffers congelados *zero-copy*), `cgd:assincrono` (`rotina`/`Rotinas`), `cgd:processo` (`Processo.executarLote` para paralelismo multi-TU), `cgd:arquivos`, `cgd:json`, `cgd:tempo` e FFI POSIX direta, com determinismo bit a bit entre GCC, Clang e TinyCC.
 
 ## Instalar as dependências
 
