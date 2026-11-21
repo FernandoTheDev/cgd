@@ -71,6 +71,39 @@ Node foldBinary(BinaryExpr expr)
                         return null;
                     value = a % b;
                     break;
+                case "\\":
+                    if (b == 0 || (a == BigInt(long.min) && b == -1))
+                        return null;
+                    value = a / b;
+                    break;
+                case "**":
+                    long exp = (as!IntLit(r)).value;
+                    if (exp < 0 || exp > 64)
+                        return null;
+                    value = BigInt(1);
+                    foreach (long _; 0 .. exp)
+                    {
+                        value *= a;
+                        if (value < BigInt(long.min) || value > BigInt(long.max))
+                            return null;
+                    }
+                    break;
+                case "&":
+                    return new IntLit((as!IntLit(l)).value & (as!IntLit(r)).value, expr.pos);
+                case "|":
+                    return new IntLit((as!IntLit(l)).value | (as!IntLit(r)).value, expr.pos);
+                case "^":
+                    return new IntLit((as!IntLit(l)).value ^ (as!IntLit(r)).value, expr.pos);
+                case "<<":
+                    long shl = (as!IntLit(r)).value;
+                    if (shl < 0 || shl >= 64)
+                        return null;
+                    return new IntLit(cast(long)(cast(ulong)(as!IntLit(l)).value << cast(ulong) shl), expr.pos);
+                case ">>":
+                    long shr = (as!IntLit(r)).value;
+                    if (shr < 0 || shr >= 64)
+                        return null;
+                    return new IntLit((as!IntLit(l)).value >> shr, expr.pos);
                 case "!=":
                     return new BoolLit(a != b, expr.pos);
                 case "<":
@@ -150,6 +183,27 @@ Node foldBinary(BinaryExpr expr)
             break;
         case Modulo:
             op = "%";
+            break;
+        case IntDiv:
+            op = "\\";
+            break;
+        case Pow:
+            op = "**";
+            break;
+        case BITAnd:
+            op = "&";
+            break;
+        case BITOr:
+            op = "|";
+            break;
+        case BITXor:
+            op = "^";
+            break;
+        case BITSL:
+            op = "<<";
+            break;
+        case BITSR:
+            op = ">>";
             break;
         case NEquals:
             op = "!=";

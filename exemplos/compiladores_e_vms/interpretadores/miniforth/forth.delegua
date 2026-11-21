@@ -1,0 +1,530 @@
+//! Soma dos quadrados (3, 4): 25\nFatorial(7): 5040\nFibonacci(11): 89\nPrimos ate 30: 2 3 5 7 11 13 17 19 23 29\nQuantidade de primos: 10
+//? fase: execucao
+//? diretorio: fonte
+// MiniForth: compilador de linguagem concatenativa (threaded-code) + VM em Delegua/CGD.
+// Suporta definicao de palavras (: ... ;), RECURSE, IF/ELSE/THEN, BEGIN/UNTIL,
+// BEGIN/WHILE/REPEAT, DO/LOOP/I, EXIT, VARIABLE/@/!, pilha de retorno e strings ."".
+// Compilar na raiz: ./cgd exemplos/miniforth/forth.delegua -s out/miniforth
+// Executar: cd exemplos/miniforth && ../../out/miniforth
+
+enum OpForth {
+    Empilhar,
+    Chamar,
+    Primitiva,
+    Saltar,
+    SaltarSeZero,
+    IniciarLoop,
+    AvancarLoop,
+    IndiceLoop,
+    ImprimirTexto,
+    Retornar
+}
+
+classe ErroForth herda Excecao {
+    construtor(mensagem: texto) {
+        super(mensagem)
+    }
+}
+
+classe InstForth {
+    op: OpForth
+    num: inteiro
+    txt: texto
+
+    construtor(op: OpForth, num: inteiro = 0, txt: texto = "") {
+        isto.op = op
+        isto.num = num
+        isto.txt = txt
+    }
+}
+
+classe PalavraForth {
+    nome: texto
+    codigo: InstForth[]
+
+    construtor(nome: texto, codigo: InstForth[]) {
+        isto.nome = nome
+        isto.codigo = codigo
+    }
+}
+
+classe FrameLoop {
+    atual: inteiro
+    limite: inteiro
+
+    construtor(atual: inteiro, limite: inteiro) {
+        isto.atual = atual
+        isto.limite = limite
+    }
+}
+
+classe TokenForth {
+    eTexto: logico
+    valor: texto
+
+    construtor(eTexto: logico, valor: texto) {
+        isto.eTexto = eTexto
+        isto.valor = valor
+    }
+}
+
+classe LexerForth {
+    fonte: texto
+    pos: inteiro
+    limite: inteiro
+
+    construtor(fonte: texto) {
+        isto.fonte = fonte
+        isto.pos = 0
+        isto.limite = fonte.tamanho()
+    }
+
+    pularEspacos(): vazio {
+        enquanto (isto.pos < isto.limite) {
+            const c: texto = isto.fonte[isto.pos]
+            se (c == " " ou c == "\n" ou c == "\r" ou c == "\t") {
+                isto.pos++
+            } senao {
+                sustar
+            }
+        }
+    }
+
+    lerPalavra(): texto {
+        var buf: texto[] = []
+        enquanto (isto.pos < isto.limite) {
+            const c: texto = isto.fonte[isto.pos]
+            se (c == " " ou c == "\n" ou c == "\r" ou c == "\t") sustar
+            buf.empilhar(c)
+            isto.pos++
+        }
+        retorna buf.juntar("")
+    }
+
+    tokenizar(): TokenForth[] {
+        var out: TokenForth[] = []
+        enquanto (verdadeiro) {
+            isto.pularEspacos()
+            se (isto.pos >= isto.limite) sustar
+            const palavra: texto = isto.lerPalavra()
+
+            se (palavra == "\\") {
+                enquanto (isto.pos < isto.limite e isto.fonte[isto.pos] != "\n") {
+                    isto.pos++
+                }
+                continua
+            }
+            se (palavra == "(") {
+                enquanto (isto.pos < isto.limite e isto.fonte[isto.pos] != ")") {
+                    isto.pos++
+                }
+                se (isto.pos < isto.limite) isto.pos++
+                continua
+            }
+            se (palavra == ".\"") {
+                se (isto.pos < isto.limite e isto.fonte[isto.pos] == " ") {
+                    isto.pos++
+                }
+                var buf: texto[] = []
+                enquanto (isto.pos < isto.limite e isto.fonte[isto.pos] != "\"") {
+                    buf.empilhar(isto.fonte[isto.pos])
+                    isto.pos++
+                }
+                se (isto.pos >= isto.limite) falhar ErroForth("String .\" sem fechamento")
+                isto.pos++
+                out.empilhar(TokenForth(verdadeiro, buf.juntar("")))
+                continua
+            }
+            out.empilhar(TokenForth(falso, palavra.maiusculo()))
+        }
+        retorna out
+    }
+}
+
+classe VMForth {
+    pilha: inteiro[]
+    retorno: inteiro[]
+    memoria: inteiro[]
+    dicionario: dicionario
+    linhaAtual: texto[]
+
+    construtor() {
+        isto.pilha = []
+        isto.retorno = []
+        isto.memoria = []
+        isto.dicionario = {}
+        isto.linhaAtual = []
+    }
+
+    eInteiro(s: texto): logico {
+        se (s.tamanho() == 0) retorna falso
+        var inicio: inteiro = 0
+        se (s[0] == "-") {
+            se (s.tamanho() == 1) retorna falso
+            inicio = 1
+        }
+        para (var i: inteiro = inicio; i < s.tamanho(); i++) {
+            se (!"0123456789".contem(s[i])) retorna falso
+        }
+        retorna verdadeiro
+    }
+
+    desempilhar(ctx: texto): inteiro {
+        se (isto.pilha.tamanho() == 0) {
+            falhar ErroForth("Pilha vazia em " + ctx)
+        }
+        retorna isto.pilha.removerUltimo()
+    }
+
+    descarregarLinha(): vazio {
+        escreva(isto.linhaAtual.juntar("").aparar())
+        isto.linhaAtual = []
+    }
+
+    executarPrimitiva(nome: texto): vazio {
+        se (nome == "DUP") {
+            const a: inteiro = isto.desempilhar("DUP")
+            isto.pilha.empilhar(a)
+            isto.pilha.empilhar(a)
+            retorna
+        }
+        se (nome == "2DUP") {
+            const b: inteiro = isto.desempilhar("2DUP")
+            const a: inteiro = isto.desempilhar("2DUP")
+            isto.pilha.empilhar(a)
+            isto.pilha.empilhar(b)
+            isto.pilha.empilhar(a)
+            isto.pilha.empilhar(b)
+            retorna
+        }
+        se (nome == "DROP") {
+            isto.desempilhar("DROP")
+            retorna
+        }
+        se (nome == "SWAP") {
+            const b: inteiro = isto.desempilhar("SWAP")
+            const a: inteiro = isto.desempilhar("SWAP")
+            isto.pilha.empilhar(b)
+            isto.pilha.empilhar(a)
+            retorna
+        }
+        se (nome == "OVER") {
+            const b: inteiro = isto.desempilhar("OVER")
+            const a: inteiro = isto.desempilhar("OVER")
+            isto.pilha.empilhar(a)
+            isto.pilha.empilhar(b)
+            isto.pilha.empilhar(a)
+            retorna
+        }
+        se (nome == "ROT") {
+            const c: inteiro = isto.desempilhar("ROT")
+            const b: inteiro = isto.desempilhar("ROT")
+            const a: inteiro = isto.desempilhar("ROT")
+            isto.pilha.empilhar(b)
+            isto.pilha.empilhar(c)
+            isto.pilha.empilhar(a)
+            retorna
+        }
+        se (nome == "DEPTH") {
+            isto.pilha.empilhar(isto.pilha.tamanho())
+            retorna
+        }
+        se (nome == ">R") {
+            isto.retorno.empilhar(isto.desempilhar(">R"))
+            retorna
+        }
+        se (nome == "R>") {
+            se (isto.retorno.tamanho() == 0) falhar ErroForth("Pilha de retorno vazia em R>")
+            isto.pilha.empilhar(isto.retorno.removerUltimo())
+            retorna
+        }
+        se (nome == "R@") {
+            se (isto.retorno.tamanho() == 0) falhar ErroForth("Pilha de retorno vazia em R@")
+            isto.pilha.empilhar(isto.retorno[isto.retorno.tamanho() - 1])
+            retorna
+        }
+        se (nome == "+") {
+            const b: inteiro = isto.desempilhar("+")
+            const a: inteiro = isto.desempilhar("+")
+            isto.pilha.empilhar(a + b)
+            retorna
+        }
+        se (nome == "-") {
+            const b: inteiro = isto.desempilhar("-")
+            const a: inteiro = isto.desempilhar("-")
+            isto.pilha.empilhar(a - b)
+            retorna
+        }
+        se (nome == "*") {
+            const b: inteiro = isto.desempilhar("*")
+            const a: inteiro = isto.desempilhar("*")
+            isto.pilha.empilhar(a * b)
+            retorna
+        }
+        se (nome == "/") {
+            const b: inteiro = isto.desempilhar("/")
+            const a: inteiro = isto.desempilhar("/")
+            se (b == 0) falhar ErroForth("Divisao por zero")
+            isto.pilha.empilhar(inteiro(a / b))
+            retorna
+        }
+        se (nome == "MOD") {
+            const b: inteiro = isto.desempilhar("MOD")
+            const a: inteiro = isto.desempilhar("MOD")
+            se (b == 0) falhar ErroForth("Resto por zero")
+            isto.pilha.empilhar(a % b)
+            retorna
+        }
+        se (nome == "NEGATE") {
+            isto.pilha.empilhar(-isto.desempilhar("NEGATE"))
+            retorna
+        }
+        se (nome == "ABS") {
+            const a: inteiro = isto.desempilhar("ABS")
+            isto.pilha.empilhar(a < 0 ? -a : a)
+            retorna
+        }
+        se (nome == "=") {
+            const b: inteiro = isto.desempilhar("=")
+            const a: inteiro = isto.desempilhar("=")
+            isto.pilha.empilhar(a == b ? -1 : 0)
+            retorna
+        }
+        se (nome == "<") {
+            const b: inteiro = isto.desempilhar("<")
+            const a: inteiro = isto.desempilhar("<")
+            isto.pilha.empilhar(a < b ? -1 : 0)
+            retorna
+        }
+        se (nome == ">") {
+            const b: inteiro = isto.desempilhar(">")
+            const a: inteiro = isto.desempilhar(">")
+            isto.pilha.empilhar(a > b ? -1 : 0)
+            retorna
+        }
+        se (nome == "<=") {
+            const b: inteiro = isto.desempilhar("<=")
+            const a: inteiro = isto.desempilhar("<=")
+            isto.pilha.empilhar(a <= b ? -1 : 0)
+            retorna
+        }
+        se (nome == ">=") {
+            const b: inteiro = isto.desempilhar(">=")
+            const a: inteiro = isto.desempilhar(">=")
+            isto.pilha.empilhar(a >= b ? -1 : 0)
+            retorna
+        }
+        se (nome == "0=") {
+            const a: inteiro = isto.desempilhar("0=")
+            isto.pilha.empilhar(a == 0 ? -1 : 0)
+            retorna
+        }
+        se (nome == "AND") {
+            const b: inteiro = isto.desempilhar("AND")
+            const a: inteiro = isto.desempilhar("AND")
+            isto.pilha.empilhar(a & b)
+            retorna
+        }
+        se (nome == "OR") {
+            const b: inteiro = isto.desempilhar("OR")
+            const a: inteiro = isto.desempilhar("OR")
+            isto.pilha.empilhar(a | b)
+            retorna
+        }
+        se (nome == "INVERT") {
+            const a: inteiro = isto.desempilhar("INVERT")
+            isto.pilha.empilhar(a == 0 ? -1 : 0)
+            retorna
+        }
+        se (nome == "@") {
+            const end: inteiro = isto.desempilhar("@")
+            isto.pilha.empilhar(isto.memoria[end])
+            retorna
+        }
+        se (nome == "!") {
+            const end: inteiro = isto.desempilhar("!")
+            const val: inteiro = isto.desempilhar("!")
+            isto.memoria[end] = val
+            retorna
+        }
+        se (nome == ".") {
+            const val: inteiro = isto.desempilhar(".")
+            se (isto.linhaAtual.tamanho() > 0) {
+                const ultimo: texto = isto.linhaAtual[isto.linhaAtual.tamanho() - 1]
+                se (ultimo.tamanho() > 0 e ultimo[ultimo.tamanho() - 1] != " ") {
+                    isto.linhaAtual.empilhar(" ")
+                }
+            }
+            isto.linhaAtual.empilhar(texto(val))
+            retorna
+        }
+        se (nome == "CR") {
+            isto.descarregarLinha()
+            retorna
+        }
+        falhar ErroForth("Palavra desconhecida: " + nome)
+    }
+
+    executarCodigo(codigo: InstForth[]): vazio {
+        var loops: FrameLoop[] = []
+        var pc: inteiro = 0
+        const n: inteiro = codigo.tamanho()
+
+        enquanto (pc < n) {
+            const inst: InstForth = codigo[pc]
+            pc++
+
+            se (inst.op == OpForth.Empilhar) {
+                isto.pilha.empilhar(inst.num)
+            } senao se (inst.op == OpForth.Primitiva) {
+                isto.executarPrimitiva(inst.txt)
+            } senao se (inst.op == OpForth.Chamar) {
+                const palavra: PalavraForth = isto.dicionario[inst.txt]
+                isto.executarCodigo(palavra.codigo)
+            } senao se (inst.op == OpForth.Saltar) {
+                pc = inst.num
+            } senao se (inst.op == OpForth.SaltarSeZero) {
+                const cond: inteiro = isto.desempilhar("IF/WHILE/UNTIL")
+                se (cond == 0) pc = inst.num
+            } senao se (inst.op == OpForth.IniciarLoop) {
+                const inicio: inteiro = isto.desempilhar("DO")
+                const limite: inteiro = isto.desempilhar("DO")
+                loops.empilhar(FrameLoop(inicio, limite))
+            } senao se (inst.op == OpForth.AvancarLoop) {
+                const topo: FrameLoop = loops[loops.tamanho() - 1]
+                topo.atual = topo.atual + 1
+                se (topo.atual < topo.limite) {
+                    pc = inst.num
+                } senao {
+                    loops.removerUltimo()
+                }
+            } senao se (inst.op == OpForth.IndiceLoop) {
+                se (loops.tamanho() == 0) falhar ErroForth("'I' fora de DO...LOOP")
+                isto.pilha.empilhar(loops[loops.tamanho() - 1].atual)
+            } senao se (inst.op == OpForth.ImprimirTexto) {
+                isto.linhaAtual.empilhar(inst.txt)
+            } senao se (inst.op == OpForth.Retornar) {
+                retorna
+            }
+        }
+    }
+
+    compilarBloco(tokens: TokenForth[], inicio: inteiro, nomeAtual: texto, pararEmPontoVirgula: logico): qualquer {
+        var codigo: InstForth[] = []
+        var pilhaControle: inteiro[] = []
+        var i: inteiro = inicio
+        const n: inteiro = tokens.tamanho()
+
+        enquanto (i < n) {
+            const tok: TokenForth = tokens[i]
+            i++
+
+            se (tok.eTexto) {
+                codigo.empilhar(InstForth(OpForth.ImprimirTexto, 0, tok.valor))
+                continua
+            }
+
+            const w: texto = tok.valor
+            se (pararEmPontoVirgula e w == ";") {
+                codigo.empilhar(InstForth(OpForth.Retornar, 0, ""))
+                retorna [codigo, i]
+            }
+
+            se (!pararEmPontoVirgula e w == ":") {
+                se (i >= n) falhar ErroForth("Esperado nome apos ':'")
+                const nomePalavra: texto = tokens[i].valor
+                i++
+                const res: qualquer = isto.compilarBloco(tokens, i, nomePalavra, verdadeiro)
+                const corpo: InstForth[] = res[0]
+                i = inteiro(res[1])
+                isto.dicionario[nomePalavra] = PalavraForth(nomePalavra, corpo)
+                continua
+            }
+
+            se (!pararEmPontoVirgula e w == "VARIABLE") {
+                se (i >= n) falhar ErroForth("Esperado nome apos VARIABLE")
+                const nomeVar: texto = tokens[i].valor
+                i++
+                const end: inteiro = isto.memoria.tamanho()
+                isto.memoria.empilhar(0)
+                var corpoVar: InstForth[] = [InstForth(OpForth.Empilhar, end, ""), InstForth(OpForth.Retornar,
+                    0, "")]
+                isto.dicionario[nomeVar] = PalavraForth(nomeVar, corpoVar)
+                continua
+            }
+
+            se (w == "IF") {
+                pilhaControle.empilhar(codigo.tamanho())
+                codigo.empilhar(InstForth(OpForth.SaltarSeZero, 0, ""))
+            } senao se (w == "ELSE") {
+                const posIf: inteiro = pilhaControle.removerUltimo()
+                const posElse: inteiro = codigo.tamanho()
+                codigo.empilhar(InstForth(OpForth.Saltar, 0, ""))
+                codigo[posIf].num = codigo.tamanho()
+                pilhaControle.empilhar(posElse)
+            } senao se (w == "THEN") {
+                const posSalto: inteiro = pilhaControle.removerUltimo()
+                codigo[posSalto].num = codigo.tamanho()
+            } senao se (w == "BEGIN") {
+                pilhaControle.empilhar(codigo.tamanho())
+            } senao se (w == "UNTIL") {
+                const alvo: inteiro = pilhaControle.removerUltimo()
+                codigo.empilhar(InstForth(OpForth.SaltarSeZero, alvo, ""))
+            } senao se (w == "WHILE") {
+                pilhaControle.empilhar(codigo.tamanho())
+                codigo.empilhar(InstForth(OpForth.SaltarSeZero, 0, ""))
+            } senao se (w == "REPEAT") {
+                const posWhile: inteiro = pilhaControle.removerUltimo()
+                const posBegin: inteiro = pilhaControle.removerUltimo()
+                codigo.empilhar(InstForth(OpForth.Saltar, posBegin, ""))
+                codigo[posWhile].num = codigo.tamanho()
+            } senao se (w == "DO") {
+                codigo.empilhar(InstForth(OpForth.IniciarLoop, 0, ""))
+                pilhaControle.empilhar(codigo.tamanho())
+            } senao se (w == "LOOP") {
+                const alvoLoop: inteiro = pilhaControle.removerUltimo()
+                codigo.empilhar(InstForth(OpForth.AvancarLoop, alvoLoop, ""))
+            } senao se (w == "I") {
+                codigo.empilhar(InstForth(OpForth.IndiceLoop, 0, ""))
+            } senao se (w == "EXIT") {
+                codigo.empilhar(InstForth(OpForth.Retornar, 0, ""))
+            } senao se (w == "RECURSE") {
+                se (nomeAtual == "") falhar ErroForth("RECURSE fora de definicao")
+                codigo.empilhar(InstForth(OpForth.Chamar, 0, nomeAtual))
+            } senao se (isto.eInteiro(w)) {
+                codigo.empilhar(InstForth(OpForth.Empilhar, inteiro(w), ""))
+            } senao se (isto.dicionario.contem(w)) {
+                codigo.empilhar(InstForth(OpForth.Chamar, 0, w))
+            } senao {
+                codigo.empilhar(InstForth(OpForth.Primitiva, 0, w))
+            }
+        }
+
+        se (pararEmPontoVirgula) {
+            falhar ErroForth("Definicao '${nomeAtual}' sem ';'")
+        }
+        retorna [codigo, i]
+    }
+
+    executarFonte(fonte: texto): vazio {
+        const tokens: TokenForth[] = LexerForth(fonte).tokenizar()
+        const res: qualquer = isto.compilarBloco(tokens, 0, "", falso)
+        const principal: InstForth[] = res[0]
+        isto.executarCodigo(principal)
+        se (isto.linhaAtual.tamanho() > 0) {
+            isto.descarregarLinha()
+        }
+    }
+}
+
+const arquivos: qualquer = importar("cgd:arquivos")
+const caminho: texto = "programa.fth"
+const arquivo: qualquer = arquivos.Arquivo(caminho)
+se (!arquivo.existe()) {
+    falhar "Arquivo MiniForth nao encontrado: ${caminho}"
+}
+
+const vmForth: VMForth = VMForth()
+vmForth.executarFonte(arquivo.ler())
+vmForth.executarFonte("7 FATORIAL 11 FIB +")
+assercao(vmForth.desempilhar("validacao") == 5129, "7! + fib(11) deveria ser 5129")

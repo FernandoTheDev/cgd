@@ -1,0 +1,1233 @@
+//! [Otimizador] Dobras: 4 | Ramos mortos eliminados: 1\n[VM] 30\n[VM] 1024\n[VM] 55\n[VM] 64\n[VM] true\n[TypeChecker] Erro capturado: Tipo incompativel na inicializacao de 'x': esperado int, recebido bool
+//? fase: execucao
+//? diretorio: fonte
+// MiniLang: compilador completo em 5 fases escrito em Delegua/CGD:
+// 1. Lexer  2. Parser (AST polimorfica com classes abstratas)
+// 3. Verificador de Tipos  4. Otimizador de AST (Constant Folding + DCE)
+// 5. Gerador de Bytecode + VM com frames de ativacao.
+// Compilar na raiz: ./cgd exemplos/minipascal/compilador.delegua -s out/minilang
+// Executar: cd exemplos/minipascal && ../../out/minilang
+
+enum Tok {
+    IntLit,
+    Ident,
+    Fn,
+    Var,
+    If,
+    Else,
+    While,
+    Return,
+    Print,
+    True,
+    False,
+    TInt,
+    TBool,
+    Mais,
+    Menos,
+    Vezes,
+    Div,
+    Mod,
+    Igual,
+    Eq,
+    Neq,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    And,
+    Or,
+    Not,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    Colon,
+    Semi,
+    Comma,
+    Fim
+}
+
+enum TipoML {
+    Int,
+    Bool
+}
+
+enum OpML {
+    PushInt,
+    PushBool,
+    LoadLocal,
+    StoreLocal,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Neg,
+    Not,
+    Eq,
+    Neq,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    And,
+    Or,
+    Jmp,
+    Jz,
+    Call,
+    Print,
+    Ret
+}
+
+classe ErroCompilador herda Excecao {
+    construtor(mensagem: texto) {
+        super(mensagem)
+    }
+}
+
+classe TokenML {
+    tag: Tok
+    lexema: texto
+    linha: inteiro
+
+    construtor(tag: Tok, lexema: texto, linha: inteiro) {
+        isto.tag = tag
+        isto.lexema = lexema
+        isto.linha = linha
+    }
+}
+
+classe InstML {
+    op: OpML
+    arg: inteiro
+    nome: texto
+
+    construtor(op: OpML, arg: inteiro = 0, nome: texto = "") {
+        isto.op = op
+        isto.arg = arg
+        isto.nome = nome
+    }
+}
+
+classe StatsOtimizacao {
+    dobras: inteiro = 0
+    ramosEliminados: inteiro = 0
+}
+
+funcao nomeTipo(t: TipoML): texto {
+    se (t == TipoML.Int) retorna "int"
+    retorna "bool"
+}
+
+// --- AST Polimorfica (despacho virtual para checagem, otimizacao e codegen) ---
+
+classe abstrata Expr {
+    abstrato especie(): texto;
+
+    abstrato verificar(funcoes: dicionario, escopo: dicionario): TipoML;
+
+    abstrato otimizar(stats: StatsOtimizacao): Expr;
+
+    abstrato emitir(codigo: InstML[], slots: dicionario): vazio;
+
+    valorInt(): inteiro {
+        retorna 0
+    }
+
+    valorBool(): logico {
+        retorna falso
+    }
+}
+
+classe ExprInt herda Expr {
+    valor: inteiro
+
+    construtor(valor: inteiro) {
+        isto.valor = valor
+    }
+
+    especie(): texto {
+        retorna "int"
+    }
+
+    valorInt(): inteiro {
+        retorna isto.valor
+    }
+
+    verificar(funcoes: dicionario, escopo: dicionario): TipoML {
+        retorna TipoML.Int
+    }
+
+    otimizar(stats: StatsOtimizacao): Expr {
+        retorna isto
+    }
+
+    emitir(codigo: InstML[], slots: dicionario): vazio {
+        codigo.empilhar(InstML(OpML.PushInt, isto.valor, ""))
+    }
+}
+
+classe ExprBool herda Expr {
+    valor: logico
+
+    construtor(valor: logico) {
+        isto.valor = valor
+    }
+
+    especie(): texto {
+        retorna "bool"
+    }
+
+    valorBool(): logico {
+        retorna isto.valor
+    }
+
+    verificar(funcoes: dicionario, escopo: dicionario): TipoML {
+        retorna TipoML.Bool
+    }
+
+    otimizar(stats: StatsOtimizacao): Expr {
+        retorna isto
+    }
+
+    emitir(codigo: InstML[], slots: dicionario): vazio {
+        codigo.empilhar(InstML(OpML.PushBool, isto.valor ? 1 : 0, ""))
+    }
+}
+
+classe ExprVar herda Expr {
+    nome: texto
+
+    construtor(nome: texto) {
+        isto.nome = nome
+    }
+
+    especie(): texto {
+        retorna "var"
+    }
+
+    verificar(funcoes: dicionario, escopo: dicionario): TipoML {
+        se (!escopo.contem(isto.nome)) {
+            falhar ErroCompilador("Variavel nao declarada: '${isto.nome}'")
+        }
+        retorna escopo[isto.nome]
+    }
+
+    otimizar(stats: StatsOtimizacao): Expr {
+        retorna isto
+    }
+
+    emitir(codigo: InstML[], slots: dicionario): vazio {
+        codigo.empilhar(InstML(OpML.LoadLocal, inteiro(slots[isto.nome]), ""))
+    }
+}
+
+classe ExprUnaria herda Expr {
+    op: Tok
+    operando: Expr
+
+    construtor(op: Tok, operando: Expr) {
+        isto.op = op
+        isto.operando = operando
+    }
+
+    especie(): texto {
+        retorna "unaria"
+    }
+
+    verificar(funcoes: dicionario, escopo: dicionario): TipoML {
+        const t: TipoML = isto.operando.verificar(funcoes, escopo)
+        se (isto.op == Tok.Menos) {
+            se (t != TipoML.Int) falhar ErroCompilador("Operador '-' exige int")
+            retorna TipoML.Int
+        }
+        se (t != TipoML.Bool) falhar ErroCompilador("Operador '!' exige bool")
+        retorna TipoML.Bool
+    }
+
+    otimizar(stats: StatsOtimizacao): Expr {
+        const opnd: Expr = isto.operando.otimizar(stats)
+        se (isto.op == Tok.Menos e opnd.especie() == "int") {
+            stats.dobras++
+            retorna ExprInt(-opnd.valorInt())
+        }
+        se (isto.op == Tok.Not e opnd.especie() == "bool") {
+            stats.dobras++
+            retorna ExprBool(!opnd.valorBool())
+        }
+        retorna ExprUnaria(isto.op, opnd)
+    }
+
+    emitir(codigo: InstML[], slots: dicionario): vazio {
+        isto.operando.emitir(codigo, slots)
+        se (isto.op == Tok.Menos) codigo.empilhar(InstML(OpML.Neg, 0, ""))
+        senao codigo.empilhar(InstML(OpML.Not, 0, ""))
+    }
+}
+
+classe ExprBinaria herda Expr {
+    op: Tok
+    esq: Expr
+    dir: Expr
+
+    construtor(op: Tok, esq: Expr, dir: Expr) {
+        isto.op = op
+        isto.esq = esq
+        isto.dir = dir
+    }
+
+    especie(): texto {
+        retorna "binaria"
+    }
+
+    verificar(funcoes: dicionario, escopo: dicionario): TipoML {
+        const te: TipoML = isto.esq.verificar(funcoes, escopo)
+        const td: TipoML = isto.dir.verificar(funcoes, escopo)
+        se (isto.op == Tok.Mais ou isto.op == Tok.Menos ou isto.op == Tok.Vezes ou isto.op == Tok.Div ou isto.op == Tok.Mod) {
+            se (te != TipoML.Int ou td != TipoML.Int) falhar ErroCompilador("Operador aritmetico exige int")
+            retorna TipoML.Int
+        }
+        se (isto.op == Tok.Lt ou isto.op == Tok.Le ou isto.op == Tok.Gt ou isto.op == Tok.Ge) {
+            se (te != TipoML.Int ou td != TipoML.Int) falhar ErroCompilador("Comparacao ordenada exige int")
+            retorna TipoML.Bool
+        }
+        se (isto.op == Tok.Eq ou isto.op == Tok.Neq) {
+            se (te != td) falhar ErroCompilador("Igualdade exige tipos iguais")
+            retorna TipoML.Bool
+        }
+        se (te != TipoML.Bool ou td != TipoML.Bool) falhar ErroCompilador("Operador logico exige bool")
+        retorna TipoML.Bool
+    }
+
+    otimizar(stats: StatsOtimizacao): Expr {
+        const esqOtim: Expr = isto.esq.otimizar(stats)
+        const dirOtim: Expr = isto.dir.otimizar(stats)
+        se (esqOtim.especie() == "int" e dirOtim.especie() == "int") {
+            const a: inteiro = esqOtim.valorInt()
+            const b: inteiro = dirOtim.valorInt()
+            se (isto.op == Tok.Mais) {
+                stats.dobras++
+                retorna ExprInt(a + b)
+            }
+            se (isto.op == Tok.Menos) {
+                stats.dobras++
+                retorna ExprInt(a - b)
+            }
+            se (isto.op == Tok.Vezes) {
+                stats.dobras++
+                retorna ExprInt(a * b)
+            }
+            se (isto.op == Tok.Div e b != 0) {
+                stats.dobras++
+                retorna ExprInt(inteiro(a / b))
+            }
+            se (isto.op == Tok.Mod e b != 0) {
+                stats.dobras++
+                retorna ExprInt(a % b)
+            }
+            se (isto.op == Tok.Lt) {
+                stats.dobras++
+                retorna ExprBool(a < b)
+            }
+            se (isto.op == Tok.Le) {
+                stats.dobras++
+                retorna ExprBool(a <= b)
+            }
+            se (isto.op == Tok.Gt) {
+                stats.dobras++
+                retorna ExprBool(a > b)
+            }
+            se (isto.op == Tok.Ge) {
+                stats.dobras++
+                retorna ExprBool(a >= b)
+            }
+            se (isto.op == Tok.Eq) {
+                stats.dobras++
+                retorna ExprBool(a == b)
+            }
+            se (isto.op == Tok.Neq) {
+                stats.dobras++
+                retorna ExprBool(a != b)
+            }
+        }
+        retorna ExprBinaria(isto.op, esqOtim, dirOtim)
+    }
+
+    emitir(codigo: InstML[], slots: dicionario): vazio {
+        isto.esq.emitir(codigo, slots)
+        isto.dir.emitir(codigo, slots)
+        se (isto.op == Tok.Mais) codigo.empilhar(InstML(OpML.Add, 0, ""))
+        senao se (isto.op == Tok.Menos) codigo.empilhar(InstML(OpML.Sub, 0, ""))
+        senao se (isto.op == Tok.Vezes) codigo.empilhar(InstML(OpML.Mul, 0, ""))
+        senao se (isto.op == Tok.Div) codigo.empilhar(InstML(OpML.Div, 0, ""))
+        senao se (isto.op == Tok.Mod) codigo.empilhar(InstML(OpML.Mod, 0, ""))
+        senao se (isto.op == Tok.Eq) codigo.empilhar(InstML(OpML.Eq, 0, ""))
+        senao se (isto.op == Tok.Neq) codigo.empilhar(InstML(OpML.Neq, 0, ""))
+        senao se (isto.op == Tok.Lt) codigo.empilhar(InstML(OpML.Lt, 0, ""))
+        senao se (isto.op == Tok.Le) codigo.empilhar(InstML(OpML.Le, 0, ""))
+        senao se (isto.op == Tok.Gt) codigo.empilhar(InstML(OpML.Gt, 0, ""))
+        senao se (isto.op == Tok.Ge) codigo.empilhar(InstML(OpML.Ge, 0, ""))
+        senao se (isto.op == Tok.And) codigo.empilhar(InstML(OpML.And, 0, ""))
+        senao se (isto.op == Tok.Or) codigo.empilhar(InstML(OpML.Or, 0, ""))
+    }
+}
+
+classe ParametroML {
+    nome: texto
+    tipoDecl: TipoML
+
+    construtor(nome: texto, tipoDecl: TipoML) {
+        isto.nome = nome
+        isto.tipoDecl = tipoDecl
+    }
+}
+
+classe ExprChamada herda Expr {
+    nome: texto
+    args: Expr[]
+
+    construtor(nome: texto, args: Expr[]) {
+        isto.nome = nome
+        isto.args = args
+    }
+
+    especie(): texto {
+        retorna "chamada"
+    }
+
+    verificar(funcoes: dicionario, escopo: dicionario): TipoML {
+        se (!funcoes.contem(isto.nome)) {
+            falhar ErroCompilador("Funcao nao declarada: '${isto.nome}'")
+        }
+        const alvo: DeclFuncao = funcoes[isto.nome]
+        se (isto.args.tamanho() != alvo.params.tamanho()) {
+            falhar ErroCompilador("Aridade incorreta ao chamar '${isto.nome}'")
+        }
+        para (var i: inteiro = 0; i < isto.args.tamanho(); i++) {
+            const ta: TipoML = isto.args[i].verificar(funcoes, escopo)
+            se (ta != alvo.params[i].tipoDecl) {
+                falhar ErroCompilador("Argumento ${i + 1} de '${isto.nome}' com tipo incompativel")
+            }
+        }
+        retorna alvo.retorno
+    }
+
+    otimizar(stats: StatsOtimizacao): Expr {
+        var novosArgs: Expr[] = []
+        para (var i: inteiro = 0; i < isto.args.tamanho(); i++) {
+            novosArgs.empilhar(isto.args[i].otimizar(stats))
+        }
+        retorna ExprChamada(isto.nome, novosArgs)
+    }
+
+    emitir(codigo: InstML[], slots: dicionario): vazio {
+        para (var i: inteiro = 0; i < isto.args.tamanho(); i++) {
+            isto.args[i].emitir(codigo, slots)
+        }
+        codigo.empilhar(InstML(OpML.Call, isto.args.tamanho(), isto.nome))
+    }
+}
+
+classe abstrata Stmt {
+    abstrato verificar(funcoes: dicionario, escopo: dicionario, retEsperado: TipoML): vazio;
+
+    abstrato otimizar(stats: StatsOtimizacao): Stmt;
+
+    abstrato emitir(codigo: InstML[], slots: dicionario, proxSlot: inteiro): inteiro;
+}
+
+classe StmtBloco herda Stmt {
+    stmts: Stmt[]
+
+    construtor(stmts: Stmt[]) {
+        isto.stmts = stmts
+    }
+
+    verificar(funcoes: dicionario, escopo: dicionario, retEsperado: TipoML): vazio {
+        para (var i: inteiro = 0; i < isto.stmts.tamanho(); i++) {
+            isto.stmts[i].verificar(funcoes, escopo, retEsperado)
+        }
+    }
+
+    otimizar(stats: StatsOtimizacao): Stmt {
+        var novos: Stmt[] = []
+        para (var i: inteiro = 0; i < isto.stmts.tamanho(); i++) {
+            novos.empilhar(isto.stmts[i].otimizar(stats))
+        }
+        retorna StmtBloco(novos)
+    }
+
+    emitir(codigo: InstML[], slots: dicionario, proxSlot: inteiro): inteiro {
+        var proximo: inteiro = proxSlot
+        para (var i: inteiro = 0; i < isto.stmts.tamanho(); i++) {
+            proximo = isto.stmts[i].emitir(codigo, slots, proximo)
+        }
+        retorna proximo
+    }
+}
+
+classe StmtVar herda Stmt {
+    nome: texto
+    tipoDecl: TipoML
+    inic: Expr
+
+    construtor(nome: texto, tipoDecl: TipoML, inic: Expr) {
+        isto.nome = nome
+        isto.tipoDecl = tipoDecl
+        isto.inic = inic
+    }
+
+    verificar(funcoes: dicionario, escopo: dicionario, retEsperado: TipoML): vazio {
+        const tInic: TipoML = isto.inic.verificar(funcoes, escopo)
+        se (tInic != isto.tipoDecl) {
+            falhar ErroCompilador("Tipo incompativel na inicializacao de '${isto.nome}': esperado ${nomeTipo(isto.tipoDecl)}, recebido ${nomeTipo(tInic)}")
+        }
+        escopo[isto.nome] = isto.tipoDecl
+    }
+
+    otimizar(stats: StatsOtimizacao): Stmt {
+        retorna StmtVar(isto.nome, isto.tipoDecl, isto.inic.otimizar(stats))
+    }
+
+    emitir(codigo: InstML[], slots: dicionario, proxSlot: inteiro): inteiro {
+        isto.inic.emitir(codigo, slots)
+        slots[isto.nome] = proxSlot
+        codigo.empilhar(InstML(OpML.StoreLocal, proxSlot, ""))
+        retorna proxSlot + 1
+    }
+}
+
+classe StmtAtrib herda Stmt {
+    nome: texto
+    valor: Expr
+
+    construtor(nome: texto, valor: Expr) {
+        isto.nome = nome
+        isto.valor = valor
+    }
+
+    verificar(funcoes: dicionario, escopo: dicionario, retEsperado: TipoML): vazio {
+        se (!escopo.contem(isto.nome)) {
+            falhar ErroCompilador("Variavel nao declarada: '${isto.nome}'")
+        }
+        const tEsperado: TipoML = escopo[isto.nome]
+        const tVal: TipoML = isto.valor.verificar(funcoes, escopo)
+        se (tVal != tEsperado) {
+            falhar ErroCompilador("Atribuicao incompativel para '${isto.nome}'")
+        }
+    }
+
+    otimizar(stats: StatsOtimizacao): Stmt {
+        retorna StmtAtrib(isto.nome, isto.valor.otimizar(stats))
+    }
+
+    emitir(codigo: InstML[], slots: dicionario, proxSlot: inteiro): inteiro {
+        isto.valor.emitir(codigo, slots)
+        codigo.empilhar(InstML(OpML.StoreLocal, inteiro(slots[isto.nome]), ""))
+        retorna proxSlot
+    }
+}
+
+classe StmtSe herda Stmt {
+    cond: Expr
+    entao: Stmt
+    senaoRamo: qualquer
+
+    construtor(cond: Expr, entao: Stmt, senaoRamo: qualquer) {
+        isto.cond = cond
+        isto.entao = entao
+        isto.senaoRamo = senaoRamo
+    }
+
+    verificar(funcoes: dicionario, escopo: dicionario, retEsperado: TipoML): vazio {
+        const tCond: TipoML = isto.cond.verificar(funcoes, escopo)
+        se (tCond != TipoML.Bool) {
+            falhar ErroCompilador("Condicao de 'if' deve ser bool")
+        }
+        isto.entao.verificar(funcoes, escopo, retEsperado)
+        se (isto.senaoRamo != nulo) {
+            const sr: Stmt = isto.senaoRamo
+            sr.verificar(funcoes, escopo, retEsperado)
+        }
+    }
+
+    otimizar(stats: StatsOtimizacao): Stmt {
+        const condOtim: Expr = isto.cond.otimizar(stats)
+        const entaoOtim: Stmt = isto.entao.otimizar(stats)
+        var senaoOtim: qualquer = nulo
+        se (isto.senaoRamo != nulo) {
+            const sr: Stmt = isto.senaoRamo
+            senaoOtim = sr.otimizar(stats)
+        }
+        se (condOtim.especie() == "bool") {
+            stats.ramosEliminados++
+            se (condOtim.valorBool()) retorna entaoOtim
+            se (senaoOtim != nulo) {
+                const sr2: Stmt = senaoOtim
+                retorna sr2
+            }
+            var vazioLista: Stmt[] = []
+            retorna StmtBloco(vazioLista)
+        }
+        retorna StmtSe(condOtim, entaoOtim, senaoOtim)
+    }
+
+    emitir(codigo: InstML[], slots: dicionario, proxSlot: inteiro): inteiro {
+        var proximo: inteiro = proxSlot
+        isto.cond.emitir(codigo, slots)
+        const posJz: inteiro = codigo.tamanho()
+        codigo.empilhar(InstML(OpML.Jz, 0, ""))
+        proximo = isto.entao.emitir(codigo, slots, proximo)
+        se (isto.senaoRamo != nulo) {
+            const posJmp: inteiro = codigo.tamanho()
+            codigo.empilhar(InstML(OpML.Jmp, 0, ""))
+            codigo[posJz].arg = codigo.tamanho()
+            const sr: Stmt = isto.senaoRamo
+            proximo = sr.emitir(codigo, slots, proximo)
+            codigo[posJmp].arg = codigo.tamanho()
+        } senao {
+            codigo[posJz].arg = codigo.tamanho()
+        }
+        retorna proximo
+    }
+}
+
+classe StmtEnquanto herda Stmt {
+    cond: Expr
+    corpo: Stmt
+
+    construtor(cond: Expr, corpo: Stmt) {
+        isto.cond = cond
+        isto.corpo = corpo
+    }
+
+    verificar(funcoes: dicionario, escopo: dicionario, retEsperado: TipoML): vazio {
+        const tCond: TipoML = isto.cond.verificar(funcoes, escopo)
+        se (tCond != TipoML.Bool) {
+            falhar ErroCompilador("Condicao de 'while' deve ser bool")
+        }
+        isto.corpo.verificar(funcoes, escopo, retEsperado)
+    }
+
+    otimizar(stats: StatsOtimizacao): Stmt {
+        retorna StmtEnquanto(isto.cond.otimizar(stats), isto.corpo.otimizar(stats))
+    }
+
+    emitir(codigo: InstML[], slots: dicionario, proxSlot: inteiro): inteiro {
+        const inicio: inteiro = codigo.tamanho()
+        isto.cond.emitir(codigo, slots)
+        const posJz: inteiro = codigo.tamanho()
+        codigo.empilhar(InstML(OpML.Jz, 0, ""))
+        const proximo: inteiro = isto.corpo.emitir(codigo, slots, proxSlot)
+        codigo.empilhar(InstML(OpML.Jmp, inicio, ""))
+        codigo[posJz].arg = codigo.tamanho()
+        retorna proximo
+    }
+}
+
+classe StmtPrint herda Stmt {
+    expr: Expr
+
+    construtor(expr: Expr) {
+        isto.expr = expr
+    }
+
+    verificar(funcoes: dicionario, escopo: dicionario, retEsperado: TipoML): vazio {
+        isto.expr.verificar(funcoes, escopo)
+    }
+
+    otimizar(stats: StatsOtimizacao): Stmt {
+        retorna StmtPrint(isto.expr.otimizar(stats))
+    }
+
+    emitir(codigo: InstML[], slots: dicionario, proxSlot: inteiro): inteiro {
+        isto.expr.emitir(codigo, slots)
+        codigo.empilhar(InstML(OpML.Print, 0, ""))
+        retorna proxSlot
+    }
+}
+
+classe StmtRetorno herda Stmt {
+    expr: Expr
+
+    construtor(expr: Expr) {
+        isto.expr = expr
+    }
+
+    verificar(funcoes: dicionario, escopo: dicionario, retEsperado: TipoML): vazio {
+        const tRet: TipoML = isto.expr.verificar(funcoes, escopo)
+        se (tRet != retEsperado) {
+            falhar ErroCompilador("Tipo de retorno incompativel: esperado ${nomeTipo(retEsperado)}, recebido ${nomeTipo(tRet)}")
+        }
+    }
+
+    otimizar(stats: StatsOtimizacao): Stmt {
+        retorna StmtRetorno(isto.expr.otimizar(stats))
+    }
+
+    emitir(codigo: InstML[], slots: dicionario, proxSlot: inteiro): inteiro {
+        isto.expr.emitir(codigo, slots)
+        codigo.empilhar(InstML(OpML.Ret, 0, ""))
+        retorna proxSlot
+    }
+}
+
+classe DeclFuncao {
+    nome: texto
+    params: ParametroML[]
+    retorno: TipoML
+    corpo: Stmt
+
+    construtor(nome: texto, params: ParametroML[], retorno: TipoML, corpo: Stmt) {
+        isto.nome = nome
+        isto.params = params
+        isto.retorno = retorno
+        isto.corpo = corpo
+    }
+}
+
+// --- Fase 1: Lexer ---
+
+classe LexerML {
+    fonte: texto
+    pos: inteiro
+    limite: inteiro
+    linha: inteiro
+
+    construtor(fonte: texto) {
+        isto.fonte = fonte
+        isto.pos = 0
+        isto.limite = fonte.tamanho()
+        isto.linha = 1
+    }
+
+    tokenizar(): TokenML[] {
+        var out: TokenML[] = []
+        enquanto (isto.pos < isto.limite) {
+            const c: texto = isto.fonte[isto.pos]
+            se (c == " " ou c == "\t" ou c == "\r") {
+                isto.pos++
+                continua
+            }
+            se (c == "\n") {
+                isto.linha++
+                isto.pos++
+                continua
+            }
+            se (c == "/" e isto.pos + 1 < isto.limite e isto.fonte[isto.pos + 1] == "/") {
+                enquanto (isto.pos < isto.limite e isto.fonte[isto.pos] != "\n") {
+                    isto.pos++
+                }
+                continua
+            }
+            se ("0123456789".contem(c)) {
+                var buf: texto[] = []
+                enquanto (isto.pos < isto.limite e "0123456789".contem(isto.fonte[isto.pos])) {
+                    buf.empilhar(isto.fonte[isto.pos])
+                    isto.pos++
+                }
+                out.empilhar(TokenML(Tok.IntLit, buf.juntar(""), isto.linha))
+                continua
+            }
+            se ("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contem(c)) {
+                var buf: texto[] = []
+                enquanto (isto.pos < isto.limite e "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789".contem(isto.fonte[isto.pos])) {
+                    buf.empilhar(isto.fonte[isto.pos])
+                    isto.pos++
+                }
+                const w: texto = buf.juntar("")
+                se (w == "fn") out.empilhar(TokenML(Tok.Fn, w, isto.linha))
+                senao se (w == "var") out.empilhar(TokenML(Tok.Var, w, isto.linha))
+                senao se (w == "if") out.empilhar(TokenML(Tok.If, w, isto.linha))
+                senao se (w == "else") out.empilhar(TokenML(Tok.Else, w, isto.linha))
+                senao se (w == "while") out.empilhar(TokenML(Tok.While, w, isto.linha))
+                senao se (w == "return") out.empilhar(TokenML(Tok.Return, w, isto.linha))
+                senao se (w == "print") out.empilhar(TokenML(Tok.Print, w, isto.linha))
+                senao se (w == "true") out.empilhar(TokenML(Tok.True, w, isto.linha))
+                senao se (w == "false") out.empilhar(TokenML(Tok.False, w, isto.linha))
+                senao se (w == "int") out.empilhar(TokenML(Tok.TInt, w, isto.linha))
+                senao se (w == "bool") out.empilhar(TokenML(Tok.TBool, w, isto.linha))
+                senao out.empilhar(TokenML(Tok.Ident, w, isto.linha))
+                continua
+            }
+            const prox: texto = isto.pos + 1 < isto.limite ? isto.fonte[isto.pos + 1] : ""
+            se (c == "=" e prox == "=") {
+                isto.pos = isto.pos + 2
+                out.empilhar(TokenML(Tok.Eq, "==", isto.linha))
+                continua
+            }
+            se (c == "!" e prox == "=") {
+                isto.pos = isto.pos + 2
+                out.empilhar(TokenML(Tok.Neq, "!=", isto.linha))
+                continua
+            }
+            se (c == "<" e prox == "=") {
+                isto.pos = isto.pos + 2
+                out.empilhar(TokenML(Tok.Le, "<=", isto.linha))
+                continua
+            }
+            se (c == ">" e prox == "=") {
+                isto.pos = isto.pos + 2
+                out.empilhar(TokenML(Tok.Ge, ">=", isto.linha))
+                continua
+            }
+            se (c == "&" e prox == "&") {
+                isto.pos = isto.pos + 2
+                out.empilhar(TokenML(Tok.And, "&&", isto.linha))
+                continua
+            }
+            se (c == "|" e prox == "|") {
+                isto.pos = isto.pos + 2
+                out.empilhar(TokenML(Tok.Or, "||", isto.linha))
+                continua
+            }
+
+            isto.pos++
+            se (c == "+") out.empilhar(TokenML(Tok.Mais, c, isto.linha))
+            senao se (c == "-") out.empilhar(TokenML(Tok.Menos, c, isto.linha))
+            senao se (c == "*") out.empilhar(TokenML(Tok.Vezes, c, isto.linha))
+            senao se (c == "/") out.empilhar(TokenML(Tok.Div, c, isto.linha))
+            senao se (c == "%") out.empilhar(TokenML(Tok.Mod, c, isto.linha))
+            senao se (c == "=") out.empilhar(TokenML(Tok.Igual, c, isto.linha))
+            senao se (c == "<") out.empilhar(TokenML(Tok.Lt, c, isto.linha))
+            senao se (c == ">") out.empilhar(TokenML(Tok.Gt, c, isto.linha))
+            senao se (c == "!") out.empilhar(TokenML(Tok.Not, c, isto.linha))
+            senao se (c == "(") out.empilhar(TokenML(Tok.LParen, c, isto.linha))
+            senao se (c == ")") out.empilhar(TokenML(Tok.RParen, c, isto.linha))
+            senao se (c == "{") out.empilhar(TokenML(Tok.LBrace, c, isto.linha))
+            senao se (c == "}") out.empilhar(TokenML(Tok.RBrace, c, isto.linha))
+            senao se (c == ":") out.empilhar(TokenML(Tok.Colon, c, isto.linha))
+            senao se (c == ";") out.empilhar(TokenML(Tok.Semi, c, isto.linha))
+            senao se (c == ",") out.empilhar(TokenML(Tok.Comma, c, isto.linha))
+            senao falhar ErroCompilador("Linha ${isto.linha}: caractere invalido '${c}'")
+        }
+        out.empilhar(TokenML(Tok.Fim, "", isto.linha))
+        retorna out
+    }
+}
+
+// --- Fase 2: Parser Descendente Recursivo ---
+
+classe ParserML {
+    tokens: TokenML[]
+    pos: inteiro
+
+    construtor(tokens: TokenML[]) {
+        isto.tokens = tokens
+        isto.pos = 0
+    }
+
+    atual(): TokenML {
+        retorna isto.tokens[isto.pos]
+    }
+
+    avancar(): TokenML {
+        const t: TokenML = isto.tokens[isto.pos]
+        isto.pos++
+        retorna t
+    }
+
+    consumir(esperado: Tok, msg: texto): TokenML {
+        se (isto.atual().tag != esperado) {
+            falhar ErroCompilador("Linha ${isto.atual().linha}: ${msg}, encontrado '${isto.atual().lexema}'")
+        }
+        retorna isto.avancar()
+    }
+
+    lerTipo(): TipoML {
+        se (isto.atual().tag == Tok.TInt) {
+            isto.avancar()
+            retorna TipoML.Int
+        }
+        se (isto.atual().tag == Tok.TBool) {
+            isto.avancar()
+            retorna TipoML.Bool
+        }
+        falhar ErroCompilador("Linha ${isto.atual().linha}: esperado tipo int ou bool")
+    }
+
+    parsePrograma(): DeclFuncao[] {
+        var funcoes: DeclFuncao[] = []
+        enquanto (isto.atual().tag != Tok.Fim) {
+            funcoes.empilhar(isto.parseFuncao())
+        }
+        retorna funcoes
+    }
+
+    parseFuncao(): DeclFuncao {
+        isto.consumir(Tok.Fn, "esperado 'fn'")
+        const nome: texto = isto.consumir(Tok.Ident, "esperado nome da funcao").lexema
+        isto.consumir(Tok.LParen, "esperado '('")
+        var params: ParametroML[] = []
+        se (isto.atual().tag != Tok.RParen) {
+            enquanto (verdadeiro) {
+                const pNome: texto = isto.consumir(Tok.Ident, "esperado nome de parametro").lexema
+                isto.consumir(Tok.Colon, "esperado ':'")
+                const pTipo: TipoML = isto.lerTipo()
+                params.empilhar(ParametroML(pNome, pTipo))
+                se (isto.atual().tag == Tok.Comma) {
+                    isto.avancar()
+                } senao {
+                    sustar
+                }
+            }
+        }
+        isto.consumir(Tok.RParen, "esperado ')'")
+        isto.consumir(Tok.Colon, "esperado ':' para tipo de retorno")
+        const retorno: TipoML = isto.lerTipo()
+        const corpo: Stmt = isto.parseBloco()
+        retorna DeclFuncao(nome, params, retorno, corpo)
+    }
+
+    parseBloco(): Stmt {
+        isto.consumir(Tok.LBrace, "esperado '{'")
+        var stmts: Stmt[] = []
+        enquanto (isto.atual().tag != Tok.RBrace e isto.atual().tag != Tok.Fim) {
+            stmts.empilhar(isto.parseStmt())
+        }
+        isto.consumir(Tok.RBrace, "esperado '}'")
+        retorna StmtBloco(stmts)
+    }
+
+    parseStmt(): Stmt {
+        const tag: Tok = isto.atual().tag
+        se (tag == Tok.LBrace) retorna isto.parseBloco()
+        se (tag == Tok.Var) {
+            isto.avancar()
+            const nome: texto = isto.consumir(Tok.Ident, "esperado nome de variavel").lexema
+            isto.consumir(Tok.Colon, "esperado ':'")
+            const t: TipoML = isto.lerTipo()
+            isto.consumir(Tok.Igual, "esperado '='")
+            const inic: Expr = isto.parseExpr()
+            isto.consumir(Tok.Semi, "esperado ';'")
+            retorna StmtVar(nome, t, inic)
+        }
+        se (tag == Tok.If) {
+            isto.avancar()
+            isto.consumir(Tok.LParen, "esperado '('")
+            const cond: Expr = isto.parseExpr()
+            isto.consumir(Tok.RParen, "esperado ')'")
+            const entao: Stmt = isto.parseStmt()
+            var senaoRamo: qualquer = nulo
+            se (isto.atual().tag == Tok.Else) {
+                isto.avancar()
+                senaoRamo = isto.parseStmt()
+            }
+            retorna StmtSe(cond, entao, senaoRamo)
+        }
+        se (tag == Tok.While) {
+            isto.avancar()
+            isto.consumir(Tok.LParen, "esperado '('")
+            const cond: Expr = isto.parseExpr()
+            isto.consumir(Tok.RParen, "esperado ')'")
+            const corpo: Stmt = isto.parseStmt()
+            retorna StmtEnquanto(cond, corpo)
+        }
+        se (tag == Tok.Print) {
+            isto.avancar()
+            isto.consumir(Tok.LParen, "esperado '('")
+            const exprVal: Expr = isto.parseExpr()
+            isto.consumir(Tok.RParen, "esperado ')'")
+            isto.consumir(Tok.Semi, "esperado ';'")
+            retorna StmtPrint(exprVal)
+        }
+        se (tag == Tok.Return) {
+            isto.avancar()
+            const exprVal: Expr = isto.parseExpr()
+            isto.consumir(Tok.Semi, "esperado ';'")
+            retorna StmtRetorno(exprVal)
+        }
+        se (tag == Tok.Ident) {
+            const nome: texto = isto.avancar().lexema
+            isto.consumir(Tok.Igual, "esperado '=' em atribuicao")
+            const val: Expr = isto.parseExpr()
+            isto.consumir(Tok.Semi, "esperado ';'")
+            retorna StmtAtrib(nome, val)
+        }
+        falhar ErroCompilador("Linha ${isto.atual().linha}: comando inesperado '${isto.atual().lexema}'")
+    }
+
+    parseExpr(): Expr {
+        retorna isto.parseOr()
+    }
+
+    parseOr(): Expr {
+        var esq: Expr = isto.parseAnd()
+        enquanto (isto.atual().tag == Tok.Or) {
+            const op: Tok = isto.avancar().tag
+            esq = ExprBinaria(op, esq, isto.parseAnd())
+        }
+        retorna esq
+    }
+
+    parseAnd(): Expr {
+        var esq: Expr = isto.parseIgualdade()
+        enquanto (isto.atual().tag == Tok.And) {
+            const op: Tok = isto.avancar().tag
+            esq = ExprBinaria(op, esq, isto.parseIgualdade())
+        }
+        retorna esq
+    }
+
+    parseIgualdade(): Expr {
+        var esq: Expr = isto.parseRelacional()
+        enquanto (isto.atual().tag == Tok.Eq ou isto.atual().tag == Tok.Neq) {
+            const op: Tok = isto.avancar().tag
+            esq = ExprBinaria(op, esq, isto.parseRelacional())
+        }
+        retorna esq
+    }
+
+    parseRelacional(): Expr {
+        var esq: Expr = isto.parseAdicao()
+        enquanto (isto.atual().tag == Tok.Lt ou isto.atual().tag == Tok.Le ou isto.atual().tag == Tok.Gt ou isto.atual().tag == Tok.Ge) {
+            const op: Tok = isto.avancar().tag
+            esq = ExprBinaria(op, esq, isto.parseAdicao())
+        }
+        retorna esq
+    }
+
+    parseAdicao(): Expr {
+        var esq: Expr = isto.parseFator()
+        enquanto (isto.atual().tag == Tok.Mais ou isto.atual().tag == Tok.Menos) {
+            const op: Tok = isto.avancar().tag
+            esq = ExprBinaria(op, esq, isto.parseFator())
+        }
+        retorna esq
+    }
+
+    parseFator(): Expr {
+        var esq: Expr = isto.parseUnario()
+        enquanto (isto.atual().tag == Tok.Vezes ou isto.atual().tag == Tok.Div ou isto.atual().tag == Tok.Mod) {
+            const op: Tok = isto.avancar().tag
+            esq = ExprBinaria(op, esq, isto.parseUnario())
+        }
+        retorna esq
+    }
+
+    parseUnario(): Expr {
+        se (isto.atual().tag == Tok.Menos ou isto.atual().tag == Tok.Not) {
+            const op: Tok = isto.avancar().tag
+            retorna ExprUnaria(op, isto.parseUnario())
+        }
+        retorna isto.parsePrimario()
+    }
+
+    parsePrimario(): Expr {
+        const t: TokenML = isto.atual()
+        se (t.tag == Tok.IntLit) {
+            isto.avancar()
+            retorna ExprInt(inteiro(t.lexema))
+        }
+        se (t.tag == Tok.True) {
+            isto.avancar()
+            retorna ExprBool(verdadeiro)
+        }
+        se (t.tag == Tok.False) {
+            isto.avancar()
+            retorna ExprBool(falso)
+        }
+        se (t.tag == Tok.LParen) {
+            isto.avancar()
+            const exprVal: Expr = isto.parseExpr()
+            isto.consumir(Tok.RParen, "esperado ')'")
+            retorna exprVal
+        }
+        se (t.tag == Tok.Ident) {
+            isto.avancar()
+            se (isto.atual().tag == Tok.LParen) {
+                isto.avancar()
+                var args: Expr[] = []
+                se (isto.atual().tag != Tok.RParen) {
+                    enquanto (verdadeiro) {
+                        args.empilhar(isto.parseExpr())
+                        se (isto.atual().tag == Tok.Comma) {
+                            isto.avancar()
+                        } senao {
+                            sustar
+                        }
+                    }
+                }
+                isto.consumir(Tok.RParen, "esperado ')'")
+                retorna ExprChamada(t.lexema, args)
+            }
+            retorna ExprVar(t.lexema)
+        }
+        falhar ErroCompilador("Linha ${t.linha}: expressao invalida '${t.lexema}'")
+    }
+}
+
+// --- Fases 3, 4 e 5: Driver de Verificacao, Otimizacao, Codegen e VM ---
+
+classe ChunkFuncao {
+    nome: texto
+    aridade: inteiro
+    numLocais: inteiro
+    codigo: InstML[]
+
+    construtor(nome: texto, aridade: inteiro, numLocais: inteiro, codigo: InstML[]) {
+        isto.nome = nome
+        isto.aridade = aridade
+        isto.numLocais = numLocais
+        isto.codigo = codigo
+    }
+}
+
+funcao verificarPrograma(decls: DeclFuncao[]): vazio {
+    var funcoes: dicionario = {}
+    para (var i: inteiro = 0; i < decls.tamanho(); i++) {
+        const fn: DeclFuncao = decls[i]
+        se (funcoes.contem(fn.nome)) {
+            falhar ErroCompilador("Funcao duplicada: '${fn.nome}'")
+        }
+        funcoes[fn.nome] = fn
+    }
+
+    se (!funcoes.contem("main")) {
+        falhar ErroCompilador("Funcao 'main' nao encontrada")
+    }
+
+    para (var i: inteiro = 0; i < decls.tamanho(); i++) {
+        const fn: DeclFuncao = decls[i]
+        var escopo: dicionario = {}
+        para (var p: inteiro = 0; p < fn.params.tamanho(); p++) {
+            escopo[fn.params[p].nome] = fn.params[p].tipoDecl
+        }
+        fn.corpo.verificar(funcoes, escopo, fn.retorno)
+    }
+}
+
+funcao otimizarPrograma(decls: DeclFuncao[]): StatsOtimizacao {
+    const stats: StatsOtimizacao = StatsOtimizacao()
+    para (var i: inteiro = 0; i < decls.tamanho(); i++) {
+        decls[i].corpo = decls[i].corpo.otimizar(stats)
+    }
+
+    retorna stats
+}
+
+funcao gerarBytecode(decls: DeclFuncao[]): dicionario {
+    var chunks: dicionario = {}
+    para (var i: inteiro = 0; i < decls.tamanho(); i++) {
+        const fn: DeclFuncao = decls[i]
+        var codigo: InstML[] = []
+        var slots: dicionario = {}
+        var proxSlot: inteiro = 0
+        para (var p: inteiro = 0; p < fn.params.tamanho(); p++) {
+            slots[fn.params[p].nome] = proxSlot
+            proxSlot++
+        }
+        const totalLocais: inteiro = fn.corpo.emitir(codigo, slots, proxSlot)
+        codigo.empilhar(InstML(OpML.PushInt, 0, ""))
+        codigo.empilhar(InstML(OpML.Ret, 0, ""))
+        chunks[fn.nome] = ChunkFuncao(fn.nome, fn.params.tamanho(), totalLocais, codigo)
+    }
+
+    retorna chunks
+}
+
+classe VMML {
+    chunks: dicionario
+
+    construtor(chunks: dicionario) {
+        isto.chunks = chunks
+    }
+
+    executarFuncao(nome: texto, args: qualquer[]): qualquer {
+        const chunk: ChunkFuncao = isto.chunks[nome]
+        var locais: qualquer[] = []
+        para (var i: inteiro = 0; i < chunk.numLocais; i++) {
+            locais.empilhar(0)
+        }
+        para (var i: inteiro = 0; i < args.tamanho(); i++) {
+            locais[i] = args[i]
+        }
+
+        var pilha: qualquer[] = []
+        var pc: inteiro = 0
+        const insts: InstML[] = chunk.codigo
+        const n: inteiro = insts.tamanho()
+
+        enquanto (pc < n) {
+            const inst: InstML = insts[pc]
+            pc++
+
+            se (inst.op == OpML.PushInt) pilha.empilhar(inst.arg)
+            senao se (inst.op == OpML.PushBool) pilha.empilhar(inst.arg != 0)
+            senao se (inst.op == OpML.LoadLocal) pilha.empilhar(locais[inst.arg])
+            senao se (inst.op == OpML.StoreLocal) locais[inst.arg] = pilha.removerUltimo()
+            senao se (inst.op == OpML.Neg) pilha.empilhar(-inteiro(pilha.removerUltimo()))
+            senao se (inst.op == OpML.Not) pilha.empilhar(!(pilha.removerUltimo() == verdadeiro))
+            senao se (inst.op == OpML.Jmp) pc = inst.arg
+            senao se (inst.op == OpML.Jz) {
+                const c: qualquer = pilha.removerUltimo()
+                se (!(c == verdadeiro)) pc = inst.arg
+            } senao se (inst.op == OpML.Print) {
+                const v: qualquer = pilha.removerUltimo()
+                se (tipo de v == "logico") {
+                    escreva("[VM] " + (v == verdadeiro ? "true" : "false"))
+                } senao {
+                    escreva("[VM] " + texto(v))
+                }
+            } senao se (inst.op == OpML.Ret) {
+                retorna pilha.removerUltimo()
+            } senao se (inst.op == OpML.Call) {
+                var callArgs: qualquer[] = []
+                para (var k: inteiro = 0; k < inst.arg; k++) {
+                    callArgs.empilhar(0)
+                }
+                para (var k: inteiro = inst.arg - 1; k >= 0; k--) {
+                    callArgs[k] = pilha.removerUltimo()
+                }
+                pilha.empilhar(isto.executarFuncao(inst.nome, callArgs))
+            } senao {
+                const b: qualquer = pilha.removerUltimo()
+                const a: qualquer = pilha.removerUltimo()
+                se (inst.op == OpML.Add) pilha.empilhar(inteiro(a) + inteiro(b))
+                senao se (inst.op == OpML.Sub) pilha.empilhar(inteiro(a) - inteiro(b))
+                senao se (inst.op == OpML.Mul) pilha.empilhar(inteiro(a) * inteiro(b))
+                senao se (inst.op == OpML.Div) pilha.empilhar(inteiro(inteiro(a) / inteiro(b)))
+                senao se (inst.op == OpML.Mod) pilha.empilhar(inteiro(a) % inteiro(b))
+                senao se (inst.op == OpML.Eq) pilha.empilhar(a == b)
+                senao se (inst.op == OpML.Neq) pilha.empilhar(a != b)
+                senao se (inst.op == OpML.Lt) pilha.empilhar(inteiro(a) < inteiro(b))
+                senao se (inst.op == OpML.Le) pilha.empilhar(inteiro(a) <= inteiro(b))
+                senao se (inst.op == OpML.Gt) pilha.empilhar(inteiro(a) > inteiro(b))
+                senao se (inst.op == OpML.Ge) pilha.empilhar(inteiro(a) >= inteiro(b))
+                senao se (inst.op == OpML.And) pilha.empilhar((a == verdadeiro) e (b == verdadeiro))
+                senao se (inst.op == OpML.Or) pilha.empilhar((a == verdadeiro) ou (b == verdadeiro))
+            }
+        }
+        retorna 0
+    }
+}
+
+const arquivos: qualquer = importar("cgd:arquivos")
+const caminho: texto = "programa.ml"
+const arquivo: qualquer = arquivos.Arquivo(caminho)
+se (!arquivo.existe()) {
+    falhar "Arquivo MiniLang nao encontrado: ${caminho}"
+}
+
+const tokens: TokenML[] = LexerML(arquivo.ler()).tokenizar()
+const ast: DeclFuncao[] = ParserML(tokens).parsePrograma()
+verificarPrograma(ast)
+
+const stats: StatsOtimizacao = otimizarPrograma(ast)
+escreva("[Otimizador] Dobras: ${stats.dobras} | Ramos mortos eliminados: ${stats.ramosEliminados}")
+
+const chunks: dicionario = gerarBytecode(ast)
+const vmMl: VMML = VMML(chunks)
+var semArgs: qualquer[] = []
+assercao(inteiro(vmMl.executarFuncao("main", semArgs)) == 0, "main() MiniLang deveria retornar 0")
+assercao(inteiro(vmMl.executarFuncao("fib", [10])) == 55, "fib(10) deveria retornar 55")
+assercao(inteiro(vmMl.executarFuncao("potencia", [2, 10])) == 1024, "potencia(2, 10) deveria retornar 1024")
+
+tente {
+    const errado: texto = "fn main(): int { var x: int = true; return x; }"
+    const toksErr: TokenML[] = LexerML(errado).tokenizar()
+    const astErr: DeclFuncao[] = ParserML(toksErr).parsePrograma()
+    verificarPrograma(astErr)
+} pegue (erro: ErroCompilador) {
+    escreva("[TypeChecker] Erro capturado: " + erro.mensagem)
+}

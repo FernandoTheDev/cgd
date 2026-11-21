@@ -27,4 +27,19 @@ classe Sistema {
     estatico capacidades(): dicionario {
         retorna { processos: verdadeiro, shell: verdadeiro, ambiente: verdadeiro, relogioMonotonico: verdadeiro, processosPersistentes: falso, plataformaValidada: "Linux x86_64" }
     }
+
+    estatico memoria(): dicionario {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sistemaMemoria()
+    }
+
+    estatico recursos(): dicionario {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sistemaRecursos()
+    }
+
+    estatico coletarGC(desmapear: logico = falso): vazio {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        nativo.sistemaColetarGC(desmapear)
+    }
 }

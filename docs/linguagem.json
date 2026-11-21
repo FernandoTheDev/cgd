@@ -206,6 +206,13 @@
             "Começam como nulo quando declarados sem valor inicial."
           ]
         ]
+      },
+      {
+        "title": "Literais numéricos e comentários",
+        "paragraphs": [
+          "Inteiros podem ser escritos em decimal, hexadecimal (0x / 0X), binário (0b / 0B) ou octal (0o / 0O), com separadores opcionais _ entre dígitos. Números reais aceitam separadores _, notação científica decimal (e / E) e ponto flutuante hexadecimal IEEE-754 (0x...p...). Comentários podem ser de linha (//) ou de bloco (/* ... */)."
+        ],
+        "code": "/* Literais inteiros e reais com separadores e bases */\nconst mascara: inteiro = 0xFFFF_FFFF\nconst flags: inteiro = 0b1111_0000\nconst permissao: inteiro = 0o755\nconst populacao: inteiro = 1_000_000\nconst pequeno: real = 1.25e-8\nconst piAprox: real = 3_141.592_653\nconst hexReal: real = 0x1.fp+3"
       }
     ]
   },

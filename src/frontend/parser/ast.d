@@ -351,6 +351,7 @@ class FnDecl : Node
     dstring builtinName;
     dstring foreignSymbol;
     bool foreignManaged;
+    bool foreignParallelSafe;
     bool isAsync;
     bool analyzed, isMethod, isStatic, accessor, anonymous, decoratorEnvelope, isAbstract;
     ClassDecl ownerClass, classFactory;

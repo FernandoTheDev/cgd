@@ -831,6 +831,11 @@ private:
         {
             node.variableRef = (cast(SymbolVar*) sym).node;
             node.type_expr = node.variableRef.type_expr;
+            if (node.variableRef.isConst)
+                if (MemberExpr initMember = cast(MemberExpr) node.variableRef.value)
+                    if (Identifier initRight = cast(Identifier) initMember.right)
+                        if (initRight.classRef !is null)
+                            node.classRef = initRight.classRef;
         }
         if (sym.isParam())
         {

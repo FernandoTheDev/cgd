@@ -516,14 +516,64 @@ private bool tokenizeDelegua(string source, out Piece[] pieces)
         else if (c >= '0' && c <= '9')
         {
             isNumber = true;
-            while (cursor < source.length && source[cursor] >= '0' && source[cursor] <= '9')
-                cursor++;
-            if (cursor + 1 < source.length && source[cursor] == '.' && source[cursor + 1] >= '0'
-                    && source[cursor + 1] <= '9')
+            bool isHex = c == '0' && cursor < source.length && (source[cursor] == 'x' || source[cursor] == 'X');
+            bool isBinOrOct = c == '0' && cursor < source.length && (source[cursor] == 'b'
+                    || source[cursor] == 'B' || source[cursor] == 'o' || source[cursor] == 'O');
+            if (isHex || isBinOrOct)
             {
                 cursor++;
-                while (cursor < source.length && source[cursor] >= '0' && source[cursor] <= '9')
+                while (cursor < source.length && ((source[cursor] >= '0' && source[cursor] <= '9')
+                        || (isHex && ((source[cursor] >= 'a' && source[cursor] <= 'f')
+                        || (source[cursor] >= 'A' && source[cursor] <= 'F'))) || source[cursor] == '_'))
                     cursor++;
+                if (isHex && cursor + 1 < source.length && source[cursor] == '.'
+                        && ((source[cursor + 1] >= '0' && source[cursor + 1] <= '9') || (source[cursor + 1] >= 'a'
+                            && source[cursor + 1] <= 'f') || (source[cursor + 1] >= 'A' && source[cursor + 1] <= 'F')))
+                {
+                    size_t look = cursor + 1;
+                    while (look < source.length && ((source[look] >= '0' && source[look] <= '9')
+                            || (source[look] >= 'a' && source[look] <= 'f') || (source[look] >= 'A'
+                            && source[look] <= 'F') || source[look] == '_'))
+                        look++;
+                    if (look < source.length && (source[look] == 'p' || source[look] == 'P'))
+                        cursor = look;
+                }
+                if (isHex && cursor < source.length && (source[cursor] == 'p' || source[cursor] == 'P'))
+                {
+                    cursor++;
+                    if (cursor < source.length && (source[cursor] == '+' || source[cursor] == '-'))
+                        cursor++;
+                    while (cursor < source.length && ((source[cursor] >= '0' && source[cursor] <= '9')
+                            || source[cursor] == '_'))
+                        cursor++;
+                }
+            }
+            else
+            {
+                while (cursor < source.length && ((source[cursor] >= '0' && source[cursor] <= '9')
+                        || source[cursor] == '_'))
+                    cursor++;
+                if (cursor + 1 < source.length && source[cursor] == '.' && source[cursor + 1] >= '0'
+                        && source[cursor + 1] <= '9')
+                {
+                    cursor++;
+                    while (cursor < source.length && ((source[cursor] >= '0' && source[cursor] <= '9')
+                            || source[cursor] == '_'))
+                        cursor++;
+                }
+                if (cursor < source.length && (source[cursor] == 'e' || source[cursor] == 'E'))
+                {
+                    size_t look = cursor + 1;
+                    if (look < source.length && (source[look] == '+' || source[look] == '-'))
+                        look++;
+                    if (look < source.length && source[look] >= '0' && source[look] <= '9')
+                    {
+                        cursor = look;
+                        while (cursor < source.length && ((source[cursor] >= '0'
+                                && source[cursor] <= '9') || source[cursor] == '_'))
+                            cursor++;
+                    }
+                }
             }
         }
         else if (word(c))
@@ -758,4 +808,10 @@ unittest
     string multi = formatDelegua("var m: dicionario = {\n\"a\":1,\n\"b\":2\n}\n");
     assert(multi == "var m: dicionario = {\n    \"a\": 1,\n    \"b\": 2\n}\n", multi);
     assert(multi == formatDelegua(multi));
+
+    // Literais numéricos modernos (hex, bin, oct, separadores, científico e hex-float)
+    string nums = formatDelegua("const a:inteiro=0xFFFF_FFFF+0b1111_0000+0o755+1_000_000\nconst b:real=1.25e-8+6.022e23+3_141.592_653+0x1.fp+3\n");
+    assert(nums == "const a: inteiro = 0xFFFF_FFFF + 0b1111_0000 + 0o755 + 1_000_000\nconst b: real = 1.25e-8 + 6.022e23 + 3_141.592_653 + 0x1.fp+3\n",
+            nums);
+    assert(nums == formatDelegua(nums));
 }

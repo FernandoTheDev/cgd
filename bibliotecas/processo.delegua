@@ -85,6 +85,11 @@ classe Processo {
         retorna Processo.executar("/bin/sh", ["-c", comando], diretorio, ambiente, timeout,
             limite, entrada)
     }
+
+    estatico executarLote(tarefas: dicionario[], maxConcorrencia: inteiro = 4): dicionario[] {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.sistemaExecutarLote(tarefas, maxConcorrencia)
+    }
 }
 
 // Comando é configuração reutilizável; executar inicia um novo filho a cada chamada.

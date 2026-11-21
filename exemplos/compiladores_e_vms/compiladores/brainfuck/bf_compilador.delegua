@@ -1,0 +1,321 @@
+//! [1] Hello World! -> Hello World!\n    Reducao: 102 brutas -> 56 RLE -> 49 otimizadas\n[2] Cifra de Cesar (+1 em CGD) -> DHE\n[3] Produto 7 * 9 na celula 0 -> 63 (em 7 passos da VM)\n[4] Erro capturado: Colchete '[' sem ']' correspondente
+//? fase: execucao
+// Compilador otimizador de Brainfuck (RLE + Peephole Zerar/Transferir + VM) em Delegua/CGD.
+// Compilar: ./cgd exemplos/brainfuck/bf_compilador.delegua -s out/bf
+// Executar: ./out/bf
+
+enum OpBF {
+    Somar,
+    Mover,
+    Imprimir,
+    Ler,
+    SaltarSeZero,
+    SaltarSeNaoZero,
+    Zerar,
+    Transferir
+}
+
+classe ErroBF herda Excecao {
+    construtor(mensagem: texto) {
+        super(mensagem)
+    }
+}
+
+classe InstrucaoBF {
+    op: OpBF
+    arg1: inteiro
+    arg2: inteiro
+
+    construtor(op: OpBF, arg1: inteiro = 0, arg2: inteiro = 0) {
+        isto.op = op
+        isto.arg1 = arg1
+        isto.arg2 = arg2
+    }
+}
+
+classe ProgramaBF {
+    instrucoes: InstrucaoBF[]
+    brutas: inteiro
+    aposRLE: inteiro
+    otimizadas: inteiro
+
+    construtor(instrucoes: InstrucaoBF[], brutas: inteiro, aposRLE: inteiro) {
+        isto.instrucoes = instrucoes
+        isto.brutas = brutas
+        isto.aposRLE = aposRLE
+        isto.otimizadas = instrucoes.tamanho()
+    }
+}
+
+classe ResultadoVM {
+    saida: texto
+    celula0: inteiro
+    passos: inteiro
+
+    construtor(saida: texto, celula0: inteiro, passos: inteiro) {
+        isto.saida = saida
+        isto.celula0 = celula0
+        isto.passos = passos
+    }
+}
+
+funcao codigoParaChar(codigo: inteiro): texto {
+    const tabela: texto = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+    se (codigo == 10) retorna "\n"
+    se (codigo >= 32 e codigo <= 126) {
+        retorna tabela[codigo - 32]
+    }
+
+    retorna "?"
+}
+
+funcao charParaCodigo(ch: texto): inteiro {
+    const tabela: texto = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+    se (ch == "\n") retorna 10
+    para (var i: inteiro = 0; i < tabela.tamanho(); i++) {
+        se (tabela[i] == ch) retorna 32 + i
+    }
+
+    retorna 0
+}
+
+classe CompiladorBF {
+    // Passe 1: Run-Length Encoding (funde + / - e > / < consecutivos)
+    gerarRLE(codigo: texto): InstrucaoBF[] {
+        var out: InstrucaoBF[] = []
+        var i: inteiro = 0
+        const n: inteiro = codigo.tamanho()
+
+        enquanto (i < n) {
+            const c: texto = codigo[i]
+            se (c == "+" ou c == "-") {
+                var delta: inteiro = 0
+                enquanto (i < n e (codigo[i] == "+" ou codigo[i] == "-")) {
+                    se (codigo[i] == "+") delta++
+                    senao delta--
+                    i++
+                }
+                se (delta != 0) out.empilhar(InstrucaoBF(OpBF.Somar, delta, 0))
+                continua
+            }
+            se (c == ">" ou c == "<") {
+                var desloc: inteiro = 0
+                enquanto (i < n e (codigo[i] == ">" ou codigo[i] == "<")) {
+                    se (codigo[i] == ">") desloc++
+                    senao desloc--
+                    i++
+                }
+                se (desloc != 0) out.empilhar(InstrucaoBF(OpBF.Mover, desloc, 0))
+                continua
+            }
+            se (c == ".") out.empilhar(InstrucaoBF(OpBF.Imprimir, 0, 0))
+            senao se (c == ",") out.empilhar(InstrucaoBF(OpBF.Ler, 0, 0))
+            senao se (c == "[") out.empilhar(InstrucaoBF(OpBF.SaltarSeZero, 0, 0))
+            senao se (c == "]") out.empilhar(InstrucaoBF(OpBF.SaltarSeNaoZero, 0, 0))
+            i++
+        }
+        retorna out
+    }
+
+    // Passe 2: Peephole (reconhece [-] -> Zerar e loops de transferencia linear -> Transferir + Zerar)
+    otimizarPeephole(entrada: InstrucaoBF[]): InstrucaoBF[] {
+        var out: InstrucaoBF[] = []
+        var i: inteiro = 0
+        const n: inteiro = entrada.tamanho()
+
+        enquanto (i < n) {
+            const inst: InstrucaoBF = entrada[i]
+            se (inst.op != OpBF.SaltarSeZero) {
+                out.empilhar(inst)
+                i++
+                continua
+            }
+
+            // Idioma 1: [-] ou [+] -> Zerar
+            se (i + 2 < n e entrada[i + 1].op == OpBF.Somar e entrada[i + 2].op == OpBF.SaltarSeNaoZero) {
+                const delta: inteiro = entrada[i + 1].arg1
+                se (delta == -1 ou delta == 1) {
+                    out.empilhar(InstrucaoBF(OpBF.Zerar, 0, 0))
+                    i = i + 3
+                    continua
+                }
+            }
+
+            // Idioma 2: loop linear de transferencia/multiplicacao
+            // Ex: [->+++>++<<] onde deslocamento liquido == 0 e delta na origem == -1
+            var j: inteiro = i + 1
+            var deslocAtual: inteiro = 0
+            var deltaOrigem: inteiro = 0
+            var simples: logico = verdadeiro
+            var alvosDesloc: inteiro[] = []
+            var alvosFator: inteiro[] = []
+
+            enquanto (j < n e entrada[j].op != OpBF.SaltarSeNaoZero) {
+                const sub: InstrucaoBF = entrada[j]
+                se (sub.op == OpBF.Mover) {
+                    deslocAtual = deslocAtual + sub.arg1
+                } senao se (sub.op == OpBF.Somar) {
+                    se (deslocAtual == 0) {
+                        deltaOrigem = deltaOrigem + sub.arg1
+                    } senao {
+                        alvosDesloc.empilhar(deslocAtual)
+                        alvosFator.empilhar(sub.arg1)
+                    }
+                } senao {
+                    simples = falso
+                    sustar
+                }
+                j++
+            }
+
+            se (simples e j < n e entrada[j].op == OpBF.SaltarSeNaoZero e deslocAtual == 0 e deltaOrigem == -1 e alvosDesloc.tamanho() > 0) {
+                para (var k: inteiro = 0; k < alvosDesloc.tamanho(); k++) {
+                    out.empilhar(InstrucaoBF(OpBF.Transferir, alvosDesloc[k], alvosFator[k]))
+                }
+                out.empilhar(InstrucaoBF(OpBF.Zerar, 0, 0))
+                i = j + 1
+                continua
+            }
+
+            out.empilhar(inst)
+            i++
+        }
+        retorna out
+    }
+
+    // Passe 3: Resolucao de saltos [ e ] com validacao de balanceamento
+    resolverSaltos(insts: InstrucaoBF[]): vazio {
+        var pilha: inteiro[] = []
+        para (var i: inteiro = 0; i < insts.tamanho(); i++) {
+            se (insts[i].op == OpBF.SaltarSeZero) {
+                pilha.empilhar(i)
+            } senao se (insts[i].op == OpBF.SaltarSeNaoZero) {
+                se (pilha.tamanho() == 0) {
+                    falhar ErroBF("Colchete ']' sem '[' correspondente")
+                }
+                const inicio: inteiro = pilha.removerUltimo()
+                insts[inicio].arg1 = i
+                insts[i].arg1 = inicio
+            }
+        }
+        se (pilha.tamanho() > 0) {
+            falhar ErroBF("Colchete '[' sem ']' correspondente")
+        }
+    }
+
+    contarBrutas(codigo: texto): inteiro {
+        var total: inteiro = 0
+        para (var i: inteiro = 0; i < codigo.tamanho(); i++) {
+            se ("+-><.,[]".contem(codigo[i])) total++
+        }
+        retorna total
+    }
+
+    compilar(codigo: texto): ProgramaBF {
+        const brutas: inteiro = isto.contarBrutas(codigo)
+        const rle: InstrucaoBF[] = isto.gerarRLE(codigo)
+        const otimizado: InstrucaoBF[] = isto.otimizarPeephole(rle)
+        isto.resolverSaltos(otimizado)
+        retorna ProgramaBF(otimizado, brutas, rle.tamanho())
+    }
+}
+
+classe VMBF {
+    tamanhoFita: inteiro
+
+    construtor(tamanhoFita: inteiro = 1024) {
+        isto.tamanhoFita = tamanhoFita
+    }
+
+    executar(programa: ProgramaBF, entrada: texto = ""): ResultadoVM {
+        var fita: inteiro[] = []
+        para (var k: inteiro = 0; k < isto.tamanhoFita; k++) {
+            fita.empilhar(0)
+        }
+
+        const insts: InstrucaoBF[] = programa.instrucoes
+        const totalInsts: inteiro = insts.tamanho()
+        var pc: inteiro = 0
+        var ptr: inteiro = 0
+        var posEntrada: inteiro = 0
+        var passos: inteiro = 0
+        var saida: texto[] = []
+
+        enquanto (pc < totalInsts) {
+            const inst: InstrucaoBF = insts[pc]
+            passos++
+
+            se (inst.op == OpBF.Somar) {
+                fita[ptr] = (fita[ptr] + inst.arg1) & 255
+            } senao se (inst.op == OpBF.Mover) {
+                ptr = ptr + inst.arg1
+                se (ptr < 0 ou ptr >= isto.tamanhoFita) {
+                    falhar ErroBF("Ponteiro da fita fora dos limites: ${ptr}")
+                }
+            } senao se (inst.op == OpBF.Zerar) {
+                fita[ptr] = 0
+            } senao se (inst.op == OpBF.Transferir) {
+                const valor: inteiro = fita[ptr]
+                se (valor != 0) {
+                    const destino: inteiro = ptr + inst.arg1
+                    se (destino < 0 ou destino >= isto.tamanhoFita) {
+                        falhar ErroBF("Destino de transferencia fora dos limites: ${destino}")
+                    }
+                    fita[destino] = (fita[destino] + valor * inst.arg2) & 255
+                }
+            } senao se (inst.op == OpBF.Imprimir) {
+                saida.empilhar(codigoParaChar(fita[ptr]))
+            } senao se (inst.op == OpBF.Ler) {
+                se (posEntrada < entrada.tamanho()) {
+                    fita[ptr] = charParaCodigo(entrada[posEntrada]) & 255
+                    posEntrada++
+                } senao {
+                    fita[ptr] = 0
+                }
+            } senao se (inst.op == OpBF.SaltarSeZero) {
+                se (fita[ptr] == 0) {
+                    pc = inst.arg1
+                }
+            } senao se (inst.op == OpBF.SaltarSeNaoZero) {
+                se (fita[ptr] != 0) {
+                    pc = inst.arg1
+                }
+            }
+            pc++
+        }
+
+        retorna ResultadoVM(saida.juntar(""), fita[0], passos)
+    }
+}
+
+const compilador: CompiladorBF = CompiladorBF()
+const vm: VMBF = VMBF(512)
+
+// 1. Hello World! classico em Brainfuck
+const bfHello: texto = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+."
+const progHello: ProgramaBF = compilador.compilar(bfHello)
+const resHello: ResultadoVM = vm.executar(progHello)
+escreva("[1] Hello World! -> " + resHello.saida)
+escreva("    Reducao: ${progHello.brutas} brutas -> ${progHello.aposRLE} RLE -> ${progHello.otimizadas} otimizadas")
+
+// 2. Cifra de Cesar (+1 em cada caractere ate EOF)
+const bfCesar: texto = ",[+.,]"
+const progCesar: ProgramaBF = compilador.compilar(bfCesar)
+const resCesar: ResultadoVM = vm.executar(progCesar, "CGD")
+escreva("[2] Cifra de Cesar (+1 em CGD) -> " + resCesar.saida)
+
+// 3. Multiplicacao 7 * 9 = 63 usando loop de transferencia otimizado para Transferir + Zerar
+const bfMult: texto = "+++++++[>+++++++++<-]>[<+>-]<"
+const progMult: ProgramaBF = compilador.compilar(bfMult)
+const resMult: ResultadoVM = vm.executar(progMult)
+assercao(resHello.saida == "Hello World!", "Hello World BF incorreto")
+assercao(resCesar.saida == "DHE", "Cifra de Cesar BF incorreta")
+assercao(resMult.celula0 == 63, "Multiplicacao 7*9 BF deveria resultar em 63")
+escreva("[3] Produto 7 * 9 na celula 0 -> ${resMult.celula0} (em ${resMult.passos} passos da VM)")
+
+// 4. Validacao de sintaxe (colchete desbalanceado)
+tente {
+    compilador.compilar("++[>+<-")
+} pegue (erro: ErroBF) {
+    escreva("[4] Erro capturado: " + erro.mensagem)
+}

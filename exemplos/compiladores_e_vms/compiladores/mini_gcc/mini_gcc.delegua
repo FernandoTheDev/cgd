@@ -1,0 +1,580 @@
+//! [Mini-GCC] 3 unidades compiladas em paralelo via rotina/Tarefa<texto>\n[Linker] Simbolos exportados: 5 | Relocacoes resolvidas: 4 | Entry main@0\n[Execucao] main() = 183\n[Linker] Erro capturado: Simbolo externo indefinido: funcao_fantasma
+//? fase: execucao
+//? diretorio: fonte
+// Mini-GCC: pre-processador (#define) + compilador C multi-arquivo em paralelo
+// usando rotina/Tarefa<texto> + formato de objeto (.obj) + Linker estatico + VM.
+// Compilar na raiz: ./cgd exemplos/compiladores_e_vms/compiladores/mini_gcc/mini_gcc.delegua -s out/mini_gcc
+// Executar: cd exemplos/compiladores_e_vms/compiladores/mini_gcc && ../../../../out/mini_gcc
+
+classe ErroGCC herda Excecao {
+    construtor(mensagem: texto) {
+        super(mensagem)
+    }
+}
+
+// --- Fase 1: Pre-processador C (#define + comentarios) ---
+
+funcao comecaComPrefixo(s: texto, pref: texto): logico {
+    se (pref.tamanho() > s.tamanho()) retorna falso
+    para (var i: inteiro = 0; i < pref.tamanho(); i++) {
+        se (s[i] != pref[i]) retorna falso
+    }
+
+    retorna verdadeiro
+}
+
+funcao preprocessarC(fonte: texto): texto {
+    const linhas: texto[] = fonte.dividir("\n")
+    var macros: dicionario = {}
+    var saida: texto[] = []
+
+    para (var i: inteiro = 0; i < linhas.tamanho(); i++) {
+        const linha: texto = linhas[i].aparar()
+        se (comecaComPrefixo(linha, "//")) continua
+        se (comecaComPrefixo(linha, "#define ")) {
+            var resto: texto[] = []
+            para (var k: inteiro = 8; k < linha.tamanho(); k++) resto.empilhar(linha[k])
+            const partes: texto[] = resto.juntar("").aparar().dividir(" ")
+            se (partes.tamanho() >= 2) {
+                macros[partes[0]] = partes[1]
+            }
+            continua
+        }
+        var linhaExpandida: texto[] = []
+        var j: inteiro = 0
+        enquanto (j < linhas[i].tamanho()) {
+            const c: texto = linhas[i][j]
+            se ("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contem(c)) {
+                var idBuf: texto[] = []
+                enquanto (j < linhas[i].tamanho() e "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789".contem(linhas[i][j])) {
+                    idBuf.empilhar(linhas[i][j])
+                    j++
+                }
+                const id: texto = idBuf.juntar("")
+                se (macros.contem(id)) linhaExpandida.empilhar(texto(macros[id]))
+                senao linhaExpandida.empilhar(id)
+            } senao {
+                linhaExpandida.empilhar(c)
+                j++
+            }
+        }
+        saida.empilhar(linhaExpandida.juntar(""))
+    }
+
+    retorna saida.juntar("\n")
+}
+
+// --- Fase 2: Lexer C (tipos primitivos/vetores para auditoria de rotina paralela) ---
+
+funcao tokenizarC(fonte: texto): texto[] {
+    var out: texto[] = []
+    var pos: inteiro = 0
+    const n: inteiro = fonte.tamanho()
+
+    enquanto (pos < n) {
+        const c: texto = fonte[pos]
+        se (c == " " ou c == "\t" ou c == "\r" ou c == "\n") {
+            pos++
+            continua
+        }
+        se (c == "/" e pos + 1 < n e fonte[pos + 1] == "/") {
+            enquanto (pos < n e fonte[pos] != "\n") pos++
+            continua
+        }
+        se ("0123456789".contem(c)) {
+            var buf: texto[] = []
+            enquanto (pos < n e "0123456789".contem(fonte[pos])) {
+                buf.empilhar(fonte[pos])
+                pos++
+            }
+            out.empilhar("INT|" + buf.juntar(""))
+            continua
+        }
+        se ("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contem(c)) {
+            var buf: texto[] = []
+            enquanto (pos < n e "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789".contem(fonte[pos])) {
+                buf.empilhar(fonte[pos])
+                pos++
+            }
+            const w: texto = buf.juntar("")
+            se (w == "int" ou w == "extern" ou w == "if" ou w == "else" ou w == "while" ou w == "return") {
+                out.empilhar("KW|" + w)
+            } senao {
+                out.empilhar("ID|" + w)
+            }
+            continua
+        }
+        const prox: texto = pos + 1 < n ? fonte[pos + 1] : ""
+        se ((c == "=" ou c == "!" ou c == "<" ou c == ">") e prox == "=") {
+            pos = pos + 2
+            out.empilhar("OP|" + c + "=")
+            continua
+        }
+        pos++
+        se ("+-*/%=<>(){};,".contem(c)) {
+            out.empilhar("OP|" + c)
+        } senao {
+            falhar "Caractere C invalido: " + c
+        }
+    }
+
+    out.empilhar("EOF|")
+    retorna out
+}
+
+// --- Fase 3: Compilador de Unidade C para Objeto (.obj serializado) ---
+// Funcoes de topo puras sobre vetores para passar na auditoria de rotinas (E3401-E3404).
+
+funcao tokTipoC(tok: texto): texto {
+    retorna tok.dividir("|")[0]
+}
+
+funcao tokLexC(tok: texto): texto {
+    const p: texto[] = tok.dividir("|")
+    se (p.tamanho() < 2) retorna ""
+    retorna p[1]
+}
+
+funcao consumirLexC(toks: texto[], cursor: inteiro[], esperado: texto): texto {
+    const atual: texto = toks[cursor[0]]
+    const lex: texto = tokLexC(atual)
+    se (lex != esperado) {
+        falhar "Esperado '" + esperado + "', encontrado '" + lex + "'"
+    }
+
+    cursor[0] = cursor[0] + 1
+    retorna lex
+}
+
+funcao consumirTipoC(toks: texto[], cursor: inteiro[], tipoEsp: texto): texto {
+    const atual: texto = toks[cursor[0]]
+    se (tokTipoC(atual) != tipoEsp) {
+        falhar "Esperado " + tipoEsp + ", encontrado '" + tokLexC(atual) + "'"
+    }
+
+    cursor[0] = cursor[0] + 1
+    retorna tokLexC(atual)
+}
+
+funcao compilarPrimarioC(toks: texto[], cursor: inteiro[], slots: dicionario, textSec: texto[],
+    relocSec: texto[]): vazio {
+    const atual: texto = toks[cursor[0]]
+    const kind: texto = tokTipoC(atual)
+    const lex: texto = tokLexC(atual)
+
+    se (kind == "INT") {
+        cursor[0] = cursor[0] + 1
+        textSec.empilhar("PUSH|" + lex)
+        retorna
+    }
+
+    se (lex == "(") {
+        cursor[0] = cursor[0] + 1
+        compilarExprC(toks, cursor, slots, textSec, relocSec)
+        consumirLexC(toks, cursor, ")")
+        retorna
+    }
+
+    se (kind == "ID") {
+        cursor[0] = cursor[0] + 1
+        se (tokLexC(toks[cursor[0]]) == "(") {
+            cursor[0] = cursor[0] + 1
+            var argc: inteiro = 0
+            se (tokLexC(toks[cursor[0]]) != ")") {
+                enquanto (verdadeiro) {
+                    compilarExprC(toks, cursor, slots, textSec, relocSec)
+                    argc++
+                    se (tokLexC(toks[cursor[0]]) == ",") {
+                        cursor[0] = cursor[0] + 1
+                    } senao {
+                        sustar
+                    }
+                }
+            }
+            consumirLexC(toks, cursor, ")")
+            const offsetInst: inteiro = textSec.tamanho()
+            textSec.empilhar("CALL_SYM|" + lex + "|" + texto(argc))
+            relocSec.empilhar("REL|" + texto(offsetInst) + "|" + lex)
+            retorna
+        }
+        textSec.empilhar("LOAD|" + texto(slots[lex]))
+        retorna
+    }
+
+    falhar "Expressao C invalida: " + lex
+}
+
+funcao compilarFatorC(toks: texto[], cursor: inteiro[], slots: dicionario, textSec: texto[],
+    relocSec: texto[]): vazio {
+    compilarPrimarioC(toks, cursor, slots, textSec, relocSec)
+    enquanto (tokLexC(toks[cursor[0]]) == "*" ou tokLexC(toks[cursor[0]]) == "/" ou tokLexC(toks[cursor[0]]) == "%") {
+        const op: texto = tokLexC(toks[cursor[0]])
+        cursor[0] = cursor[0] + 1
+        compilarPrimarioC(toks, cursor, slots, textSec, relocSec)
+        se (op == "*") textSec.empilhar("MUL")
+        senao se (op == "/") textSec.empilhar("DIV")
+        senao textSec.empilhar("MOD")
+    }
+}
+
+funcao compilarAdicaoC(toks: texto[], cursor: inteiro[], slots: dicionario, textSec: texto[],
+    relocSec: texto[]): vazio {
+    compilarFatorC(toks, cursor, slots, textSec, relocSec)
+    enquanto (tokLexC(toks[cursor[0]]) == "+" ou tokLexC(toks[cursor[0]]) == "-") {
+        const op: texto = tokLexC(toks[cursor[0]])
+        cursor[0] = cursor[0] + 1
+        compilarFatorC(toks, cursor, slots, textSec, relocSec)
+        se (op == "+") textSec.empilhar("ADD")
+        senao textSec.empilhar("SUB")
+    }
+}
+
+funcao compilarExprC(toks: texto[], cursor: inteiro[], slots: dicionario, textSec: texto[],
+    relocSec: texto[]): vazio {
+    compilarAdicaoC(toks, cursor, slots, textSec, relocSec)
+    enquanto (tokLexC(toks[cursor[0]]) == "==" ou tokLexC(toks[cursor[0]]) == "!=" ou tokLexC(toks[cursor[0]]) == "<" ou tokLexC(toks[cursor[0]]) == "<=" ou tokLexC(toks[cursor[0]]) == ">" ou tokLexC(toks[cursor[0]]) == ">=") {
+        const op: texto = tokLexC(toks[cursor[0]])
+        cursor[0] = cursor[0] + 1
+        compilarAdicaoC(toks, cursor, slots, textSec, relocSec)
+        se (op == "==") textSec.empilhar("EQ")
+        senao se (op == "!=") textSec.empilhar("NEQ")
+        senao se (op == "<") textSec.empilhar("LT")
+        senao se (op == "<=") textSec.empilhar("LE")
+        senao se (op == ">") textSec.empilhar("GT")
+        senao textSec.empilhar("GE")
+    }
+}
+
+funcao compilarBlocoC(toks: texto[], cursor: inteiro[], slots: dicionario, proxSlot: inteiro,
+    textSec: texto[], relocSec: texto[]): inteiro {
+    consumirLexC(toks, cursor, "{")
+    var proximo: inteiro = proxSlot
+    enquanto (tokLexC(toks[cursor[0]]) != "}" e tokTipoC(toks[cursor[0]]) != "EOF") {
+        proximo = compilarStmtC(toks, cursor, slots, proximo, textSec, relocSec)
+    }
+
+    consumirLexC(toks, cursor, "}")
+    retorna proximo
+}
+
+funcao compilarStmtC(toks: texto[], cursor: inteiro[], slots: dicionario, proxSlot: inteiro,
+    textSec: texto[], relocSec: texto[]): inteiro {
+    const lex: texto = tokLexC(toks[cursor[0]])
+    se (lex == "{") retorna compilarBlocoC(toks, cursor, slots, proxSlot, textSec, relocSec)
+    se (lex == "int") {
+        cursor[0] = cursor[0] + 1
+        const nome: texto = consumirTipoC(toks, cursor, "ID")
+        consumirLexC(toks, cursor, "=")
+        compilarExprC(toks, cursor, slots, textSec, relocSec)
+        consumirLexC(toks, cursor, ";")
+        slots[nome] = proxSlot
+        textSec.empilhar("STORE|" + texto(proxSlot))
+        retorna proxSlot + 1
+    }
+
+    se (lex == "return") {
+        cursor[0] = cursor[0] + 1
+        compilarExprC(toks, cursor, slots, textSec, relocSec)
+        consumirLexC(toks, cursor, ";")
+        textSec.empilhar("RET")
+        retorna proxSlot
+    }
+
+    se (lex == "if") {
+        cursor[0] = cursor[0] + 1
+        consumirLexC(toks, cursor, "(")
+        compilarExprC(toks, cursor, slots, textSec, relocSec)
+        consumirLexC(toks, cursor, ")")
+        const posJz: inteiro = textSec.tamanho()
+        textSec.empilhar("JZ|0")
+        var proximo: inteiro = compilarStmtC(toks, cursor, slots, proxSlot, textSec, relocSec)
+        se (tokLexC(toks[cursor[0]]) == "else") {
+            cursor[0] = cursor[0] + 1
+            const posJmp: inteiro = textSec.tamanho()
+            textSec.empilhar("JMP|0")
+            textSec[posJz] = "JZ|" + texto(textSec.tamanho())
+            proximo = compilarStmtC(toks, cursor, slots, proximo, textSec, relocSec)
+            textSec[posJmp] = "JMP|" + texto(textSec.tamanho())
+        } senao {
+            textSec[posJz] = "JZ|" + texto(textSec.tamanho())
+        }
+        retorna proximo
+    }
+
+    se (lex == "while") {
+        cursor[0] = cursor[0] + 1
+        const inicio: inteiro = textSec.tamanho()
+        consumirLexC(toks, cursor, "(")
+        compilarExprC(toks, cursor, slots, textSec, relocSec)
+        consumirLexC(toks, cursor, ")")
+        const posJz: inteiro = textSec.tamanho()
+        textSec.empilhar("JZ|0")
+        const proximo: inteiro = compilarStmtC(toks, cursor, slots, proxSlot, textSec, relocSec)
+        textSec.empilhar("JMP|" + texto(inicio))
+        textSec[posJz] = "JZ|" + texto(textSec.tamanho())
+        retorna proximo
+    }
+
+    se (tokTipoC(toks[cursor[0]]) == "ID") {
+        const nome: texto = consumirTipoC(toks, cursor, "ID")
+        consumirLexC(toks, cursor, "=")
+        compilarExprC(toks, cursor, slots, textSec, relocSec)
+        consumirLexC(toks, cursor, ";")
+        textSec.empilhar("STORE|" + texto(slots[nome]))
+        retorna proxSlot
+    }
+
+    falhar "Comando C inesperado: " + lex
+}
+
+funcao compilarFuncaoC(toks: texto[], cursor: inteiro[], textSec: texto[], symSec: texto[],
+    relocSec: texto[]): vazio {
+    consumirLexC(toks, cursor, "int")
+    const nome: texto = consumirTipoC(toks, cursor, "ID")
+    consumirLexC(toks, cursor, "(")
+    var slots: dicionario = {}
+    var proxSlot: inteiro = 0
+    se (tokLexC(toks[cursor[0]]) != ")") {
+        enquanto (verdadeiro) {
+            consumirLexC(toks, cursor, "int")
+            const pNome: texto = consumirTipoC(toks, cursor, "ID")
+            slots[pNome] = proxSlot
+            proxSlot++
+            se (tokLexC(toks[cursor[0]]) == ",") cursor[0] = cursor[0] + 1
+            senao sustar
+        }
+    }
+
+    const aridade: inteiro = proxSlot
+    consumirLexC(toks, cursor, ")")
+
+    const offsetFn: inteiro = textSec.tamanho()
+    const posEnter: inteiro = textSec.tamanho()
+    textSec.empilhar("ENTER|0|" + texto(aridade))
+
+    proxSlot = compilarBlocoC(toks, cursor, slots, proxSlot, textSec, relocSec)
+    textSec[posEnter] = "ENTER|" + texto(proxSlot) + "|" + texto(aridade)
+    textSec.empilhar("PUSH|0")
+    textSec.empilhar("RET")
+
+    symSec.empilhar("SYM|" + nome + "|" + texto(offsetFn) + "|" + texto(aridade))
+}
+
+// Funcao de topo pura executada em threads nativas via `rotina`!
+funcao compilarUnidadeC(nomeModulo: texto, fonteC: texto): texto {
+    const pre: texto = preprocessarC(fonteC)
+    const toks: texto[] = tokenizarC(pre)
+    var cursor: inteiro[] = [0]
+    var textSec: texto[] = []
+    var symSec: texto[] = []
+    var relocSec: texto[] = []
+
+    enquanto (tokTipoC(toks[cursor[0]]) != "EOF") {
+        se (tokLexC(toks[cursor[0]]) == "extern") {
+            cursor[0] = cursor[0] + 1
+            consumirLexC(toks, cursor, "int")
+            consumirTipoC(toks, cursor, "ID")
+            consumirLexC(toks, cursor, "(")
+            enquanto (tokLexC(toks[cursor[0]]) != ")" e tokTipoC(toks[cursor[0]]) != "EOF") {
+                cursor[0] = cursor[0] + 1
+            }
+            consumirLexC(toks, cursor, ")")
+            consumirLexC(toks, cursor, ";")
+            continua
+        }
+        compilarFuncaoC(toks, cursor, textSec, symSec, relocSec)
+    }
+
+    var linhas: texto[] = ["MOD|" + nomeModulo]
+    para (var i: inteiro = 0; i < symSec.tamanho(); i++) linhas.empilhar(symSec[i])
+    para (var i: inteiro = 0; i < relocSec.tamanho(); i++) linhas.empilhar(relocSec[i])
+    para (var i: inteiro = 0; i < textSec.tamanho(); i++) linhas.empilhar("TXT|" + textSec[i])
+    retorna linhas.juntar("\n")
+}
+
+// --- Fase 4: Linker Estatico (resolve simbolos e relocacoes entre .obj) ---
+
+classe BinarioLinkado {
+    codigo: texto[]
+    entryMain: inteiro
+    totalSimbolos: inteiro
+    totalRelocacoes: inteiro
+
+    construtor(codigo: texto[], entryMain: inteiro, totalSimbolos: inteiro, totalRelocacoes: inteiro) {
+        isto.codigo = codigo
+        isto.entryMain = entryMain
+        isto.totalSimbolos = totalSimbolos
+        isto.totalRelocacoes = totalRelocacoes
+    }
+}
+
+funcao linkarObjetos(objetos: texto[]): BinarioLinkado {
+    var simbolos: dicionario = {}
+    var totalSimbolos: inteiro = 0
+    var codigoGlobal: texto[] = []
+
+    para (var i: inteiro = 0; i < objetos.tamanho(); i++) {
+        const baseOffset: inteiro = codigoGlobal.tamanho()
+        const linhas: texto[] = objetos[i].dividir("\n")
+        var textLocal: texto[] = []
+
+        para (var j: inteiro = 0; j < linhas.tamanho(); j++) {
+            const p: texto[] = linhas[j].dividir("|")
+            se (p[0] == "SYM") {
+                const nomeSym: texto = p[1]
+                const offAbs: inteiro = baseOffset + inteiro(p[2])
+                se (simbolos.contem(nomeSym)) {
+                    falhar ErroGCC("Simbolo duplicado no linker: " + nomeSym)
+                }
+                simbolos[nomeSym] = offAbs
+                totalSimbolos++
+            } senao se (p[0] == "TXT") {
+                var resto: texto[] = []
+                para (var k: inteiro = 1; k < p.tamanho(); k++) resto.empilhar(p[k])
+                textLocal.empilhar(resto.juntar("|"))
+            }
+        }
+
+        para (var j: inteiro = 0; j < textLocal.tamanho(); j++) {
+            const p: texto[] = textLocal[j].dividir("|")
+            se (p[0] == "JMP" ou p[0] == "JZ") {
+                codigoGlobal.empilhar(p[0] + "|" + texto(inteiro(p[1]) + baseOffset))
+            } senao {
+                codigoGlobal.empilhar(textLocal[j])
+            }
+        }
+    }
+
+    var totalReloc: inteiro = 0
+    para (var i: inteiro = 0; i < codigoGlobal.tamanho(); i++) {
+        const p: texto[] = codigoGlobal[i].dividir("|")
+        se (p[0] == "CALL_SYM") {
+            const alvo: texto = p[1]
+            const argc: texto = p[2]
+            se (!simbolos.contem(alvo)) {
+                falhar ErroGCC("Simbolo externo indefinido: " + alvo)
+            }
+            const endAbs: inteiro = inteiro(simbolos[alvo])
+            codigoGlobal[i] = "CALL|" + texto(endAbs) + "|" + argc
+            totalReloc++
+        }
+    }
+
+    se (!simbolos.contem("main")) {
+        falhar ErroGCC("Ponto de entrada 'main' nao encontrado")
+    }
+
+    retorna BinarioLinkado(codigoGlobal, inteiro(simbolos["main"]), totalSimbolos, totalReloc)
+}
+
+// --- Fase 5: VM Binaria ---
+
+classe FrameGCC {
+    retPc: inteiro
+    locais: inteiro[]
+
+    construtor(retPc: inteiro, numLocais: inteiro) {
+        isto.retPc = retPc
+        isto.locais = []
+        para (var i: inteiro = 0; i < numLocais; i++) isto.locais.empilhar(0)
+    }
+}
+
+funcao executarBinario(bin: BinarioLinkado): inteiro {
+    var pilha: inteiro[] = []
+    var frames: FrameGCC[] = []
+    var pc: inteiro = bin.entryMain
+    const code: texto[] = bin.codigo
+
+    enquanto (pc >= 0 e pc < code.tamanho()) {
+        const p: texto[] = code[pc].dividir("|")
+        pc++
+        const op: texto = p[0]
+
+        se (op == "ENTER") {
+            const nLocais: inteiro = inteiro(p[1])
+            const aridade: inteiro = inteiro(p[2])
+            const retPc: inteiro = frames.tamanho() == 0 ? -1 : frames[frames.tamanho() - 1].retPc
+            se (frames.tamanho() == 0) {
+                frames.empilhar(FrameGCC(-1, nLocais))
+            } senao {
+                const f: FrameGCC = FrameGCC(retPc, nLocais)
+                para (var k: inteiro = aridade - 1; k >= 0; k--) {
+                    f.locais[k] = pilha.removerUltimo()
+                }
+                frames[frames.tamanho() - 1] = f
+            }
+        } senao se (op == "PUSH") {
+            pilha.empilhar(inteiro(p[1]))
+        } senao se (op == "LOAD") {
+            const topo: FrameGCC = frames[frames.tamanho() - 1]
+            pilha.empilhar(topo.locais[inteiro(p[1])])
+        } senao se (op == "STORE") {
+            const topo: FrameGCC = frames[frames.tamanho() - 1]
+            topo.locais[inteiro(p[1])] = pilha.removerUltimo()
+        } senao se (op == "JMP") {
+            pc = inteiro(p[1])
+        } senao se (op == "JZ") {
+            se (pilha.removerUltimo() == 0) pc = inteiro(p[1])
+        } senao se (op == "CALL") {
+            const alvo: inteiro = inteiro(p[1])
+            frames.empilhar(FrameGCC(pc, 0))
+            pc = alvo
+        } senao se (op == "RET") {
+            const retVal: inteiro = pilha.removerUltimo()
+            const frameEncerrado: FrameGCC = frames.removerUltimo()
+            se (frameEncerrado.retPc < 0) retorna retVal
+            pilha.empilhar(retVal)
+            pc = frameEncerrado.retPc
+        } senao {
+            const b: inteiro = pilha.removerUltimo()
+            const a: inteiro = pilha.removerUltimo()
+            se (op == "ADD") pilha.empilhar(a + b)
+            senao se (op == "SUB") pilha.empilhar(a - b)
+            senao se (op == "MUL") pilha.empilhar(a * b)
+            senao se (op == "DIV") pilha.empilhar(inteiro(a / b))
+            senao se (op == "MOD") pilha.empilhar(a % b)
+            senao se (op == "EQ") pilha.empilhar(a == b ? 1 : 0)
+            senao se (op == "NEQ") pilha.empilhar(a != b ? 1 : 0)
+            senao se (op == "LT") pilha.empilhar(a < b ? 1 : 0)
+            senao se (op == "LE") pilha.empilhar(a <= b ? 1 : 0)
+            senao se (op == "GT") pilha.empilhar(a > b ? 1 : 0)
+            senao se (op == "GE") pilha.empilhar(a >= b ? 1 : 0)
+        }
+    }
+
+    retorna 0
+}
+
+assincrona funcao principal(): vazio {
+    const arquivos: qualquer = importar("cgd:arquivos")
+    const srcMain: texto = arquivos.Arquivo("main.c").ler()
+    const srcMat: texto = arquivos.Arquivo("matematica.c").ler()
+    const srcAlg: texto = arquivos.Arquivo("algoritmos.c").ler()
+
+    // Compilacao paralela real das 3 unidades de traducao em worker threads!
+    const tMain: Tarefa<texto> = rotina compilarUnidadeC("main.o", srcMain)
+    const tMat: Tarefa<texto> = rotina compilarUnidadeC("matematica.o", srcMat)
+    const tAlg: Tarefa<texto> = rotina compilarUnidadeC("algoritmos.o", srcAlg)
+
+    const objMain: texto = aguardar tMain
+    const objMat: texto = aguardar tMat
+    const objAlg: texto = aguardar tAlg
+    escreva("[Mini-GCC] 3 unidades compiladas em paralelo via rotina/Tarefa<texto>")
+
+    const binario: BinarioLinkado = linkarObjetos([objMain, objMat, objAlg])
+    escreva("[Linker] Simbolos exportados: ${binario.totalSimbolos} | Relocacoes resolvidas: ${binario.totalRelocacoes} | Entry main@${binario.entryMain}")
+
+    const resultado: inteiro = executarBinario(binario)
+    assercao(resultado == 183, "main() do binario linkado deveria retornar 183")
+    escreva("[Execucao] main() = ${resultado}")
+
+    tente {
+        const objQuebrado: texto = compilarUnidadeC("erro.o", "extern int funcao_fantasma(); int main() { return funcao_fantasma(); }")
+        linkarObjetos([objQuebrado])
+    } pegue (erro: ErroGCC) {
+        escreva("[Linker] Erro capturado: " + erro.mensagem)
+    }
+}
+
+principal()

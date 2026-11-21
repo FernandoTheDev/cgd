@@ -201,6 +201,17 @@ const limite: inteiro = 10
 <tr><td>qualquer, classe, interface, funcao, tupla</td><td>Começam como nulo quando declarados sem valor inicial.</td></tr>
 </tbody></table>
 </div>
+<h2 id="literais-numéricos-e-comentários"><a class="header" href="#literais-numéricos-e-comentários">Literais numéricos e comentários</a></h2>
+<p>Inteiros podem ser escritos em decimal, hexadecimal (0x / 0X), binário (0b / 0B) ou octal (0o / 0O), com separadores opcionais _ entre dígitos. Números reais aceitam separadores _, notação científica decimal (e / E) e ponto flutuante hexadecimal IEEE-754 (0x...p...). Comentários podem ser de linha (//) ou de bloco (/* ... */).</p>
+<pre><code class="language-delegua">/* Literais inteiros e reais com separadores e bases */
+const mascara: inteiro = 0xFFFF_FFFF
+const flags: inteiro = 0b1111_0000
+const permissao: inteiro = 0o755
+const populacao: inteiro = 1_000_000
+const pequeno: real = 1.25e-8
+const piAprox: real = 3_141.592_653
+const hexReal: real = 0x1.fp+3
+</code></pre>
 <h2 id="experimente-01_tipos"><a class="header" href="#experimente-01_tipos">Experimente: 01_tipos</a></h2>
 <pre><code class="language-delegua">// Declaração, valores primitivos e tipo de em execução.
 var vazio: qualquer

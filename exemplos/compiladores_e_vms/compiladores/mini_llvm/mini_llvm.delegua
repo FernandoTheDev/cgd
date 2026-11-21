@@ -1,0 +1,688 @@
+//! [Mini-LLVM] Funcoes: 3 | Verificacao SSA: OK\n[Otimizador] ConstProp dobras: 7 | DCE removidas: 6 | Blocos mortos: 1\n[RegAlloc] @main: 4 regs virtuais -> 2 regs fisicos max\n[Execucao IR] @soma_ate(10) = 55\n[Execucao IR] @fatorial(7) = 5040\n[Execucao IR] @main() = 5145
+//? fase: execucao
+//? diretorio: fonte
+// Mini-LLVM: infraestrutura de compilador SSA escrita em Delegua/CGD.
+// Inclui parser de IR (.ll), verificador SSA, Constant Propagation/Folding,
+// Dead Code Elimination (DCE), eliminacao de blocos inalcancaveis no CFG,
+// alocador de registradores linear scan e executor de IR com nos PHI.
+// Compilar na raiz: ./cgd exemplos/compiladores_e_vms/compiladores/mini_llvm/mini_llvm.delegua -s out/mini_llvm
+// Executar: cd exemplos/compiladores_e_vms/compiladores/mini_llvm && ../../../../out/mini_llvm
+
+enum OpIR {
+    Add,
+    Sub,
+    Mul,
+    Sdiv,
+    Srem,
+    Icmp,
+    Phi,
+    Call,
+    Br,
+    BrCond,
+    Ret,
+    Const
+}
+
+classe ErroLLVM herda Excecao {
+    construtor(mensagem: texto) {
+        super(mensagem)
+    }
+}
+
+classe EntradaPhi {
+    valor: texto
+    bloco: texto
+
+    construtor(valor: texto, bloco: texto) {
+        isto.valor = valor
+        isto.bloco = bloco
+    }
+}
+
+classe InstIR {
+    op: OpIR
+    dst: texto
+    pred: texto
+    args: texto[]
+    phis: EntradaPhi[]
+    alvo1: texto
+    alvo2: texto
+
+    construtor(op: OpIR, dst: texto = "") {
+        isto.op = op
+        isto.dst = dst
+        isto.pred = ""
+        isto.args = []
+        isto.phis = []
+        isto.alvo1 = ""
+        isto.alvo2 = ""
+    }
+}
+
+classe BlocoBasico {
+    nome: texto
+    insts: InstIR[]
+
+    construtor(nome: texto) {
+        isto.nome = nome
+        isto.insts = []
+    }
+}
+
+classe FuncaoIR {
+    nome: texto
+    params: texto[]
+    blocos: BlocoBasico[]
+
+    construtor(nome: texto, params: texto[]) {
+        isto.nome = nome
+        isto.params = params
+        isto.blocos = []
+    }
+
+    buscarBloco(nome: texto): qualquer {
+        para (var i: inteiro = 0; i < isto.blocos.tamanho(); i++) {
+            se (isto.blocos[i].nome == nome) retorna isto.blocos[i]
+        }
+        retorna nulo
+    }
+}
+
+funcao comecaCom(s: texto, pref: texto): logico {
+    se (pref.tamanho() > s.tamanho()) retorna falso
+    para (var i: inteiro = 0; i < pref.tamanho(); i++) {
+        se (s[i] != pref[i]) retorna falso
+    }
+
+    retorna verdadeiro
+}
+
+funcao indiceDe(s: texto, alvo: texto): inteiro {
+    para (var i: inteiro = 0; i < s.tamanho(); i++) {
+        se (s[i] == alvo) retorna i
+    }
+
+    retorna -1
+}
+
+funcao eNumeroInt(s: texto): logico {
+    se (s.tamanho() == 0) retorna falso
+    var ini: inteiro = 0
+    se (s[0] == "-") {
+        se (s.tamanho() == 1) retorna falso
+        ini = 1
+    }
+
+    para (var i: inteiro = ini; i < s.tamanho(); i++) {
+        se (!"0123456789".contem(s[i])) retorna falso
+    }
+
+    retorna verdadeiro
+}
+
+funcao limparComentario(linha: texto): texto {
+    var out: texto[] = []
+    para (var i: inteiro = 0; i < linha.tamanho(); i++) {
+        se (linha[i] == ";") sustar
+        out.empilhar(linha[i])
+    }
+
+    retorna out.juntar("").aparar()
+}
+
+funcao removerPrefixo(s: texto, pref: texto): texto {
+    se (s.tamanho() > 0 e s[0] == pref) {
+        var out: texto[] = []
+        para (var i: inteiro = 1; i < s.tamanho(); i++) {
+            out.empilhar(s[i])
+        }
+        retorna out.juntar("")
+    }
+
+    retorna s
+}
+
+funcao dividirArgs(textoArgs: texto): texto[] {
+    const limpo: texto = textoArgs.aparar()
+    var out: texto[] = []
+    se (limpo.tamanho() == 0) retorna out
+    const partes: texto[] = limpo.dividir(",")
+    para (var i: inteiro = 0; i < partes.tamanho(); i++) {
+        out.empilhar(partes[i].aparar())
+    }
+
+    retorna out
+}
+
+// --- Parser de IR (.ll) ---
+
+classe ParserIR {
+    extrairEntre(s: texto, abre: texto, fecha: texto): texto {
+        var ini: inteiro = -1
+        var fim: inteiro = -1
+        para (var i: inteiro = 0; i < s.tamanho(); i++) {
+            se (s[i] == abre e ini < 0) ini = i + 1
+            senao se (s[i] == fecha) fim = i
+        }
+        se (ini < 0 ou fim < ini) retorna ""
+        var out: texto[] = []
+        para (var i: inteiro = ini; i < fim; i++) {
+            out.empilhar(s[i])
+        }
+        retorna out.juntar("")
+    }
+
+    parseModulo(fonte: texto): FuncaoIR[] {
+        const linhas: texto[] = fonte.dividir("\n")
+        var funcoes: FuncaoIR[] = []
+        var fnAtual: qualquer = nulo
+        var bbAtual: qualquer = nulo
+
+        para (var idx: inteiro = 0; idx < linhas.tamanho(); idx++) {
+            const linha: texto = limparComentario(linhas[idx])
+            se (linha.tamanho() == 0) continua
+
+            se (linha == "}") {
+                fnAtual = nulo
+                bbAtual = nulo
+                continua
+            }
+
+            se (comecaCom(linha, "define ")) {
+                const posAt: inteiro = indiceDe(linha, "@")
+                const posLP: inteiro = indiceDe(linha, "(")
+                var nomeBuf: texto[] = []
+                para (var i: inteiro = posAt + 1; i < posLP; i++) {
+                    nomeBuf.empilhar(linha[i])
+                }
+                const nomeFn: texto = nomeBuf.juntar("").aparar()
+                const paramsStr: texto = isto.extrairEntre(linha, "(", ")")
+                const params: texto[] = dividirArgs(paramsStr)
+                const fn: FuncaoIR = FuncaoIR(nomeFn, params)
+                funcoes.empilhar(fn)
+                fnAtual = fn
+                bbAtual = nulo
+                continua
+            }
+
+            se (linha[linha.tamanho() - 1] == ":") {
+                var lblBuf: texto[] = []
+                para (var i: inteiro = 0; i < linha.tamanho() - 1; i++) {
+                    lblBuf.empilhar(linha[i])
+                }
+                const bb: BlocoBasico = BlocoBasico(lblBuf.juntar("").aparar())
+                const fn: FuncaoIR = fnAtual
+                fn.blocos.empilhar(bb)
+                bbAtual = bb
+                continua
+            }
+
+            const bb: BlocoBasico = bbAtual
+            bb.insts.empilhar(isto.parseInstrucao(linha))
+        }
+        retorna funcoes
+    }
+
+    parseInstrucao(linha: texto): InstIR {
+        se (comecaCom(linha, "ret ")) {
+            const inst: InstIR = InstIR(OpIR.Ret)
+            var resto: texto[] = []
+            para (var i: inteiro = 4; i < linha.tamanho(); i++) resto.empilhar(linha[i])
+            inst.args.empilhar(resto.juntar("").aparar())
+            retorna inst
+        }
+
+        se (comecaCom(linha, "br label ")) {
+            const inst: InstIR = InstIR(OpIR.Br)
+            var resto: texto[] = []
+            para (var i: inteiro = 9; i < linha.tamanho(); i++) resto.empilhar(linha[i])
+            inst.alvo1 = removerPrefixo(resto.juntar("").aparar(), "%")
+            retorna inst
+        }
+
+        se (comecaCom(linha, "br ")) {
+            const inst: InstIR = InstIR(OpIR.BrCond)
+            var resto: texto[] = []
+            para (var i: inteiro = 3; i < linha.tamanho(); i++) resto.empilhar(linha[i])
+            const partes: texto[] = dividirArgs(resto.juntar(""))
+            inst.args.empilhar(partes[0])
+            const p1: texto[] = partes[1].dividir(" ")
+            const p2: texto[] = partes[2].dividir(" ")
+            inst.alvo1 = removerPrefixo(p1[p1.tamanho() - 1], "%")
+            inst.alvo2 = removerPrefixo(p2[p2.tamanho() - 1], "%")
+            retorna inst
+        }
+
+        const posEq: inteiro = indiceDe(linha, "=")
+        se (posEq < 0) falhar ErroLLVM("Instrucao invalida: " + linha)
+
+        var dstBuf: texto[] = []
+        para (var i: inteiro = 0; i < posEq; i++) dstBuf.empilhar(linha[i])
+        const dst: texto = dstBuf.juntar("").aparar()
+
+        var rhsBuf: texto[] = []
+        para (var i: inteiro = posEq + 1; i < linha.tamanho(); i++) rhsBuf.empilhar(linha[i])
+        const rhs: texto = rhsBuf.juntar("").aparar()
+
+        se (comecaCom(rhs, "phi ")) {
+            const inst: InstIR = InstIR(OpIR.Phi, dst)
+            var i: inteiro = 4
+            enquanto (i < rhs.tamanho()) {
+                se (rhs[i] == "[") {
+                    i++
+                    var itemBuf: texto[] = []
+                    enquanto (i < rhs.tamanho() e rhs[i] != "]") {
+                        itemBuf.empilhar(rhs[i])
+                        i++
+                    }
+                    const par: texto[] = dividirArgs(itemBuf.juntar(""))
+                    inst.phis.empilhar(EntradaPhi(par[0], removerPrefixo(par[1], "%")))
+                }
+                i++
+            }
+            retorna inst
+        }
+
+        se (comecaCom(rhs, "call ")) {
+            const inst: InstIR = InstIR(OpIR.Call, dst)
+            const posAt: inteiro = indiceDe(rhs, "@")
+            const posLP: inteiro = indiceDe(rhs, "(")
+            var fnBuf: texto[] = []
+            para (var i: inteiro = posAt + 1; i < posLP; i++) fnBuf.empilhar(rhs[i])
+            inst.alvo1 = fnBuf.juntar("").aparar()
+            inst.args = dividirArgs(isto.extrairEntre(rhs, "(", ")"))
+            retorna inst
+        }
+
+        se (comecaCom(rhs, "icmp ")) {
+            const inst: InstIR = InstIR(OpIR.Icmp, dst)
+            var semIcmp: texto[] = []
+            para (var i: inteiro = 5; i < rhs.tamanho(); i++) semIcmp.empilhar(rhs[i])
+            const s: texto = semIcmp.juntar("").aparar()
+            const posEsp: inteiro = indiceDe(s, " ")
+            var predBuf: texto[] = []
+            para (var i: inteiro = 0; i < posEsp; i++) predBuf.empilhar(s[i])
+            inst.pred = predBuf.juntar("")
+            var argsBuf: texto[] = []
+            para (var i: inteiro = posEsp + 1; i < s.tamanho(); i++) argsBuf.empilhar(s[i])
+            inst.args = dividirArgs(argsBuf.juntar(""))
+            retorna inst
+        }
+
+        const posEsp: inteiro = indiceDe(rhs, " ")
+        var opBuf: texto[] = []
+        para (var i: inteiro = 0; i < posEsp; i++) opBuf.empilhar(rhs[i])
+        const opNome: texto = opBuf.juntar("")
+        var opsBuf: texto[] = []
+        para (var i: inteiro = posEsp + 1; i < rhs.tamanho(); i++) opsBuf.empilhar(rhs[i])
+        const operandos: texto[] = dividirArgs(opsBuf.juntar(""))
+
+        var op: OpIR = OpIR.Add
+        se (opNome == "add") op = OpIR.Add
+        senao se (opNome == "sub") op = OpIR.Sub
+        senao se (opNome == "mul") op = OpIR.Mul
+        senao se (opNome == "sdiv") op = OpIR.Sdiv
+        senao se (opNome == "srem") op = OpIR.Srem
+        senao falhar ErroLLVM("Opcode IR desconhecido: " + opNome)
+
+        const inst: InstIR = InstIR(op, dst)
+        inst.args = operandos
+        retorna inst
+    }
+}
+
+// --- Verificador SSA ---
+
+funcao verificarSSA(funcoes: FuncaoIR[]): vazio {
+    para (var f: inteiro = 0; f < funcoes.tamanho(); f++) {
+        const fn: FuncaoIR = funcoes[f]
+        var definidos: dicionario = {}
+        para (var p: inteiro = 0; p < fn.params.tamanho(); p++) {
+            definidos[fn.params[p]] = verdadeiro
+        }
+        para (var b: inteiro = 0; b < fn.blocos.tamanho(); b++) {
+            const bb: BlocoBasico = fn.blocos[b]
+            para (var i: inteiro = 0; i < bb.insts.tamanho(); i++) {
+                const inst: InstIR = bb.insts[i]
+                se (inst.dst.tamanho() > 0) {
+                    se (definidos.contem(inst.dst)) {
+                        falhar ErroLLVM("Violacao SSA em @" + fn.nome + ": redefinicao de " + inst.dst)
+                    }
+                    definidos[inst.dst] = verdadeiro
+                }
+                se (inst.op == OpIR.Br e fn.buscarBloco(inst.alvo1) == nulo) {
+                    falhar ErroLLVM("Bloco inexistente: " + inst.alvo1)
+                }
+                se (inst.op == OpIR.BrCond) {
+                    se (fn.buscarBloco(inst.alvo1) == nulo ou fn.buscarBloco(inst.alvo2) == nulo) {
+                        falhar ErroLLVM("Bloco alvo inexistente em br condicional")
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- Passes de Otimizacao (ConstProp + DCE + CFG Reachability) ---
+
+classe StatsLLVM {
+    dobras: inteiro = 0
+    dceRemovidas: inteiro = 0
+    blocosMortos: inteiro = 0
+}
+
+funcao avaliarBinario(op: OpIR, a: inteiro, b: inteiro): inteiro {
+    se (op == OpIR.Add) retorna a + b
+    se (op == OpIR.Sub) retorna a - b
+    se (op == OpIR.Mul) retorna a * b
+    se (op == OpIR.Sdiv) retorna inteiro(a / b)
+    retorna a % b
+}
+
+funcao avaliarIcmp(pred: texto, a: inteiro, b: inteiro): inteiro {
+    se (pred == "eq") retorna a == b ? 1 : 0
+    se (pred == "ne") retorna a != b ? 1 : 0
+    se (pred == "slt") retorna a < b ? 1 : 0
+    se (pred == "sle") retorna a <= b ? 1 : 0
+    se (pred == "sgt") retorna a > b ? 1 : 0
+    retorna a >= b ? 1 : 0
+}
+
+funcao passeConstProp(fn: FuncaoIR, stats: StatsLLVM): vazio {
+    var constantes: dicionario = {}
+    para (var b: inteiro = 0; b < fn.blocos.tamanho(); b++) {
+        const bb: BlocoBasico = fn.blocos[b]
+        para (var i: inteiro = 0; i < bb.insts.tamanho(); i++) {
+            const inst: InstIR = bb.insts[i]
+            para (var a: inteiro = 0; a < inst.args.tamanho(); a++) {
+                const arg: texto = inst.args[a]
+                se (constantes.contem(arg)) {
+                    inst.args[a] = texto(constantes[arg])
+                }
+            }
+            se (inst.op == OpIR.Add ou inst.op == OpIR.Sub ou inst.op == OpIR.Mul ou inst.op == OpIR.Sdiv ou inst.op == OpIR.Srem) {
+                se (eNumeroInt(inst.args[0]) e eNumeroInt(inst.args[1])) {
+                    const v1: inteiro = inteiro(inst.args[0])
+                    const v2: inteiro = inteiro(inst.args[1])
+                    se ((inst.op != OpIR.Sdiv e inst.op != OpIR.Srem) ou v2 != 0) {
+                        const res: inteiro = avaliarBinario(inst.op, v1, v2)
+                        constantes[inst.dst] = res
+                        inst.op = OpIR.Const
+                        inst.args = [texto(res)]
+                        stats.dobras++
+                    }
+                }
+            } senao se (inst.op == OpIR.Icmp) {
+                se (eNumeroInt(inst.args[0]) e eNumeroInt(inst.args[1])) {
+                    const res: inteiro = avaliarIcmp(inst.pred, inteiro(inst.args[0]), inteiro(inst.args[1]))
+                    constantes[inst.dst] = res
+                    inst.op = OpIR.Const
+                    inst.args = [texto(res)]
+                    stats.dobras++
+                }
+            } senao se (inst.op == OpIR.BrCond e eNumeroInt(inst.args[0])) {
+                const c: inteiro = inteiro(inst.args[0])
+                inst.op = OpIR.Br
+                inst.alvo1 = c != 0 ? inst.alvo1 : inst.alvo2
+                inst.alvo2 = ""
+                inst.args = []
+            }
+        }
+    }
+}
+
+funcao passeCFGInalcancavel(fn: FuncaoIR, stats: StatsLLVM): vazio {
+    se (fn.blocos.tamanho() == 0) retorna
+    var alcancaveis: dicionario = {}
+    var fila: texto[] = [fn.blocos[0].nome]
+    alcancaveis[fn.blocos[0].nome] = verdadeiro
+
+    enquanto (fila.tamanho() > 0) {
+        const atualNome: texto = fila.removerUltimo()
+        const bbObj: qualquer = fn.buscarBloco(atualNome)
+        se (bbObj == nulo) continua
+        const bb: BlocoBasico = bbObj
+        para (var i: inteiro = 0; i < bb.insts.tamanho(); i++) {
+            const inst: InstIR = bb.insts[i]
+            se (inst.op == OpIR.Br ou inst.op == OpIR.BrCond) {
+                se (!alcancaveis.contem(inst.alvo1)) {
+                    alcancaveis[inst.alvo1] = verdadeiro
+                    fila.empilhar(inst.alvo1)
+                }
+            }
+            se (inst.op == OpIR.BrCond e !alcancaveis.contem(inst.alvo2)) {
+                alcancaveis[inst.alvo2] = verdadeiro
+                fila.empilhar(inst.alvo2)
+            }
+        }
+    }
+
+    var vivos: BlocoBasico[] = []
+    para (var b: inteiro = 0; b < fn.blocos.tamanho(); b++) {
+        se (alcancaveis.contem(fn.blocos[b].nome)) {
+            vivos.empilhar(fn.blocos[b])
+        } senao {
+            stats.blocosMortos++
+        }
+    }
+
+    fn.blocos = vivos
+}
+
+funcao passeDCE(fn: FuncaoIR, stats: StatsLLVM): vazio {
+    var mudou: logico = verdadeiro
+    enquanto (mudou) {
+        mudou = falso
+        var usados: dicionario = {}
+        para (var b: inteiro = 0; b < fn.blocos.tamanho(); b++) {
+            const bb: BlocoBasico = fn.blocos[b]
+            para (var i: inteiro = 0; i < bb.insts.tamanho(); i++) {
+                const inst: InstIR = bb.insts[i]
+                para (var a: inteiro = 0; a < inst.args.tamanho(); a++) {
+                    usados[inst.args[a]] = verdadeiro
+                }
+                para (var p: inteiro = 0; p < inst.phis.tamanho(); p++) {
+                    usados[inst.phis[p].valor] = verdadeiro
+                }
+            }
+        }
+        para (var b: inteiro = 0; b < fn.blocos.tamanho(); b++) {
+            const bb: BlocoBasico = fn.blocos[b]
+            var novas: InstIR[] = []
+            para (var i: inteiro = 0; i < bb.insts.tamanho(); i++) {
+                const inst: InstIR = bb.insts[i]
+                const pura: logico = inst.dst.tamanho() > 0 e inst.op != OpIR.Call
+                se (pura e !usados.contem(inst.dst)) {
+                    stats.dceRemovidas++
+                    mudou = verdadeiro
+                } senao {
+                    novas.empilhar(inst)
+                }
+            }
+            bb.insts = novas
+        }
+    }
+}
+
+// --- Alocador de Registradores Linear Scan ---
+
+classe ResultadoRegAlloc {
+    virtuais: inteiro
+    fisicosMax: inteiro
+
+    construtor(virtuais: inteiro, fisicosMax: inteiro) {
+        isto.virtuais = virtuais
+        isto.fisicosMax = fisicosMax
+    }
+}
+
+funcao alocarRegistradores(fn: FuncaoIR): ResultadoRegAlloc {
+    var inicio: dicionario = {}
+    var fim: dicionario = {}
+    var ordem: texto[] = []
+    var pos: inteiro = 0
+
+    para (var b: inteiro = 0; b < fn.blocos.tamanho(); b++) {
+        const bb: BlocoBasico = fn.blocos[b]
+        para (var i: inteiro = 0; i < bb.insts.tamanho(); i++) {
+            const inst: InstIR = bb.insts[i]
+            se (inst.dst.tamanho() > 0) {
+                se (!inicio.contem(inst.dst)) {
+                    inicio[inst.dst] = pos
+                    fim[inst.dst] = pos
+                    ordem.empilhar(inst.dst)
+                }
+            }
+            para (var a: inteiro = 0; a < inst.args.tamanho(); a++) {
+                const arg: texto = inst.args[a]
+                se (inicio.contem(arg)) fim[arg] = pos
+            }
+            para (var p: inteiro = 0; p < inst.phis.tamanho(); p++) {
+                const v: texto = inst.phis[p].valor
+                se (inicio.contem(v)) fim[v] = pos
+            }
+            pos++
+        }
+    }
+
+    var ativos: texto[] = []
+    var maxSimultaneos: inteiro = 0
+    para (var i: inteiro = 0; i < ordem.tamanho(); i++) {
+        const reg: texto = ordem[i]
+        const iniReg: inteiro = inteiro(inicio[reg])
+        var aindaAtivos: texto[] = []
+        para (var j: inteiro = 0; j < ativos.tamanho(); j++) {
+            se (inteiro(fim[ativos[j]]) > iniReg) {
+                aindaAtivos.empilhar(ativos[j])
+            }
+        }
+        aindaAtivos.empilhar(reg)
+        ativos = aindaAtivos
+        se (ativos.tamanho() > maxSimultaneos) {
+            maxSimultaneos = ativos.tamanho()
+        }
+    }
+
+    retorna ResultadoRegAlloc(ordem.tamanho(), maxSimultaneos)
+}
+
+// --- Executor de IR SSA ---
+
+classe ExecutorIR {
+    funcoes: dicionario
+
+    construtor(lista: FuncaoIR[]) {
+        isto.funcoes = {}
+        para (var i: inteiro = 0; i < lista.tamanho(); i++) {
+            isto.funcoes[lista[i].nome] = lista[i]
+        }
+    }
+
+    lerOperando(op: texto, regs: dicionario): inteiro {
+        se (eNumeroInt(op)) retorna inteiro(op)
+        se (!regs.contem(op)) falhar ErroLLVM("Registrador virtual indefinido: " + op)
+        retorna inteiro(regs[op])
+    }
+
+    executar(nomeFn: texto, args: inteiro[]): inteiro {
+        const fn: FuncaoIR = isto.funcoes[nomeFn]
+        var regs: dicionario = {}
+        para (var i: inteiro = 0; i < fn.params.tamanho(); i++) {
+            regs[fn.params[i]] = args[i]
+        }
+
+        var blocoAtual: BlocoBasico = fn.blocos[0]
+        var blocoAnterior: texto = ""
+
+        enquanto (verdadeiro) {
+            var proxBloco: texto = ""
+            // Avalia nos PHI simultaneamente usando o snapshot anterior de regs
+            var atualizacoesPhi: dicionario = {}
+            var chavesPhi: texto[] = []
+
+            para (var i: inteiro = 0; i < blocoAtual.insts.tamanho(); i++) {
+                const inst: InstIR = blocoAtual.insts[i]
+                se (inst.op == OpIR.Phi) {
+                    para (var p: inteiro = 0; p < inst.phis.tamanho(); p++) {
+                        se (inst.phis[p].bloco == blocoAnterior) {
+                            atualizacoesPhi[inst.dst] = isto.lerOperando(inst.phis[p].valor,
+                                regs)
+                            chavesPhi.empilhar(inst.dst)
+                            sustar
+                        }
+                    }
+                    continua
+                }
+                se (chavesPhi.tamanho() > 0) {
+                    para (var k: inteiro = 0; k < chavesPhi.tamanho(); k++) {
+                        regs[chavesPhi[k]] = atualizacoesPhi[chavesPhi[k]]
+                    }
+                    chavesPhi = []
+                }
+
+                se (inst.op == OpIR.Const) {
+                    regs[inst.dst] = inteiro(inst.args[0])
+                } senao se (inst.op == OpIR.Add ou inst.op == OpIR.Sub ou inst.op == OpIR.Mul ou inst.op == OpIR.Sdiv ou inst.op == OpIR.Srem) {
+                    const a: inteiro = isto.lerOperando(inst.args[0], regs)
+                    const b: inteiro = isto.lerOperando(inst.args[1], regs)
+                    regs[inst.dst] = avaliarBinario(inst.op, a, b)
+                } senao se (inst.op == OpIR.Icmp) {
+                    const a: inteiro = isto.lerOperando(inst.args[0], regs)
+                    const b: inteiro = isto.lerOperando(inst.args[1], regs)
+                    regs[inst.dst] = avaliarIcmp(inst.pred, a, b)
+                } senao se (inst.op == OpIR.Call) {
+                    var callArgs: inteiro[] = []
+                    para (var a: inteiro = 0; a < inst.args.tamanho(); a++) {
+                        callArgs.empilhar(isto.lerOperando(inst.args[a], regs))
+                    }
+                    regs[inst.dst] = isto.executar(inst.alvo1, callArgs)
+                } senao se (inst.op == OpIR.Br) {
+                    proxBloco = inst.alvo1
+                    sustar
+                } senao se (inst.op == OpIR.BrCond) {
+                    const c: inteiro = isto.lerOperando(inst.args[0], regs)
+                    proxBloco = c != 0 ? inst.alvo1 : inst.alvo2
+                    sustar
+                } senao se (inst.op == OpIR.Ret) {
+                    retorna isto.lerOperando(inst.args[0], regs)
+                }
+            }
+            blocoAnterior = blocoAtual.nome
+            blocoAtual = fn.buscarBloco(proxBloco)
+        }
+        retorna 0
+    }
+}
+
+const arquivos: qualquer = importar("cgd:arquivos")
+const caminho: texto = "programa.ll"
+const arquivo: qualquer = arquivos.Arquivo(caminho)
+se (!arquivo.existe()) falhar "Arquivo IR nao encontrado: ${caminho}"
+
+const funcoes: FuncaoIR[] = ParserIR().parseModulo(arquivo.ler())
+verificarSSA(funcoes)
+escreva("[Mini-LLVM] Funcoes: ${funcoes.tamanho()} | Verificacao SSA: OK")
+
+const stats: StatsLLVM = StatsLLVM()
+para (var i: inteiro = 0; i < funcoes.tamanho(); i++) {
+    passeConstProp(funcoes[i], stats)
+    passeCFGInalcancavel(funcoes[i], stats)
+    passeDCE(funcoes[i], stats)
+}
+
+escreva("[Otimizador] ConstProp dobras: ${stats.dobras} | DCE removidas: ${stats.dceRemovidas} | Blocos mortos: ${stats.blocosMortos}")
+
+const regMain: ResultadoRegAlloc = alocarRegistradores(funcoes[2])
+escreva("[RegAlloc] @main: ${regMain.virtuais} regs virtuais -> ${regMain.fisicosMax} regs fisicos max")
+
+const exec: ExecutorIR = ExecutorIR(funcoes)
+const resSoma: inteiro = exec.executar("soma_ate", [10])
+const resFat: inteiro = exec.executar("fatorial", [7])
+var vazioArgs: inteiro[] = []
+const resMain: inteiro = exec.executar("main", vazioArgs)
+assercao(resSoma == 55, "soma_ate(10) deveria ser 55")
+assercao(resFat == 5040, "fatorial(7) deveria ser 5040")
+assercao(resMain == 5145, "main() deveria ser 5145")
+escreva("[Execucao IR] @soma_ate(10) = ${resSoma}")
+escreva("[Execucao IR] @fatorial(7) = ${resFat}")
+escreva("[Execucao IR] @main() = ${resMain}")

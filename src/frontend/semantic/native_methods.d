@@ -17,7 +17,7 @@ string[] builtinMethods(TypeSema receiver)
         return names ~ [
         "adicionar", "empilhar", "tamanho", "inclui", "contem", "contém", "fatiar", "mapear",
         "filtrarPor", "remover", "removerPrimeiro", "removerUltimo", "inverter", "somar",
-        "juntar", "concatenar", "encaixar", "ordenar"
+        "juntar", "concatenar", "encaixar", "ordenar", "limpar"
     ];
     if (TypeSemaBuiltin type = cast(TypeSemaBuiltin) receiver)
     {
@@ -88,7 +88,7 @@ FnDecl builtinMethod(TypeSema receiver, string name)
             result = "qualquer[]";
             break;
         case "limpar":
-            result = "dicionario";
+            result = receiver.isArray() ? "qualquer[]" : "dicionario";
             break;
         case "tipo":
         case "paraTexto":

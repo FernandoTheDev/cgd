@@ -1,0 +1,690 @@
+//! [Mini-Clang C++] Simbolos mangled: _ZN3mat5somarEii, _ZN3mat5somarEiii, _ZN5Forma5fatorEv, _ZN9Retangulo4areaEv\nmat::somar(10,20) = 30\nmat::somar(1,2,3) = 6\nRetangulo.area() = 60\nRetangulo.fator() herdado = 3
+//? fase: execucao
+//? diretorio: fonte
+// Mini-Clang C++: compilador de subconjunto de C++ escrito em Delegua/CGD.
+// Implementa namespaces (::), sobrecarga de funcoes com Itanium Name Mangling (_Z...),
+// classes, construtores, heranca publica, lowering de metodos com 'this' e 'cout <<'.
+// Compilar na raiz: ./cgd exemplos/compiladores_e_vms/compiladores/mini_clang_cpp/mini_clang.delegua -s out/mini_clang
+// Executar: cd exemplos/compiladores_e_vms/compiladores/mini_clang_cpp && ../../../../out/mini_clang
+
+enum TokCpp {
+    IntLit,
+    StrLit,
+    Ident,
+    KwNamespace,
+    KwClass,
+    KwPublic,
+    KwInt,
+    KwThis,
+    KwReturn,
+    KwIf,
+    KwElse,
+    KwWhile,
+    KwCout,
+    KwEndl,
+    Scope,
+    Arrow,
+    Shl,
+    Mais,
+    Menos,
+    Vezes,
+    Div,
+    Igual,
+    Eq,
+    Lt,
+    Le,
+    Gt,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    Colon,
+    Semi,
+    Comma,
+    Dot,
+    Fim
+}
+
+classe ErroClang herda Excecao {
+    construtor(mensagem: texto) {
+        super(mensagem)
+    }
+}
+
+classe TokenCpp {
+    tag: TokCpp
+    lexema: texto
+
+    construtor(tag: TokCpp, lexema: texto) {
+        isto.tag = tag
+        isto.lexema = lexema
+    }
+}
+
+classe LexerCpp {
+    fonte: texto
+    pos: inteiro
+    n: inteiro
+
+    construtor(fonte: texto) {
+        isto.fonte = fonte
+        isto.pos = 0
+        isto.n = fonte.tamanho()
+    }
+
+    tokenizar(): TokenCpp[] {
+        var out: TokenCpp[] = []
+        enquanto (isto.pos < isto.n) {
+            const c: texto = isto.fonte[isto.pos]
+            se (c == " " ou c == "\t" ou c == "\r" ou c == "\n") {
+                isto.pos++
+                continua
+            }
+            se (c == "/" e isto.pos + 1 < isto.n e isto.fonte[isto.pos + 1] == "/") {
+                enquanto (isto.pos < isto.n e isto.fonte[isto.pos] != "\n") isto.pos++
+                continua
+            }
+            se (c == "\"") {
+                isto.pos++
+                var buf: texto[] = []
+                enquanto (isto.pos < isto.n e isto.fonte[isto.pos] != "\"") {
+                    buf.empilhar(isto.fonte[isto.pos])
+                    isto.pos++
+                }
+                se (isto.pos >= isto.n) falhar ErroClang("String C++ nao terminada")
+                isto.pos++
+                out.empilhar(TokenCpp(TokCpp.StrLit, buf.juntar("")))
+                continua
+            }
+            se ("0123456789".contem(c)) {
+                var buf: texto[] = []
+                enquanto (isto.pos < isto.n e "0123456789".contem(isto.fonte[isto.pos])) {
+                    buf.empilhar(isto.fonte[isto.pos])
+                    isto.pos++
+                }
+                out.empilhar(TokenCpp(TokCpp.IntLit, buf.juntar("")))
+                continua
+            }
+            se ("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contem(c)) {
+                var buf: texto[] = []
+                enquanto (isto.pos < isto.n e "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789".contem(isto.fonte[isto.pos])) {
+                    buf.empilhar(isto.fonte[isto.pos])
+                    isto.pos++
+                }
+                const w: texto = buf.juntar("")
+                se (w == "namespace") out.empilhar(TokenCpp(TokCpp.KwNamespace, w))
+                senao se (w == "class") out.empilhar(TokenCpp(TokCpp.KwClass, w))
+                senao se (w == "public") out.empilhar(TokenCpp(TokCpp.KwPublic, w))
+                senao se (w == "int") out.empilhar(TokenCpp(TokCpp.KwInt, w))
+                senao se (w == "this") out.empilhar(TokenCpp(TokCpp.KwThis, w))
+                senao se (w == "return") out.empilhar(TokenCpp(TokCpp.KwReturn, w))
+                senao se (w == "if") out.empilhar(TokenCpp(TokCpp.KwIf, w))
+                senao se (w == "else") out.empilhar(TokenCpp(TokCpp.KwElse, w))
+                senao se (w == "while") out.empilhar(TokenCpp(TokCpp.KwWhile, w))
+                senao se (w == "cout") out.empilhar(TokenCpp(TokCpp.KwCout, w))
+                senao se (w == "endl") out.empilhar(TokenCpp(TokCpp.KwEndl, w))
+                senao out.empilhar(TokenCpp(TokCpp.Ident, w))
+                continua
+            }
+            const prox: texto = isto.pos + 1 < isto.n ? isto.fonte[isto.pos + 1] : ""
+            se (c == ":" e prox == ":") {
+                isto.pos = isto.pos + 2
+                out.empilhar(TokenCpp(TokCpp.Scope, "::"))
+                continua
+            }
+            se (c == "-" e prox == ">") {
+                isto.pos = isto.pos + 2
+                out.empilhar(TokenCpp(TokCpp.Arrow, "->"))
+                continua
+            }
+            se (c == "<" e prox == "<") {
+                isto.pos = isto.pos + 2
+                out.empilhar(TokenCpp(TokCpp.Shl, "<<"))
+                continua
+            }
+            se (c == "=" e prox == "=") {
+                isto.pos = isto.pos + 2
+                out.empilhar(TokenCpp(TokCpp.Eq, "=="))
+                continua
+            }
+            se (c == "<" e prox == "=") {
+                isto.pos = isto.pos + 2
+                out.empilhar(TokenCpp(TokCpp.Le, "<="))
+                continua
+            }
+            isto.pos++
+            se (c == "+") out.empilhar(TokenCpp(TokCpp.Mais, c))
+            senao se (c == "-") out.empilhar(TokenCpp(TokCpp.Menos, c))
+            senao se (c == "*") out.empilhar(TokenCpp(TokCpp.Vezes, c))
+            senao se (c == "/") out.empilhar(TokenCpp(TokCpp.Div, c))
+            senao se (c == "=") out.empilhar(TokenCpp(TokCpp.Igual, c))
+            senao se (c == "<") out.empilhar(TokenCpp(TokCpp.Lt, c))
+            senao se (c == ">") out.empilhar(TokenCpp(TokCpp.Gt, c))
+            senao se (c == "(") out.empilhar(TokenCpp(TokCpp.LParen, c))
+            senao se (c == ")") out.empilhar(TokenCpp(TokCpp.RParen, c))
+            senao se (c == "{") out.empilhar(TokenCpp(TokCpp.LBrace, c))
+            senao se (c == "}") out.empilhar(TokenCpp(TokCpp.RBrace, c))
+            senao se (c == ":") out.empilhar(TokenCpp(TokCpp.Colon, c))
+            senao se (c == ";") out.empilhar(TokenCpp(TokCpp.Semi, c))
+            senao se (c == ",") out.empilhar(TokenCpp(TokCpp.Comma, c))
+            senao se (c == ".") out.empilhar(TokenCpp(TokCpp.Dot, c))
+            senao falhar ErroClang("Caractere C++ invalido: " + c)
+        }
+        out.empilhar(TokenCpp(TokCpp.Fim, ""))
+        retorna out
+    }
+}
+
+// --- Itanium C++ ABI Name Mangling ---
+
+funcao mangleSimbolo(escopo: texto, nome: texto, numIntParams: inteiro): texto {
+    var sufixo: texto = ""
+    se (numIntParams == 0) {
+        sufixo = "v"
+    } senao {
+        var ps: texto[] = []
+        para (var i: inteiro = 0; i < numIntParams; i++) ps.empilhar("i")
+        sufixo = ps.juntar("")
+    }
+
+    se (escopo.tamanho() > 0) {
+        retorna "_ZN${escopo.tamanho()}${escopo}${nome.tamanho()}${nome}E${sufixo}"
+    }
+
+    retorna "_Z${nome.tamanho()}${nome}${sufixo}"
+}
+
+classe ClasseCppInfo {
+    nome: texto
+    pai: texto
+    campos: texto[]
+    metodos: dicionario
+
+    construtor(nome: texto, pai: texto) {
+        isto.nome = nome
+        isto.pai = pai
+        isto.campos = []
+        isto.metodos = {}
+    }
+}
+
+classe ChunkCpp {
+    simbolo: texto
+    numLocais: inteiro
+    codigo: texto[]
+
+    construtor(simbolo: texto, numLocais: inteiro, codigo: texto[]) {
+        isto.simbolo = simbolo
+        isto.numLocais = numLocais
+        isto.codigo = codigo
+    }
+}
+
+classe CompiladorClang {
+    tokens: TokenCpp[]
+    pos: inteiro
+    classes: dicionario
+    chunks: dicionario
+    simbolosMangled: texto[]
+
+    construtor(tokens: TokenCpp[]) {
+        isto.tokens = tokens
+        isto.pos = 0
+        isto.classes = {}
+        isto.chunks = {}
+        isto.simbolosMangled = []
+    }
+
+    atual(): TokenCpp {
+        retorna isto.tokens[isto.pos]
+    }
+
+    avancar(): TokenCpp {
+        const t: TokenCpp = isto.tokens[isto.pos]
+        isto.pos++
+        retorna t
+    }
+
+    consumir(tag: TokCpp, msg: texto): TokenCpp {
+        se (isto.atual().tag != tag) {
+            falhar ErroClang(msg + ", encontrado '" + isto.atual().lexema + "'")
+        }
+        retorna isto.avancar()
+    }
+
+    resolverMetodo(nomeClasse: texto, nomeMetodo: texto, numArgs: inteiro): texto {
+        var atualNome: texto = nomeClasse
+        enquanto (atualNome.tamanho() > 0) {
+            const info: ClasseCppInfo = isto.classes[atualNome]
+            const chave: texto = nomeMetodo + "/" + texto(numArgs)
+            se (info.metodos.contem(chave)) {
+                retorna texto(info.metodos[chave])
+            }
+            atualNome = info.pai
+        }
+        falhar ErroClang("Metodo '${nomeMetodo}' nao encontrado em '${nomeClasse}'")
+    }
+
+    compilarPrograma(): vazio {
+        enquanto (isto.atual().tag != TokCpp.Fim) {
+            se (isto.atual().tag == TokCpp.KwNamespace) {
+                isto.avancar()
+                const ns: texto = isto.consumir(TokCpp.Ident, "esperado nome de namespace").lexema
+                isto.consumir(TokCpp.LBrace, "esperado '{'")
+                enquanto (isto.atual().tag != TokCpp.RBrace e isto.atual().tag != TokCpp.Fim) {
+                    isto.compilarFuncaoLivre(ns)
+                }
+                isto.consumir(TokCpp.RBrace, "esperado '}'")
+                continua
+            }
+            se (isto.atual().tag == TokCpp.KwClass) {
+                isto.compilarClasse()
+                continua
+            }
+            isto.compilarFuncaoLivre("")
+        }
+    }
+
+    compilarClasse(): vazio {
+        isto.consumir(TokCpp.KwClass, "esperado 'class'")
+        const nome: texto = isto.consumir(TokCpp.Ident, "esperado nome de classe").lexema
+        var pai: texto = ""
+        se (isto.atual().tag == TokCpp.Colon) {
+            isto.avancar()
+            se (isto.atual().tag == TokCpp.KwPublic) isto.avancar()
+            pai = isto.consumir(TokCpp.Ident, "esperado classe base").lexema
+        }
+        const info: ClasseCppInfo = ClasseCppInfo(nome, pai)
+        isto.classes[nome] = info
+        isto.consumir(TokCpp.LBrace, "esperado '{'")
+
+        enquanto (isto.atual().tag != TokCpp.RBrace e isto.atual().tag != TokCpp.Fim) {
+            se (isto.atual().tag == TokCpp.KwPublic) {
+                isto.avancar()
+                isto.consumir(TokCpp.Colon, "esperado ':'")
+                continua
+            }
+            // Construtor: NomeClasse(...)
+            se (isto.atual().tag == TokCpp.Ident e isto.atual().lexema == nome) {
+                isto.avancar()
+                isto.compilarMetodoOuCtor(info, nome, verdadeiro)
+                continua
+            }
+            // Campo ou metodo int
+            isto.consumir(TokCpp.KwInt, "esperado 'int' ou construtor")
+            const membro: texto = isto.consumir(TokCpp.Ident, "esperado nome de membro").lexema
+            se (isto.atual().tag == TokCpp.Semi) {
+                isto.avancar()
+                info.campos.empilhar(membro)
+                continua
+            }
+            isto.compilarMetodoOuCtor(info, membro, falso)
+        }
+        isto.consumir(TokCpp.RBrace, "esperado '}'")
+        isto.consumir(TokCpp.Semi, "esperado ';' apos classe")
+    }
+
+    compilarMetodoOuCtor(info: ClasseCppInfo, nome: texto, ehCtor: logico): vazio {
+        isto.consumir(TokCpp.LParen, "esperado '('")
+        var slots: dicionario = {}
+        var tiposVar: dicionario = {}
+        slots["this"] = 0
+        tiposVar["this"] = info.nome
+        var proxSlot: inteiro = 1
+        var numParams: inteiro = 0
+
+        se (isto.atual().tag != TokCpp.RParen) {
+            enquanto (verdadeiro) {
+                isto.consumir(TokCpp.KwInt, "esperado 'int'")
+                const pNome: texto = isto.consumir(TokCpp.Ident, "esperado parametro").lexema
+                slots[pNome] = proxSlot
+                tiposVar[pNome] = "int"
+                proxSlot++
+                numParams++
+                se (isto.atual().tag == TokCpp.Comma) isto.avancar()
+                senao sustar
+            }
+        }
+        isto.consumir(TokCpp.RParen, "esperado ')'")
+
+        var mangled: texto = mangleSimbolo(info.nome, nome, numParams)
+        se (ehCtor) {
+            mangled = "__ctor_" + info.nome + "_" + texto(numParams)
+        }
+        se (!ehCtor) {
+            info.metodos[nome + "/" + texto(numParams)] = mangled
+            isto.simbolosMangled.empilhar(mangled)
+        }
+
+        var codigo: texto[] = []
+        proxSlot = isto.compilarBloco(codigo, slots, tiposVar, proxSlot, info.nome)
+        se (ehCtor) {
+            codigo.empilhar("LOAD|0")
+            codigo.empilhar("RET")
+        } senao {
+            codigo.empilhar("PUSH_INT|0")
+            codigo.empilhar("RET")
+        }
+        isto.chunks[mangled] = ChunkCpp(mangled, proxSlot, codigo)
+    }
+
+    compilarFuncaoLivre(ns: texto): vazio {
+        isto.consumir(TokCpp.KwInt, "esperado 'int'")
+        const nome: texto = isto.consumir(TokCpp.Ident, "esperado nome de funcao").lexema
+        isto.consumir(TokCpp.LParen, "esperado '('")
+        var slots: dicionario = {}
+        var tiposVar: dicionario = {}
+        var proxSlot: inteiro = 0
+        var numParams: inteiro = 0
+
+        se (isto.atual().tag != TokCpp.RParen) {
+            enquanto (verdadeiro) {
+                isto.consumir(TokCpp.KwInt, "esperado 'int'")
+                const pNome: texto = isto.consumir(TokCpp.Ident, "esperado parametro").lexema
+                slots[pNome] = proxSlot
+                tiposVar[pNome] = "int"
+                proxSlot++
+                numParams++
+                se (isto.atual().tag == TokCpp.Comma) isto.avancar()
+                senao sustar
+            }
+        }
+        isto.consumir(TokCpp.RParen, "esperado ')'")
+
+        const simbolo: texto = (ns == "" e nome == "main") ? "main" : mangleSimbolo(ns, nome,
+            numParams)
+        se (simbolo != "main") {
+            isto.simbolosMangled.empilhar(simbolo)
+        }
+
+        var codigo: texto[] = []
+        proxSlot = isto.compilarBloco(codigo, slots, tiposVar, proxSlot, "")
+        codigo.empilhar("PUSH_INT|0")
+        codigo.empilhar("RET")
+        isto.chunks[simbolo] = ChunkCpp(simbolo, proxSlot, codigo)
+    }
+
+    compilarBloco(codigo: texto[], slots: dicionario, tiposVar: dicionario, proxSlot: inteiro,
+        classeAtual: texto): inteiro {
+        isto.consumir(TokCpp.LBrace, "esperado '{'")
+        var proximo: inteiro = proxSlot
+        enquanto (isto.atual().tag != TokCpp.RBrace e isto.atual().tag != TokCpp.Fim) {
+            proximo = isto.compilarStmt(codigo, slots, tiposVar, proximo, classeAtual)
+        }
+        isto.consumir(TokCpp.RBrace, "esperado '}'")
+        retorna proximo
+    }
+
+    compilarStmt(codigo: texto[], slots: dicionario, tiposVar: dicionario, proxSlot: inteiro,
+        classeAtual: texto): inteiro {
+        const tag: TokCpp = isto.atual().tag
+        se (tag == TokCpp.KwInt) {
+            isto.avancar()
+            const nome: texto = isto.consumir(TokCpp.Ident, "esperado nome de variavel").lexema
+            isto.consumir(TokCpp.Igual, "esperado '='")
+            isto.compilarExpr(codigo, slots, tiposVar, classeAtual)
+            isto.consumir(TokCpp.Semi, "esperado ';'")
+            slots[nome] = proxSlot
+            tiposVar[nome] = "int"
+            codigo.empilhar("STORE|" + texto(proxSlot))
+            retorna proxSlot + 1
+        }
+        se (tag == TokCpp.Ident e isto.classes.contem(isto.atual().lexema)) {
+            const nomeCls: texto = isto.avancar().lexema
+            const nomeVar: texto = isto.consumir(TokCpp.Ident, "esperado nome de objeto").lexema
+            isto.consumir(TokCpp.Igual, "esperado '='")
+            isto.compilarExpr(codigo, slots, tiposVar, classeAtual)
+            isto.consumir(TokCpp.Semi, "esperado ';'")
+            slots[nomeVar] = proxSlot
+            tiposVar[nomeVar] = nomeCls
+            codigo.empilhar("STORE|" + texto(proxSlot))
+            retorna proxSlot + 1
+        }
+        se (tag == TokCpp.KwThis) {
+            isto.avancar()
+            isto.consumir(TokCpp.Arrow, "esperado '->'")
+            const campo: texto = isto.consumir(TokCpp.Ident, "esperado campo").lexema
+            isto.consumir(TokCpp.Igual, "esperado '='")
+            codigo.empilhar("LOAD|0")
+            isto.compilarExpr(codigo, slots, tiposVar, classeAtual)
+            isto.consumir(TokCpp.Semi, "esperado ';'")
+            codigo.empilhar("SET_FIELD|" + campo)
+            retorna proxSlot
+        }
+        se (tag == TokCpp.KwCout) {
+            isto.avancar()
+            enquanto (isto.atual().tag == TokCpp.Shl) {
+                isto.avancar()
+                se (isto.atual().tag == TokCpp.KwEndl) {
+                    isto.avancar()
+                    codigo.empilhar("COUT_ENDL")
+                } senao {
+                    isto.compilarExpr(codigo, slots, tiposVar, classeAtual)
+                    codigo.empilhar("COUT_VAL")
+                }
+            }
+            isto.consumir(TokCpp.Semi, "esperado ';'")
+            retorna proxSlot
+        }
+        se (tag == TokCpp.KwReturn) {
+            isto.avancar()
+            isto.compilarExpr(codigo, slots, tiposVar, classeAtual)
+            isto.consumir(TokCpp.Semi, "esperado ';'")
+            codigo.empilhar("RET")
+            retorna proxSlot
+        }
+        falhar ErroClang("Comando C++ inesperado: " + isto.atual().lexema)
+    }
+
+    compilarExpr(codigo: texto[], slots: dicionario, tiposVar: dicionario, classeAtual: texto): vazio {
+        isto.compilarAdicao(codigo, slots, tiposVar, classeAtual)
+    }
+
+    compilarAdicao(codigo: texto[], slots: dicionario, tiposVar: dicionario, classeAtual: texto): vazio {
+        isto.compilarFator(codigo, slots, tiposVar, classeAtual)
+        enquanto (isto.atual().tag == TokCpp.Mais ou isto.atual().tag == TokCpp.Menos) {
+            const op: TokCpp = isto.avancar().tag
+            isto.compilarFator(codigo, slots, tiposVar, classeAtual)
+            se (op == TokCpp.Mais) codigo.empilhar("ADD")
+            senao codigo.empilhar("SUB")
+        }
+    }
+
+    compilarFator(codigo: texto[], slots: dicionario, tiposVar: dicionario, classeAtual: texto): vazio {
+        isto.compilarPrimario(codigo, slots, tiposVar, classeAtual)
+        enquanto (isto.atual().tag == TokCpp.Vezes ou isto.atual().tag == TokCpp.Div) {
+            const op: TokCpp = isto.avancar().tag
+            isto.compilarPrimario(codigo, slots, tiposVar, classeAtual)
+            se (op == TokCpp.Vezes) codigo.empilhar("MUL")
+            senao codigo.empilhar("DIV")
+        }
+    }
+
+    compilarPrimario(codigo: texto[], slots: dicionario, tiposVar: dicionario, classeAtual: texto): vazio {
+        const t: TokenCpp = isto.atual()
+        se (t.tag == TokCpp.IntLit) {
+            isto.avancar()
+            codigo.empilhar("PUSH_INT|" + t.lexema)
+            retorna
+        }
+        se (t.tag == TokCpp.StrLit) {
+            isto.avancar()
+            codigo.empilhar("PUSH_STR|" + t.lexema)
+            retorna
+        }
+        se (t.tag == TokCpp.KwThis) {
+            isto.avancar()
+            isto.consumir(TokCpp.Arrow, "esperado '->'")
+            const membro: texto = isto.consumir(TokCpp.Ident, "esperado membro").lexema
+            codigo.empilhar("LOAD|0")
+            se (isto.atual().tag == TokCpp.LParen) {
+                isto.avancar()
+                var argc: inteiro = 0
+                se (isto.atual().tag != TokCpp.RParen) {
+                    enquanto (verdadeiro) {
+                        isto.compilarExpr(codigo, slots, tiposVar, classeAtual)
+                        argc++
+                        se (isto.atual().tag == TokCpp.Comma) isto.avancar()
+                        senao sustar
+                    }
+                }
+                isto.consumir(TokCpp.RParen, "esperado ')'")
+                const sym: texto = isto.resolverMetodo(classeAtual, membro, argc)
+                codigo.empilhar("CALL|" + sym + "|" + texto(argc + 1))
+                retorna
+            }
+            codigo.empilhar("GET_FIELD|" + membro)
+            retorna
+        }
+        se (t.tag == TokCpp.Ident) {
+            const primeiro: texto = isto.avancar().lexema
+            // Chamada em namespace: ns::fn(...)
+            se (isto.atual().tag == TokCpp.Scope) {
+                isto.avancar()
+                const fnNome: texto = isto.consumir(TokCpp.Ident, "esperado funcao em namespace").lexema
+                isto.consumir(TokCpp.LParen, "esperado '('")
+                var argc: inteiro = 0
+                se (isto.atual().tag != TokCpp.RParen) {
+                    enquanto (verdadeiro) {
+                        isto.compilarExpr(codigo, slots, tiposVar, classeAtual)
+                        argc++
+                        se (isto.atual().tag == TokCpp.Comma) isto.avancar()
+                        senao sustar
+                    }
+                }
+                isto.consumir(TokCpp.RParen, "esperado ')'")
+                const sym: texto = mangleSimbolo(primeiro, fnNome, argc)
+                codigo.empilhar("CALL|" + sym + "|" + texto(argc))
+                retorna
+            }
+            // Construcao de objeto: Classe(...)
+            se (isto.classes.contem(primeiro) e isto.atual().tag == TokCpp.LParen) {
+                isto.avancar()
+                codigo.empilhar("NEW_OBJ|" + primeiro)
+                var argc: inteiro = 0
+                se (isto.atual().tag != TokCpp.RParen) {
+                    enquanto (verdadeiro) {
+                        isto.compilarExpr(codigo, slots, tiposVar, classeAtual)
+                        argc++
+                        se (isto.atual().tag == TokCpp.Comma) isto.avancar()
+                        senao sustar
+                    }
+                }
+                isto.consumir(TokCpp.RParen, "esperado ')'")
+                const ctorSym: texto = "__ctor_" + primeiro + "_" + texto(argc)
+                codigo.empilhar("CALL|" + ctorSym + "|" + texto(argc + 1))
+                retorna
+            }
+            // Metodo em objeto: obj.metodo(...)
+            se (isto.atual().tag == TokCpp.Dot) {
+                isto.avancar()
+                const metodo: texto = isto.consumir(TokCpp.Ident, "esperado metodo").lexema
+                isto.consumir(TokCpp.LParen, "esperado '('")
+                codigo.empilhar("LOAD|" + texto(slots[primeiro]))
+                var argc: inteiro = 0
+                se (isto.atual().tag != TokCpp.RParen) {
+                    enquanto (verdadeiro) {
+                        isto.compilarExpr(codigo, slots, tiposVar, classeAtual)
+                        argc++
+                        se (isto.atual().tag == TokCpp.Comma) isto.avancar()
+                        senao sustar
+                    }
+                }
+                isto.consumir(TokCpp.RParen, "esperado ')'")
+                const tipoObj: texto = texto(tiposVar[primeiro])
+                const sym: texto = isto.resolverMetodo(tipoObj, metodo, argc)
+                codigo.empilhar("CALL|" + sym + "|" + texto(argc + 1))
+                retorna
+            }
+            codigo.empilhar("LOAD|" + texto(slots[primeiro]))
+            retorna
+        }
+        falhar ErroClang("Expressao C++ invalida: " + t.lexema)
+    }
+}
+
+classe VMCpp {
+    chunks: dicionario
+    linhaBuf: texto[]
+
+    construtor(chunks: dicionario) {
+        isto.chunks = chunks
+        isto.linhaBuf = []
+    }
+
+    executar(simbolo: texto, args: qualquer[]): qualquer {
+        se (!isto.chunks.contem(simbolo)) {
+            falhar ErroClang("Simbolo C++ nao resolvido: " + simbolo)
+        }
+        const ch: ChunkCpp = isto.chunks[simbolo]
+        var locais: qualquer[] = []
+        para (var i: inteiro = 0; i < ch.numLocais; i++) locais.empilhar(0)
+        para (var i: inteiro = 0; i < args.tamanho(); i++) locais[i] = args[i]
+
+        var pilha: qualquer[] = []
+        var pc: inteiro = 0
+        const insts: texto[] = ch.codigo
+
+        enquanto (pc < insts.tamanho()) {
+            const p: texto[] = insts[pc].dividir("|")
+            pc++
+            const op: texto = p[0]
+
+            se (op == "PUSH_INT") pilha.empilhar(inteiro(p[1]))
+            senao se (op == "PUSH_STR") pilha.empilhar(p[1])
+            senao se (op == "LOAD") pilha.empilhar(locais[inteiro(p[1])])
+            senao se (op == "STORE") locais[inteiro(p[1])] = pilha.removerUltimo()
+            senao se (op == "NEW_OBJ") {
+                var obj: dicionario = {}
+                obj["__classe__"] = p[1]
+                pilha.empilhar(obj)
+            } senao se (op == "SET_FIELD") {
+                const val: qualquer = pilha.removerUltimo()
+                const obj: dicionario = pilha.removerUltimo()
+                obj[p[1]] = val
+            } senao se (op == "GET_FIELD") {
+                const obj: dicionario = pilha.removerUltimo()
+                pilha.empilhar(obj[p[1]])
+            } senao se (op == "COUT_VAL") {
+                isto.linhaBuf.empilhar(texto(pilha.removerUltimo()))
+            } senao se (op == "COUT_ENDL") {
+                escreva(isto.linhaBuf.juntar(""))
+                isto.linhaBuf = []
+            } senao se (op == "CALL") {
+                const alvo: texto = p[1]
+                const argc: inteiro = inteiro(p[2])
+                var callArgs: qualquer[] = []
+                para (var k: inteiro = 0; k < argc; k++) callArgs.empilhar(0)
+                para (var k: inteiro = argc - 1; k >= 0; k--) callArgs[k] = pilha.removerUltimo()
+                pilha.empilhar(isto.executar(alvo, callArgs))
+            } senao se (op == "RET") {
+                retorna pilha.removerUltimo()
+            } senao {
+                const b: inteiro = inteiro(pilha.removerUltimo())
+                const a: inteiro = inteiro(pilha.removerUltimo())
+                se (op == "ADD") pilha.empilhar(a + b)
+                senao se (op == "SUB") pilha.empilhar(a - b)
+                senao se (op == "MUL") pilha.empilhar(a * b)
+                senao se (op == "DIV") pilha.empilhar(inteiro(a / b))
+            }
+        }
+        retorna 0
+    }
+}
+
+const arquivos: qualquer = importar("cgd:arquivos")
+const caminho: texto = "programa.cpp"
+const arquivo: qualquer = arquivos.Arquivo(caminho)
+se (!arquivo.existe()) falhar "Arquivo C++ nao encontrado: ${caminho}"
+
+const tokens: TokenCpp[] = LexerCpp(arquivo.ler()).tokenizar()
+const clang: CompiladorClang = CompiladorClang(tokens)
+clang.compilarPrograma()
+escreva("[Mini-Clang C++] Simbolos mangled: " + clang.simbolosMangled.juntar(", "))
+
+var semArgs: qualquer[] = []
+const vmCpp: VMCpp = VMCpp(clang.chunks)
+const retMain: qualquer = vmCpp.executar("main", semArgs)
+assercao(inteiro(retMain) == 0, "main() C++ deveria retornar 0")
+assercao(inteiro(vmCpp.executar("_ZN3mat5somarEii", [10, 20])) == 30, "mat::somar(10, 20) deveria retornar 30")
+assercao(inteiro(vmCpp.executar("_ZN3mat5somarEiii", [1, 2, 3])) == 6, "mat::somar(1, 2, 3) deveria retornar 6")

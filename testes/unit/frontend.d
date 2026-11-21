@@ -208,3 +208,47 @@ unittest
     assert(libs.any!((CgdLibraryEntry e) => e.name == "custom" && e.fromUserDir));
     assert(libs.any!((CgdLibraryEntry e) => e.name == "sub/helper" && e.fromUserDir));
 }
+
+unittest
+{
+    import std.math : isClose;
+
+    // Literais numéricos: hex, binário, octal, separadores, notação científica, hex-float e comentários /* */
+    Diagnostics diag = new Diagnostics;
+    Token[] tks = new Lexer("/* comentário\nde bloco */ 0xFF 0xFFFF_FFFF 0b101010 0b1111_0000 0o755 1_000_000 1.25e-8 6.022e23 3_141.592_653 0x1.fp+3 _100",
+            "literais.delegua", diag).tokenizer();
+    assert(!diag.hasErrors());
+    assert(tks.length == 11);
+    assert(tks[0].kind == TokenKind.Int && tks[0].value.i == 255);
+    assert(tks[1].kind == TokenKind.Int && tks[1].value.i == 4_294_967_295L);
+    assert(tks[2].kind == TokenKind.Int && tks[2].value.i == 42);
+    assert(tks[3].kind == TokenKind.Int && tks[3].value.i == 240);
+    assert(tks[4].kind == TokenKind.Int && tks[4].value.i == 493);
+    assert(tks[5].kind == TokenKind.Int && tks[5].value.i == 1_000_000);
+    assert(tks[6].kind == TokenKind.Double && isClose(tks[6].value.d, 1.25e-8));
+    assert(tks[7].kind == TokenKind.Double && isClose(tks[7].value.d, 6.022e23));
+    assert(tks[8].kind == TokenKind.Double && isClose(tks[8].value.d, 3141.592653));
+    assert(tks[9].kind == TokenKind.Double && isClose(tks[9].value.d, 15.5));
+    assert(tks[10].kind == TokenKind.Identifier && tks[10].value.s == "_100");
+
+    // Chamadas de método após literal numérico continuam funcionando (ex: 0xFF.formatar(), 10.absoluto())
+    assert(!analyzed("escreva(0xFF.formatar(), 10.absoluto(), 3.14.formatar())").hasErrors());
+
+    // Casos negativos que devem produzir E1005 controlado
+    string[] invalidLiterals = [
+        "0x", "0b", "0o", "0b102", "0o89", "1__000", "100_", "0x_FF", "0xFF_", "1_.0", "1._0",
+        "1e", "1e+", "1e-", "1e_5", "1e5_", "0xGG", "0x1.fp", "0x1.fp+", "0x8000_0000_0000_0000"
+    ];
+    foreach (string bad; invalidLiterals)
+    {
+        Diagnostics badDiag = new Diagnostics;
+        new Lexer("const x = " ~ bad, "invalido.delegua", badDiag).tokenizer();
+        assert(badDiag.hasErrors(), "Deveria falhar: " ~ bad);
+        assert(badDiag.entries.any!((const(Diagnostic) d) => d.code == "E1005"), "Esperado E1005 para: " ~ bad);
+    }
+
+    // Diagnóstico claro quando palavra reservada (ex: 'e') é usada como identificador
+    Diagnostics kwDiag = analyzed("tente { escreva(1) } pegue (e: Excecao) { escreva(2) }");
+    assert(kwDiag.hasErrors());
+    assert(kwDiag.entries.any!((const(Diagnostic) d) => d.code == "E1001" && d.message.indexOf("palavra reservada") >= 0));
+}

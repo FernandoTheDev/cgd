@@ -135,7 +135,7 @@ com arquivos temporários e servidor HTTP de loopback.
 acertos. `minigpt` preserva o treinamento de 150 épocas: a matriz valida apenas
 compilação/vínculo desse experimento longo, sem afirmar validação de seu treino.
 
-## Calculadora e MiniJS
+## Calculadora, VMs, interpretadores e compiladores
 
 [Calculadora](calculadora.delegua) implementa lexer, parser, compilação para bytecode
 e VM de expressões, com saída exata 90/15/25.
@@ -144,6 +144,23 @@ fibonacci, funções, vetores, objetos, laços e escopos têm saída exata verif
 É um programa didático em Delégua; não habilita integração JS ou compatibilidade
 ECMAScript no compilador. O contrato `diretorio: fonte` mantém o caminho relativo
 válido também ao testar cópias formatadas.
+
+Projetos maiores reunidos em [compiladores_e_vms/](compiladores_e_vms/README.md),
+organizados entre `compiladores/` e `interpretadores/`:
+
+| Projeto                                                                               | Categoria     | O que implementa                                                                                                                          |
+| ------------------------------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| [C99 Nativo (ASM + ELF64)](compiladores_e_vms/compiladores/c_nativo/c_nativo.delegua) | Compilador    | Projeto modular (7 arquivos): Lexer, Parser, Semântica, CFG/SSA + otimizador, **Backend Assembly x86_64** e **Backend ELF64 nativo**      |
+| [Mini-LLVM](compiladores_e_vms/compiladores/mini_llvm/mini_llvm.delegua)              | Compilador    | IR SSA (`.ll`), verificador SSA, ConstProp/Folding, DCE, CFG reachability, alocador de registradores Linear Scan e executor com nós `phi` |
+| [Mini-GCC + Linker](compiladores_e_vms/compiladores/mini_gcc/mini_gcc.delegua)        | Compilador    | Pré-processador `#define`, compilação paralela de 3 arquivos `.c` -> `.obj` via `rotina`/`Tarefa<texto>`, Linker estático e VM            |
+| [Mini-Clang C++](compiladores_e_vms/compiladores/mini_clang_cpp/mini_clang.delegua)   | Compilador    | `namespace`, sobrecarga com Itanium Name Mangling (`_Z...`), classes, herança, lowering com `this` e `cout <<`                            |
+| [Mini-Rust + Borrow](compiladores_e_vms/compiladores/mini_rust/mini_rust.delegua)     | Compilador    | Ownership/Move, `let mut`, `&T`/`&mut T`, lifetimes lexicais, Borrow Checker (`E0382`/`E0596`/`E0502`/`E0499`/`E0506`) e VM               |
+| [MiniLang (5 fases)](compiladores_e_vms/compiladores/minipascal/compilador.delegua)   | Compilador    | Lexer, parser com AST polimórfica (`classe abstrata`), verificador de tipos, otimizador (folding/DCE) e VM                                |
+| [CPU Mini-RISC](compiladores_e_vms/compiladores/riscv_vm/vm.delegua)                  | Compilador/VM | Emulador de CPU de 16 registradores (`zero`/`sp`/`lr`), RAM, pilha e assembler de 2 passes (MDC, fatorial recursivo e Bubble Sort)        |
+| [Brainfuck Otim.](compiladores_e_vms/compiladores/brainfuck/bf_compilador.delegua)    | Compilador/VM | RLE, peephole (`Zerar` e `Transferir` em O(1)), resolução de saltos e VM de fita de bytes                                                 |
+| [MiniLisp](compiladores_e_vms/interpretadores/minilisp/lisp.delegua)                  | Interpretador | Scheme com S-expressions, ambientes léxicos, closures mutáveis (`set!`), currying, `map`/`filter`/`foldl` e Quicksort funcional           |
+| [MiniForth](compiladores_e_vms/interpretadores/miniforth/forth.delegua)               | Interpretador | Linguagem concatenativa threaded-code com `: ... ;`, `RECURSE`, `IF/ELSE/THEN`, `BEGIN/WHILE/REPEAT`, `DO/LOOP/I` e `VARIABLE`            |
+| [Regex PikeVM](compiladores_e_vms/interpretadores/regex_vm/regex_vm.delegua)          | Interpretador | Parser de regex -> bytecode NFA de Thompson -> PikeVM em tempo linear O(n·m), imune a backtracking exponencial                            |
 
 ## Ferramentas de sistema
 

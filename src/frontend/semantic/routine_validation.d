@@ -12,6 +12,7 @@ void validateRoutines(Program program, Diagnostics diagnostics)
 {
     bool[VarDecl] mutableGlobals;
     bool[Node] collectedModules;
+    bool[Node] importVisited;
 
     void collectGlobals(Program unit)
     {
@@ -33,12 +34,11 @@ void validateRoutines(Program program, Diagnostics diagnostics)
                             mutableGlobals[innerDecl] = true;
             }
         }
-        bool[Node] visited;
         void findImports(Node node)
         {
-            if (node is null || node in visited)
+            if (node is null || node in importVisited || cast(ModuleUnit) node)
                 return;
-            visited[node] = true;
+            importVisited[node] = true;
             if (ImportExpr imported = cast(ImportExpr) node)
                 if (imported.target !is null)
                     collectGlobals(imported.target.program);
@@ -99,7 +99,7 @@ void validateRoutines(Program program, Diagnostics diagnostics)
             failReason[fn] = "chama função assíncrona";
             return failReason[fn];
         }
-        if (fn.foreignSymbol.length)
+        if (fn.foreignSymbol.length && !fn.foreignParallelSafe)
         {
             failed[fn] = true;
             failReason[fn] = "chama função estrangeira/FFI";
@@ -121,8 +121,27 @@ void validateRoutines(Program program, Diagnostics diagnostics)
                     return "referencia classe estrangeira '" ~ id.classRef.name.to!string ~ "'";
                 return null;
             }
-            if (cast(ImportExpr) node)
-                return "importa módulo dentro da rotina";
+            if (ImportExpr imported = cast(ImportExpr) node)
+            {
+                if (imported.target is null || imported.target.program is null)
+                    return "importa módulo desconhecido dentro da rotina";
+                foreach (Node stmt; imported.target.program.body)
+                {
+                    if (cast(ClassDecl) stmt || cast(FnDecl) stmt)
+                        continue;
+                    if (VarDecl vd = cast(VarDecl) stmt)
+                    {
+                        if (!vd.isConst && !vd.isEnum)
+                            return "importa módulo com variável global mutável dentro da rotina";
+                        string initErr = inspect(vd.value);
+                        if (initErr.length)
+                            return initErr;
+                        continue;
+                    }
+                    return "importa módulo com código executável de topo dentro da rotina";
+                }
+                return null;
+            }
             if (cast(AwaitExpr) node)
                 return "usa aguardar dentro da rotina";
             if (cast(RoutineExpr) node)
@@ -169,21 +188,56 @@ void validateRoutines(Program program, Diagnostics diagnostics)
                 }
                 if (MemberExpr member = cast(MemberExpr) call.fn)
                 {
-                    string recvErr = inspect(member.left);
-                    if (recvErr.length)
-                        return recvErr;
                     if (Identifier right = cast(Identifier) member.right)
                     {
+                        if (right.classRef !is null)
+                        {
+                            string recvErr = inspect(member.left);
+                            if (recvErr.length)
+                                return recvErr;
+                            if (right.classRef.isForeign)
+                                return "instancia classe estrangeira";
+                            foreach (ClassField field; right.classRef.fields)
+                                if (field.initializer !is null)
+                                {
+                                    string initErr = auditFunction(field.initializer);
+                                    if (initErr.length)
+                                        return initErr;
+                                }
+                            foreach (FnDecl method; right.classRef.methods)
+                                if (method.fn == "construtor")
+                                {
+                                    string ctorErr = auditFunction(method);
+                                    if (ctorErr.length)
+                                        return ctorErr;
+                                }
+                            return null;
+                        }
                         if (right.functionRef !is null)
                         {
+                            if (!right.functionRef.foreignParallelSafe)
+                            {
+                                string recvErr = inspect(member.left);
+                                if (recvErr.length)
+                                    return recvErr;
+                            }
                             string calleeErr = auditFunction(right.functionRef);
                             if (calleeErr.length)
                                 return calleeErr;
                             return null;
                         }
+                        string recvErr = inspect(member.left);
+                        if (recvErr.length)
+                            return recvErr;
                         if (member.left.type_sema !is null && !member.left.type_sema.isAny()
                                 && builtinMethods(member.left.type_sema).canFind(right.value.to!string))
                             return null;
+                    }
+                    else
+                    {
+                        string recvErr = inspect(member.left);
+                        if (recvErr.length)
+                            return recvErr;
                     }
                     return "chamada de método sem contrato paralelo";
                 }

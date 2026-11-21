@@ -20,6 +20,7 @@ struct LValue
     dstring container;
     dstring index;
     dstring caller;
+    dstring icSlot;
 
     dstring read()
     {
@@ -29,7 +30,9 @@ struct LValue
                 return name;
 
             case LValueKind.Member:
-                return formatD("delegua_propriedade_em(%s, %s, %s)", container, index, caller);
+                return icSlot.length
+                    ? formatD("delegua_prop_ic(%s, %s, %s, %s)", container, index, caller, icSlot)
+                    : formatD("delegua_propriedade_em(%s, %s, %s)", container, index, caller);
             case LValueKind.Index:
                 return formatD("delegua_obter(%s, %s)", container, index);
         }
@@ -43,8 +46,9 @@ struct LValue
                 return formatD("%s = %s", name, value);
 
             case LValueKind.Member:
-                return formatD("delegua_definir_em(%s, %s, %s, %s)", container,
-                        index, value, caller);
+                return icSlot.length
+                    ? formatD("delegua_def_ic(%s, %s, %s, %s, %s)", container, index, value, caller, icSlot)
+                    : formatD("delegua_definir_em(%s, %s, %s, %s)", container, index, value, caller);
             case LValueKind.Index:
                 return formatD("delegua_setar(%s, %s, %s)", container, index, value);
         }

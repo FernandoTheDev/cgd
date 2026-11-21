@@ -1,0 +1,605 @@
+//! Fatorial(10): 3628800\nFibonacci(12): 144\nContadores: (10 15 1 20 2)\nComposicao(7): 24\nQuadrados pares: (4 16 36 64)\nSoma dos quadrados pares: 120\nQuicksort: (1 2 3 4 5 6 7 8 9)\nErro capturado: Simbolo indefinido: variavel-inexistente
+//? fase: execucao
+//? diretorio: fonte
+// MiniLisp: interpretador funcional estilo Scheme escrito em Delegua/CGD.
+// Suporta S-expressions, quote, define, set!, if, cond, let, let*, begin,
+// lambda com closures lexicas, and/or e primitivas de listas e aritmetica.
+// Compilar na raiz: ./cgd exemplos/minilisp/lisp.delegua -s out/minilisp
+// Executar: cd exemplos/minilisp && ../../out/minilisp
+
+enum TipoValor {
+    Inteiro,
+    Texto,
+    Logico,
+    Simbolo,
+    Lista,
+    Clausura,
+    Primitiva,
+    Nulo
+}
+
+classe ErroLisp herda Excecao {
+    construtor(mensagem: texto) {
+        super(mensagem)
+    }
+}
+
+classe ValorLisp {
+    categoria: TipoValor
+    dado: qualquer
+
+    construtor(categoria: TipoValor, dado: qualquer) {
+        isto.categoria = categoria
+        isto.dado = dado
+    }
+
+    estatico inteiroVal(v: inteiro): ValorLisp {
+        retorna ValorLisp(TipoValor.Inteiro, v)
+    }
+
+    estatico textoVal(v: texto): ValorLisp {
+        retorna ValorLisp(TipoValor.Texto, v)
+    }
+
+    estatico logicoVal(v: logico): ValorLisp {
+        retorna ValorLisp(TipoValor.Logico, v)
+    }
+
+    estatico simboloVal(v: texto): ValorLisp {
+        retorna ValorLisp(TipoValor.Simbolo, v)
+    }
+
+    estatico listaVal(itens: ValorLisp[]): ValorLisp {
+        retorna ValorLisp(TipoValor.Lista, itens)
+    }
+
+    estatico nuloVal(): ValorLisp {
+        retorna ValorLisp(TipoValor.Nulo, nulo)
+    }
+
+    eVerdadeiro(): logico {
+        se (isto.categoria == TipoValor.Logico) {
+            retorna isto.dado == verdadeiro
+        }
+        retorna verdadeiro
+    }
+
+    formatar(): texto {
+        se (isto.categoria == TipoValor.Inteiro) retorna texto(isto.dado)
+        se (isto.categoria == TipoValor.Texto) retorna texto(isto.dado)
+        se (isto.categoria == TipoValor.Logico) {
+            se (isto.dado == verdadeiro) retorna "#t"
+            retorna "#f"
+        }
+        se (isto.categoria == TipoValor.Simbolo) retorna texto(isto.dado)
+        se (isto.categoria == TipoValor.Nulo) retorna "()"
+        se (isto.categoria == TipoValor.Primitiva) retorna "<primitiva:${isto.dado}>"
+        se (isto.categoria == TipoValor.Clausura) retorna "<clausura>"
+        se (isto.categoria == TipoValor.Lista) {
+            const itens: ValorLisp[] = isto.dado
+            var partes: texto[] = []
+            para (var i: inteiro = 0; i < itens.tamanho(); i++) {
+                partes.empilhar(itens[i].formatar())
+            }
+            retorna "(" + partes.juntar(" ") + ")"
+        }
+        retorna "<desconhecido>"
+    }
+}
+
+classe Ambiente {
+    vinculos: dicionario
+    pai: qualquer
+
+    construtor(pai: qualquer = nulo) {
+        isto.vinculos = {}
+        isto.pai = pai
+    }
+
+    definir(nome: texto, valor: ValorLisp): vazio {
+        isto.vinculos[nome] = valor
+    }
+
+    obter(nome: texto): ValorLisp {
+        se (isto.vinculos.contem(nome)) {
+            retorna isto.vinculos[nome]
+        }
+        se (isto.pai != nulo) {
+            const anterior: Ambiente = isto.pai
+            retorna anterior.obter(nome)
+        }
+        falhar ErroLisp("Simbolo indefinido: " + nome)
+    }
+
+    atribuir(nome: texto, valor: ValorLisp): vazio {
+        se (isto.vinculos.contem(nome)) {
+            isto.vinculos[nome] = valor
+            retorna
+        }
+        se (isto.pai != nulo) {
+            const anterior: Ambiente = isto.pai
+            anterior.atribuir(nome, valor)
+            retorna
+        }
+        falhar ErroLisp("Simbolo indefinido em set!: " + nome)
+    }
+}
+
+classe ClausuraLisp {
+    parametros: texto[]
+    corpo: ValorLisp[]
+    ambiente: Ambiente
+
+    construtor(parametros: texto[], corpo: ValorLisp[], ambiente: Ambiente) {
+        isto.parametros = parametros
+        isto.corpo = corpo
+        isto.ambiente = ambiente
+    }
+}
+
+classe LeitorLisp {
+    fonte: texto
+    pos: inteiro
+    limite: inteiro
+
+    construtor(fonte: texto) {
+        isto.fonte = fonte
+        isto.pos = 0
+        isto.limite = fonte.tamanho()
+    }
+
+    pularEspacos(): vazio {
+        enquanto (isto.pos < isto.limite) {
+            const c: texto = isto.fonte[isto.pos]
+            se (c == " " ou c == "\n" ou c == "\r" ou c == "\t") {
+                isto.pos++
+                continua
+            }
+            se (c == ";") {
+                enquanto (isto.pos < isto.limite e isto.fonte[isto.pos] != "\n") {
+                    isto.pos++
+                }
+                continua
+            }
+            sustar
+        }
+    }
+
+    eDelimitador(c: texto): logico {
+        retorna c == " " ou c == "\n" ou c == "\r" ou c == "\t" ou c == "(" ou c == ")" ou c == ";" ou c == "\""
+    }
+
+    eInteiro(s: texto): logico {
+        se (s.tamanho() == 0) retorna falso
+        var inicio: inteiro = 0
+        se (s[0] == "-") {
+            se (s.tamanho() == 1) retorna falso
+            inicio = 1
+        }
+        para (var i: inteiro = inicio; i < s.tamanho(); i++) {
+            se (!"0123456789".contem(s[i])) retorna falso
+        }
+        retorna verdadeiro
+    }
+
+    lerString(): ValorLisp {
+        isto.pos++
+        var partes: texto[] = []
+        enquanto (isto.pos < isto.limite) {
+            const c: texto = isto.fonte[isto.pos]
+            isto.pos++
+            se (c == "\"") {
+                retorna ValorLisp.textoVal(partes.juntar(""))
+            }
+            se (c == "\\") {
+                se (isto.pos >= isto.limite) falhar ErroLisp("Escape incompleto em string")
+                const esc: texto = isto.fonte[isto.pos]
+                isto.pos++
+                se (esc == "n") partes.empilhar("\n")
+                senao se (esc == "t") partes.empilhar("\t")
+                senao se (esc == "\"") partes.empilhar("\"")
+                senao se (esc == "\\") partes.empilhar("\\")
+                senao partes.empilhar(esc)
+            } senao {
+                partes.empilhar(c)
+            }
+        }
+        falhar ErroLisp("String nao terminada")
+    }
+
+    lerLista(): ValorLisp {
+        isto.pos++
+        var itens: ValorLisp[] = []
+        enquanto (verdadeiro) {
+            isto.pularEspacos()
+            se (isto.pos >= isto.limite) {
+                falhar ErroLisp("Parentese '(' sem fechamento")
+            }
+            se (isto.fonte[isto.pos] == ")") {
+                isto.pos++
+                retorna ValorLisp.listaVal(itens)
+            }
+            itens.empilhar(isto.lerExpressao())
+        }
+    }
+
+    lerExpressao(): ValorLisp {
+        isto.pularEspacos()
+        se (isto.pos >= isto.limite) {
+            falhar ErroLisp("Fim inesperado da entrada")
+        }
+        const c: texto = isto.fonte[isto.pos]
+        se (c == "(") retorna isto.lerLista()
+        se (c == ")") falhar ErroLisp("Parentese ')' inesperado")
+        se (c == "\"") retorna isto.lerString()
+        se (c == "'") {
+            isto.pos++
+            const citada: ValorLisp = isto.lerExpressao()
+            var par: ValorLisp[] = [ValorLisp.simboloVal("quote"), citada]
+            retorna ValorLisp.listaVal(par)
+        }
+        var buf: texto[] = []
+        enquanto (isto.pos < isto.limite e !isto.eDelimitador(isto.fonte[isto.pos])) {
+            buf.empilhar(isto.fonte[isto.pos])
+            isto.pos++
+        }
+        const atomo: texto = buf.juntar("")
+        se (atomo == "#t") retorna ValorLisp.logicoVal(verdadeiro)
+        se (atomo == "#f") retorna ValorLisp.logicoVal(falso)
+        se (isto.eInteiro(atomo)) retorna ValorLisp.inteiroVal(inteiro(atomo))
+        retorna ValorLisp.simboloVal(atomo)
+    }
+
+    lerTudo(): ValorLisp[] {
+        var expressoes: ValorLisp[] = []
+        enquanto (verdadeiro) {
+            isto.pularEspacos()
+            se (isto.pos >= isto.limite) sustar
+            expressoes.empilhar(isto.lerExpressao())
+        }
+        retorna expressoes
+    }
+}
+
+classe InterpretadorLisp {
+    global: Ambiente
+
+    construtor() {
+        isto.global = Ambiente(nulo)
+        const primitivas: texto[] = [
+            "+", "-", "*", "/", "mod",
+            "=", "<", "<=", ">", ">=",
+            "not", "cons", "car", "cdr", "list",
+            "null?", "length", "append",
+            "number?", "string?", "symbol?", "list?", "eq?",
+            "display", "str-concat"
+        ]
+        para (var i: inteiro = 0; i < primitivas.tamanho(); i++) {
+            const nome: texto = primitivas[i]
+            isto.global.definir(nome, ValorLisp(TipoValor.Primitiva, nome))
+        }
+    }
+
+    exigirInteiro(v: ValorLisp, contexto: texto): inteiro {
+        se (v.categoria != TipoValor.Inteiro) {
+            falhar ErroLisp("Esperado inteiro em " + contexto + ", recebido: " + v.formatar())
+        }
+        retorna inteiro(v.dado)
+    }
+
+    exigirLista(v: ValorLisp, contexto: texto): ValorLisp[] {
+        se (v.categoria != TipoValor.Lista) {
+            falhar ErroLisp("Esperada lista em " + contexto + ", recebido: " + v.formatar())
+        }
+        retorna v.dado
+    }
+
+    avaliarSequencia(exprs: ValorLisp[], inicio: inteiro, env: Ambiente): ValorLisp {
+        var ultimo: ValorLisp = ValorLisp.nuloVal()
+        para (var i: inteiro = inicio; i < exprs.tamanho(); i++) {
+            ultimo = isto.avaliar(exprs[i], env)
+        }
+        retorna ultimo
+    }
+
+    aplicarPrimitiva(nome: texto, args: ValorLisp[]): ValorLisp {
+        se (nome == "+") {
+            var soma: inteiro = 0
+            para (var i: inteiro = 0; i < args.tamanho(); i++) {
+                soma = soma + isto.exigirInteiro(args[i], "+")
+            }
+            retorna ValorLisp.inteiroVal(soma)
+        }
+        se (nome == "-") {
+            se (args.tamanho() == 0) falhar ErroLisp("'-' requer ao menos 1 argumento")
+            se (args.tamanho() == 1) retorna ValorLisp.inteiroVal(-isto.exigirInteiro(args[0],
+                "-"))
+            var acc: inteiro = isto.exigirInteiro(args[0], "-")
+            para (var i: inteiro = 1; i < args.tamanho(); i++) {
+                acc = acc - isto.exigirInteiro(args[i], "-")
+            }
+            retorna ValorLisp.inteiroVal(acc)
+        }
+        se (nome == "*") {
+            var prod: inteiro = 1
+            para (var i: inteiro = 0; i < args.tamanho(); i++) {
+                prod = prod * isto.exigirInteiro(args[i], "*")
+            }
+            retorna ValorLisp.inteiroVal(prod)
+        }
+        se (nome == "/") {
+            se (args.tamanho() < 2) falhar ErroLisp("'/' requer ao menos 2 argumentos")
+            var acc: inteiro = isto.exigirInteiro(args[0], "/")
+            para (var i: inteiro = 1; i < args.tamanho(); i++) {
+                const divisor: inteiro = isto.exigirInteiro(args[i], "/")
+                se (divisor == 0) falhar ErroLisp("Divisao por zero")
+                acc = inteiro(acc / divisor)
+            }
+            retorna ValorLisp.inteiroVal(acc)
+        }
+        se (nome == "mod") {
+            se (args.tamanho() != 2) falhar ErroLisp("'mod' requer 2 argumentos")
+            const a: inteiro = isto.exigirInteiro(args[0], "mod")
+            const b: inteiro = isto.exigirInteiro(args[1], "mod")
+            se (b == 0) falhar ErroLisp("Resto por zero")
+            retorna ValorLisp.inteiroVal(a % b)
+        }
+        se (nome == "=" ou nome == "<" ou nome == "<=" ou nome == ">" ou nome == ">=") {
+            se (args.tamanho() != 2) falhar ErroLisp("Comparacao requer 2 argumentos")
+            const a: inteiro = isto.exigirInteiro(args[0], nome)
+            const b: inteiro = isto.exigirInteiro(args[1], nome)
+            se (nome == "=") retorna ValorLisp.logicoVal(a == b)
+            se (nome == "<") retorna ValorLisp.logicoVal(a < b)
+            se (nome == "<=") retorna ValorLisp.logicoVal(a <= b)
+            se (nome == ">") retorna ValorLisp.logicoVal(a > b)
+            retorna ValorLisp.logicoVal(a >= b)
+        }
+        se (nome == "not") {
+            se (args.tamanho() != 1) falhar ErroLisp("'not' requer 1 argumento")
+            retorna ValorLisp.logicoVal(!args[0].eVerdadeiro())
+        }
+        se (nome == "list") {
+            retorna ValorLisp.listaVal(args)
+        }
+        se (nome == "cons") {
+            se (args.tamanho() != 2) falhar ErroLisp("'cons' requer 2 argumentos")
+            const cauda: ValorLisp[] = isto.exigirLista(args[1], "cons")
+            var nova: ValorLisp[] = [args[0]]
+            para (var i: inteiro = 0; i < cauda.tamanho(); i++) {
+                nova.empilhar(cauda[i])
+            }
+            retorna ValorLisp.listaVal(nova)
+        }
+        se (nome == "car") {
+            se (args.tamanho() != 1) falhar ErroLisp("'car' requer 1 argumento")
+            const lista: ValorLisp[] = isto.exigirLista(args[0], "car")
+            se (lista.tamanho() == 0) falhar ErroLisp("'car' em lista vazia")
+            retorna lista[0]
+        }
+        se (nome == "cdr") {
+            se (args.tamanho() != 1) falhar ErroLisp("'cdr' requer 1 argumento")
+            const lista: ValorLisp[] = isto.exigirLista(args[0], "cdr")
+            se (lista.tamanho() == 0) falhar ErroLisp("'cdr' em lista vazia")
+            var resto: ValorLisp[] = []
+            para (var i: inteiro = 1; i < lista.tamanho(); i++) {
+                resto.empilhar(lista[i])
+            }
+            retorna ValorLisp.listaVal(resto)
+        }
+        se (nome == "null?") {
+            se (args.tamanho() != 1) falhar ErroLisp("'null?' requer 1 argumento")
+            se (args[0].categoria != TipoValor.Lista) retorna ValorLisp.logicoVal(falso)
+            const lista: ValorLisp[] = args[0].dado
+            retorna ValorLisp.logicoVal(lista.tamanho() == 0)
+        }
+        se (nome == "length") {
+            se (args.tamanho() != 1) falhar ErroLisp("'length' requer 1 argumento")
+            const lista: ValorLisp[] = isto.exigirLista(args[0], "length")
+            retorna ValorLisp.inteiroVal(lista.tamanho())
+        }
+        se (nome == "append") {
+            var resultado: ValorLisp[] = []
+            para (var i: inteiro = 0; i < args.tamanho(); i++) {
+                const sub: ValorLisp[] = isto.exigirLista(args[i], "append")
+                para (var j: inteiro = 0; j < sub.tamanho(); j++) {
+                    resultado.empilhar(sub[j])
+                }
+            }
+            retorna ValorLisp.listaVal(resultado)
+        }
+        se (nome == "number?") retorna ValorLisp.logicoVal(args.tamanho() == 1 e args[0].categoria == TipoValor.Inteiro)
+        se (nome == "string?") retorna ValorLisp.logicoVal(args.tamanho() == 1 e args[0].categoria == TipoValor.Texto)
+        se (nome == "symbol?") retorna ValorLisp.logicoVal(args.tamanho() == 1 e args[0].categoria == TipoValor.Simbolo)
+        se (nome == "list?") retorna ValorLisp.logicoVal(args.tamanho() == 1 e args[0].categoria == TipoValor.Lista)
+        se (nome == "eq?") {
+            se (args.tamanho() != 2) falhar ErroLisp("'eq?' requer 2 argumentos")
+            retorna ValorLisp.logicoVal(args[0].categoria == args[1].categoria e args[0].formatar() == args[1].formatar())
+        }
+        se (nome == "str-concat") {
+            var partes: texto[] = []
+            para (var i: inteiro = 0; i < args.tamanho(); i++) {
+                partes.empilhar(args[i].formatar())
+            }
+            retorna ValorLisp.textoVal(partes.juntar(""))
+        }
+        se (nome == "display") {
+            se (args.tamanho() != 1) falhar ErroLisp("'display' requer 1 argumento")
+            escreva(args[0].formatar())
+            retorna ValorLisp.nuloVal()
+        }
+        falhar ErroLisp("Primitiva desconhecida: " + nome)
+    }
+
+    avaliar(expr: ValorLisp, env: Ambiente): ValorLisp {
+        se (expr.categoria == TipoValor.Inteiro ou expr.categoria == TipoValor.Texto ou expr.categoria == TipoValor.Logico ou expr.categoria == TipoValor.Nulo) {
+            retorna expr
+        }
+        se (expr.categoria == TipoValor.Simbolo) {
+            retorna env.obter(texto(expr.dado))
+        }
+        se (expr.categoria != TipoValor.Lista) {
+            retorna expr
+        }
+        const itens: ValorLisp[] = expr.dado
+        se (itens.tamanho() == 0) {
+            retorna ValorLisp.nuloVal()
+        }
+        const cabeca: ValorLisp = itens[0]
+        se (cabeca.categoria == TipoValor.Simbolo) {
+            const forma: texto = texto(cabeca.dado)
+            se (forma == "quote") {
+                se (itens.tamanho() != 2) falhar ErroLisp("'quote' requer 1 argumento")
+                retorna itens[1]
+            }
+            se (forma == "if") {
+                se (itens.tamanho() < 3 ou itens.tamanho() > 4) falhar ErroLisp("'if' requer 2 ou 3 argumentos")
+                const cond: ValorLisp = isto.avaliar(itens[1], env)
+                se (cond.eVerdadeiro()) retorna isto.avaliar(itens[2], env)
+                se (itens.tamanho() == 4) retorna isto.avaliar(itens[3], env)
+                retorna ValorLisp.nuloVal()
+            }
+            se (forma == "cond") {
+                para (var i: inteiro = 1; i < itens.tamanho(); i++) {
+                    const clausula: ValorLisp[] = isto.exigirLista(itens[i], "cond")
+                    se (clausula.tamanho() < 2) falhar ErroLisp("Clausula 'cond' invalida")
+                    se (clausula[0].categoria == TipoValor.Simbolo e texto(clausula[0].dado) == "else") {
+                        retorna isto.avaliarSequencia(clausula, 1, env)
+                    }
+                    se (isto.avaliar(clausula[0], env).eVerdadeiro()) {
+                        retorna isto.avaliarSequencia(clausula, 1, env)
+                    }
+                }
+                retorna ValorLisp.nuloVal()
+            }
+            se (forma == "and") {
+                var ultimo: ValorLisp = ValorLisp.logicoVal(verdadeiro)
+                para (var i: inteiro = 1; i < itens.tamanho(); i++) {
+                    ultimo = isto.avaliar(itens[i], env)
+                    se (!ultimo.eVerdadeiro()) retorna ValorLisp.logicoVal(falso)
+                }
+                retorna ultimo
+            }
+            se (forma == "or") {
+                para (var i: inteiro = 1; i < itens.tamanho(); i++) {
+                    const atual: ValorLisp = isto.avaliar(itens[i], env)
+                    se (atual.eVerdadeiro()) retorna atual
+                }
+                retorna ValorLisp.logicoVal(falso)
+            }
+            se (forma == "begin") {
+                retorna isto.avaliarSequencia(itens, 1, env)
+            }
+            se (forma == "define") {
+                se (itens.tamanho() < 3) falhar ErroLisp("'define' invalido")
+                se (itens[1].categoria == TipoValor.Simbolo) {
+                    const nomeVar: texto = texto(itens[1].dado)
+                    const val: ValorLisp = isto.avaliar(itens[2], env)
+                    env.definir(nomeVar, val)
+                    retorna val
+                }
+                se (itens[1].categoria == TipoValor.Lista) {
+                    const assinatura: ValorLisp[] = itens[1].dado
+                    se (assinatura.tamanho() == 0 ou assinatura[0].categoria != TipoValor.Simbolo) {
+                        falhar ErroLisp("Assinatura invalida em 'define'")
+                    }
+                    const nomeFn: texto = texto(assinatura[0].dado)
+                    var params: texto[] = []
+                    para (var i: inteiro = 1; i < assinatura.tamanho(); i++) {
+                        se (assinatura[i].categoria != TipoValor.Simbolo) falhar ErroLisp("Parametro invalido")
+                        params.empilhar(texto(assinatura[i].dado))
+                    }
+                    var corpo: ValorLisp[] = []
+                    para (var j: inteiro = 2; j < itens.tamanho(); j++) {
+                        corpo.empilhar(itens[j])
+                    }
+                    const cl: ValorLisp = ValorLisp(TipoValor.Clausura, ClausuraLisp(params,
+                        corpo, env))
+                    env.definir(nomeFn, cl)
+                    retorna cl
+                }
+                falhar ErroLisp("Alvo invalido em 'define'")
+            }
+            se (forma == "set!") {
+                se (itens.tamanho() != 3 ou itens[1].categoria != TipoValor.Simbolo) {
+                    falhar ErroLisp("'set!' requer simbolo e valor")
+                }
+                const val: ValorLisp = isto.avaliar(itens[2], env)
+                env.atribuir(texto(itens[1].dado), val)
+                retorna val
+            }
+            se (forma == "lambda") {
+                se (itens.tamanho() < 3) falhar ErroLisp("'lambda' invalido")
+                const listaParams: ValorLisp[] = isto.exigirLista(itens[1], "lambda")
+                var params: texto[] = []
+                para (var i: inteiro = 0; i < listaParams.tamanho(); i++) {
+                    se (listaParams[i].categoria != TipoValor.Simbolo) falhar ErroLisp("Parametro de lambda invalido")
+                    params.empilhar(texto(listaParams[i].dado))
+                }
+                var corpo: ValorLisp[] = []
+                para (var j: inteiro = 2; j < itens.tamanho(); j++) {
+                    corpo.empilhar(itens[j])
+                }
+                retorna ValorLisp(TipoValor.Clausura, ClausuraLisp(params, corpo, env))
+            }
+            se (forma == "let" ou forma == "let*") {
+                se (itens.tamanho() < 3) falhar ErroLisp("'let' invalido")
+                const ligacoes: ValorLisp[] = isto.exigirLista(itens[1], forma)
+                const local: Ambiente = Ambiente(env)
+                para (var i: inteiro = 0; i < ligacoes.tamanho(); i++) {
+                    const par: ValorLisp[] = isto.exigirLista(ligacoes[i], forma)
+                    se (par.tamanho() != 2 ou par[0].categoria != TipoValor.Simbolo) {
+                        falhar ErroLisp("Ligacao invalida em " + forma)
+                    }
+                    const envEval: Ambiente = forma == "let*" ? local : env
+                    const val: ValorLisp = isto.avaliar(par[1], envEval)
+                    local.definir(texto(par[0].dado), val)
+                }
+                retorna isto.avaliarSequencia(itens, 2, local)
+            }
+        }
+
+        const operador: ValorLisp = isto.avaliar(cabeca, env)
+        var args: ValorLisp[] = []
+        para (var i: inteiro = 1; i < itens.tamanho(); i++) {
+            args.empilhar(isto.avaliar(itens[i], env))
+        }
+        se (operador.categoria == TipoValor.Primitiva) {
+            retorna isto.aplicarPrimitiva(texto(operador.dado), args)
+        }
+        se (operador.categoria == TipoValor.Clausura) {
+            const cl: ClausuraLisp = operador.dado
+            se (args.tamanho() != cl.parametros.tamanho()) {
+                falhar ErroLisp("Numero de argumentos incorreto: esperado ${cl.parametros.tamanho()}, recebido ${args.tamanho()}")
+            }
+            const escopo: Ambiente = Ambiente(cl.ambiente)
+            para (var i: inteiro = 0; i < cl.parametros.tamanho(); i++) {
+                escopo.definir(cl.parametros[i], args[i])
+            }
+            retorna isto.avaliarSequencia(cl.corpo, 0, escopo)
+        }
+        falhar ErroLisp("Valor nao invocavel: " + operador.formatar())
+    }
+
+    executarFonte(codigo: texto): ValorLisp {
+        const expressoes: ValorLisp[] = LeitorLisp(codigo).lerTudo()
+        retorna isto.avaliarSequencia(expressoes, 0, isto.global)
+    }
+}
+
+const arquivos: qualquer = importar("cgd:arquivos")
+const caminho: texto = "programa.scm"
+const arquivo: qualquer = arquivos.Arquivo(caminho)
+se (!arquivo.existe()) {
+    falhar "Arquivo MiniLisp nao encontrado: ${caminho}"
+}
+
+const interp: InterpretadorLisp = InterpretadorLisp()
+interp.executarFonte(arquivo.ler())
+assercao(interp.executarFonte("(fatorial 10)").formatar() == "3628800", "fatorial(10) MiniLisp incorreto")
+assercao(interp.executarFonte("(quicksort '(4 1 3 2))").formatar() == "(1 2 3 4)", "quicksort MiniLisp incorreto")
+
+tente {
+    interp.executarFonte("(+ 1 variavel-inexistente)")
+} pegue (erro: ErroLisp) {
+    escreva("Erro capturado: " + erro.mensagem)
+}

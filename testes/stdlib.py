@@ -81,6 +81,10 @@ IO_CASES = [
     'var copiaArquivo: qualquer=arquivo.copiarPara(alvo+".copia"); assercao(copiaArquivo.ler()==arquivo.ler())',
     'arquivo.copiarPara(alvo); assercao(arquivo.lerJSON()["a"][0]==1)',
     "assercao(arquivo.remover() e copiaArquivo.remover())",
+    'var B: qualquer=importar("cgd:bytes").Bytes; var buf: qualquer=B.criarReservado(8); buf.anexarByte(65); buf.anexarU16LE(0x4342); buf.anexarU32LE(0x47464544); buf.definirU32LE(3, 0x34333231); buf.anexarTexto("XY"); buf.anexarZeros(1); assercao(buf.tamanho()==10 e buf.fatiarTexto(0, 9)=="ABC1234XY")',
+    'buf.gravarArquivo(alvo+".bin"); var lido: qualquer=B.lerArquivo(alvo+".bin"); assercao(lido.igual(buf)); importar("cgd:arquivos").Arquivo(alvo+".bin").remover()',
+    'var S: qualquer=importar("cgd:sistema").Sistema; var mem: dicionario=S.memoria(); assercao(mem.contem("gc_heap") e mem.contem("gc_total") e mem.contem("rss_kb")); S.coletarGC(falso)',
+    'var vl: inteiro[]=[1,2,3]; vl.limpar(); assercao(vl.tamanho()==0); vl.empilhar(9); assercao(vl.tamanho()==1 e vl[0]==9)',
 ]
 source += "\n" + "\n".join(IO_CASES)
 source += '\nescreva("stdlib OK")\n'

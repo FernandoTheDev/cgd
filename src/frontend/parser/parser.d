@@ -125,6 +125,14 @@ public:
         Token tk = advance();
         if (tk.kind == kind)
             return tk;
+        if (kind == TokenKind.Identifier && tk.kind <= TokenKind.Of && tk.value.s.length)
+        {
+            import std.format : format;
+
+            err.errorCode(tk.pos, expectedToken,
+                    format("%s ('%s' é uma palavra reservada em Delégua).", message, tk.value.s));
+            throw new ParseException;
+        }
         err.errorCode(tk.pos, expectedToken, message);
         throw new ParseException;
     }

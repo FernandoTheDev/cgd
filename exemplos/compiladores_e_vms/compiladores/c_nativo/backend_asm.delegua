@@ -1,0 +1,463 @@
+//!
+// Backend 1: Lowering de ModuloSSA (enum OpIR) para Assembly x86_64 (Intel / System V AMD64 ABI).
+// Suporta secoes .rodata, .data, .bss, .text, inteiros 1/2/4/8B signed/unsigned, SSE2 float/double,
+// argumentos > 6 na pilha (alinhamento 16B), ponteiros de funcao (call indireto) e libc externa.
+
+funcao alinhar16(n: inteiro): inteiro {
+    const resto: inteiro = n % 16
+    se (resto == 0) retorna n
+    retorna n + (16 - resto)
+}
+
+funcao offsetReg(tamanhoLocaisBytes: inteiro, reg: inteiro): inteiro {
+    retorna tamanhoLocaisBytes + (reg + 1) * 8
+}
+
+funcao formatarBytesRodata(s: texto): texto {
+    const bytesMod: qualquer = importar("cgd:bytes")
+    const vals: inteiro[] = bytesMod.Bytes.deTexto(s).paraVetor()
+    var partes: texto[] = []
+    para (var i: inteiro = 0; i < vals.tamanho(); i++) {
+        partes.empilhar(texto(vals[i]))
+    }
+
+    partes.empilhar("0")
+    retorna partes.juntar(", ")
+}
+
+funcao formatarBytesLista(vals: inteiro[]): texto {
+    var partes: texto[] = []
+    para (var i: inteiro = 0; i < vals.tamanho(); i++) {
+        partes.empilhar(texto(vals[i] & 255))
+    }
+
+    retorna partes.juntar(", ")
+}
+
+funcao emitirCallAsm(linhas: texto[], fn: qualquer, inst: qualquer, alvoCall: texto, ehIndireto: logico,
+    ehExtern: logico): vazio {
+    const abiInt: texto[] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
+    var intIdx: inteiro = 0
+    var fltIdx: inteiro = 0
+    var stackArgs: inteiro[] = []
+    var regIntSlots: inteiro[] = []
+    var regIntNums: inteiro[] = []
+    var regFltSlots: inteiro[] = []
+    var regFltNums: inteiro[] = []
+
+    para (var k: inteiro = 0; k < inst.callArgs.tamanho(); k++) {
+        const regArg: inteiro = inst.callArgs[k]
+        const ehFlt: logico = k < inst.callArgFloats.tamanho() ? inst.callArgFloats[k] : falso
+        se (ehFlt) {
+            se (fltIdx < 8) {
+                regFltNums.empilhar(fltIdx)
+                regFltSlots.empilhar(offsetReg(fn.tamanhoLocaisBytes, regArg))
+                fltIdx++
+            } senao {
+                stackArgs.empilhar(offsetReg(fn.tamanhoLocaisBytes, regArg))
+            }
+        } senao {
+            se (intIdx < 6) {
+                regIntNums.empilhar(intIdx)
+                regIntSlots.empilhar(offsetReg(fn.tamanhoLocaisBytes, regArg))
+                intIdx++
+            } senao {
+                stackArgs.empilhar(offsetReg(fn.tamanhoLocaisBytes, regArg))
+            }
+        }
+    }
+
+    const padStack: inteiro = stackArgs.tamanho() % 2 == 1 ? 8 : 0
+    se (padStack > 0) {
+        linhas.empilhar("    sub rsp, 8")
+    }
+
+    para (var s: inteiro = stackArgs.tamanho() - 1; s >= 0; s--) {
+        linhas.empilhar("    mov rax, [rbp - ${stackArgs[s]}]")
+        linhas.empilhar("    push rax")
+    }
+
+    para (var i: inteiro = 0; i < regIntNums.tamanho(); i++) {
+        linhas.empilhar("    mov ${abiInt[regIntNums[i]]}, [rbp - ${regIntSlots[i]}]")
+    }
+
+    para (var i: inteiro = 0; i < regFltNums.tamanho(); i++) {
+        linhas.empilhar("    movsd xmm${regFltNums[i]}, [rbp - ${regFltSlots[i]}]")
+    }
+
+    se (ehIndireto) {
+        linhas.empilhar("    mov r10, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+        linhas.empilhar("    mov eax, ${fltIdx}")
+        linhas.empilhar("    call r10")
+    } senao {
+        linhas.empilhar("    mov eax, ${fltIdx}")
+        linhas.empilhar("    call ${alvoCall}")
+    }
+
+    const totalPop: inteiro = stackArgs.tamanho() * 8 + padStack
+    se (totalPop > 0) {
+        linhas.empilhar("    add rsp, ${totalPop}")
+    }
+
+    se (inst.dst >= 0) {
+        se (inst.ehFloatDst) {
+            linhas.empilhar("    movsd [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], xmm0")
+        } senao {
+            linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+        }
+    }
+}
+
+funcao emitirAssemblyX86_64(modulo: qualquer): texto {
+    const tMod: qualquer = importar("tipos.delegua")
+    const OpI: qualquer = tMod.OpIR
+    const abiInt: texto[] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
+
+    var linhas: texto[] = [
+        "; Gerado pelo Compilador C99 em Delegua/CGD (Backend 1: Assembly x86_64 System V AMD64 ABI)",
+        "global _start"
+    ]
+
+    para (var i: inteiro = 0; i < modulo.externos.tamanho(); i++) {
+        linhas.empilhar("extern " + modulo.externos[i])
+    }
+
+    se (modulo.strings.tamanho() > 0) {
+        linhas.empilhar("")
+        linhas.empilhar("section .rodata")
+        para (var i: inteiro = 0; i < modulo.strings.tamanho(); i++) {
+            linhas.empilhar(".S${i}: db " + formatarBytesRodata(modulo.strings[i]))
+        }
+    }
+
+    var temData: logico = falso
+    var temBss: logico = falso
+    para (var i: inteiro = 0; i < modulo.globais.tamanho(); i++) {
+        se (modulo.globais[i].temInit) temData = verdadeiro
+        senao temBss = verdadeiro
+    }
+
+    se (temData) {
+        linhas.empilhar("")
+        linhas.empilhar("section .data")
+        para (var i: inteiro = 0; i < modulo.globais.tamanho(); i++) {
+            const g: qualquer = modulo.globais[i]
+            se (!g.temInit) continua
+            linhas.empilhar("align ${g.alinhamento}")
+            linhas.empilhar("G_${g.nome}: db " + formatarBytesLista(g.bytesInit))
+        }
+    }
+
+    se (temBss) {
+        linhas.empilhar("")
+        linhas.empilhar("section .bss")
+        para (var i: inteiro = 0; i < modulo.globais.tamanho(); i++) {
+            const g: qualquer = modulo.globais[i]
+            se (g.temInit) continua
+            linhas.empilhar("align ${g.alinhamento}")
+            linhas.empilhar("G_${g.nome}: resb ${g.tamanhoBytes}")
+        }
+    }
+
+    linhas.empilhar("")
+    linhas.empilhar("section .text")
+    linhas.empilhar("_start:")
+    linhas.empilhar("    call main")
+    linhas.empilhar("    mov rdi, rax")
+    linhas.empilhar("    xor eax, eax")
+    linhas.empilhar("    call exit")
+    linhas.empilhar("")
+
+    const funcoes: qualquer[] = modulo.funcoes
+    para (var f: inteiro = 0; f < funcoes.tamanho(); f++) {
+        const fn: qualquer = funcoes[f]
+        const frameBytes: inteiro = alinhar16(fn.tamanhoLocaisBytes + fn.numRegs * 8)
+
+        linhas.empilhar(fn.nome + ":")
+        linhas.empilhar("    push rbp")
+        linhas.empilhar("    mov rbp, rsp")
+        se (frameBytes > 0) {
+            linhas.empilhar("    sub rsp, ${frameBytes}")
+        }
+
+        // Reg save area System V AMD64 para funcoes variadicas (176 bytes: 6 GP + 8 XMM*16)
+        se (fn.ehVariadica) {
+            para (var r: inteiro = 0; r < 6; r++) {
+                linhas.empilhar("    mov [rbp - ${fn.regSaveOffset - r * 8}], ${abiInt[r]}")
+            }
+            para (var x: inteiro = 0; x < 8; x++) {
+                linhas.empilhar("    movsd [rbp - ${fn.regSaveOffset - (48 + x * 16)}], xmm${x}")
+            }
+        }
+
+        // Prologo ABI: salva parametros inteiros (rdi..r9), flutuantes (xmm0..xmm7) e excedentes na pilha
+        var pInt: inteiro = 0
+        var pFlt: inteiro = 0
+        var pStk: inteiro = 0
+        para (var p: inteiro = 0; p < fn.aridade; p++) {
+            const offP: inteiro = fn.paramOffsets[p]
+            const largP: inteiro = fn.paramLarguras[p]
+            const ehFltP: logico = fn.paramEhFloat[p]
+            se (ehFltP) {
+                se (pFlt < 8) {
+                    se (largP == 4) {
+                        linhas.empilhar("    cvtsd2ss xmm0, xmm${pFlt}")
+                        linhas.empilhar("    movss [rbp - ${offP}], xmm0")
+                    } senao {
+                        linhas.empilhar("    movsd [rbp - ${offP}], xmm${pFlt}")
+                    }
+                    pFlt++
+                } senao {
+                    const stkOff: inteiro = 16 + pStk * 8
+                    linhas.empilhar("    movsd xmm0, [rbp + ${stkOff}]")
+                    se (largP == 4) {
+                        linhas.empilhar("    cvtsd2ss xmm0, xmm0")
+                        linhas.empilhar("    movss [rbp - ${offP}], xmm0")
+                    } senao {
+                        linhas.empilhar("    movsd [rbp - ${offP}], xmm0")
+                    }
+                    pStk++
+                }
+            } senao {
+                se (pInt < 6) {
+                    linhas.empilhar("    mov [rbp - ${offP}], ${abiInt[pInt]}")
+                    pInt++
+                } senao {
+                    const stkOff: inteiro = 16 + pStk * 8
+                    linhas.empilhar("    mov rax, [rbp + ${stkOff}]")
+                    linhas.empilhar("    mov [rbp - ${offP}], rax")
+                    pStk++
+                }
+            }
+        }
+
+        para (var b: inteiro = 0; b < fn.blocos.tamanho(); b++) {
+            const bb: qualquer = fn.blocos[b]
+            linhas.empilhar(".L_${fn.nome}_${bb.nome}:")
+
+            para (var i: inteiro = 0; i < bb.insts.tamanho(); i++) {
+                const inst: qualquer = bb.insts[i]
+                const op: qualquer = inst.op
+
+                escolha (op) {
+                    caso OpI.Const:
+                    linhas.empilhar("    mov rax, ${inst.a}")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.FConst:
+                    const fBits: inteiro = tMod.doubleParaBitsIEEE754(inst.fval)
+                    linhas.empilhar("    mov rax, ${fBits} ; double ${inst.fval}")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.Copy:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.AddrSlot:
+                    linhas.empilhar("    lea rax, [rbp - ${inst.a}]")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.AddrRbpDisp:
+                    linhas.empilhar("    lea rax, [rbp + ${inst.a}]")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.AddrGlobal:
+                    linhas.empilhar("    mov rax, G_${inst.alvo1}")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.AddrFunc:
+                    linhas.empilhar("    mov rax, ${inst.alvo1}")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.AddrStr:
+                    linhas.empilhar("    mov rax, .S${inst.a}")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.Alloca:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    add rax, 15")
+                    linhas.empilhar("    and rax, -16")
+                    linhas.empilhar("    sub rsp, rax")
+                    linhas.empilhar("    mov rax, rsp")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.Load:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    se (inst.largura == 1) {
+                        se (inst.ehSemSinal) linhas.empilhar("    movzx rax, byte [rax]")
+                        senao linhas.empilhar("    movsx rax, byte [rax]")
+                    } senao se (inst.largura == 2) {
+                        se (inst.ehSemSinal) linhas.empilhar("    movzx rax, word [rax]")
+                        senao linhas.empilhar("    movsx rax, word [rax]")
+                    } senao se (inst.largura == 4) {
+                        se (inst.ehSemSinal) linhas.empilhar("    mov eax, dword [rax]")
+                        senao linhas.empilhar("    movsxd rax, dword [rax]")
+                    } senao {
+                        linhas.empilhar("    mov rax, [rax]")
+                    }
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.Store:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    mov rcx, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.b)}]")
+                    se (inst.largura == 1) linhas.empilhar("    mov [rax], cl")
+                    senao se (inst.largura == 2) linhas.empilhar("    mov [rax], cx")
+                    senao se (inst.largura == 4) linhas.empilhar("    mov [rax], ecx")
+                    senao linhas.empilhar("    mov [rax], rcx")
+                    caso OpI.FLoad:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    se (inst.largura == 4) {
+                        linhas.empilhar("    movss xmm0, [rax]")
+                        linhas.empilhar("    cvtss2sd xmm0, xmm0")
+                    } senao {
+                        linhas.empilhar("    movsd xmm0, [rax]")
+                    }
+                    linhas.empilhar("    movsd [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], xmm0")
+                    caso OpI.FStore:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    movsd xmm0, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.b)}]")
+                    se (inst.largura == 4) {
+                        linhas.empilhar("    cvtsd2ss xmm0, xmm0")
+                        linhas.empilhar("    movss [rax], xmm0")
+                    } senao {
+                        linhas.empilhar("    movsd [rax], xmm0")
+                    }
+                    caso OpI.Neg:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    neg rax")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.BitNot:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    not rax")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.LogNot:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    test rax, rax")
+                    linhas.empilhar("    sete al")
+                    linhas.empilhar("    movzx rax, al")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.ToBool:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    test rax, rax")
+                    linhas.empilhar("    setne al")
+                    linhas.empilhar("    movzx rax, al")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.TruncSext:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    se (inst.largura == 1) linhas.empilhar("    movsx rax, al")
+                    senao se (inst.largura == 2) linhas.empilhar("    movsx rax, ax")
+                    senao se (inst.largura == 4) linhas.empilhar("    movsxd rax, eax")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.TruncZext:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    se (inst.largura == 1) linhas.empilhar("    movzx rax, al")
+                    senao se (inst.largura == 2) linhas.empilhar("    movzx rax, ax")
+                    senao se (inst.largura == 4) linhas.empilhar("    mov eax, eax")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.ItoF:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    cvtsi2sd xmm0, rax")
+                    linhas.empilhar("    movsd [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], xmm0")
+                    caso OpI.FtoI:
+                    linhas.empilhar("    movsd xmm0, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    cvttsd2si rax, xmm0")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.FNeg:
+                    linhas.empilhar("    movsd xmm0, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    mov rax, -9223372036854775808")
+                    linhas.empilhar("    movq xmm1, rax")
+                    linhas.empilhar("    xorpd xmm0, xmm1")
+                    linhas.empilhar("    movsd [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], xmm0")
+                    caso OpI.FAdd:
+                    caso OpI.FSub:
+                    caso OpI.FMul:
+                    caso OpI.FDiv:
+                    linhas.empilhar("    movsd xmm0, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    movsd xmm1, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.b)}]")
+                    se (op == OpI.FAdd) linhas.empilhar("    addsd xmm0, xmm1")
+                    senao se (op == OpI.FSub) linhas.empilhar("    subsd xmm0, xmm1")
+                    senao se (op == OpI.FMul) linhas.empilhar("    mulsd xmm0, xmm1")
+                    senao linhas.empilhar("    divsd xmm0, xmm1")
+                    linhas.empilhar("    movsd [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], xmm0")
+                    caso OpI.FEq:
+                    caso OpI.FNeq:
+                    caso OpI.FLt:
+                    caso OpI.FLe:
+                    caso OpI.FGt:
+                    caso OpI.FGe:
+                    linhas.empilhar("    movsd xmm0, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    movsd xmm1, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.b)}]")
+                    linhas.empilhar("    ucomisd xmm0, xmm1")
+                    se (op == OpI.FEq) linhas.empilhar("    sete al")
+                    senao se (op == OpI.FNeq) linhas.empilhar("    setne al")
+                    senao se (op == OpI.FLt) linhas.empilhar("    setb al")
+                    senao se (op == OpI.FLe) linhas.empilhar("    setbe al")
+                    senao se (op == OpI.FGt) linhas.empilhar("    seta al")
+                    senao linhas.empilhar("    setae al")
+                    linhas.empilhar("    movzx rax, al")
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                    caso OpI.Br:
+                    linhas.empilhar("    jmp .L_${fn.nome}_${inst.alvo1}")
+                    caso OpI.BrCond:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    test rax, rax")
+                    linhas.empilhar("    jz .L_${fn.nome}_${inst.alvo2}")
+                    linhas.empilhar("    jmp .L_${fn.nome}_${inst.alvo1}")
+                    caso OpI.Ret:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    mov rsp, rbp")
+                    linhas.empilhar("    pop rbp")
+                    linhas.empilhar("    ret")
+                    caso OpI.FRet:
+                    linhas.empilhar("    movsd xmm0, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    mov rsp, rbp")
+                    linhas.empilhar("    pop rbp")
+                    linhas.empilhar("    ret")
+                    caso OpI.Call:
+                    emitirCallAsm(linhas, fn, inst, inst.alvo1, falso, falso)
+                    caso OpI.CallExtern:
+                    emitirCallAsm(linhas, fn, inst, inst.alvo1, falso, verdadeiro)
+                    caso OpI.CallIndirect:
+                    emitirCallAsm(linhas, fn, inst, "", verdadeiro, falso)
+                    padrao:
+                    linhas.empilhar("    mov rax, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.a)}]")
+                    linhas.empilhar("    mov rcx, [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.b)}]")
+                    escolha (op) {
+                        caso OpI.Add: linhas.empilhar("    add rax, rcx")
+                        caso OpI.Sub: linhas.empilhar("    sub rax, rcx")
+                        caso OpI.Mul: linhas.empilhar("    imul rax, rcx")
+                        caso OpI.SDiv:
+                        linhas.empilhar("    cqo")
+                        linhas.empilhar("    idiv rcx")
+                        caso OpI.UDiv:
+                        linhas.empilhar("    xor rdx, rdx")
+                        linhas.empilhar("    div rcx")
+                        caso OpI.SMod:
+                        linhas.empilhar("    cqo")
+                        linhas.empilhar("    idiv rcx")
+                        linhas.empilhar("    mov rax, rdx")
+                        caso OpI.UMod:
+                        linhas.empilhar("    xor rdx, rdx")
+                        linhas.empilhar("    div rcx")
+                        linhas.empilhar("    mov rax, rdx")
+                        caso OpI.BitAnd: linhas.empilhar("    and rax, rcx")
+                        caso OpI.BitOr: linhas.empilhar("    or rax, rcx")
+                        caso OpI.BitXor: linhas.empilhar("    xor rax, rcx")
+                        caso OpI.Shl: linhas.empilhar("    shl rax, cl")
+                        caso OpI.AShr: linhas.empilhar("    sar rax, cl")
+                        caso OpI.LShr: linhas.empilhar("    shr rax, cl")
+                        padrao:
+                        linhas.empilhar("    cmp rax, rcx")
+                        escolha (op) {
+                            caso OpI.Eq: linhas.empilhar("    sete al")
+                            caso OpI.Neq: linhas.empilhar("    setne al")
+                            caso OpI.SLt: linhas.empilhar("    setl al")
+                            caso OpI.SLe: linhas.empilhar("    setle al")
+                            caso OpI.SGt: linhas.empilhar("    setg al")
+                            caso OpI.SGe: linhas.empilhar("    setge al")
+                            caso OpI.ULt: linhas.empilhar("    setb al")
+                            caso OpI.ULe: linhas.empilhar("    setbe al")
+                            caso OpI.UGt: linhas.empilhar("    seta al")
+                            padrao: linhas.empilhar("    setae al")
+                        }
+                        linhas.empilhar("    movzx rax, al")
+                    }
+                    linhas.empilhar("    mov [rbp - ${offsetReg(fn.tamanhoLocaisBytes, inst.dst)}], rax")
+                }
+            }
+        }
+        linhas.empilhar("")
+    }
+
+    retorna linhas.juntar("\n")
+}

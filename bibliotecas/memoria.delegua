@@ -1,0 +1,372 @@
+// Controle fino e seguro de memória, Boehm GC, arenas binárias com verificação de geração,
+// buffers reutilizáveis e escopos determinísticos de recursos nativos.
+@definicao(biblioteca = "cgd-runtime", abi = "delegua", prefixo = "delegua_ffi_")
+classe estrangeira PrimitivasMemoria {
+    @definicao(simbolo = "memEstatisticas")
+    estatico memEstatisticas(): dicionario;
+    @definicao(simbolo = "sistemaRecursos")
+    estatico sistemaRecursos(): dicionario;
+    @definicao(simbolo = "memColetar")
+    estatico memColetar(desmapear: logico): vazio;
+    @definicao(simbolo = "memColetarSeAcima")
+    estatico memColetarSeAcima(limiteHeapBytes: inteiro, desmapear: logico): logico;
+    @definicao(simbolo = "memDefinirDivisor")
+    estatico memDefinirDivisor(divisor: inteiro): vazio;
+    @definicao(simbolo = "memObterDivisor")
+    estatico memObterDivisor(): inteiro;
+    @definicao(simbolo = "memDefinirFreqCompleta")
+    estatico memDefinirFreqCompleta(frequencia: inteiro): vazio;
+    @definicao(simbolo = "memExpandirHeap")
+    estatico memExpandirHeap(bytes: inteiro): logico;
+
+    @definicao(simbolo = "arenaCriar", paralelo = verdadeiro)
+    estatico arenaCriar(capacidadeInicial: inteiro, limiteMaximo: inteiro): qualquer;
+    @definicao(simbolo = "arenaLimpar", paralelo = verdadeiro)
+    estatico arenaLimpar(arena: qualquer): vazio;
+    @definicao(simbolo = "arenaLiberar", paralelo = verdadeiro)
+    estatico arenaLiberar(arena: qualquer): vazio;
+    @definicao(simbolo = "arenaAtiva", paralelo = verdadeiro)
+    estatico arenaAtiva(arena: qualquer): logico;
+    @definicao(simbolo = "arenaEstatisticas", paralelo = verdadeiro)
+    estatico arenaEstatisticas(arena: qualquer): dicionario;
+    @definicao(simbolo = "arenaAlocarBytes", paralelo = verdadeiro)
+    estatico arenaAlocarBytes(arena: qualquer, tamanho: inteiro, zerar: logico): qualquer;
+    @definicao(simbolo = "arenaAlocarInt64", paralelo = verdadeiro)
+    estatico arenaAlocarInt64(arena: qualquer, quantidade: inteiro, valorInicial: inteiro): qualquer;
+
+    @definicao(simbolo = "fatiaValida", paralelo = verdadeiro)
+    estatico fatiaValida(fatia: qualquer): logico;
+    @definicao(simbolo = "fatiaTamanho", paralelo = verdadeiro)
+    estatico fatiaTamanho(fatia: qualquer): inteiro;
+    @definicao(simbolo = "fatiaCapacidade", paralelo = verdadeiro)
+    estatico fatiaCapacidade(fatia: qualquer): inteiro;
+    @definicao(simbolo = "fatiaObterByte", paralelo = verdadeiro)
+    estatico fatiaObterByte(fatia: qualquer, indice: inteiro): inteiro;
+    @definicao(simbolo = "fatiaDefinirByte", paralelo = verdadeiro)
+    estatico fatiaDefinirByte(fatia: qualquer, indice: inteiro, valor: inteiro): vazio;
+    @definicao(simbolo = "fatiaAnexarByte", paralelo = verdadeiro)
+    estatico fatiaAnexarByte(fatia: qualquer, valor: inteiro): vazio;
+    @definicao(simbolo = "fatiaAnexarU32LE", paralelo = verdadeiro)
+    estatico fatiaAnexarU32LE(fatia: qualquer, valor: inteiro): vazio;
+    @definicao(simbolo = "fatiaAnexarU64LE", paralelo = verdadeiro)
+    estatico fatiaAnexarU64LE(fatia: qualquer, valor: inteiro): vazio;
+    @definicao(simbolo = "fatiaParaBytes", paralelo = verdadeiro)
+    estatico fatiaParaBytes(fatia: qualquer): qualquer;
+    @definicao(simbolo = "fatiaParaBytesCongelado", paralelo = verdadeiro)
+    estatico fatiaParaBytesCongelado(fatia: qualquer): qualquer;
+    @definicao(simbolo = "fatiaObterInt64", paralelo = verdadeiro)
+    estatico fatiaObterInt64(fatia: qualquer, indice: inteiro): inteiro;
+    @definicao(simbolo = "fatiaDefinirInt64", paralelo = verdadeiro)
+    estatico fatiaDefinirInt64(fatia: qualquer, indice: inteiro, valor: inteiro): vazio;
+    @definicao(simbolo = "fatiaPreencherInt64", paralelo = verdadeiro)
+    estatico fatiaPreencherInt64(fatia: qualquer, valor: inteiro): vazio;
+}
+
+classe FatiaBytes {
+    privado {
+        _recurso: qualquer
+    }
+
+    construtor(recurso: qualquer) {
+        isto._recurso = recurso
+    }
+
+    valida(): logico {
+        retorna PrimitivasMemoria.fatiaValida(isto._recurso)
+    }
+
+    tamanho(): inteiro {
+        retorna PrimitivasMemoria.fatiaTamanho(isto._recurso)
+    }
+
+    capacidade(): inteiro {
+        retorna PrimitivasMemoria.fatiaCapacidade(isto._recurso)
+    }
+
+    obter(indice: inteiro): inteiro {
+        retorna PrimitivasMemoria.fatiaObterByte(isto._recurso, indice)
+    }
+
+    definir(indice: inteiro, valor: inteiro): vazio {
+        PrimitivasMemoria.fatiaDefinirByte(isto._recurso, indice, valor)
+    }
+
+    anexarByte(valor: inteiro): vazio {
+        PrimitivasMemoria.fatiaAnexarByte(isto._recurso, valor)
+    }
+
+    anexarU32LE(valor: inteiro): vazio {
+        PrimitivasMemoria.fatiaAnexarU32LE(isto._recurso, valor)
+    }
+
+    anexarU64LE(valor: inteiro): vazio {
+        PrimitivasMemoria.fatiaAnexarU64LE(isto._recurso, valor)
+    }
+
+    paraBytes(): qualquer {
+        retorna importar("cgd:bytes").Bytes.deRecurso(PrimitivasMemoria.fatiaParaBytes(isto._recurso))
+    }
+
+    paraBytesCongelado(): qualquer {
+        retorna importar("cgd:bytes").Bytes.deRecurso(PrimitivasMemoria.fatiaParaBytesCongelado(isto._recurso))
+    }
+}
+
+classe FatiaInt64 {
+    privado {
+        _recurso: qualquer
+    }
+
+    construtor(recurso: qualquer) {
+        isto._recurso = recurso
+    }
+
+    valida(): logico {
+        retorna PrimitivasMemoria.fatiaValida(isto._recurso)
+    }
+
+    tamanho(): inteiro {
+        retorna PrimitivasMemoria.fatiaTamanho(isto._recurso)
+    }
+
+    obter(indice: inteiro): inteiro {
+        retorna PrimitivasMemoria.fatiaObterInt64(isto._recurso, indice)
+    }
+
+    definir(indice: inteiro, valor: inteiro): vazio {
+        PrimitivasMemoria.fatiaDefinirInt64(isto._recurso, indice, valor)
+    }
+
+    preencher(valor: inteiro): vazio {
+        PrimitivasMemoria.fatiaPreencherInt64(isto._recurso, valor)
+    }
+}
+
+classe Arena {
+    privado {
+        _recurso: qualquer
+    }
+
+    construtor(capacidadeInicial: inteiro = 65536, limiteMaximo: inteiro = 67108864) {
+        isto._recurso = PrimitivasMemoria.arenaCriar(capacidadeInicial, limiteMaximo)
+    }
+
+    criarBytes(tamanho: inteiro): FatiaBytes {
+        retorna FatiaBytes(PrimitivasMemoria.arenaAlocarBytes(isto._recurso, tamanho, verdadeiro))
+    }
+
+    criarBytesReservado(capacidade: inteiro): FatiaBytes {
+        retorna FatiaBytes(PrimitivasMemoria.arenaAlocarBytes(isto._recurso, capacidade,
+            falso))
+    }
+
+    criarInt64(quantidade: inteiro, valorInicial: inteiro = 0): FatiaInt64 {
+        retorna FatiaInt64(PrimitivasMemoria.arenaAlocarInt64(isto._recurso, quantidade,
+            valorInicial))
+    }
+
+    limpar(): vazio {
+        PrimitivasMemoria.arenaLimpar(isto._recurso)
+    }
+
+    liberar(): vazio {
+        PrimitivasMemoria.arenaLiberar(isto._recurso)
+    }
+
+    ativa(): logico {
+        retorna PrimitivasMemoria.arenaAtiva(isto._recurso)
+    }
+
+    estatisticas(): dicionario {
+        retorna PrimitivasMemoria.arenaEstatisticas(isto._recurso)
+    }
+
+    destrutor(): vazio {
+        isto.liberar()
+    }
+}
+
+classe PoolBuffers {
+    privado {
+        _livres: qualquer[]
+        _capacidadePadrao: inteiro
+        _maxLivres: inteiro
+        _reutilizados: inteiro
+        _criados: inteiro
+    }
+
+    construtor(capacidadePadrao: inteiro = 4096, maxLivres: inteiro = 32) {
+        isto._livres = []
+        isto._capacidadePadrao = capacidadePadrao > 0 ? capacidadePadrao : 4096
+        isto._maxLivres = maxLivres > 0 ? maxLivres : 32
+        isto._reutilizados = 0
+        isto._criados = 0
+    }
+
+    adquirir(): qualquer {
+        se (isto._livres.tamanho() > 0) {
+            const buf: qualquer = isto._livres.removerUltimo()
+            buf.limpar()
+            isto._reutilizados++
+            retorna buf
+        }
+        isto._criados++
+        retorna importar("cgd:bytes").Bytes.criarReservado(isto._capacidadePadrao)
+    }
+
+    devolver(buffer: qualquer): vazio {
+        se (buffer == nulo ou buffer.ehCongelado()) retorna
+        buffer.limpar()
+        se (isto._livres.tamanho() < isto._maxLivres) {
+            isto._livres.empilhar(buffer)
+        } senao {
+            buffer.liberar()
+        }
+    }
+
+    limpar(): vazio {
+        para (var i: inteiro = 0; i < isto._livres.tamanho(); i++) {
+            isto._livres[i].liberar()
+        }
+        isto._livres.limpar()
+    }
+
+    estatisticas(): dicionario {
+        retorna {
+            livres: isto._livres.tamanho(),
+            maxLivres: isto._maxLivres,
+            capacidadePadrao: isto._capacidadePadrao,
+            criados: isto._criados,
+            reutilizados: isto._reutilizados
+        }
+    }
+}
+
+classe EscopoMemoria {
+    privado {
+        _arenas: Arena[]
+        _buffers: qualquer[]
+        _encerrado: logico
+        _alocadosInicio: inteiro
+        _ciclosInicio: inteiro
+        _rssInicio: inteiro
+    }
+
+    construtor() {
+        const st: dicionario = PrimitivasMemoria.memEstatisticas()
+        isto._arenas = []
+        isto._buffers = []
+        isto._encerrado = falso
+        isto._alocadosInicio = inteiro(st["alocadosBytes"])
+        isto._ciclosInicio = inteiro(st["ciclosGC"])
+        isto._rssInicio = inteiro(st["rssBytes"])
+    }
+
+    criarArena(capacidadeInicial: inteiro = 65536, limiteMaximo: inteiro = 67108864): Arena {
+        se (isto._encerrado) falhar "EscopoMemoria já foi encerrado."
+        const a: Arena = Arena(capacidadeInicial, limiteMaximo)
+        isto._arenas.empilhar(a)
+        retorna a
+    }
+
+    registrarArena(arena: Arena): vazio {
+        se (isto._encerrado) falhar "EscopoMemoria já foi encerrado."
+        isto._arenas.empilhar(arena)
+    }
+
+    registrarBuffer(buffer: qualquer): vazio {
+        se (isto._encerrado) falhar "EscopoMemoria já foi encerrado."
+        isto._buffers.empilhar(buffer)
+    }
+
+    encerrado(): logico {
+        retorna isto._encerrado
+    }
+
+    relatorio(): dicionario {
+        const st: dicionario = PrimitivasMemoria.memEstatisticas()
+        retorna {
+            deltaAlocadosBytes: inteiro(st["alocadosBytes"]) - isto._alocadosInicio,
+            deltaCiclosGC: inteiro(st["ciclosGC"]) - isto._ciclosInicio,
+            deltaRssBytes: inteiro(st["rssBytes"]) - isto._rssInicio,
+            heapBytes: inteiro(st["heapBytes"]),
+            arenasRegistradas: isto._arenas.tamanho(),
+            buffersRegistrados: isto._buffers.tamanho(),
+            encerrado: isto._encerrado
+        }
+    }
+
+    encerrar(coletarGC: logico = falso, desmapear: logico = falso): vazio {
+        se (isto._encerrado) retorna
+        isto._encerrado = verdadeiro
+        para (var i: inteiro = isto._arenas.tamanho() - 1; i >= 0; i--) {
+            isto._arenas[i].liberar()
+        }
+        isto._arenas.limpar()
+        para (var i: inteiro = isto._buffers.tamanho() - 1; i >= 0; i--) {
+            isto._buffers[i].liberar()
+        }
+        isto._buffers.limpar()
+        se (coletarGC) {
+            PrimitivasMemoria.memColetar(desmapear)
+        }
+    }
+
+    destrutor(): vazio {
+        isto.encerrar(falso, falso)
+    }
+}
+
+classe Memoria {
+    estatico estatisticas(): dicionario {
+        retorna PrimitivasMemoria.memEstatisticas()
+    }
+
+    estatico sistema(): dicionario {
+        retorna PrimitivasMemoria.sistemaRecursos()
+    }
+
+    estatico coletar(desmapear: logico = falso): vazio {
+        PrimitivasMemoria.memColetar(desmapear)
+    }
+
+    estatico coletarSeAcima(limiteHeapBytes: inteiro, desmapear: logico = verdadeiro): logico {
+        retorna PrimitivasMemoria.memColetarSeAcima(limiteHeapBytes, desmapear)
+    }
+
+    estatico definirDivisorEspacoLivre(divisor: inteiro): vazio {
+        PrimitivasMemoria.memDefinirDivisor(divisor)
+    }
+
+    estatico obterDivisorEspacoLivre(): inteiro {
+        retorna PrimitivasMemoria.memObterDivisor()
+    }
+
+    estatico definirFrequenciaColetaCompleta(frequencia: inteiro): vazio {
+        PrimitivasMemoria.memDefinirFreqCompleta(frequencia)
+    }
+
+    estatico expandirHeap(bytes: inteiro): logico {
+        retorna PrimitivasMemoria.memExpandirHeap(bytes)
+    }
+
+    estatico criarArena(capacidadeInicial: inteiro = 65536, limiteMaximo: inteiro = 67108864): Arena {
+        retorna Arena(capacidadeInicial, limiteMaximo)
+    }
+
+    estatico criarBuffer(capacidadeInicial: inteiro = 4096): qualquer {
+        retorna importar("cgd:bytes").Bytes.criarReservado(capacidadeInicial)
+    }
+
+    estatico congelarBytes(buffer: qualquer): qualquer {
+        retorna buffer.congelar()
+    }
+
+    estatico criarPoolBuffers(capacidadePadrao: inteiro = 4096, maxLivres: inteiro = 32): PoolBuffers {
+        retorna PoolBuffers(capacidadePadrao, maxLivres)
+    }
+
+    estatico criarEscopo(): EscopoMemoria {
+        retorna EscopoMemoria()
+    }
+}

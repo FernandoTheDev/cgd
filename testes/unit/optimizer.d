@@ -217,3 +217,16 @@ unittest
     new PureFunctionAnalysis(diagnostics).analyze(p);
     assert(diagnostics.hasErrors());
 }
+
+unittest
+{
+    Context context;
+    Program p = program(
+            "var a = (0xFF & 0x0F) | (1 << 4); var b = 100 \\ 3; var c = 2 ** 10; var x: inteiro = 7; var d = (x + 0) * 1",
+            context);
+    optimize(p, new CTFEContext);
+    assert((cast(IntLit)(cast(VarDecl) p.body[0]).value).value == 31);
+    assert((cast(IntLit)(cast(VarDecl) p.body[1]).value).value == 33);
+    assert((cast(IntLit)(cast(VarDecl) p.body[2]).value).value == 1024);
+    assert(cast(Identifier)(cast(VarDecl) p.body[4]).value);
+}

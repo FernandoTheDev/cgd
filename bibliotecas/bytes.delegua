@@ -1,4 +1,92 @@
-// Buffer binário gerenciado com limite explícito de 64 MiB e conversões seguras.
+// Buffer binário gerenciado com limite explícito de 64 MiB, imutabilidade zero-copy e conversões seguras.
+@definicao(biblioteca = "cgd-runtime", abi = "delegua", prefixo = "delegua_ffi_")
+classe estrangeira PrimitivasBytes {
+    @definicao(simbolo = "bytesCriar", paralelo = verdadeiro)
+    estatico bytesCriar(tamanho: inteiro): qualquer;
+    @definicao(simbolo = "bytesDeTexto", paralelo = verdadeiro)
+    estatico bytesDeTexto(valor: texto): qualquer;
+    @definicao(simbolo = "bytesDeVetor", paralelo = verdadeiro)
+    estatico bytesDeVetor(valores: inteiro[]): qualquer;
+    @definicao(simbolo = "bytesDeHex", paralelo = verdadeiro)
+    estatico bytesDeHex(hex: texto): qualquer;
+    @definicao(simbolo = "bytesDeBase64", paralelo = verdadeiro)
+    estatico bytesDeBase64(b64: texto): qualquer;
+    @definicao(simbolo = "bytesTamanho", paralelo = verdadeiro)
+    estatico bytesTamanho(buffer: qualquer): inteiro;
+    @definicao(simbolo = "bytesCapacidade", paralelo = verdadeiro)
+    estatico bytesCapacidade(buffer: qualquer): inteiro;
+    @definicao(simbolo = "bytesObter", paralelo = verdadeiro)
+    estatico bytesObter(buffer: qualquer, indice: inteiro): inteiro;
+    @definicao(simbolo = "bytesDefinir", paralelo = verdadeiro)
+    estatico bytesDefinir(buffer: qualquer, indice: inteiro, valor: inteiro): vazio;
+    @definicao(simbolo = "bytesFatiar", paralelo = verdadeiro)
+    estatico bytesFatiar(buffer: qualquer, inicio: inteiro, fim: inteiro): qualquer;
+    @definicao(simbolo = "bytesConcatenar", paralelo = verdadeiro)
+    estatico bytesConcatenar(a: qualquer, b: qualquer): qualquer;
+    @definicao(simbolo = "bytesParaTexto", paralelo = verdadeiro)
+    estatico bytesParaTexto(buffer: qualquer): texto;
+    @definicao(simbolo = "bytesParaHex", paralelo = verdadeiro)
+    estatico bytesParaHex(buffer: qualquer): texto;
+    @definicao(simbolo = "bytesParaBase64", paralelo = verdadeiro)
+    estatico bytesParaBase64(buffer: qualquer): texto;
+    @definicao(simbolo = "bytesParaVetor", paralelo = verdadeiro)
+    estatico bytesParaVetor(buffer: qualquer): inteiro[];
+    @definicao(simbolo = "bytesIgual", paralelo = verdadeiro)
+    estatico bytesIgual(a: qualquer, b: qualquer): logico;
+    @definicao(simbolo = "bytesEncontrar", paralelo = verdadeiro)
+    estatico bytesEncontrar(buffer: qualquer, alvo: qualquer, inicio: inteiro): inteiro;
+    @definicao(simbolo = "bytesCriarReservado", paralelo = verdadeiro)
+    estatico bytesCriarReservado(capacidade: inteiro): qualquer;
+    @definicao(simbolo = "bytesAnexarByte", paralelo = verdadeiro)
+    estatico bytesAnexarByte(buffer: qualquer, valor: inteiro): vazio;
+    @definicao(simbolo = "bytesAnexarU16LE", paralelo = verdadeiro)
+    estatico bytesAnexarU16LE(buffer: qualquer, valor: inteiro): vazio;
+    @definicao(simbolo = "bytesAnexarU32LE", paralelo = verdadeiro)
+    estatico bytesAnexarU32LE(buffer: qualquer, valor: inteiro): vazio;
+    @definicao(simbolo = "bytesAnexarU64LE", paralelo = verdadeiro)
+    estatico bytesAnexarU64LE(buffer: qualquer, valor: inteiro): vazio;
+    @definicao(simbolo = "bytesDefinirU32LE", paralelo = verdadeiro)
+    estatico bytesDefinirU32LE(buffer: qualquer, indice: inteiro, valor: inteiro): vazio;
+    @definicao(simbolo = "bytesDefinirU64LE", paralelo = verdadeiro)
+    estatico bytesDefinirU64LE(buffer: qualquer, indice: inteiro, valor: inteiro): vazio;
+    @definicao(simbolo = "bytesLerU16LE", paralelo = verdadeiro)
+    estatico bytesLerU16LE(buffer: qualquer, indice: inteiro): inteiro;
+    @definicao(simbolo = "bytesLerU32LE", paralelo = verdadeiro)
+    estatico bytesLerU32LE(buffer: qualquer, indice: inteiro): inteiro;
+    @definicao(simbolo = "bytesLerU64LE", paralelo = verdadeiro)
+    estatico bytesLerU64LE(buffer: qualquer, indice: inteiro): inteiro;
+    @definicao(simbolo = "bytesAnexarBytes", paralelo = verdadeiro)
+    estatico bytesAnexarBytes(buffer: qualquer, outro: qualquer): vazio;
+    @definicao(simbolo = "bytesAnexarBytesFatia", paralelo = verdadeiro)
+    estatico bytesAnexarBytesFatia(buffer: qualquer, outro: qualquer, inicio: inteiro, tamanho: inteiro): vazio;
+    @definicao(simbolo = "bytesAnexarVetor", paralelo = verdadeiro)
+    estatico bytesAnexarVetor(buffer: qualquer, valores: inteiro[]): vazio;
+    @definicao(simbolo = "bytesAnexarZeros", paralelo = verdadeiro)
+    estatico bytesAnexarZeros(buffer: qualquer, quantidade: inteiro): vazio;
+    @definicao(simbolo = "bytesAnexarPreenchimento", paralelo = verdadeiro)
+    estatico bytesAnexarPreenchimento(buffer: qualquer, valor: inteiro, quantidade: inteiro): vazio;
+    @definicao(simbolo = "bytesAnexarTexto", paralelo = verdadeiro)
+    estatico bytesAnexarTexto(buffer: qualquer, valor: texto): vazio;
+    @definicao(simbolo = "bytesFatiarTexto", paralelo = verdadeiro)
+    estatico bytesFatiarTexto(buffer: qualquer, inicio: inteiro, fim: inteiro): texto;
+    @definicao(simbolo = "bytesLerCString", paralelo = verdadeiro)
+    estatico bytesLerCString(buffer: qualquer, inicio: inteiro, limite: inteiro): texto;
+    @definicao(simbolo = "bytesCongelar", paralelo = verdadeiro)
+    estatico bytesCongelar(buffer: qualquer): qualquer;
+    @definicao(simbolo = "bytesEhCongelado", paralelo = verdadeiro)
+    estatico bytesEhCongelado(buffer: qualquer): logico;
+    @definicao(simbolo = "bytesLimpar", paralelo = verdadeiro)
+    estatico bytesLimpar(buffer: qualquer): vazio;
+    @definicao(simbolo = "bytesLiberar", paralelo = verdadeiro)
+    estatico bytesLiberar(buffer: qualquer): vazio;
+    @definicao(simbolo = "bytesReservar", paralelo = verdadeiro)
+    estatico bytesReservar(buffer: qualquer, capacidade: inteiro): vazio;
+    @definicao(simbolo = "bytesGravarArquivo")
+    estatico bytesGravarArquivo(buffer: qualquer, caminho: texto): vazio;
+    @definicao(simbolo = "bytesLerArquivo")
+    estatico bytesLerArquivo(caminho: texto): qualquer;
+}
+
 classe Bytes {
     privado {
         _recurso: qualquer
@@ -8,29 +96,36 @@ classe Bytes {
         isto._recurso = recurso
     }
 
+    estatico deRecurso(recurso: qualquer): Bytes {
+        retorna Bytes(recurso)
+    }
+
     estatico criar(tamanho: inteiro = 0): Bytes {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        retorna Bytes(nativo.bytesCriar(tamanho))
+        retorna Bytes(PrimitivasBytes.bytesCriar(tamanho))
+    }
+
+    estatico criarReservado(capacidade: inteiro = 0): Bytes {
+        retorna Bytes(PrimitivasBytes.bytesCriarReservado(capacidade))
+    }
+
+    estatico lerArquivo(caminho: texto): Bytes {
+        retorna Bytes(PrimitivasBytes.bytesLerArquivo(caminho))
     }
 
     estatico deTexto(valor: texto): Bytes {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        retorna Bytes(nativo.bytesDeTexto(valor))
+        retorna Bytes(PrimitivasBytes.bytesDeTexto(valor))
     }
 
     estatico deVetor(valores: inteiro[]): Bytes {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        retorna Bytes(nativo.bytesDeVetor(valores))
+        retorna Bytes(PrimitivasBytes.bytesDeVetor(valores))
     }
 
     estatico deHex(hex: texto): Bytes {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        retorna Bytes(nativo.bytesDeHex(hex))
+        retorna Bytes(PrimitivasBytes.bytesDeHex(hex))
     }
 
     estatico deBase64(valor: texto): Bytes {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        retorna Bytes(nativo.bytesDeBase64(valor))
+        retorna Bytes(PrimitivasBytes.bytesDeBase64(valor))
     }
 
     recursoInterno(): qualquer {
@@ -38,62 +133,150 @@ classe Bytes {
     }
 
     tamanho(): inteiro {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        retorna nativo.bytesTamanho(isto._recurso)
+        retorna PrimitivasBytes.bytesTamanho(isto._recurso)
+    }
+
+    capacidade(): inteiro {
+        retorna PrimitivasBytes.bytesCapacidade(isto._recurso)
+    }
+
+    congelar(): Bytes {
+        retorna Bytes(PrimitivasBytes.bytesCongelar(isto._recurso))
+    }
+
+    ehCongelado(): logico {
+        retorna PrimitivasBytes.bytesEhCongelado(isto._recurso)
+    }
+
+    limpar(): vazio {
+        PrimitivasBytes.bytesLimpar(isto._recurso)
+    }
+
+    liberar(): vazio {
+        PrimitivasBytes.bytesLiberar(isto._recurso)
+    }
+
+    reservar(capacidade: inteiro): vazio {
+        PrimitivasBytes.bytesReservar(isto._recurso, capacidade)
     }
 
     obter(indice: inteiro): inteiro {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        retorna nativo.bytesObter(isto._recurso, indice)
+        retorna PrimitivasBytes.bytesObter(isto._recurso, indice)
     }
 
     definir(indice: inteiro, valor: inteiro): vazio {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        nativo.bytesDefinir(isto._recurso, indice, valor)
+        PrimitivasBytes.bytesDefinir(isto._recurso, indice, valor)
+    }
+
+    lerU16LE(indice: inteiro): inteiro {
+        retorna PrimitivasBytes.bytesLerU16LE(isto._recurso, indice)
+    }
+
+    lerU32LE(indice: inteiro): inteiro {
+        retorna PrimitivasBytes.bytesLerU32LE(isto._recurso, indice)
+    }
+
+    lerU64LE(indice: inteiro): inteiro {
+        retorna PrimitivasBytes.bytesLerU64LE(isto._recurso, indice)
     }
 
     fatiar(inicio: inteiro, fim: inteiro = -1): Bytes {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
         var limite: inteiro = fim < 0 ? isto.tamanho() : fim
-        retorna Bytes(nativo.bytesFatiar(isto._recurso, inicio, limite))
+        retorna Bytes(PrimitivasBytes.bytesFatiar(isto._recurso, inicio, limite))
     }
 
     concatenar(outro: Bytes): Bytes {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        retorna Bytes(nativo.bytesConcatenar(isto._recurso, outro.recursoInterno()))
+        retorna Bytes(PrimitivasBytes.bytesConcatenar(isto._recurso, outro.recursoInterno()))
     }
 
     paraTexto(): texto {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        retorna nativo.bytesParaTexto(isto._recurso)
+        retorna PrimitivasBytes.bytesParaTexto(isto._recurso)
     }
 
     paraHex(): texto {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        retorna nativo.bytesParaHex(isto._recurso)
+        retorna PrimitivasBytes.bytesParaHex(isto._recurso)
     }
 
     paraBase64(): texto {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        retorna nativo.bytesParaBase64(isto._recurso)
+        retorna PrimitivasBytes.bytesParaBase64(isto._recurso)
     }
 
     paraVetor(): inteiro[] {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        retorna nativo.bytesParaVetor(isto._recurso)
+        retorna PrimitivasBytes.bytesParaVetor(isto._recurso)
     }
 
     igual(outro: Bytes): logico {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        retorna nativo.bytesIgual(isto._recurso, outro.recursoInterno())
+        retorna PrimitivasBytes.bytesIgual(isto._recurso, outro.recursoInterno())
     }
 
     encontrar(alvo: Bytes, inicio: inteiro = 0): inteiro {
-        var nativo: qualquer = importar("cgd:nativo").Primitivas
-        retorna nativo.bytesEncontrar(isto._recurso, alvo.recursoInterno(), inicio)
+        retorna PrimitivasBytes.bytesEncontrar(isto._recurso, alvo.recursoInterno(), inicio)
     }
 
     copiar(): Bytes {
         retorna isto.fatiar(0, isto.tamanho())
+    }
+
+    anexarByte(valor: inteiro): vazio {
+        PrimitivasBytes.bytesAnexarByte(isto._recurso, valor)
+    }
+
+    anexarU16LE(valor: inteiro): vazio {
+        PrimitivasBytes.bytesAnexarU16LE(isto._recurso, valor)
+    }
+
+    anexarU32LE(valor: inteiro): vazio {
+        PrimitivasBytes.bytesAnexarU32LE(isto._recurso, valor)
+    }
+
+    anexarU64LE(valor: inteiro): vazio {
+        PrimitivasBytes.bytesAnexarU64LE(isto._recurso, valor)
+    }
+
+    definirU32LE(indice: inteiro, valor: inteiro): vazio {
+        PrimitivasBytes.bytesDefinirU32LE(isto._recurso, indice, valor)
+    }
+
+    definirU64LE(indice: inteiro, valor: inteiro): vazio {
+        PrimitivasBytes.bytesDefinirU64LE(isto._recurso, indice, valor)
+    }
+
+    anexarBytes(outro: Bytes): vazio {
+        PrimitivasBytes.bytesAnexarBytes(isto._recurso, outro.recursoInterno())
+    }
+
+    anexarBytesFatia(outro: Bytes, inicio: inteiro, tamanho: inteiro): vazio {
+        PrimitivasBytes.bytesAnexarBytesFatia(isto._recurso, outro.recursoInterno(), inicio,
+            tamanho)
+    }
+
+    anexarVetor(valores: inteiro[]): vazio {
+        PrimitivasBytes.bytesAnexarVetor(isto._recurso, valores)
+    }
+
+    anexarZeros(quantidade: inteiro): vazio {
+        PrimitivasBytes.bytesAnexarZeros(isto._recurso, quantidade)
+    }
+
+    anexarPreenchimento(valor: inteiro, quantidade: inteiro): vazio {
+        PrimitivasBytes.bytesAnexarPreenchimento(isto._recurso, valor, quantidade)
+    }
+
+    anexarTexto(valor: texto): vazio {
+        PrimitivasBytes.bytesAnexarTexto(isto._recurso, valor)
+    }
+
+    fatiarTexto(inicio: inteiro, fim: inteiro = -1): texto {
+        var limite: inteiro = fim < 0 ? isto.tamanho() : fim
+        retorna PrimitivasBytes.bytesFatiarTexto(isto._recurso, inicio, limite)
+    }
+
+    lerCString(inicio: inteiro, limite: inteiro = -1): texto {
+        var teto: inteiro = limite < 0 ? isto.tamanho() : limite
+        retorna PrimitivasBytes.bytesLerCString(isto._recurso, inicio, teto)
+    }
+
+    gravarArquivo(caminho: texto): vazio {
+        PrimitivasBytes.bytesGravarArquivo(isto._recurso, caminho)
     }
 }

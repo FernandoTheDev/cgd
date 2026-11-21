@@ -1,0 +1,397 @@
+//! Saida da CPU: 21, 40320, 3, 7, 11, 19, 25, 42\nInstrucoes montadas: 72 | Ciclos executados: 370 | SP final: 256
+//? fase: execucao
+//? diretorio: fonte
+// Mini-RISC: emulador de CPU baseada em registradores + Assembler de 2 passes em Delegua/CGD.
+// Arquitetura: 16 registradores (r0/zero, r1..r13, r14/sp, r15/lr), RAM de 256 palavras,
+// pilha de hardware (PUSH/POP), sub-rotinas (CALL/RET) e operacoes aritmeticas/bitwise.
+// Compilar na raiz: ./cgd exemplos/riscv_vm/vm.delegua -s out/riscv_vm
+// Executar: cd exemplos/riscv_vm && ../../out/riscv_vm
+
+enum OpCPU {
+    MOVI,
+    MOV,
+    ADD,
+    ADDI,
+    SUB,
+    SUBI,
+    MUL,
+    DIV,
+    MOD,
+    AND,
+    OR,
+    XOR,
+    SHL,
+    SHR,
+    LOAD,
+    STORE,
+    PUSH,
+    POP,
+    CMP,
+    JMP,
+    JEQ,
+    JNE,
+    JLT,
+    JLE,
+    JGT,
+    JGE,
+    CALL,
+    RET,
+    PRINT,
+    HALT
+}
+
+classe ErroMontagem herda Excecao {
+    construtor(mensagem: texto) {
+        super(mensagem)
+    }
+}
+
+classe ErroCPU herda Excecao {
+    construtor(mensagem: texto) {
+        super(mensagem)
+    }
+}
+
+classe InstrucaoCPU {
+    op: OpCPU
+    a: inteiro
+    b: inteiro
+    c: inteiro
+
+    construtor(op: OpCPU, a: inteiro = 0, b: inteiro = 0, c: inteiro = 0) {
+        isto.op = op
+        isto.a = a
+        isto.b = b
+        isto.c = c
+    }
+}
+
+classe Montador {
+    limparLinha(linha: texto): texto {
+        var posComentario: inteiro = -1
+        para (var i: inteiro = 0; i < linha.tamanho(); i++) {
+            se (linha[i] == ";") {
+                posComentario = i
+                sustar
+            }
+        }
+        var limpa: texto = linha
+        se (posComentario >= 0) {
+            var buf: texto[] = []
+            para (var i: inteiro = 0; i < posComentario; i++) {
+                buf.empilhar(linha[i])
+            }
+            limpa = buf.juntar("")
+        }
+        retorna limpa.aparar()
+    }
+
+    quebrarTokens(linha: texto): texto[] {
+        var tokens: texto[] = []
+        var atual: texto[] = []
+        para (var i: inteiro = 0; i < linha.tamanho(); i++) {
+            const c: texto = linha[i]
+            se (c == " " ou c == "\t" ou c == ",") {
+                se (atual.tamanho() > 0) {
+                    tokens.empilhar(atual.juntar(""))
+                    atual = []
+                }
+            } senao {
+                atual.empilhar(c)
+            }
+        }
+        se (atual.tamanho() > 0) {
+            tokens.empilhar(atual.juntar(""))
+        }
+        retorna tokens
+    }
+
+    decodificarReg(nome: texto, numLinha: inteiro): inteiro {
+        const lower: texto = nome.minusculo()
+        se (lower == "zero") retorna 0
+        se (lower == "sp") retorna 14
+        se (lower == "lr") retorna 15
+        se (lower.tamanho() >= 2 e lower[0] == "r") {
+            var digitos: texto[] = []
+            para (var i: inteiro = 1; i < lower.tamanho(); i++) {
+                se (!"0123456789".contem(lower[i])) {
+                    falhar ErroMontagem("Linha ${numLinha}: registrador invalido '${nome}'")
+                }
+                digitos.empilhar(lower[i])
+            }
+            const idx: inteiro = inteiro(digitos.juntar(""))
+            se (idx >= 0 e idx <= 15) retorna idx
+        }
+        falhar ErroMontagem("Linha ${numLinha}: registrador invalido '${nome}'")
+    }
+
+    decodificarLabel(nome: texto, labels: dicionario, numLinha: inteiro): inteiro {
+        se (!labels.contem(nome)) {
+            falhar ErroMontagem("Linha ${numLinha}: label indefinido '${nome}'")
+        }
+        retorna inteiro(labels[nome])
+    }
+
+    montar(fonte: texto): InstrucaoCPU[] {
+        const linhasBrutas: texto[] = fonte.dividir("\n")
+        var labels: dicionario = {}
+        var linhasInst: texto[] = []
+        var numerosLinha: inteiro[] = []
+
+        // Passe 1: coleta labels e linhas de instrucao
+        para (var i: inteiro = 0; i < linhasBrutas.tamanho(); i++) {
+            var linha: texto = isto.limparLinha(linhasBrutas[i])
+            se (linha.tamanho() == 0) continua
+            se (linha[linha.tamanho() - 1] == ":") {
+                var nomeBuf: texto[] = []
+                para (var k: inteiro = 0; k < linha.tamanho() - 1; k++) {
+                    nomeBuf.empilhar(linha[k])
+                }
+                const nomeLabel: texto = nomeBuf.juntar("").aparar()
+                labels[nomeLabel] = linhasInst.tamanho()
+                continua
+            }
+            linhasInst.empilhar(linha)
+            numerosLinha.empilhar(i + 1)
+        }
+
+        // Passe 2: codifica instrucoes resolvendo labels e registradores
+        var programa: InstrucaoCPU[] = []
+        para (var i: inteiro = 0; i < linhasInst.tamanho(); i++) {
+            const numLinha: inteiro = numerosLinha[i]
+            const toks: texto[] = isto.quebrarTokens(linhasInst[i])
+            const mnem: texto = toks[0].maiusculo()
+
+            se (mnem == "MOVI") {
+                programa.empilhar(InstrucaoCPU(OpCPU.MOVI, isto.decodificarReg(toks[1], numLinha),
+                    inteiro(toks[2]), 0))
+            } senao se (mnem == "MOV") {
+                programa.empilhar(InstrucaoCPU(OpCPU.MOV, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), 0))
+            } senao se (mnem == "ADD") {
+                programa.empilhar(InstrucaoCPU(OpCPU.ADD, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), isto.decodificarReg(toks[3], numLinha)))
+            } senao se (mnem == "ADDI") {
+                programa.empilhar(InstrucaoCPU(OpCPU.ADDI, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), inteiro(toks[3])))
+            } senao se (mnem == "SUB") {
+                programa.empilhar(InstrucaoCPU(OpCPU.SUB, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), isto.decodificarReg(toks[3], numLinha)))
+            } senao se (mnem == "SUBI") {
+                programa.empilhar(InstrucaoCPU(OpCPU.SUBI, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), inteiro(toks[3])))
+            } senao se (mnem == "MUL") {
+                programa.empilhar(InstrucaoCPU(OpCPU.MUL, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), isto.decodificarReg(toks[3], numLinha)))
+            } senao se (mnem == "DIV") {
+                programa.empilhar(InstrucaoCPU(OpCPU.DIV, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), isto.decodificarReg(toks[3], numLinha)))
+            } senao se (mnem == "MOD") {
+                programa.empilhar(InstrucaoCPU(OpCPU.MOD, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), isto.decodificarReg(toks[3], numLinha)))
+            } senao se (mnem == "AND") {
+                programa.empilhar(InstrucaoCPU(OpCPU.AND, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), isto.decodificarReg(toks[3], numLinha)))
+            } senao se (mnem == "OR") {
+                programa.empilhar(InstrucaoCPU(OpCPU.OR, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), isto.decodificarReg(toks[3], numLinha)))
+            } senao se (mnem == "XOR") {
+                programa.empilhar(InstrucaoCPU(OpCPU.XOR, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), isto.decodificarReg(toks[3], numLinha)))
+            } senao se (mnem == "SHL") {
+                programa.empilhar(InstrucaoCPU(OpCPU.SHL, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), inteiro(toks[3])))
+            } senao se (mnem == "SHR") {
+                programa.empilhar(InstrucaoCPU(OpCPU.SHR, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), inteiro(toks[3])))
+            } senao se (mnem == "LOAD") {
+                programa.empilhar(InstrucaoCPU(OpCPU.LOAD, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), inteiro(toks[3])))
+            } senao se (mnem == "STORE") {
+                programa.empilhar(InstrucaoCPU(OpCPU.STORE, isto.decodificarReg(toks[1],
+                    numLinha), isto.decodificarReg(toks[2], numLinha), inteiro(toks[3])))
+            } senao se (mnem == "PUSH") {
+                programa.empilhar(InstrucaoCPU(OpCPU.PUSH, isto.decodificarReg(toks[1], numLinha),
+                    0, 0))
+            } senao se (mnem == "POP") {
+                programa.empilhar(InstrucaoCPU(OpCPU.POP, isto.decodificarReg(toks[1], numLinha),
+                    0, 0))
+            } senao se (mnem == "CMP") {
+                programa.empilhar(InstrucaoCPU(OpCPU.CMP, isto.decodificarReg(toks[1], numLinha),
+                    isto.decodificarReg(toks[2], numLinha), 0))
+            } senao se (mnem == "JMP") {
+                programa.empilhar(InstrucaoCPU(OpCPU.JMP, isto.decodificarLabel(toks[1],
+                    labels, numLinha), 0, 0))
+            } senao se (mnem == "JEQ") {
+                programa.empilhar(InstrucaoCPU(OpCPU.JEQ, isto.decodificarLabel(toks[1],
+                    labels, numLinha), 0, 0))
+            } senao se (mnem == "JNE") {
+                programa.empilhar(InstrucaoCPU(OpCPU.JNE, isto.decodificarLabel(toks[1],
+                    labels, numLinha), 0, 0))
+            } senao se (mnem == "JLT") {
+                programa.empilhar(InstrucaoCPU(OpCPU.JLT, isto.decodificarLabel(toks[1],
+                    labels, numLinha), 0, 0))
+            } senao se (mnem == "JLE") {
+                programa.empilhar(InstrucaoCPU(OpCPU.JLE, isto.decodificarLabel(toks[1],
+                    labels, numLinha), 0, 0))
+            } senao se (mnem == "JGT") {
+                programa.empilhar(InstrucaoCPU(OpCPU.JGT, isto.decodificarLabel(toks[1],
+                    labels, numLinha), 0, 0))
+            } senao se (mnem == "JGE") {
+                programa.empilhar(InstrucaoCPU(OpCPU.JGE, isto.decodificarLabel(toks[1],
+                    labels, numLinha), 0, 0))
+            } senao se (mnem == "CALL") {
+                programa.empilhar(InstrucaoCPU(OpCPU.CALL, isto.decodificarLabel(toks[1],
+                    labels, numLinha), 0, 0))
+            } senao se (mnem == "RET") {
+                programa.empilhar(InstrucaoCPU(OpCPU.RET, 0, 0, 0))
+            } senao se (mnem == "PRINT") {
+                programa.empilhar(InstrucaoCPU(OpCPU.PRINT, isto.decodificarReg(toks[1],
+                    numLinha), 0, 0))
+            } senao se (mnem == "HALT") {
+                programa.empilhar(InstrucaoCPU(OpCPU.HALT, 0, 0, 0))
+            } senao {
+                falhar ErroMontagem("Linha ${numLinha}: instrucao desconhecida '${mnem}'")
+            }
+        }
+        retorna programa
+    }
+}
+
+classe CPU {
+    regs: inteiro[]
+    ram: inteiro[]
+    tamanhoRam: inteiro
+    pc: inteiro
+    flagEq: logico
+    flagLt: logico
+    ciclos: inteiro
+    saidas: texto[]
+
+    construtor(tamanhoRam: inteiro = 256) {
+        isto.tamanhoRam = tamanhoRam
+        isto.regs = []
+        para (var i: inteiro = 0; i < 16; i++) {
+            isto.regs.empilhar(0)
+        }
+        isto.ram = []
+        para (var j: inteiro = 0; j < tamanhoRam; j++) {
+            isto.ram.empilhar(0)
+        }
+        isto.regs[14] = tamanhoRam
+        isto.pc = 0
+        isto.flagEq = falso
+        isto.flagLt = falso
+        isto.ciclos = 0
+        isto.saidas = []
+    }
+
+    escreverReg(idx: inteiro, valor: inteiro): vazio {
+        se (idx != 0) {
+            isto.regs[idx] = valor
+        }
+    }
+
+    verificarEndereco(end: inteiro): vazio {
+        se (end < 0 ou end >= isto.tamanhoRam) {
+            falhar ErroCPU("Acesso fora da RAM: endereco ${end}")
+        }
+    }
+
+    executar(programa: InstrucaoCPU[]): vazio {
+        const limite: inteiro = programa.tamanho()
+        enquanto (isto.pc >= 0 e isto.pc < limite) {
+            const inst: InstrucaoCPU = programa[isto.pc]
+            isto.pc++
+            isto.ciclos++
+
+            const op: OpCPU = inst.op
+            se (op == OpCPU.HALT) sustar
+            senao se (op == OpCPU.MOVI) isto.escreverReg(inst.a, inst.b)
+            senao se (op == OpCPU.MOV) isto.escreverReg(inst.a, isto.regs[inst.b])
+            senao se (op == OpCPU.ADD) isto.escreverReg(inst.a, isto.regs[inst.b] + isto.regs[inst.c])
+            senao se (op == OpCPU.ADDI) isto.escreverReg(inst.a, isto.regs[inst.b] + inst.c)
+            senao se (op == OpCPU.SUB) isto.escreverReg(inst.a, isto.regs[inst.b] - isto.regs[inst.c])
+            senao se (op == OpCPU.SUBI) isto.escreverReg(inst.a, isto.regs[inst.b] - inst.c)
+            senao se (op == OpCPU.MUL) isto.escreverReg(inst.a, isto.regs[inst.b] * isto.regs[inst.c])
+            senao se (op == OpCPU.DIV) {
+                const d: inteiro = isto.regs[inst.c]
+                se (d == 0) falhar ErroCPU("Divisao por zero")
+                isto.escreverReg(inst.a, inteiro(isto.regs[inst.b] / d))
+            } senao se (op == OpCPU.MOD) {
+                const d: inteiro = isto.regs[inst.c]
+                se (d == 0) falhar ErroCPU("Resto por zero")
+                isto.escreverReg(inst.a, isto.regs[inst.b] % d)
+            } senao se (op == OpCPU.AND) isto.escreverReg(inst.a, isto.regs[inst.b] & isto.regs[inst.c])
+            senao se (op == OpCPU.OR) isto.escreverReg(inst.a, isto.regs[inst.b] | isto.regs[inst.c])
+            senao se (op == OpCPU.XOR) isto.escreverReg(inst.a, isto.regs[inst.b] ^ isto.regs[inst.c])
+            senao se (op == OpCPU.SHL) isto.escreverReg(inst.a, isto.regs[inst.b] << inst.c)
+            senao se (op == OpCPU.SHR) isto.escreverReg(inst.a, isto.regs[inst.b] >> inst.c)
+            senao se (op == OpCPU.LOAD) {
+                const end: inteiro = isto.regs[inst.b] + inst.c
+                isto.verificarEndereco(end)
+                isto.escreverReg(inst.a, isto.ram[end])
+            } senao se (op == OpCPU.STORE) {
+                const end: inteiro = isto.regs[inst.b] + inst.c
+                isto.verificarEndereco(end)
+                isto.ram[end] = isto.regs[inst.a]
+            } senao se (op == OpCPU.PUSH) {
+                isto.regs[14] = isto.regs[14] - 1
+                isto.verificarEndereco(isto.regs[14])
+                isto.ram[isto.regs[14]] = isto.regs[inst.a]
+            } senao se (op == OpCPU.POP) {
+                isto.verificarEndereco(isto.regs[14])
+                const val: inteiro = isto.ram[isto.regs[14]]
+                isto.regs[14] = isto.regs[14] + 1
+                isto.escreverReg(inst.a, val)
+            } senao se (op == OpCPU.CMP) {
+                const x: inteiro = isto.regs[inst.a]
+                const y: inteiro = isto.regs[inst.b]
+                isto.flagEq = x == y
+                isto.flagLt = x < y
+            } senao se (op == OpCPU.JMP) isto.pc = inst.a
+            senao se (op == OpCPU.JEQ) {
+                se (isto.flagEq) isto.pc = inst.a
+            }
+            senao se (op == OpCPU.JNE) {
+                se (!isto.flagEq) isto.pc = inst.a
+            }
+            senao se (op == OpCPU.JLT) {
+                se (isto.flagLt) isto.pc = inst.a
+            }
+            senao se (op == OpCPU.JLE) {
+                se (isto.flagLt ou isto.flagEq) isto.pc = inst.a
+            }
+            senao se (op == OpCPU.JGT) {
+                se (!isto.flagLt e !isto.flagEq) isto.pc = inst.a
+            }
+            senao se (op == OpCPU.JGE) {
+                se (!isto.flagLt) isto.pc = inst.a
+            }
+            senao se (op == OpCPU.CALL) {
+                isto.regs[15] = isto.pc
+                isto.pc = inst.a
+            } senao se (op == OpCPU.RET) {
+                isto.pc = isto.regs[15]
+            } senao se (op == OpCPU.PRINT) {
+                isto.saidas.empilhar(texto(isto.regs[inst.a]))
+            }
+        }
+    }
+}
+
+const arquivos: qualquer = importar("cgd:arquivos")
+const caminho: texto = "programa.asm"
+const arquivo: qualquer = arquivos.Arquivo(caminho)
+se (!arquivo.existe()) {
+    falhar "Arquivo assembly nao encontrado: ${caminho}"
+}
+
+const programa: InstrucaoCPU[] = Montador().montar(arquivo.ler())
+const cpu: CPU = CPU(256)
+cpu.executar(programa)
+const saidaCpu: texto = cpu.saidas.juntar(", ")
+assercao(saidaCpu == "21, 40320, 3, 7, 11, 19, 25, 42", "Saida inesperada da CPU RISC: ${saidaCpu}")
+assercao(cpu.regs[14] == 256, "Stack pointer deveria retornar a 256")
+escreva("Saida da CPU: " + saidaCpu)
+escreva("Instrucoes montadas: ${programa.tamanho()} | Ciclos executados: ${cpu.ciclos} | SP final: ${cpu.regs[14]}")

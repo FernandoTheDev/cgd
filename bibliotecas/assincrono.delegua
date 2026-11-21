@@ -33,6 +33,12 @@ classe estrangeira OperacoesAssincronas {
     estatico canalTamanho(canal: qualquer): inteiro;
     @definicao(simbolo = "canalCapacidade")
     estatico canalCapacidade(canal: qualquer): inteiro;
+    @definicao(simbolo = "rotinasConfigurar")
+    estatico rotinasConfigurar(workers: inteiro, capacidade: inteiro): inteiro;
+    @definicao(simbolo = "rotinasWorkersRecomendados")
+    estatico rotinasWorkersRecomendados(memPorTarefaBytes: inteiro): inteiro;
+    @definicao(simbolo = "rotinasEstatisticas")
+    estatico rotinasEstatisticas(): dicionario;
 }
 
 classe Tempo {
@@ -286,5 +292,23 @@ classe GrupoTarefas {
             isto.cancelarTodas()
             falhar erro
         }
+    }
+}
+
+classe Rotinas {
+    estatico configurar(workers: inteiro = 0, capacidade: inteiro = 256): inteiro {
+        retorna OperacoesAssincronas.rotinasConfigurar(workers, capacidade)
+    }
+
+    estatico workersRecomendados(memPorTarefaBytes: inteiro = 0): inteiro {
+        retorna OperacoesAssincronas.rotinasWorkersRecomendados(memPorTarefaBytes)
+    }
+
+    estatico estatisticas(): dicionario {
+        retorna OperacoesAssincronas.rotinasEstatisticas()
+    }
+
+    estatico recursos(): dicionario {
+        retorna importar("cgd:nativo").Primitivas.sistemaRecursos()
     }
 }

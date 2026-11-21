@@ -1,3 +1,440 @@
+# Quarta Auditoria Técnica — Paralelismo Nativo, `cgd:memoria` e Otimização Profunda CGD × DCC (Ciclo IV — Prompt Mestre VIII) — 21/11/2026
+
+Solicitação ativa: auditar integralmente o runtime de rotinas do CGD (25 perguntas §4.1 com evidência de código e microbenchmarks), projetar e implementar a biblioteca padrão segura `cgd:memoria`, evoluir o runtime paralelo (`Bytes` congelado *zero-copy*, pool dinâmico configurável, detecção de recursos via afinidade/cgroups/RAM, `Processo.executarLote` e correções de thread-safety), e integrar tudo ao DCC Ciclo V reduzindo tempo e memória simultaneamente com determinismo bit a bit.
+
+## Implementação entregue
+
+- **Runtime C (`vendor/delegua-runtime/src/`)**:
+  - `bytes_interno.h`, `bytes_rt.c`, `rotinas_transferencia.{h,c}`: `rt_shared_bytes` fora do Boehm GC com refcount atômico *Arc* (`acquire`/`release`), `Bytes.congelar()` imutável com transferência **zero-copy** entre threads (`RT_TRANSFER_IMMUTABLE_BYTES`), limite de transferência elevado de `16 MiB` para `64 MiB`, e novas primitivas binárias (`ehCongelado`, `capacidade`, `limpar`, `liberar`, `reservar`, `lerU16LE/U32LE/U64LE`, `definirU64LE`, `anexarBytesFatia`, `anexarPreenchimento`, `lerCString`).
+  - `memoria_rt.c` + `valores.c` + `colecoes.c` + `delegua_rt.h`: tipos nativos `DELEGUA_T_ARENA` e `DELEGUA_T_ARENA_SLICE`, `Arena` em `malloc` fora do GC com contador de geração de 64 bits (prevenção determinística contra *use-after-free*, *use-after-reset* e *double-free*), finalizador GC anti-vazamento, `FatiaBytes`, `FatiaInt64`, telemetria completa (`memEstatisticas`) e controles seguros do Boehm GC (`memColetar`, `memColetarSeAcima`, `memDefinirDivisor`, `memDefinirFreqCompleta`, `memExpandirHeap`).
+  - `sistema_posix.c` + `interno.h`: detecção confiável de recursos `rt_detectar_recursos` (CPUs lógicas, `sched_getaffinity`, cgroup v2 `cpu.max`/`memory.max`/`memory.current` com fallback cgroup v1, `/proc/meminfo`, `RLIMIT_NPROC`, índice de pressão de memória) e política conservadora `rt_workers_recomendados`.
+  - `rotinas_pool.{h,c}`, `rotinas_reactor.c`: alocação circular $O(1)$ de slots, telemetria `rt_pool_stats`, pool inicializado via `rt_workers_recomendados(0)` e reconfigurável em runtime (`delegua_async_rotinasConfigurar`).
+  - `processo_posix.c`: `delegua_ffi_sistemaExecutarLote` (`posix_spawnp` + `poll()` com concorrência máxima limitada, timeouts e saída ordenada `0..N-1`).
+  - `objetos.c`, `modulos.c`: corrigida *data race* real em `delegua_funcao_cache` (`func_cache_mutex` + atômicas), endurecidos ICs com `DELEGUA_ATOMIC_LOAD_PTR`, inicialização thread-safe recursiva de módulos (`delegua_mod_lock`) e **destravamento de Inline Caching monomórfico para classes fechadas com campos `privado`** (`Bytes`, `Arena`, `FatiaBytes`, `FatiaInt64`).
+- **Compilador D (`src/`)**:
+  - `src/frontend/parser/ast.d`, `src/frontend/semantic/foreign.d`, `src/frontend/semantic/routine_validation.d`: suporte a `@definicao(..., paralelo = verdadeiro)` restrito exclusivamente a `biblioteca = "cgd-runtime", abi = "delegua"`, permissão de módulos puros (`ImportExpr`) e instanciação auditada de classes exportadas (`right.classRef`) dentro de `rotina`, preservando bloqueio `E3402`/`E3403` para I/O, FFI externo e objetos mutáveis.
+  - `src/backend/c/codegen.d`: inicialização de módulos thread-safe (`DELEGUA_ATOMIC_LOAD_INT`/`STORE_INT` + `delegua_mod_lock`/`unlock`).
+- **Biblioteca Padrão (`bibliotecas/`)**:
+  - Criada `memoria.delegua` (`Memoria`, `Arena`, `FatiaBytes`, `FatiaInt64`, `PoolBuffers`, `EscopoMemoria`).
+  - Atualizadas `bytes.delegua`, `assincrono.delegua` (`Rotinas`), `sistema.delegua` (`Sistema.recursos()`), `processo.delegua` (`Processo.executarLote()`), `nativo.delegua`.
+- **Relatórios e scripts**:
+  - `docs/ROTINAS_AUDITORIA_CICLO_IV.md`, `docs/MEMORIA_API_CICLO_IV.md`, `docs/PARALELISMO_RUNTIME_CICLO_IV.md`, `docs/PERFORMANCE_CICLO_IV.md`, `scripts/bench_rotinas_memoria.py`, `testes/memoria.py`.
+
+## Resultados quantitativos reais medidos
+
+- `06_bytes_frozen_zero_copy` (`16 MiB` × 4 workers): **`76,92 ms → 19,62 ms` (`3,92×`)**, `transfer_ms = 0,011 ms`, apenas `137 KiB` de alocação GC (vs `80 MiB` GC em 4 MiB de `texto`).
+- `07_arena_vs_bytes_vs_vetor_vs_dict`: `Arena FatiaInt64` **`76,86 ms`** com **`10 KiB` GC** vs `inteiro[]` `54,35 ms` com `61.467 KiB` GC (**6.147× menos churn no GC**).
+- `08_workers_1_2_4_8_scaling`: `w1=535,4 ms → w2=290,5 ms (1,84×) → w4=194,2 ms (2,76×) → w8=114,6 ms (4,67×)` com `7,8 MiB` RSS.
+- **Impacto no DCC Ciclo V (`frozen_dcc.c`, `clang -O2`, mesmos headers)**: tempo **`12,11 s → 8,66 s` (`-28,5%`)**, pico RSS **`995.100 KB → 572.960 KB` (`-42,4%`)**, SHA-256 bit a bit idêntico; Multi-TU (17 `.c`): **`1,96 s → 1,06 s` (`-j4`) / `0,83 s` (`-j8`)**; Linker 300 `.o`: **`0,20 s / 154 MiB → 0,03 s / 22 MiB`**.
+
+## Testes realmente executados
+
+- `./build-runtime`, `(cd vendor/delegua-runtime && ./tests/run.sh)`, `python3 testes/assincronismo.py` (Clang, GCC `-O2`, ASan/UBSan e **TSan**): todos aprovados (0 races/erros).
+- `dub test --compiler=dmd --config=unittest` e `dub test --compiler=ldc2 --config=unittest`: 10/10 módulos aprovados.
+- `testes/memoria.py` (9), `testes/rotinas.py` (15), `testes/driver.py` (26), `testes/stdlib.py` (122), `testes/integracao.py` (439), `testes/async_linguagem.py` (30), `testes/bibliotecas.py` (342), `testes/exemplos.py` (155 exemplos, 310 verificações, 0 falhas): todos aprovados.
+- Formatação verificada (`./cgd --verificar-formatacao`) nos 6 arquivos da biblioteca padrão alterados e reinstalados via `./instalar --no-build`.
+
+---
+
+# Terceira Auditoria Técnica Profunda e Engenharia Cruzada CGD × DCC (Ciclo III — Prompt Mestre VII) — 21/11/2026
+
+Solicitação ativa: auditar e otimizar simultaneamente o CGD (`src/`, `vendor/delegua-runtime/`, `bibliotecas/`) e o DCC (`/home/fernandodev/dcc`) sob a carga real de auto-compilação (`build/dcc.c`, ~865k–955k tokens), atacando o consumo de memória de 6,4–7,1 GiB e os gargalos de tempo de execução, preservando 100% da semântica, segurança de threads/GC e portabilidade GCC/Clang/TinyCC.
+
+## Implementação entregue
+
+- **Runtime C (`vendor/delegua-runtime/`)**:
+  - `build`: habilitada otimização padrão `RT_OPT=${RT_OPT:--O2}` em `CFLAGS` (antes compilado em `-O0`).
+  - `src/objetos.c`, `src/delegua_rt.h`: instâncias de classe migradas de `hashmap` por objeto para cabeçalho compacto de 32 B + *flexible array member* `delegua_value slots[]` em alocação única `GC_MALLOC`, eliminando `semear_campos`, com layout plano thread-safe (`layout_mutex`), `ctor_cache`, `origem_erro` preguiçoso, `campos_extra` sob demanda e invalidação segura de layout; **Inline Caching monomórfico thread-safe** (`delegua_prop_ic`, `delegua_def_ic`, `delegua_chamar_ic`) com checagem inline `validar_slot_valor` e guardas atômicas C99/TinyCC (`DELEGUA_ATOMIC_LOAD_PTR`/`STORE_PTR`).
+  - `src/colecoes.c`, `src/biblioteca.c`, `src/interno.h`: `create_vetor()` e `create_map()` preguiçosos (`values=NULL`/`buckets=NULL` até a primeira inserção), `VETOR_INIT_CAP` reduzido de `8` para `4`, novo método nativo `vetor.limpar()` e liberação de `buckets` em `delegua_map_limpar`, com guarda contra UB em `memmove(NULL, ...)`.
+  - `src/bytes_rt.c` + `bibliotecas/bytes.delegua`: `Bytes` crescível em `GC_MALLOC_ATOMIC` com `criarReservado`, `anexarByte`, `anexarU16LE/U32LE/U64LE`, `definirU32LE`, `anexarBytes/Vetor/Zeros/Texto`, `fatiarTexto` e I/O binário direto (`gravarArquivo`, `lerArquivo`).
+  - `src/sistema_posix.c` + `bibliotecas/{nativo,sistema}.delegua`: `Sistema.memoria()` (`/proc/self/status`, `/proc/self/smaps_rollup`, Boehm GC) e `Sistema.coletarGC(desmapear)`.
+- **Compilador D (`src/`)**:
+  - `src/backend/c/codegen.d`, `src/backend/c/lvalue.d`: emissão de tabela `static const void *cgd_ic[N];` e chamadas `delegua_prop_ic`/`delegua_def_ic`/`delegua_chamar_ic` (zerando `delegua_chamar_membro` no C gerado do DCC 0.2.0).
+  - `src/backend/c/foreign.d`: checagem inline `delegua_assegurar_*_em` para primitivos em wrappers `@definicao` (no lugar de `delegua_assegurar_descr(..., delegua_descr_nome(...))`).
+  - `src/frontend/semantic/native_methods.d`: registro semântico de `vetor.limpar(): nulo`.
+- **Documentação e dados brutos**:
+  - `docs/AUDITORIA_CICLO_III.md`, `docs/PERFORMANCE_CICLO_III.md`, `docs/MEMORIA_RUNTIME_CICLO_III.md`, `out/bench_ciclo3_clang.json`, `out/bench_ciclo3_gcc.json`.
+
+## Resultados quantitativos reais medidos
+
+- **Microbenchmarks (`clang -O2` / `gcc -O2`)**:
+  - `oop_fields_methods`: **75,00 → 24,20 ms (3,10×)** / **84,56 → 29,72 ms (2,85×)**.
+  - `stdlib_bytes_json`: **40,55 → 19,57 ms (2,07×)** / **43,65 → 19,07 ms (2,29×)**.
+  - `dict_ops`: **46,38 → 36,60 ms** / **54,82 → 39,43 ms**.
+  - `string_unicode_preproc`: **8,50 → 6,77 ms** / **9,39 → 7,41 ms**.
+- **DCC 0.2.0 (`examples/hello_libc.c`)**: **266,7 → 168,5 ms** (`clang -O2`, -36,8%) e **290,7 → 168,1 ms** (`gcc -O2`, -42,2%); ciclos de GC `20 → 11`.
+- **DCC 0.2.0 auto-compilando `frozen_dcc.c` (`clang -O2`, Modo A)**: tempo **29,94 s → 8,56 s (3,50×)** e pico RSS **6.715.172 KB (6,40 GiB) → 955.216 KB (0,91 GiB, 7,03× menor / -85,8%)**.
+
+## Testes realmente executados
+
+- `./build-runtime` e `(cd vendor/delegua-runtime && ./tests/run.sh)` (incluindo +51 linhas de regressões de slots/IC/coleções/invalidação): OK.
+- `dub test --compiler=dmd --config=unittest` e `dub test --compiler=ldc2 --config=unittest`: 10/10 módulos aprovados.
+- `driver.py` (26), `integracao.py` (439), `expansao.py`, `enums.py`, `bibliotecas.py` (342), `stdlib.py` (122 contratos), `stdlib_avancada.py` (11), `linguagem_nova.py` (8), `rotinas.py` (15), `async_linguagem.py` (30), `assincronismo.py` (Clang/GCC/ASan/UBSan/TSan), `lsp.py` e `exemplos.py` (155 programas, 310 verificações, 0 falhas): todos aprovados.
+- ASan + UBSan sobre runtime C + `stdlib.py` (122 contratos) + `linguagem_nova.py` (8 verificações): 0 erros (runtime `-O2` restaurado e reinstalado em seguida).
+- TinyCC `0.9.28rc`: smoke (`TCC-OK:42`) e auto-compilação completa do DCC 0.2.0 com `.o` bit-a-bit idêntico a GCC e Clang.
+
+---
+
+# Segunda Auditoria Técnica Total e Otimização Profunda (Ciclo II — Prompt Mestre V) — 21/11/2026
+
+Solicitação ativa: auditar novamente todo o CGD (`src/`, `vendor/delegua-runtime/`, biblioteca padrão, CLI/LSP, portabilidade C99/TinyCC e ferramentas), corrigir gargalos estruturais e regressões sutis preservando 100% da semântica e dos contratos de segurança da Delégua, documentando em `docs/AUDITORIA_CICLO_II.md` e `docs/PERFORMANCE_CICLO_II.md`.
+
+## Implementação entregue
+
+- **Runtime C (`vendor/delegua-runtime/src/`)**:
+  - `objetos.c`: separação dos caches atômicos `promise_of_this` e `task_of_this` em `struct delegua_tipo` via `descr_unary_cached` (corrigindo mutação acidental de `array_of_this` por `delegua_descr_promessa`/`delegua_descr_tarefa`), `semear_campos` direto por `c->nomes_campos` sem alocar tuplas, atalho de despacho em classes fechadas sem acessores/restrições, `conforme`/`fixar_contrato` em $O(1)$ para `qualquer` ou restrições já registradas e `delegua_assegurar_descr_em`.
+  - `textos.c`: prefixo rápido ASCII (`first_non_ascii`), retomada de varredura SWAR de 64 bits após multibyte, amostragem intermediária (`mid_sample`), slot MRU na cache TLS e cursor bidirecional em `rt_text_offset` / `rt_text_char_at`.
+  - `colecoes.c`, `biblioteca.c`, `adicionais.c`, `interno.h`, `delegua_rt.h`, `valores.c`: `VETOR_INIT_CAP = 8`, `create_tupla` exato, tabelas hash com máscara `h & (cap - 1)` sem dupla busca pós-rehash, fast-paths em `delegua_obter`/`delegua_iterar` e cursor TLS para dicionários, `delegua_op_in` em textos via `memchr`, `delegua_conv_inteiro`, `delegua_conv_real`, `delegua_tamanho_val`, `delegua_assegurar_*_em`, despacho rápido em `rt_chamar_metodo_padrao`, `rt_hash_cstr` inline e portabilidade C99/TinyCC (`DELEGUA_LIKELY`/`DELEGUA_UNLIKELY`, `delegua_local_atual_slot()`, `((sz)-1)`, inicializadores `.value = {.campo = ...}` e guardas GCC/Clang).
+- **Compilador CGD (`src/`)**:
+  - `src/backend/c/codegen.d` e `src/driver/compile.d`: eliminação de código morto interprocedimental (`computeReachability`, `isReachable`) podando módulos, classes, métodos, exportações e bibliotecas nativas não alcançáveis; despacho direto estático para funções de módulo/estáticas/livres (`delegua_chamar_direto` com init idempotente quando necessário), construtores (`delegua_instanciar`) e builtins 1-arg (`texto`, `tamanho`, `inteiro`, `real`, `clonar`, `destruir`, `tupla`, `leia`); eliminação de temporários `cgd_tmp_*`, checagens `checked` e `delegua_is_truthy` (`effectiveTypeExpr`, `nodeMatchesExactType`, `compileCondition`, `nodesToStr`, `MapLit` com chaves seguras, `ConditionalExpr`, omissão de `return` morto final); ordem de avaliação segura em lvalues (`resolveLValue(node, rhs)` protegendo `v[i] = i++`).
+  - `src/frontend/semantic/analyzer.d`, `src/frontend/semantic/routine_validation.d`, `src/backend/c/utils.d`, `src/backend/c/foreign.d`: propagação de `classRef` em aliases `const`, `importVisited` único em `collectGlobals`, cache TLS em `cName`/`cString`, poda de checagem `qualquer` e protótipo `_exit(int)` no wrapper FFI, além de medição isolada de carregamento de módulos no `--tempo`.
+- **Regressões e benchmark**:
+  - Casos adicionados em `testes/casos_linguagem.py` (`lvalue_indice_pos_incremento`, `cursor_utf8_reverso_multibyte`, `literais_numericos_expandidos_ciclo2`, `promessa_nao_corrompe_descr_vetor`) e em `vendor/delegua-runtime/tests/runtime.c` (independência de `delegua_descr_array`/`delegua_descr_promessa`/`delegua_descr_tarefa`).
+  - `scripts/benchmark_suite.py` expandido com estatísticas `min`/`median`/`max`, métricas C, `--tempo` e `GC_PRINT_STATS`, gerando `out/bench_ciclo2_gcc.json` e `out/bench_ciclo2_clang.json`.
+  - Documentação gerada em `docs/AUDITORIA_CICLO_II.md` e `docs/PERFORMANCE_CICLO_II.md`.
+
+## Testes realmente executados
+
+- `./build-runtime` e `(cd vendor/delegua-runtime && ./tests/run.sh)`: OK (incluindo async C e caminhos de erro).
+- `dub test --compiler=dmd --config=unittest` e `dub test --compiler=ldc2 --config=unittest`: 10 módulos aprovados em ambos.
+- `dub build --compiler=ldc2 --build=release` e `./cgd --cc=/usr/local/sbin/tcc` (TinyCC 0.9.28rc): build e execução validados (`CLI_STATUS=0`).
+- `python3 testes/driver.py`: 26 verificações aprovadas.
+- `python3 testes/integracao.py`: 439 verificações aprovadas.
+- `python3 testes/expansao.py`, `enums.py`, `bibliotecas.py` (342 verificações), `stdlib.py` (114 contratos), `stdlib_avancada.py` (11 verificações), `linguagem_nova.py` (8 verificações), `rotinas.py` (15 verificações), `async_linguagem.py` (30 verificações), `assincronismo.py` (Clang/GCC/ASan/UBSan/TSan), `lsp.py` e `exemplos.py` (155 exemplos, 310 verificações, 0 falhas): todos aprovados.
+- `python3 scripts/formatar.py`, `python3 scripts/formatar.py --check` e `python3 scripts/verificar_tipos.py`: aprovados.
+
+---
+
+# Auditoria Total, Otimização do Compilador, Runtime C, Biblioteca Padrão e Expansão de Literais Numéricos — 21/11/2026
+
+Solicitação ativa: realizar auditoria técnica baseada em evidências de todo o ecossistema CGD (36 componentes: frontend, lexer, parser, AST, sistema de tipos, semântica, CTFE, otimizador, lowering, codegen C, runtime C, Boehm GC, FFI, biblioteca padrão, formatador e testes), produzir `docs/AUDITORIA_COMPLETA.md` e `docs/PERFORMANCE_AUDIT.md`, expandir o suporte a literais numéricos no lexer e formatador, e implementar refatorações e otimizações concretas de geração de código C e runtime tendo o **DCC 0.1.0** e uma suíte de microbenchmarks (`scripts/benchmark_suite.py`) como estudo de caso quantitativo.
+
+## Decisões e Implementação Entregue
+
+- **Documentação de Auditoria e Benchmarks**:
+  - `docs/AUDITORIA_COMPLETA.md`: catálogo estruturado com os 36 componentes auditados e os 11 achados (`AUD-01` a `AUD-11`) com causa raiz, evidências, testes, riscos e resultados medidos.
+  - `docs/PERFORMANCE_AUDIT.md` e `scripts/benchmark_suite.py`: suíte reproduzível comparando métricas antes/depois (GCC e Clang) para 8 microbenchmarks e para o DCC 0.1.0.
+- **Lexer, Formatador e Parser (`AUD-01`, `AUD-09`)**:
+  - `src/frontend/lexer/lexer.d`: corrigida decodificação UTF-8 em `future(uint n)`; adicionado suporte a comentários em bloco `/* ... */`; implementada máquina de estados linear $O(n)$ `lexNumberToken` suportando inteiros hexadecimais (`0xFF`, `0xFFFF_FFFF`), binários (`0b101010`, `0b1111_0000`), octais (`0o755`), separadores `_` entre dígitos (`1_000_000`, `3_141.592_653`), notação científica (`1.25e-8`, `6.022e23`) e ponto flutuante hexadecimal (`0x1.fp+3`), preservando chamadas de método sobre números (`10.absoluto()`, `0xFF.formatar()`) e emitindo diagnósticos `E1005` precisos para literais malformados (`0x`, `0b102`, `0o89`, `1__000`, `100_`, `1e+`, `0xGG`, overflow de 64 bits).
+  - `src/frontend/formatter.d`: `tokenizeDelegua` atualizado para preservar todos os novos formatos numéricos em um único token.
+  - `src/frontend/parser/parser.d`: `consume()` passa a explicar explicitamente quando uma palavra reservada (`e`, `ou`, `em`, `de`, etc.) é usada onde um `Identifier` era esperado.
+- **Dobramento de Constantes e Otimizador (`AUD-08`)**:
+  - `src/frontend/semantic/constants.d`: adicionado dobramento em tempo de compilação para operadores bit a bit (`&`, `|`, `^`, `<<`, `>>`), divisão inteira (`\`) e potência inteira (`**`) com verificação de limites.
+  - `src/opt/constant_folding.d`: adicionadas identidades algébricas seguras (`x + 0`, `0 + x`, `x - 0`, `x * 1`, `1 * x`, `x | 0`, `x ^ 0`, `x << 0`, `x >> 0`, `x \ 1`) para operandos comprovadamente `inteiro`.
+- **Geração de Código C (`src/backend/c/codegen.d` — `AUD-02`, `AUD-03`, `AUD-04`, `AUD-05`, `AUD-07`, `AUD-08`)**:
+  - Deduplicação de nomes de arquivo em `cgd_source_sites[]` via `static const char cgd_file_N[]`, reduzindo a tabela do DCC de **3,71 MB para 282 KB (-92,4%)**.
+  - Eliminação de `volatile delegua_value` em funções síncronas que não contêm `TryStmt` (`containsTryStmt`), reduzindo variáveis `volatile` no DCC de **1.667 para 79 (-95,3%)**.
+  - Eliminação de temporários redundantes `cgd_tmp_*` em `materialize()` e `nodesToStr()` (`isAlreadyMaterializedNode`, `isImmutableIdentifier`, análise `canMutateVar`/`siblingsCanMutateVar` e proteção contra autossombreamento C em inicializadores `currentDeclaringVar`), reduzindo `cgd_tmp_*` no DCC de **29.751 para 10.877 (-63,4%)** e cópias de `isto` de **3.328 para 0 (-100%)**.
+  - Elisão de verificações redundantes `delegua_assegurar_*` (`nodeMatchesExactType`) e de chamadas `delegua_is_truthy` (`isGuaranteedBoolNode` / `truthyExpr` usando `.value.b1`), reduzindo chamadas a `delegua_is_truthy` no DCC de **2.029 para 253 (-87,5%)**.
+  - Emissão de `create_text_lit` para literais de texto, `delegua_chamar_direto` para funções livres/estáticas conhecidas sem envelope e `delegua_chamar_membro` para chamadas de método.
+- **Runtime C (`vendor/delegua-runtime` — `AUD-05`, `AUD-06`, `AUD-07`, `AUD-08`, `AUD-11`) e Biblioteca Padrão (`AUD-10`)**:
+  - `valores.c` e `delegua_rt.h`: tabela estática `delegua_single_byte_strs[256][2]`, `create_text_lit` sem alocação GC para literais `.rodata`, fast-paths `static inline` para operações inteiras (`delegua_fast_op_*`) e checagens de tipo primitivo (`delegua_assegurar_*`).
+  - `textos.c`, `colecoes.c` e `biblioteca.c`: cache TLS de 8 slots com detecção ASCII 64-bit e cursor sequencial para indexação UTF-8 $O(1)$ (`rt_text_char_at`), fatiamento contíguo de strings (`delegua_intervalo` com `stride == 1`), `juntar`/`concatenar` em alocação única $O(N)$, helpers de mapa C-string sem alocação (`rt_map_try_get_cstr`, `rt_map_contains_cstr`) e despacho direto de métodos nativos (`rt_chamar_metodo_padrao`).
+  - `objetos.c`, `modulos.c` e `ffi.c`: singletons estáticos `delegua_tipo` com `fast_tag` em `delegua_descr_nome`, `delegua_chamar_membro` e `delegua_chamar_direto` sem alocar closure `ligar`, buffer `stack_args[16]`, e proteção por `pthread_mutex_t ffi_mutex` em `ffi.c`.
+  - `bibliotecas/bytes.delegua` (sincronizado com `~/.delegua/cgd/bytes.delegua`): classe estrangeira direta `@definicao` `PrimitivasBytes`, eliminando reimportação dinâmica por byte.
+
+## Resultados Quantitativos Reais Medidos
+
+- **DCC 0.1.0**:
+  - Linhas C (`-o`): **56.479 → 37.829 (-33,0%)**
+  - Bytes C (`-o`): **9.155.945 B (8,73 MiB) → 4.257.615 B (4,06 MiB) (-53,5%)**
+  - Execução do DCC compilando `examples/hello_libc.c` (com headers reais da glibc): **1.549,3 ms → 682,0 ms (`gcc -O2`, 2,27x mais rápido) / 692,9 ms (`clang -O2`, 2,24x mais rápido)**
+  - Binário DCC: **4.137.808 B → 3.859.264 B (`gcc -O2`, -6,7%) / 3.592.600 B (`clang -O2`, -13,2%)**
+- **Microbenchmarks (`gcc -O2` / `clang -O2`)**:
+  - `string_unicode_preproc`: **22.916,00 ms → 9,75 ms / 9,26 ms (~2.350x–2.475x mais rápido)**
+  - `fn_calls`: **365,67 ms → 30,34 ms (12,05x) / 25,55 ms (14,31x)**
+  - `int_loop`: **397,68 ms → 57,21 ms (6,95x) / 43,77 ms (9,09x)**
+  - `oop_fields_methods`: **688,24 ms → 103,21 ms (6,67x) / 96,71 ms (7,12x)**
+  - `stdlib_bytes_json`: **244,47 ms → 53,05 ms (4,61x) / 52,45 ms (4,66x)**
+  - `array_ops`: **115,42 ms → 40,95 ms (2,82x) / 38,60 ms (2,99x)**
+  - `float_loop`: **233,72 ms → 96,72 ms (2,42x) / 87,70 ms (2,67x)**
+  - `dict_ops`: **114,68 ms → 69,95 ms (1,64x) / 71,73 ms (1,60x)**
+
+## Testes Realmente Executados
+
+- `(cd vendor/delegua-runtime && ./tests/run.sh)`: todos os testes C do runtime e núcleo async aprovados.
+- `dub test --compiler=dmd --config=unittest` e `dub test --compiler=ldc2 --config=unittest`: 10/10 módulos aprovados.
+- `python3 testes/driver.py`: 26 verificações aprovadas.
+- `python3 testes/integracao.py`: 431 verificações aprovadas (incluindo os novos casos de literais numéricos, comentários de bloco, dobramento bit a bit/identidades e ordem de avaliação).
+- `python3 testes/expansao.py`, `python3 testes/enums.py`, `python3 testes/bibliotecas.py` (342 verificações), `python3 testes/stdlib.py` (114 contratos), `python3 testes/stdlib_avancada.py` (11 verificações), `python3 testes/linguagem_nova.py` (8 verificações), `python3 testes/rotinas.py` (15 verificações), `python3 testes/async_linguagem.py` (30 verificações), `python3 testes/assincronismo.py` (Clang, GCC, ASan/UBSan e TSan), `python3 testes/lsp.py`: todas aprovadas com 0 falhas.
+- `python3 testes/exemplos.py`: 155 exemplos; 310 verificações; 0 falhas; nenhum arquivo ignorado.
+- `(cd out/dcc_v010 && ./bootstrap/verify.sh)` com binário DCC compilado pelo CGD otimizado: **35/35 verificações aprovadas, 0 falhas**.
+
+---
+
+# Extração do Compilador C99 para Projeto Independente DCC (`/home/fernandodev/dcc`) — 21/11/2026
+
+Solicitação ativa: auditar o compilador C99 de `exemplos/compiladores_e_vms/compiladores/c_nativo/`
+e extraí-lo para um repositório Git independente chamado **DCC — Delégua C Compiler** em
+`/home/fernandodev/dcc`, consumindo os **cabeçalhos originais do sistema (`/usr/include` + diretório
+freestanding)** sem headers falsos, com camada formal GNU (Categorias A/B/C), objetos relocáveis
+ELF64 (`-c` → `.o` `ET_REL`), linker nativo ELF64, diagnósticos estruturados, bootstrap, `Makefile`,
+CI e documentação própria — preservando intacto o repositório CGD.
+
+## Entrega concluída em `/home/fernandodev/dcc`
+
+- Repositório Git local independente inicializado em `/home/fernandodev/dcc` (branch `main`, commit `25f3609`, sem push remoto), 29 arquivos versionados.
+- Processamento real dos headers da glibc em `/usr/include/` + diretório freestanding descoberto dinamicamente (`stdio.h`, `stdlib.h`, `string.h`, `stdint.h`, `stdbool.h`, `limits.h`, `iso646.h`, `float.h`, `inttypes.h`, `ctype.h`, `assert.h`, `errno.h`, `signal.h`, `math.h`, `time.h`, `stdarg.h`).
+- Camada formal GNU (`-std=c99` / `-std=gnu99`) com Categorias A/B/C, bit-fields C99, globais externas via GOT (`stdout`/`stderr`), código x86-64 PIC, emissor `.o` (`ET_REL`) e linker nativo ELF64 interoperável nos dois sentidos com GCC e Clang.
+- Bootstrap (`bootstrap/build.sh`, `bootstrap/verify.sh`), `Makefile` (`install`, `dist`, `format`, `check-format`), `.github/workflows/ci.yml` e docs (`README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/C99_CONFORMANCE.md`, `docs/GNU_COMPATIBILITY.md`, `docs/CONTINUITY.md`).
+
+## Testes realmente executados
+
+- Em `/home/fernandodev/dcc`:
+  - `./bootstrap/build.sh` e `./bootstrap/verify.sh`: **35/35 verificações aprovadas, 0 falhas** (diferencial contra GCC 16 e Clang 22 em `-O0` e `-O2`, 4 combinações de linkagem ELF64 DCC/GCC/Clang, auditoria `readelf`/`ldd`, 7 testes negativos/diagnósticos e execução a partir de `/tmp`).
+  - `make check-format`: todos os 12 `.delegua` de `src/` válidos.
+  - `make dist` (`dist/dcc-0.1.0-linux-x86_64.tar.gz`, 1,2 MB) e `make install DESTDIR=/tmp/dcc_stage PREFIX=/usr/local`: OK.
+- Em `/home/fernandodev/cgd`:
+  - `python3 testes/exemplos.py --examples-dir exemplos/compiladores_e_vms/compiladores/c_nativo` validado para garantir preservação intacta do CGD.
+
+---
+
+# Evolução Real do Compilador C99 Nativo (`c_nativo/`) — 21/11/2026
+
+Solicitação ativa: evoluir `exemplos/compiladores_e_vms/compiladores/c_nativo/`
+em direção a uma implementação real, modular e rigorosamente testada de ISO C99
+(x86-64 Linux / System V AMD64 ABI), escrita em Delégua e compilada pelo CGD,
+sem wrappers externos e sem hardcoding de headers/símbolos no pré-processador.
+
+## Implementação entregue
+
+- **Pré-processador C99 real (`preproc.delegua`) — zero tabelas de headers codificadas**:
+  - Fases 1–4: trigraphs, junção de linhas (`\` + `\n`), remoção de comentários
+    `/* ... */` e `//` preservando strings/chars, resolução real de `#include "..."`
+    e `#include <...>` com diretórios `-I`, macros de objeto, macros com parâmetros,
+    macros variádicas (`__VA_ARGS__`), stringificação (`#`), colagem de tokens (`##`),
+    hide-set contra recursão infinita, `#define`, `#undef`, `#if`/`#ifdef`/`#ifndef`/
+    `#elif`/`#else`/`#endif` com avaliador de expressões constantes e operador `defined`,
+    `#error`, `#line`, `#pragma once`, `_Pragma`, `-D` via CLI e macros predefinidas
+    (`__FILE__`, `__LINE__`, `__DATE__`, `__TIME__`, `__STDC__`, `__STDC_VERSION__`).
+- **Distribuição própria de 17 headers C99 reais (`include/*.h`)**:
+  - `stddef.h`, `stdint.h`, `stdbool.h`, `limits.h`, `iso646.h`, `float.h`,
+    `inttypes.h`, `errno.h`, `assert.h`, `ctype.h`, `string.h`, `stdlib.h`,
+    `stdio.h`, `stdarg.h`, `math.h`, `time.h`, `signal.h` — analisados pelo próprio
+    pré-processador/lexer/parser do compilador.
+- **Frontend C99 / LP64 (`tipos.delegua`, `lexer.delegua`, `parser.delegua`, `sema.delegua`)**:
+  - Larguras e alinhamentos reais LP64 (`_Bool`/`char`=1, `short`=2, `int`/`float`=4,
+    `long`/`long long`/`double`/ponteiro=8), padding interno e final em `struct`/`union`,
+    `offsetof`, `signed`/`unsigned`, promoções inteiras, conversões aritméticas usuais,
+    `typedef`, `enum`, globais `.data`/`.bss`, `static` locais, `__func__`, arrays
+    multidimensionais, arrays de tamanho inferido (`int a[] = ...`, `char s[] = "..."`),
+    VLAs com `sizeof` dinâmico, inicializadores designados, literais compostos,
+    ponteiros para funções, chamadas indiretas, `goto`/labels, `switch` com fallthrough,
+    `<stdarg.h>` (`__builtin_va_start`/`__builtin_va_arg`).
+  - Codificadores IEEE-754 puros em Delégua (`doubleParaBitsIEEE754` e `floatParaBitsIEEE754`).
+- **IR SSA Tipada, Otimizador e Verificador (`ir_ssa.delegua`)**:
+  - `ModuloSSA` com `.rodata`, `.data`, `.bss`, `libsExternas` (`libc.so.6` + `-lm` → `libm.so.6`),
+    cargas/escritas dimensionadas (1/2/4/8B signed/unsigned), SSE2 float/double,
+    `Alloca` 16B para VLAs, cópia de agregados, passagem/retorno de structs ≤ 8B por valor,
+    `va_list` compatível com System V AMD64, passes ConstProp/Folding/Simplificação/CopyProp/CFG/DCE
+    e verificador de invariantes (`verificarModuloSSA`).
+- **Backends Nativos (`backend_asm.delegua`, `backend_elf.delegua`) e Driver CLI (`c_nativo.delegua`)**:
+  - Backend 1 (`-S`): Assembly x86-64 Intel completo (`.rodata`, `.data`, `.bss`, `.text`, SSE2, >6 args na pilha, variádicos).
+  - Backend 2 (padrão): código de máquina x86-64 direto + ELF64 dinâmico com 2 segmentos `PT_LOAD`
+    separados (`R E` e `R W` alinhado em página 4096, sem `RWE`), 5 Program Headers, 13 Section Headers
+    (`.interp`, `.dynstr`, `.dynsym`, `.hash`, `.rela.dyn`, `.rodata`, `.text`, `.dynamic`, `.got`,
+    `.data`, `.bss`, `.shstrtab`), relocações `R_X86_64_GLOB_DAT` e `DT_NEEDED` dinâmico.
+  - Driver CLI suporta `-I`, `-D`, `-l`, `-o`, `-S`, `-E`, `-O0`, `-O1`, múltiplos `.c` (multi-TU) e modo auto-teste sem argumentos.
+- **Documentação técnica e suíte diferencial**:
+  - `ARQUITETURA.md` com especificação completa e matriz honesta de conformidade/pendências C99.
+  - `testes_c99.py` comparando `stdout` e `exit code` contra `gcc -std=c99` (`-O0` e `-O1`), incluindo `qsort` callback, `vsnprintf` da `libc.so.6` com `va_list` própria, `libm.so.6`, VLAs, multi-TU, testes negativos e auditoria `readelf`/`ldd`.
+
+## Testes realmente executados
+
+- `./cgd exemplos/compiladores_e_vms/compiladores/c_nativo/c_nativo.delegua -s out/c99cc`: compilação limpa (0 erros, 0 avisos).
+- `python3 exemplos/compiladores_e_vms/compiladores/c_nativo/testes_c99.py`: **52/52 verificações aprovadas, 0 falhas** (22 programas diferenciais × `-O0`/`-O1` vs `gcc -std=c99`, multi-TU + `-I`, 6 testes negativos, auditoria ELF64 `readelf`/`ldd` + `-S`).
+- `python3 testes/exemplos.py --examples-dir exemplos/compiladores_e_vms/compiladores/c_nativo`: **9 exemplos; 18 verificações; 0 falhas; nenhum arquivo ignorado** (`opt=False` e `opt=True`).
+- `./cgd --verificar-formatacao` em todos os 9 `.delegua` de `c_nativo/`: OK.
+- `clang-format` aplicado em `programa.c`, `geometria.h` e `include/*.h`.
+- Auditoria manual com `file`, `ldd` e `readelf -h -l -S -d -r` confirmando 2 segmentos `PT_LOAD` (`R E` e `RW`), 13 seções e vínculo dinâmico à `libc.so.6`.
+
+## Próximos passos para continuidade C99
+
+- Implementar bit-fields em `struct`, structs > 8 bytes por valor (9–16B em `rax:rdx` e > 16B via `sret`), `_Complex`/`long double`, literais hex-float (`0x1.fp+3`), relocações de ponteiros em `.data` (ex. `const char *g = "abc";`), `typedef` com escopo de bloco, qualificação estrita `const`/`volatile`/`restrict`, modo de compatibilidade GNU para `/usr/include` da glibc, `mem2reg`/SSA com `phi` e emissão de objetos `.o` (`ET_REL`) com linker próprio.
+
+---
+
+# Compilador C99 Nativo com ELF64 Dinâmico linkado à `libc.so.6` oficial + Refatoração idiomática + Asserções nos exemplos — 21/11/2026
+
+Solicitação ativa: refatorar o compilador C99 usando melhor os recursos de
+Delégua (dicionários para keywords/operadores no lexer/parser, tuplas,
+`escolha`/`caso`, formatador próprio), adicionar suporte à **stdlib oficial de C
+(`libc.so.6`)** com `#include <stdio.h>/<stdlib.h>/<string.h>` validados em
+`/usr/include/`, e garantir que todos os exemplos de compiladores e
+interpretadores validem explicitamente o resultado produzido pelos binários/VMs.
+
+## Implementação entregue
+
+- **Compilador C99 Nativo (`exemplos/compiladores_e_vms/compiladores/c_nativo/`)**:
+  - `preproc.delegua`: suporta `#include <stdio.h>`, `<stdlib.h>`, `<string.h>`
+    e `<ctype.h>` verificando `/usr/include/*.h` e expondo declarações `extern`
+    oficiais da ABI da glibc, retornando tupla `(texto, inteiro, inteiro)`.
+  - `lexer.delegua` e `parser.delegua`: tabelas em dicionários (`keywords`,
+    `opsDuplos`, `opsSimples`, `escapes`, `mapaAtrib`, `mapaRel`, `mapaFator`,
+    `mapaUnario`), `escolha`/`caso`, suporte a `char`, `const`, `extern`, `...`
+    (variádicos), strings literais `"..."` e char literais `'a'`.
+  - `ir_ssa.delegua`: `ModuloSSA` com tabela `.rodata`, lista de símbolos
+    `extern` da `libc.so.6`, `OpIR.AddrStr`, `OpIR.LoadByte`, `OpIR.StoreByte` e
+    `OpIR.CallExtern`.
+  - `backend_asm.delegua`: emite `extern <simbolo>`, `section .rodata` e
+    `section .text` (1.033 linhas para `programa.c`).
+  - `backend_elf.delegua`: gera **ELF64 dinâmico real** (`PT_PHDR`, `PT_INTERP`
+    `/lib64/ld-linux-x86-64.so.2`, `PT_LOAD`, `PT_DYNAMIC`, `.dynsym`,
+    `.dynstr`, `.hash`, `.rela.dyn` com `R_X86_64_GLOB_DAT`, `.got`, `.rodata`,
+    `.text`) de 7.412 bytes linkado à `libc.so.6` oficial do sistema.
+  - `programa.c` + `c_nativo.delegua`: executa `malloc`, `strcpy`, `strcat`,
+    `strlen`, `strcmp`, `abs`, `puts`, `printf`, `free` e `exit` da `libc.so.6`
+    nativamente no kernel Linux x86*64 e valida via `assercao` tanto o `stdout`
+    (`ELF64 dinamico linkado a libc.so.6 oficial!` / `Area=37 Heap=CGD-C99 Len=7 Cmp=0 Abs=15`)
+    quanto o \_exit code* real (`163`).
+- **Validação de resultado nos demais exemplos (`exemplos/compiladores_e_vms/`)**:
+  - Adicionadas `assercao(...)` explícitas nos outros 10 projetos (Mini-LLVM,
+    Mini-GCC, Mini-Clang C++, Mini-Rust, RISC-V VM, Brainfuck, MiniLang,
+    MiniLisp, MiniForth e Regex PikeVM) verificando os valores finais produzidos.
+
+## Testes realmente executados
+
+- `python3 testes/exemplos.py`: 155 exemplos, 310 verificações (`opt=False` e
+  `opt=True`), 0 falhas, nenhum arquivo ignorado.
+- `./cgd --verificar-formatacao` em todos os `.delegua` de
+  `exemplos/compiladores_e_vms/`.
+- `python3 scripts/formatar.py --check`.
+
+---
+
+# Expansão do Compilador C99 Nativo (Enums, Pré-processador, Ponteiros, Structs, Unions, Arrays, Switch/Do-While) — 21/11/2026
+
+Solicitação ativa: expandir o compilador C99 nativo em
+`exemplos/compiladores_e_vms/compiladores/c_nativo/` com uso extensivo de Enums
+(sem comparar strings para tags/opcodes), pré-processador com cabeçalhos `.h`,
+ponteiros (`*`, `**`, `&`, `->`, aritmética), arrays, `struct`, `union`,
+`typedef`, `enum`, `sizeof`, `switch/case`, `do-while`, formatação limpa e
+geração de Assembly x86_64 + ELF64 nativo.
+
+## Implementação entregue
+
+Projeto modular expandido para 9 arquivos `.delegua` + `geometria.h` +
+`programa.c` + `README.md`:
+
+- `tipos.delegua`: Enums `TokC99`, `NoKind`, `OpBin`, `OpUn`, `OpIR`,
+  `TipoBase`, além de `TipoC`, `TabelaTipos` (cálculo de layout/offsets de
+  `struct` e `union` com offset compartilhado `0`) e `ErroC99`.
+- `preproc.delegua`: Pré-processador C99 com `#include "..."`, `#define`,
+  `#ifndef`, `#ifdef` e `#endif`.
+- `lexer.delegua` e `parser.delegua`: suporte completo a `struct`, `union`,
+  `enum`, `typedef`, protótipos, ponteiros (`*`, `**`, `&`, `->`), arrays `[N]`,
+  `sizeof`, `switch/case/default`, `do-while`, `for` C99 e precedência completa.
+- `sema.delegua`: registro de layouts, anotação de `TipoC` em toda a AST e
+  validação de ponteiros, campos, arrays, protótipos e `break`/`continue`.
+- `ir_ssa.delegua`: lowering de memória real (`AddrSlot`, `LoadMem`, `StoreMem`,
+  aritmética de ponteiros) + otimizador SSA 100% sobre `enum OpIR` (10 dobras,
+  1 bloco morto removido, 19 instruções removidas por DCE em `programa.c`).
+- `backend_asm.delegua` e `backend_elf.delegua`: lowering de `OpIR` para
+  Assembly x86_64 (888 linhas) e código de máquina x86_64 puro (`lea`,
+  `mov [rax]`, `mov [rax], rcx`, etc.) empacotado em ELF64 de 5.363 bytes,
+  executado nativamente no Linux x86_64 retornando exatamente `163`.
+
+## Testes realmente executados
+
+- `python3 testes/exemplos.py`: 155 exemplos, 310 verificações (`opt=False` e
+  `opt=True`), 0 falhas, nenhum arquivo ignorado.
+- `./cgd --verificar-formatacao` em todos os 9 arquivos `.delegua` de `c_nativo/`.
+- `python3 scripts/formatar.py --check` (incluindo `clang-format` em `programa.c`
+  e `geometria.h` e Prettier nos `.md`).
+
+---
+
+# Compilador C99 Nativo Modular (SSA/CFG + Backend Assembly x86_64 + Backend ELF64 Direto) — 20/11/2026
+
+Solicitação ativa: criar um compilador C99 completo modular com lexer, parser,
+análise semântica, lowering para CFG + SSA e otimizador, oferecendo 2 backends:
+um que emite Assembly x86_64 e outro que faz lowering direto do SSA para código
+de máquina x86_64 e gera executável ELF64 nativamente.
+
+## Implementação entregue
+
+Projeto modular em `exemplos/compiladores_e_vms/compiladores/c_nativo/` (7 módulos `.delegua` + `programa.c` + `README.md`):
+
+- `lexer.delegua`: Lexer C99 com linha/coluna, comentários `//` e `/* ... */`, operadores aritméticos, bitwise, shifts, lógicos, compostos (`+=`, `-=`, `*=`) e `++`/`--`.
+- `parser.delegua`: Parser descendente recursivo com precedência C99 completa (`for (int i = ...)`, `while`, `if/else`, `break`, `continue`, ternário `? :`, `&&`/`||`, chamadas).
+- `sema.delegua`: Análise semântica com escopos aninhados, verificação de aridade, limite de 6 parâmetros System V ABI, `break`/`continue` e retornos.
+- `ir_ssa.delegua`: Lowering AST → CFG de blocos básicos + IR SSA + passes de Constant Propagation/Folding, eliminação de blocos inalcançáveis no CFG e DCE.
+- `backend_asm.delegua` (**Backend 1**): Emissor de Assembly x86_64 (Intel/NASM, System V AMD64 ABI, `_start` + `syscall exit`).
+- `backend_elf.delegua` (**Backend 2**): Emissor de código de máquina x86_64 puro (REX.W, ModRM, `disp32`, `rel32` com backpatching) + empacotador ELF64 (`ET_EXEC`, `EM_X86_64`, `PT_LOAD` em `0x400000`, entry `0x400078`).
+- `c_nativo.delegua`: Driver principal que compila `programa.c`, executa os dois backends, grava o ELF64 gerado (1.812 bytes), executa-o nativamente no kernel Linux x86*64 validando o \_exit code* real (`153`) e testa erro semântico (`break` fora de laço).
+
+## Testes realmente executados
+
+- `python3 testes/exemplos.py`: 153 exemplos, 306 verificações (`opt=False` e `opt=True`), 0 falhas, nenhum arquivo ignorado.
+- `./cgd --verificar-formatacao` em todos os 7 arquivos `.delegua` de `c_nativo/`.
+- `python3 scripts/formatar.py --check`.
+
+---
+
+# Coleção `exemplos/compiladores_e_vms/` (Mini-LLVM, Mini-GCC paralelo, Mini-Clang C++, Mini-Rust + Borrow Checker e VMs) — 20/11/2026
+
+Solicitação ativa: reunir em uma pasta organizada (separando `compiladores/` e
+`interpretadores/`) projetos avançados demonstrando o poder e estabilidade do
+CGD, incluindo Mini-LLVM, Mini-GCC com linker e compilação paralela via
+`rotina`/`Tarefa<T>`, Mini-Clang C++, Mini-Rust com Borrow Checker, além dos
+demais interpretadores, assemblers e VMs.
+
+## Implementação entregue
+
+Pasta unificada `exemplos/compiladores_e_vms/` com [README.md](../exemplos/compiladores_e_vms/README.md)
+reunindo 10 projetos completos, todos validados com e sem `-o` e formatados com
+`./cgd --formatar`:
+
+### `exemplos/compiladores_e_vms/compiladores/`
+
+- **Mini-LLVM (`mini_llvm/mini_llvm.delegua` + `programa.ll`)**:
+  - Parser de IR SSA, verificador SSA, Constant Propagation/Folding, DCE,
+    eliminação de blocos inalcançáveis no CFG, alocador de registradores Linear
+    Scan e executor de IR com nós `phi` e recursão.
+- **Mini-GCC + Linker Paralelo (`mini_gcc/mini_gcc.delegua` + `main.c`, `matematica.c`, `algoritmos.c`)**:
+  - Pré-processador `#define`, compilação paralela de 3 unidades C para `.obj`
+    em worker threads via `rotina compilarUnidadeC(...)` / `Tarefa<texto>` +
+    `assincrona`/`aguardar`, Linker estático com tabela global de símbolos,
+    relocação de saltos/chamadas externas e detecção de símbolo indefinido.
+- **Mini-Clang C++ (`mini_clang_cpp/mini_clang.delegua` + `programa.cpp`)**:
+  - `namespace` (`::`), sobrecarga de funções com Itanium Name Mangling
+    (`_Z...`), classes, construtores, herança pública, lowering de métodos com
+    `this` e `cout <<`.
+- **Mini-Rust + Borrow Checker (`mini_rust/mini_rust.delegua` + `programa.rs`)**:
+  - Ownership/Move (`String` vs `Copy` `i64`), `let mut`, empréstimos `&T` e
+    `&mut T`, liberação lexical de lifetimes (`{ ... }`), validação negativa de
+    `E0382`, `E0596`, `E0502`, `E0499` e `E0506`, e execução na VM com células
+    de referência mutáveis (`*x = ...`).
+- **Compilador MiniLang (`minipascal/compilador.delegua` + `programa.ml`)**:
+  - 5 fases: lexer, parser com AST polimórfica (`classe abstrata`), verificador
+    de tipos, otimizador (folding + DCE) e bytecode/VM.
+- **CPU Mini-RISC + Assembler (`riscv_vm/vm.delegua` + `programa.asm`)**:
+  - 16 registradores (`zero`/`sp`/`lr`), RAM, `PUSH`/`POP`, `CALL`/`RET` e
+    montador de 2 passes executando MDC, fatorial recursivo e Bubble Sort.
+- **Compilador Brainfuck Otimizador (`brainfuck/bf_compilador.delegua`)**:
+  - RLE, peephole (`Zerar` e `Transferir` em O(1)), resolução de saltos e VM.
+
+### `exemplos/compiladores_e_vms/interpretadores/`
+
+- **MiniLisp (`minilisp/lisp.delegua` + `programa.scm`)**: Scheme com closures
+  léxicas mutáveis (`set!`), `let*`, `cond`, currying, `map`/`filter`/`foldl` e
+  Quicksort funcional.
+- **MiniForth (`miniforth/forth.delegua` + `programa.fth`)**: compilador
+  threaded-code e VM concatenativa com `: ... ;`, `RECURSE`, `IF/ELSE/THEN`,
+  `BEGIN/WHILE/REPEAT`, `DO/LOOP/I` e `VARIABLE`.
+- **Motor de Regex (`regex_vm/regex_vm.delegua`)**: parser -> bytecode NFA de
+  Thompson -> PikeVM em tempo linear O(n·m).
+
+## Testes realmente executados
+
+- `python3 testes/exemplos.py`: 146 exemplos, 292 verificações (`opt=False` e
+  `opt=True`), 0 falhas, nenhum arquivo ignorado.
+- `./cgd --verificar-formatacao` nos 10 arquivos `.delegua` de
+  `exemplos/compiladores_e_vms/`.
+- `python3 scripts/formatar.py --check`.
+
+---
+
 # Hover limpo no LSP e decorador `@puro` para CTFE — 20/11/2026
 
 Solicitação ativa: remover ruído de pureza/CTFE do hover do LSP para funções

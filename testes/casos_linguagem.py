@@ -410,4 +410,59 @@ CASES += [
         'var a:inteiro[]=[1];var b:qualquer=a;tente{b.encaixar(0,1,"erro")}pegue(erro){escreva("bloqueado")}escreva(a)',
         "bloqueado\n[1]",
     ),
+    (
+        "literais_numericos_expandidos",
+        "/* comentário em bloco */\n"
+        "const h: inteiro = 0xFF; const m: inteiro = 0xFFFF_FFFF; "
+        "const b: inteiro = 0b101010; const f: inteiro = 0b1111_0000; "
+        "const o: inteiro = 0o755; const p: inteiro = 1_000_000; "
+        "const r: real = 3_141.592_653; const hf: real = 0x1.fp+3; "
+        "const e1: real = 1.25e-2; "
+        "escreva(h, m, b, f, o, p, inteiro(r * 1000), hf, e1)",
+        "2554294967295422404931000000314159215.50.0125",
+    ),
+    (
+        "dobramento_constantes_bits_identidades",
+        "funcao calc(x: inteiro): inteiro { "
+        "const mask: inteiro = (0xF0 & 0x3F) | (1 << 4) ^ (32 >> 2); "
+        "const divp: inteiro = (2 ** 10) \\ 10; "
+        "retorna ((((x + 0) * 1 - 0) | 0) ^ 0) + (0 + mask) + (divp \\ 1) "
+        "} escreva(calc(5))",
+        "163",
+    ),
+    (
+        "ordem_avaliacao_argumentos_mutados",
+        "var i: inteiro = 10; escreva(i, i++, i, ++i, i)",
+        "1010111212",
+    ),
+    (
+        "lvalue_indice_pos_incremento",
+        'var v = [10, 20, 30]; var i = 0; v[i] = i++; var j = 0; var w = [10, 20, 30]; w[j] = ++j; escreva("${v[0]},${v[1]},${i};${w[0]},${w[1]},${j}")',
+        "0,20,1;1,20,1",
+    ),
+    (
+        "cursor_utf8_reverso_multibyte",
+        'var s = "abcáéíóúxyz😀fim"; var l = "0123456789abcdef0123456789abcdefçãõ"; escreva("${s[0]}:${s[5]}:${s[10]}:${s[11]}:${s[10]}:${s[3]}:${s.fatiar(3, 8)}:${s.fatiar(-4, -1)}:${tamanho(s)}|${l[5]}:${l[32]}:${l[34]}:${l[33]}:${l[10]}:${tamanho(l)}")',
+        "a:í:z:😀:z:á:áéíóú:😀fi:15|5:ç:õ:ã:a:35",
+    ),
+    (
+        "literais_numericos_expandidos_ciclo2",
+        '@puro\nfuncao dobro(n: inteiro): inteiro { retorna n * 2 }\nconst a: inteiro = 0x1_0; const b: inteiro = 0b1010_0101; const c: inteiro = 0o7_7; const d: real = 1_000.5e-1; const hx: real = 0x1.fp+3; const d2: inteiro = dobro(0x0A); escreva("${a}:${b}:${c}:${d}:${hx}:${d2}:${0xFF.paraTexto()}:${inteiro(0b1111)}")',
+        "16:165:63:100.05:15.5:20:255:15",
+    ),
+    (
+        "promessa_nao_corrompe_descr_vetor",
+        'assincrona funcao f(): texto { retorna "ok" }\nassincrona funcao g(): vazio { var p: Promessa<texto> = f(); var v: texto[] = "a/b".dividir("/"); escreva("${aguardar p}:${v[0]}:${v[1]}") }\ng()',
+        "ok:a:b",
+    ),
+]
+ERRORS += [
+    ("hex_vazio", "const x = 0x", "E1005"),
+    ("bin_digito_invalido", "const x = 0b102", "E1005"),
+    ("oct_digito_invalido", "const x = 0o89", "E1005"),
+    ("sep_duplo", "const x = 1__000", "E1005"),
+    ("sep_final", "const x = 100_", "E1005"),
+    ("exp_incompleto", "const x = 1e+", "E1005"),
+    ("hex_digito_invalido", "const x = 0xGG", "E1005"),
+    ("identificador_nao_declarado_sublinhado", "const x = _100", "declarado"),
 ]

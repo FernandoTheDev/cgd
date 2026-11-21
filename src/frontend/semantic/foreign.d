@@ -13,6 +13,17 @@ private dstring metadata(Decorator[] decorators, dstring key)
     return "";
 }
 
+private bool boolMetadata(Decorator[] decorators, dstring key)
+{
+    foreach (Decorator decorator; decorators)
+        if (decorator.name == "definicao" || decorator.name == "definição")
+            foreach (size_t index, dstring name; decorator.keys)
+                if (name == key)
+                    if (BoolLit literal = cast(BoolLit) decorator.values[index])
+                        return literal.value;
+    return false;
+}
+
 private bool identifier(dstring name)
 {
     if (!name.length)
@@ -53,6 +64,8 @@ void resolveForeignClass(ClassDecl declaration, Diagnostics diagnostics)
     {
         method.foreignManaged = abi == "delegua";
         method.foreignSymbol = prefix ~ metadata(method.decorators, "simbolo");
+        method.foreignParallelSafe = declaration.foreignLibrary == "cgd-runtime"
+            && method.foreignManaged && boolMetadata(method.decorators, "paralelo");
         if (!identifier(method.foreignSymbol))
             diagnostics.error(method.pos, "FFI exige @definicao(simbolo=...) com identificador C válido.");
         if (!method.foreignManaged && !supported(method.type_expr, true))

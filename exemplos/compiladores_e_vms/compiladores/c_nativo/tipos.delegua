@@ -1,0 +1,655 @@
+//!
+// Definicoes centrais de Enums, Erros e Sistema de Tipos ISO C99 / LP64 (System V AMD64 ABI).
+// Larguras e alinhamentos reais: _Bool/char=1, short=2, int=4, long/ptr/double=8, float=4.
+
+enum TokC99 {
+    IntLit,
+    FloatLit,
+    StrLit,
+    CharLit,
+    Ident,
+    KwVoid,
+    KwBool,
+    KwChar,
+    KwShort,
+    KwInt,
+    KwLong,
+    KwSigned,
+    KwUnsigned,
+    KwFloat,
+    KwDouble,
+    KwConst,
+    KwVolatile,
+    KwRestrict,
+    KwInline,
+    KwExtern,
+    KwStatic,
+    KwAuto,
+    KwRegister,
+    KwStruct,
+    KwUnion,
+    KwEnum,
+    KwTypedef,
+    KwSizeof,
+    KwIf,
+    KwElse,
+    KwWhile,
+    KwDo,
+    KwFor,
+    KwSwitch,
+    KwCase,
+    KwDefault,
+    KwBreak,
+    KwContinue,
+    KwGoto,
+    KwReturn,
+    Mais,
+    Menos,
+    Vezes,
+    Div,
+    Mod,
+    MaisIgual,
+    MenosIgual,
+    VezesIgual,
+    DivIgual,
+    ModIgual,
+    AndIgual,
+    OrIgual,
+    XorIgual,
+    ShlIgual,
+    ShrIgual,
+    Inc,
+    Dec,
+    Igual,
+    Eq,
+    Neq,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    AndLog,
+    OrLog,
+    NotLog,
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitNot,
+    Shl,
+    Shr,
+    Interrog,
+    Colon,
+    Dot,
+    Arrow,
+    Ellipsis,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    LBracket,
+    RBracket,
+    Semi,
+    Comma,
+    Fim
+}
+
+enum NoKind {
+    Programa,
+    Funcao,
+    Prototipo,
+    VarGlobal,
+    DeclStruct,
+    DeclUnion,
+    DeclEnum,
+    DeclTypedef,
+    Params,
+    Param,
+    Campo,
+    ItemEnum,
+    Bloco,
+    VarDecl,
+    StmtIf,
+    StmtWhile,
+    StmtDoWhile,
+    StmtFor,
+    StmtSwitch,
+    StmtCase,
+    StmtBreak,
+    StmtContinue,
+    StmtGoto,
+    StmtLabel,
+    StmtReturn,
+    StmtExpr,
+    StmtVazio,
+    ExprInt,
+    ExprFloat,
+    ExprStr,
+    ExprVar,
+    ExprAtrib,
+    ExprBinaria,
+    ExprUnaria,
+    ExprPosfixo,
+    ExprTernario,
+    ExprComma,
+    ExprCast,
+    ExprChamada,
+    ExprMembro,
+    ExprIndice,
+    ExprSizeofTipo,
+    ExprSizeofExpr,
+    ExprInitList,
+    ExprInicDesignado,
+    ExprLiteralComposto,
+    ExprVaStart,
+    ExprVaArg
+}
+
+enum OpBin {
+    Nenhum,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
+    Eq,
+    Neq,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    LogAnd,
+    LogOr,
+    Assign,
+    AddAssign,
+    SubAssign,
+    MulAssign,
+    DivAssign,
+    ModAssign,
+    BitAndAssign,
+    BitOrAssign,
+    BitXorAssign,
+    ShlAssign,
+    ShrAssign
+}
+
+enum OpUn {
+    Nenhum,
+    Neg,
+    Pos,
+    LogNot,
+    BitNot,
+    Deref,
+    AddrOf,
+    PreInc,
+    PreDec,
+    PostInc,
+    PostDec
+}
+
+enum OpIR {
+    Const,
+    FConst,
+    Copy,
+    AddrSlot,
+    AddrRbpDisp,
+    AddrGlobal,
+    AddrFunc,
+    AddrStr,
+    Alloca,
+    Load,
+    Store,
+    FLoad,
+    FStore,
+    Add,
+    Sub,
+    Mul,
+    SDiv,
+    UDiv,
+    SMod,
+    UMod,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    AShr,
+    LShr,
+    Eq,
+    Neq,
+    SLt,
+    SLe,
+    SGt,
+    SGe,
+    ULt,
+    ULe,
+    UGt,
+    UGe,
+    Neg,
+    LogNot,
+    BitNot,
+    FAdd,
+    FSub,
+    FMul,
+    FDiv,
+    FNeg,
+    FEq,
+    FNeq,
+    FLt,
+    FLe,
+    FGt,
+    FGe,
+    ItoF,
+    FtoI,
+    TruncSext,
+    TruncZext,
+    ToBool,
+    Call,
+    CallExtern,
+    CallIndirect,
+    Br,
+    BrCond,
+    Ret,
+    FRet
+}
+
+enum TipoBase {
+    Void,
+    Bool,
+    Char,
+    Short,
+    Int,
+    Long,
+    Float,
+    Double,
+    Struct,
+    Union,
+    Ponteiro,
+    Array,
+    Funcao
+}
+
+classe ErroC99 herda Excecao {
+    construtor(mensagem: texto) {
+        super(mensagem)
+    }
+}
+
+classe TipoC {
+    base: TipoBase
+    ehSemSinal: logico
+    nomeAgregado: texto
+    alvo: qualquer
+    tamArray: inteiro
+    ehVLA: logico
+    exprTamVLA: qualquer
+    paramsFn: qualquer[]
+    ehVariadica: logico
+
+    construtor(base: TipoBase, ehSemSinal: logico = falso, nomeAgregado: texto = "", alvo: qualquer = nulo,
+        tamArray: inteiro = 0) {
+        isto.base = base
+        isto.ehSemSinal = ehSemSinal
+        isto.nomeAgregado = nomeAgregado
+        isto.alvo = alvo
+        isto.tamArray = tamArray
+        isto.ehVLA = falso
+        isto.exprTamVLA = nulo
+        isto.paramsFn = []
+        isto.ehVariadica = falso
+    }
+
+    estatico tipoVoid(): TipoC {
+        retorna TipoC(TipoBase.Void)
+    }
+
+    estatico tipoBool(): TipoC {
+        retorna TipoC(TipoBase.Bool, verdadeiro)
+    }
+
+    estatico tipoChar(semSinal: logico = falso): TipoC {
+        retorna TipoC(TipoBase.Char, semSinal)
+    }
+
+    estatico tipoShort(semSinal: logico = falso): TipoC {
+        retorna TipoC(TipoBase.Short, semSinal)
+    }
+
+    estatico tipoInt(semSinal: logico = falso): TipoC {
+        retorna TipoC(TipoBase.Int, semSinal)
+    }
+
+    estatico tipoLong(semSinal: logico = falso): TipoC {
+        retorna TipoC(TipoBase.Long, semSinal)
+    }
+
+    estatico tipoFloat(): TipoC {
+        retorna TipoC(TipoBase.Float)
+    }
+
+    estatico tipoDouble(): TipoC {
+        retorna TipoC(TipoBase.Double)
+    }
+
+    estatico ponteiroPara(inner: TipoC): TipoC {
+        retorna TipoC(TipoBase.Ponteiro, verdadeiro, "", inner, 0)
+    }
+
+    estatico arrayDe(inner: TipoC, qtd: inteiro): TipoC {
+        retorna TipoC(TipoBase.Array, falso, "", inner, qtd)
+    }
+
+    estatico vlaDe(inner: TipoC, exprTam: qualquer): TipoC {
+        const t: TipoC = TipoC(TipoBase.Array, falso, "", inner, 0)
+        t.ehVLA = verdadeiro
+        t.exprTamVLA = exprTam
+        retorna t
+    }
+
+    estatico deStruct(nome: texto): TipoC {
+        retorna TipoC(TipoBase.Struct, falso, nome)
+    }
+
+    estatico deUnion(nome: texto): TipoC {
+        retorna TipoC(TipoBase.Union, falso, nome)
+    }
+
+    estatico funcaoTipo(retTipo: TipoC, params: qualquer[], variadica: logico = falso): TipoC {
+        const t: TipoC = TipoC(TipoBase.Funcao, falso, "", retTipo, 0)
+        t.paramsFn = params
+        t.ehVariadica = variadica
+        retorna t
+    }
+
+    ehInteiro(): logico {
+        retorna isto.base == TipoBase.Bool ou isto.base == TipoBase.Char ou isto.base == TipoBase.Short ou isto.base == TipoBase.Int ou isto.base == TipoBase.Long
+    }
+
+    ehFlutuante(): logico {
+        retorna isto.base == TipoBase.Float ou isto.base == TipoBase.Double
+    }
+
+    ehAritmetico(): logico {
+        retorna isto.ehInteiro() ou isto.ehFlutuante()
+    }
+
+    ehPonteiro(): logico {
+        retorna isto.base == TipoBase.Ponteiro
+    }
+
+    ehPonteiroOuArray(): logico {
+        retorna isto.base == TipoBase.Ponteiro ou isto.base == TipoBase.Array
+    }
+
+    ehAgregado(): logico {
+        retorna isto.base == TipoBase.Struct ou isto.base == TipoBase.Union
+    }
+
+    rankInteiro(): inteiro {
+        escolha (isto.base) {
+            caso TipoBase.Bool: retorna 1
+            caso TipoBase.Char: retorna 2
+            caso TipoBase.Short: retorna 3
+            caso TipoBase.Int: retorna 4
+            caso TipoBase.Long: retorna 5
+            padrao: retorna 0
+        }
+        retorna 0
+    }
+}
+
+funcao alinharOffset(off: inteiro, alinh: inteiro): inteiro {
+    se (alinh <= 1) retorna off
+    const r: inteiro = off % alinh
+    se (r == 0) retorna off
+    retorna off + (alinh - r)
+}
+
+funcao promocaoInteira(t: TipoC): TipoC {
+    se (t.base == TipoBase.Bool ou t.base == TipoBase.Char ou t.base == TipoBase.Short) {
+        retorna TipoC.tipoInt(falso)
+    }
+
+    retorna t
+}
+
+funcao tipoAritmeticoComum(a: TipoC, b: TipoC): TipoC {
+    se (a.base == TipoBase.Double ou b.base == TipoBase.Double) retorna TipoC.tipoDouble()
+    se (a.base == TipoBase.Float ou b.base == TipoBase.Float) retorna TipoC.tipoFloat()
+    const pa: TipoC = promocaoInteira(a)
+    const pb: TipoC = promocaoInteira(b)
+    se (pa.base == TipoBase.Long ou pb.base == TipoBase.Long) {
+        se (pa.base == TipoBase.Long e pb.base == TipoBase.Long) {
+            retorna TipoC.tipoLong(pa.ehSemSinal ou pb.ehSemSinal)
+        }
+        se (pa.base == TipoBase.Long) retorna pa
+        retorna pb
+    }
+
+    retorna TipoC.tipoInt(pa.ehSemSinal ou pb.ehSemSinal)
+}
+
+classe CampoLayout {
+    nome: texto
+    tipoCampo: TipoC
+    offset: inteiro
+
+    construtor(nome: texto, tipoCampo: TipoC, offset: inteiro) {
+        isto.nome = nome
+        isto.tipoCampo = tipoCampo
+        isto.offset = offset
+    }
+}
+
+classe AgregadoLayout {
+    nome: texto
+    ehUnion: logico
+    tamanhoBytes: inteiro
+    alinhamento: inteiro
+    campos: dicionario
+    ordemCampos: texto[]
+
+    construtor(nome: texto, ehUnion: logico) {
+        isto.nome = nome
+        isto.ehUnion = ehUnion
+        isto.tamanhoBytes = 0
+        isto.alinhamento = 1
+        isto.campos = {}
+        isto.ordemCampos = []
+    }
+}
+
+classe TabelaTipos {
+    structs: dicionario
+    unions: dicionario
+    typedefs: dicionario
+    constantesEnum: dicionario
+    funcoesExternas: dicionario
+    assinaturasFuncoes: dicionario
+
+    construtor() {
+        isto.structs = {}
+        isto.unions = {}
+        isto.typedefs = {}
+        isto.constantesEnum = {}
+        isto.funcoesExternas = {}
+        isto.assinaturasFuncoes = {}
+    }
+
+    alinhamentoDe(t: TipoC): inteiro {
+        escolha (t.base) {
+            caso TipoBase.Void:
+            caso TipoBase.Bool:
+            caso TipoBase.Char:
+            retorna 1
+            caso TipoBase.Short:
+            retorna 2
+            caso TipoBase.Int:
+            caso TipoBase.Float:
+            retorna 4
+            caso TipoBase.Long:
+            caso TipoBase.Double:
+            caso TipoBase.Ponteiro:
+            caso TipoBase.Funcao:
+            retorna 8
+            caso TipoBase.Array:
+            const elem: TipoC = t.alvo
+            retorna isto.alinhamentoDe(elem)
+            caso TipoBase.Struct:
+            se (isto.structs.contem(t.nomeAgregado)) {
+                const ag: AgregadoLayout = isto.structs[t.nomeAgregado]
+                retorna ag.alinhamento
+            }
+            retorna 1
+            caso TipoBase.Union:
+            se (isto.unions.contem(t.nomeAgregado)) {
+                const ag: AgregadoLayout = isto.unions[t.nomeAgregado]
+                retorna ag.alinhamento
+            }
+            retorna 1
+            padrao:
+            retorna 8
+        }
+        retorna 8
+    }
+
+    tamanhoDe(t: TipoC): inteiro {
+        escolha (t.base) {
+            caso TipoBase.Void:
+            retorna 0
+            caso TipoBase.Bool:
+            caso TipoBase.Char:
+            retorna 1
+            caso TipoBase.Short:
+            retorna 2
+            caso TipoBase.Int:
+            caso TipoBase.Float:
+            retorna 4
+            caso TipoBase.Long:
+            caso TipoBase.Double:
+            caso TipoBase.Ponteiro:
+            caso TipoBase.Funcao:
+            retorna 8
+            caso TipoBase.Array:
+            const elem: TipoC = t.alvo
+            retorna isto.tamanhoDe(elem) * t.tamArray
+            caso TipoBase.Struct:
+            se (!isto.structs.contem(t.nomeAgregado)) {
+                falhar ErroC99("Struct incompleta ou desconhecida: '${t.nomeAgregado}'")
+            }
+            const layout: AgregadoLayout = isto.structs[t.nomeAgregado]
+            retorna layout.tamanhoBytes
+            caso TipoBase.Union:
+            se (!isto.unions.contem(t.nomeAgregado)) {
+                falhar ErroC99("Union incompleta ou desconhecida: '${t.nomeAgregado}'")
+            }
+            const layout: AgregadoLayout = isto.unions[t.nomeAgregado]
+            retorna layout.tamanhoBytes
+            padrao:
+            retorna 8
+        }
+        retorna 8
+    }
+
+    buscarCampo(t: TipoC, nomeCampo: texto): CampoLayout {
+        var layout: qualquer = nulo
+        se (t.base == TipoBase.Struct e isto.structs.contem(t.nomeAgregado)) {
+            layout = isto.structs[t.nomeAgregado]
+        } senao se (t.base == TipoBase.Union e isto.unions.contem(t.nomeAgregado)) {
+            layout = isto.unions[t.nomeAgregado]
+        } senao {
+            falhar ErroC99("Acesso ao campo '${nomeCampo}' em tipo nao-agregado")
+        }
+        const ag: AgregadoLayout = layout
+        se (!ag.campos.contem(nomeCampo)) {
+            falhar ErroC99("Campo '${nomeCampo}' nao existe em '${ag.nome}'")
+        }
+        retorna ag.campos[nomeCampo]
+    }
+}
+
+// Conversao IEEE-754 pura em Delegua: double (real) -> 64 bits (inteiro)
+funcao doubleParaBitsIEEE754(val: real): inteiro {
+    se (val == 0.0) retorna 0
+    var sinal: inteiro = 0
+    var x: real = val
+    se (x < 0.0) {
+        sinal = 1
+        x = -x
+    }
+
+    var exp: inteiro = 1023
+    enquanto (x >= 2.0 e exp < 2047) {
+        x = x / 2.0
+        exp++
+    }
+
+    enquanto (x < 1.0 e exp > 0) {
+        x = x * 2.0
+        exp--
+    }
+
+    var frac: real = x - 1.0
+    var mantissa: inteiro = 0
+    para (var i: inteiro = 0; i < 52; i++) {
+        frac = frac * 2.0
+        mantissa = mantissa << 1
+        se (frac >= 1.0) {
+            mantissa = mantissa | 1
+            frac = frac - 1.0
+        }
+    }
+
+    var bits: inteiro = (exp << 52) | mantissa
+    se (sinal == 1) {
+        const bitSinal64: inteiro = -9223372036854775807 - 1
+        bits = bits | bitSinal64
+    }
+
+    retorna bits
+}
+
+// Conversao IEEE-754 pura em Delegua: float (binary32) -> 32 bits (inteiro)
+funcao floatParaBitsIEEE754(val: real): inteiro {
+    se (val == 0.0) retorna 0
+    var sinal: inteiro = 0
+    var x: real = val
+    se (x < 0.0) {
+        sinal = 1
+        x = -x
+    }
+
+    var exp: inteiro = 127
+    enquanto (x >= 2.0 e exp < 255) {
+        x = x / 2.0
+        exp++
+    }
+
+    enquanto (x < 1.0 e exp > 0) {
+        x = x * 2.0
+        exp--
+    }
+
+    var frac: real = x - 1.0
+    var mantissa: inteiro = 0
+    para (var i: inteiro = 0; i < 23; i++) {
+        frac = frac * 2.0
+        mantissa = mantissa << 1
+        se (frac >= 1.0) {
+            mantissa = mantissa | 1
+            frac = frac - 1.0
+        }
+    }
+
+    se (frac >= 0.5) {
+        mantissa++
+        se (mantissa >= 8388608) {
+            mantissa = 0
+            exp++
+        }
+    }
+
+    retorna (sinal * 2147483648) | (exp << 23) | mantissa
+}

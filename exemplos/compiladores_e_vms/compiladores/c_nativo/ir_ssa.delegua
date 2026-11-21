@@ -1,0 +1,1881 @@
+//!
+// Fase 4: Lowering AST -> ModuloSSA (CFG + IR SSA tipada com larguras 1/2/4/8B, signed/unsigned,
+// ponto flutuante IEEE-754, globais .data/.bss, ponteiros de funcao, goto/labels, inicializadores)
+// + Otimizador SSA (ConstProp, Simplificacao, CopyProp, CFG Reachability, DCE) + Verificador de IR.
+
+classe InstSSA {
+    op: qualquer
+    dst: inteiro
+    a: inteiro
+    b: inteiro
+    fval: real
+    largura: inteiro
+    ehSemSinal: logico
+    ehFloatDst: logico
+    alvo1: texto
+    alvo2: texto
+    callArgs: inteiro[]
+    callArgFloats: logico[]
+
+    construtor(op: qualquer, dst: inteiro = -1, a: inteiro = 0, b: inteiro = 0, alvo1: texto = "",
+        alvo2: texto = "") {
+        isto.op = op
+        isto.dst = dst
+        isto.a = a
+        isto.b = b
+        isto.fval = 0.0
+        isto.largura = 8
+        isto.ehSemSinal = falso
+        isto.ehFloatDst = falso
+        isto.alvo1 = alvo1
+        isto.alvo2 = alvo2
+        isto.callArgs = []
+        isto.callArgFloats = []
+    }
+}
+
+classe BlocoSSA {
+    nome: texto
+    insts: InstSSA[]
+    terminado: logico
+
+    construtor(nome: texto) {
+        isto.nome = nome
+        isto.insts = []
+        isto.terminado = falso
+    }
+}
+
+classe FuncaoSSA {
+    nome: texto
+    aridade: inteiro
+    retornaFloat: logico
+    ehVariadica: logico
+    regSaveOffset: inteiro
+    numFixedIntParams: inteiro
+    numFixedFltParams: inteiro
+    numFixedStkParams: inteiro
+    paramOffsets: inteiro[]
+    paramLarguras: inteiro[]
+    paramEhFloat: logico[]
+    tamanhoLocaisBytes: inteiro
+    numRegs: inteiro
+    blocos: BlocoSSA[]
+
+    construtor(nome: texto, aridade: inteiro, retornaFloat: logico = falso, ehVariadica: logico = falso) {
+        isto.nome = nome
+        isto.aridade = aridade
+        isto.retornaFloat = retornaFloat
+        isto.ehVariadica = ehVariadica
+        isto.regSaveOffset = 0
+        isto.numFixedIntParams = 0
+        isto.numFixedFltParams = 0
+        isto.numFixedStkParams = 0
+        isto.paramOffsets = []
+        isto.paramLarguras = []
+        isto.paramEhFloat = []
+        isto.tamanhoLocaisBytes = 0
+        isto.numRegs = 0
+        isto.blocos = []
+    }
+}
+
+classe GlobalSSA {
+    nome: texto
+    tamanhoBytes: inteiro
+    alinhamento: inteiro
+    temInit: logico
+    bytesInit: inteiro[]
+
+    construtor(nome: texto, tamanhoBytes: inteiro, alinhamento: inteiro, temInit: logico) {
+        isto.nome = nome
+        isto.tamanhoBytes = tamanhoBytes
+        isto.alinhamento = alinhamento
+        isto.temInit = temInit
+        isto.bytesInit = []
+    }
+}
+
+classe ModuloSSA {
+    funcoes: FuncaoSSA[]
+    globais: GlobalSSA[]
+    mapaGlobais: dicionario
+    strings: texto[]
+    mapaStrings: dicionario
+    externos: texto[]
+    mapaExternos: dicionario
+    libsExternas: texto[]
+    mapaLibs: dicionario
+
+    construtor() {
+        isto.funcoes = []
+        isto.globais = []
+        isto.mapaGlobais = {}
+        isto.strings = []
+        isto.mapaStrings = {}
+        isto.externos = []
+        isto.mapaExternos = {}
+        isto.libsExternas = []
+        isto.mapaLibs = {}
+        isto.registrarBiblioteca("libc.so.6")
+        isto.registrarExterno("exit")
+    }
+
+    registrarBiblioteca(nomeLib: texto): vazio {
+        se (!isto.mapaLibs.contem(nomeLib)) {
+            isto.mapaLibs[nomeLib] = verdadeiro
+            isto.libsExternas.empilhar(nomeLib)
+        }
+    }
+
+    internarString(valor: texto): inteiro {
+        se (isto.mapaStrings.contem(valor)) {
+            retorna inteiro(isto.mapaStrings[valor])
+        }
+        const idx: inteiro = isto.strings.tamanho()
+        isto.strings.empilhar(valor)
+        isto.mapaStrings[valor] = idx
+        retorna idx
+    }
+
+    registrarExterno(nome: texto): vazio {
+        se (!isto.mapaExternos.contem(nome)) {
+            isto.mapaExternos[nome] = isto.externos.tamanho()
+            isto.externos.empilhar(nome)
+        }
+    }
+
+    registrarGlobal(g: GlobalSSA): vazio {
+        isto.mapaGlobais[g.nome] = isto.globais.tamanho()
+        isto.globais.empilhar(g)
+    }
+}
+
+classe StatsSSA {
+    dobras: inteiro = 0
+    simplificacoes: inteiro = 0
+    copiasPropagadas: inteiro = 0
+    blocosMortos: inteiro = 0
+    dceRemovidas: inteiro = 0
+}
+
+funcao gravarIntLE(buf: inteiro[], pos: inteiro, val: inteiro, largura: inteiro): vazio {
+    para (var i: inteiro = 0; i < largura; i++) {
+        se (pos + i < buf.tamanho()) {
+            buf[pos + i] = (val >> (i * 8)) & 255
+        }
+    }
+}
+
+classe ConstrutorSSA {
+    tMod: qualquer
+    Kind: qualquer
+    OpB: qualquer
+    OpU: qualquer
+    OpI: qualquer
+    TB: qualquer
+    tabela: qualquer
+    modulo: ModuloSSA
+    fn: FuncaoSSA
+    blocoAtual: BlocoSSA
+    contBlocos: inteiro
+    escoposOffset: dicionario[]
+    escoposStatic: dicionario[]
+    escoposVla: dicionario[]
+    contStatic: inteiro
+    blocosLabel: dicionario
+    alvosBreak: texto[]
+    alvosContinue: texto[]
+
+    construtor(modulo: ModuloSSA, fn: FuncaoSSA, tabela: qualquer) {
+        isto.tMod = importar("tipos.delegua")
+        isto.Kind = isto.tMod.NoKind
+        isto.OpB = isto.tMod.OpBin
+        isto.OpU = isto.tMod.OpUn
+        isto.OpI = isto.tMod.OpIR
+        isto.TB = isto.tMod.TipoBase
+        isto.tabela = tabela
+        isto.modulo = modulo
+        isto.fn = fn
+        isto.contBlocos = 0
+        isto.escoposOffset = [{}]
+        isto.escoposStatic = [{}]
+        isto.escoposVla = [{}]
+        isto.contStatic = 0
+        isto.blocosLabel = {}
+        isto.alvosBreak = []
+        isto.alvosContinue = []
+        isto.blocoAtual = isto.criarBloco("entry")
+    }
+
+    criarBloco(prefixo: texto): BlocoSSA {
+        const nome: texto = prefixo == "entry" ? "entry" : "${prefixo}_${isto.contBlocos}"
+        isto.contBlocos++
+        const bb: BlocoSSA = BlocoSSA(nome)
+        isto.fn.blocos.empilhar(bb)
+        retorna bb
+    }
+
+    obterOuCriarBlocoLabel(nomeLbl: texto): BlocoSSA {
+        se (isto.blocosLabel.contem(nomeLbl)) {
+            retorna isto.blocosLabel[nomeLbl]
+        }
+        const bb: BlocoSSA = isto.criarBloco("lbl_" + nomeLbl)
+        isto.blocosLabel[nomeLbl] = bb
+        retorna bb
+    }
+
+    novoReg(): inteiro {
+        const r: inteiro = isto.fn.numRegs
+        isto.fn.numRegs++
+        retorna r
+    }
+
+    alocarBytes(tamBytes: inteiro): inteiro {
+        const resto: inteiro = tamBytes % 8
+        const tam: inteiro = tamBytes <= 0 ? 8 : (resto == 0 ? tamBytes : tamBytes + (8 - resto))
+        isto.fn.tamanhoLocaisBytes = isto.fn.tamanhoLocaisBytes + tam
+        retorna isto.fn.tamanhoLocaisBytes
+    }
+
+    alocarVar(nome: texto, tipoC: qualquer): inteiro {
+        const tam: inteiro = isto.tabela.tamanhoDe(tipoC)
+        const off: inteiro = isto.alocarBytes(tam)
+        isto.escoposOffset[isto.escoposOffset.tamanho() - 1][nome] = off
+        retorna off
+    }
+
+    buscarOffsetLocal(nome: texto): inteiro {
+        para (var i: inteiro = isto.escoposOffset.tamanho() - 1; i >= 0; i--) {
+            se (isto.escoposOffset[i].contem(nome)) retorna inteiro(isto.escoposOffset[i][nome])
+        }
+        retorna -1
+    }
+
+    buscarStaticLocal(nome: texto): texto {
+        para (var i: inteiro = isto.escoposStatic.tamanho() - 1; i >= 0; i--) {
+            se (isto.escoposStatic[i].contem(nome)) retorna texto(isto.escoposStatic[i][nome])
+            se (isto.escoposOffset[i].contem(nome) ou isto.escoposVla[i].contem(nome)) retorna ""
+        }
+        retorna ""
+    }
+
+    buscarVlaInfo(nome: texto): qualquer {
+        para (var i: inteiro = isto.escoposVla.tamanho() - 1; i >= 0; i--) {
+            se (isto.escoposVla[i].contem(nome)) retorna isto.escoposVla[i][nome]
+            se (isto.escoposOffset[i].contem(nome) ou isto.escoposStatic[i].contem(nome)) retorna nulo
+        }
+        retorna nulo
+    }
+
+    emitirCopiaMemoria(dstAddr: inteiro, srcAddr: inteiro, tamBytes: inteiro): vazio {
+        var off: inteiro = 0
+        enquanto (off + 8 <= tamBytes) {
+            var pDst: inteiro = dstAddr
+            var pSrc: inteiro = srcAddr
+            se (off > 0) {
+                const offR: inteiro = isto.emitirConst(off)
+                pDst = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.Add, pDst, dstAddr, offR))
+                pSrc = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.Add, pSrc, srcAddr, offR))
+            }
+            const val8: inteiro = isto.novoReg()
+            const ld8: InstSSA = InstSSA(isto.OpI.Load, val8, pSrc, 0)
+            ld8.largura = 8
+            isto.emitir(ld8)
+            const st8: InstSSA = InstSSA(isto.OpI.Store, -1, pDst, val8)
+            st8.largura = 8
+            isto.emitir(st8)
+            off = off + 8
+        }
+        enquanto (off < tamBytes) {
+            var pDst: inteiro = dstAddr
+            var pSrc: inteiro = srcAddr
+            se (off > 0) {
+                const offR: inteiro = isto.emitirConst(off)
+                pDst = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.Add, pDst, dstAddr, offR))
+                pSrc = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.Add, pSrc, srcAddr, offR))
+            }
+            const val1: inteiro = isto.novoReg()
+            const ld1: InstSSA = InstSSA(isto.OpI.Load, val1, pSrc, 0)
+            ld1.largura = 1
+            ld1.ehSemSinal = verdadeiro
+            isto.emitir(ld1)
+            const st1: InstSSA = InstSSA(isto.OpI.Store, -1, pDst, val1)
+            st1.largura = 1
+            isto.emitir(st1)
+            off++
+        }
+    }
+
+    emitir(inst: InstSSA): vazio {
+        se (isto.blocoAtual.terminado) retorna
+        isto.blocoAtual.insts.empilhar(inst)
+        se (inst.op == isto.OpI.Br ou inst.op == isto.OpI.BrCond ou inst.op == isto.OpI.Ret ou inst.op == isto.OpI.FRet) {
+            isto.blocoAtual.terminado = verdadeiro
+        }
+    }
+
+    emitirConst(val: inteiro): inteiro {
+        const dst: inteiro = isto.novoReg()
+        isto.emitir(InstSSA(isto.OpI.Const, dst, val, 0))
+        retorna dst
+    }
+
+    emitirFConst(val: real): inteiro {
+        const dst: inteiro = isto.novoReg()
+        const inst: InstSSA = InstSSA(isto.OpI.FConst, dst, 0, 0)
+        inst.fval = val
+        inst.ehFloatDst = verdadeiro
+        isto.emitir(inst)
+        retorna dst
+    }
+
+    emitirLoadTipo(addrReg: inteiro, tipoC: qualquer): inteiro {
+        const dst: inteiro = isto.novoReg()
+        const tam: inteiro = isto.tabela.tamanhoDe(tipoC)
+        se (tipoC.ehFlutuante()) {
+            const instF: InstSSA = InstSSA(isto.OpI.FLoad, dst, addrReg, 0)
+            instF.largura = tam
+            instF.ehFloatDst = verdadeiro
+            isto.emitir(instF)
+            retorna dst
+        }
+        const inst: InstSSA = InstSSA(isto.OpI.Load, dst, addrReg, 0)
+        inst.largura = tam <= 0 ? 8 : tam
+        inst.ehSemSinal = tipoC.ehSemSinal
+        isto.emitir(inst)
+        retorna dst
+    }
+
+    emitirStoreTipo(addrReg: inteiro, valReg: inteiro, tipoC: qualquer): vazio {
+        const tam: inteiro = isto.tabela.tamanhoDe(tipoC)
+        se (tipoC.ehFlutuante()) {
+            const instF: InstSSA = InstSSA(isto.OpI.FStore, -1, addrReg, valReg)
+            instF.largura = tam
+            isto.emitir(instF)
+            retorna
+        }
+        var regFinal: inteiro = valReg
+        se (tipoC.base == isto.TB.Bool) {
+            regFinal = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.ToBool, regFinal, valReg, 0))
+        }
+        const inst: InstSSA = InstSSA(isto.OpI.Store, -1, addrReg, regFinal)
+        inst.largura = tam <= 0 ? 8 : tam
+        isto.emitir(inst)
+    }
+
+    converterValor(valReg: inteiro, tipoOrig: qualquer, tipoDest: qualquer): inteiro {
+        se (tipoDest == nulo ou tipoOrig == nulo ou tipoDest.base == isto.TB.Void) retorna valReg
+        se (tipoDest.base == isto.TB.Bool) {
+            se (tipoOrig.ehFlutuante()) {
+                const zeroF: inteiro = isto.emitirFConst(0.0)
+                const dstB: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.FNeq, dstB, valReg, zeroF))
+                retorna dstB
+            }
+            const dstB: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.ToBool, dstB, valReg, 0))
+            retorna dstB
+        }
+        se (tipoDest.ehFlutuante() e !tipoOrig.ehFlutuante()) {
+            const dstF: inteiro = isto.novoReg()
+            const inst: InstSSA = InstSSA(isto.OpI.ItoF, dstF, valReg, 0)
+            inst.ehFloatDst = verdadeiro
+            isto.emitir(inst)
+            retorna dstF
+        }
+        se (!tipoDest.ehFlutuante() e tipoOrig.ehFlutuante()) {
+            const dstI: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.FtoI, dstI, valReg, 0))
+            retorna dstI
+        }
+        se (tipoDest.ehInteiro() e tipoOrig.ehInteiro()) {
+            const tamD: inteiro = isto.tabela.tamanhoDe(tipoDest)
+            const tamO: inteiro = isto.tabela.tamanhoDe(tipoOrig)
+            se (tamD < 8 e (tamD < tamO ou tipoDest.ehSemSinal != tipoOrig.ehSemSinal)) {
+                const dstT: inteiro = isto.novoReg()
+                const opT: qualquer = tipoDest.ehSemSinal ? isto.OpI.TruncZext : isto.OpI.TruncSext
+                const instT: InstSSA = InstSSA(opT, dstT, valReg, 0)
+                instT.largura = tamD
+                isto.emitir(instT)
+                retorna dstT
+            }
+        }
+        retorna valReg
+    }
+
+    zerarMemoria(addrBase: inteiro, tamBytes: inteiro): vazio {
+        const zero: inteiro = isto.emitirConst(0)
+        var off: inteiro = 0
+        enquanto (off + 8 <= tamBytes) {
+            var ptr: inteiro = addrBase
+            se (off > 0) {
+                const offR: inteiro = isto.emitirConst(off)
+                ptr = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.Add, ptr, addrBase, offR))
+            }
+            const st: InstSSA = InstSSA(isto.OpI.Store, -1, ptr, zero)
+            st.largura = 8
+            isto.emitir(st)
+            off = off + 8
+        }
+        enquanto (off < tamBytes) {
+            var ptr: inteiro = addrBase
+            se (off > 0) {
+                const offR: inteiro = isto.emitirConst(off)
+                ptr = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.Add, ptr, addrBase, offR))
+            }
+            const st: InstSSA = InstSSA(isto.OpI.Store, -1, ptr, zero)
+            st.largura = 1
+            isto.emitir(st)
+            off++
+        }
+    }
+
+    baixarInicializador(addrBase: inteiro, inic: qualquer, tipoAlvo: qualquer): vazio {
+        se (inic.kind == isto.Kind.ExprInitList) {
+            isto.zerarMemoria(addrBase, isto.tabela.tamanhoDe(tipoAlvo))
+            var idxSeq: inteiro = 0
+            para (var i: inteiro = 0; i < inic.filhos.tamanho(); i++) {
+                const item: qualquer = inic.filhos[i]
+                var offItem: inteiro = 0
+                var subTipo: qualquer = tipoAlvo
+                var exprItem: qualquer = item
+
+                se (item.kind == isto.Kind.ExprInicDesignado) {
+                    exprItem = item.filhos[0]
+                    se (item.ehSeta) {
+                        // [idx] = val
+                        subTipo = tipoAlvo.alvo
+                        offItem = item.valor * isto.tabela.tamanhoDe(subTipo)
+                        idxSeq = item.valor + 1
+                    } senao {
+                        // .campo = val
+                        offItem = item.valor
+                        subTipo = item.tipoC
+                    }
+                } senao se (tipoAlvo.base == isto.TB.Array) {
+                    subTipo = tipoAlvo.alvo
+                    offItem = idxSeq * isto.tabela.tamanhoDe(subTipo)
+                    idxSeq++
+                } senao se (tipoAlvo.base == isto.TB.Struct ou tipoAlvo.base == isto.TB.Union) {
+                    const ag: qualquer = tipoAlvo.base == isto.TB.Struct ? isto.tabela.structs[tipoAlvo.nomeAgregado] : isto.tabela.unions[tipoAlvo.nomeAgregado]
+                    const campoL: qualquer = ag.campos[ag.ordemCampos[idxSeq]]
+                    offItem = campoL.offset
+                    subTipo = campoL.tipoCampo
+                    idxSeq++
+                }
+
+                var addrItem: inteiro = addrBase
+                se (offItem > 0) {
+                    const offR: inteiro = isto.emitirConst(offItem)
+                    addrItem = isto.novoReg()
+                    isto.emitir(InstSSA(isto.OpI.Add, addrItem, addrBase, offR))
+                }
+                isto.baixarInicializador(addrItem, exprItem, subTipo)
+            }
+            retorna
+        }
+        se (inic.kind == isto.Kind.ExprStr e tipoAlvo.base == isto.TB.Array e tipoAlvo.alvo.base == isto.TB.Char) {
+            const tamArr: inteiro = isto.tabela.tamanhoDe(tipoAlvo)
+            isto.zerarMemoria(addrBase, tamArr)
+            const bytesMod: qualquer = importar("cgd:bytes")
+            const dadosStr: inteiro[] = bytesMod.Bytes.deTexto(inic.textoLit).paraVetor()
+            para (var i: inteiro = 0; i < dadosStr.tamanho() e i < tamArr; i++) {
+                var pChar: inteiro = addrBase
+                se (i > 0) {
+                    const offR: inteiro = isto.emitirConst(i)
+                    pChar = isto.novoReg()
+                    isto.emitir(InstSSA(isto.OpI.Add, pChar, addrBase, offR))
+                }
+                const chVal: inteiro = isto.emitirConst(dadosStr[i])
+                const stC: InstSSA = InstSSA(isto.OpI.Store, -1, pChar, chVal)
+                stC.largura = 1
+                isto.emitir(stC)
+            }
+            retorna
+        }
+        se (tipoAlvo.base == isto.TB.Struct ou tipoAlvo.base == isto.TB.Union) {
+            const srcAddr: inteiro = isto.baixarEndereco(inic)
+            isto.emitirCopiaMemoria(addrBase, srcAddr, isto.tabela.tamanhoDe(tipoAlvo))
+            retorna
+        }
+        const rawReg: inteiro = isto.baixarExpr(inic)
+        const convReg: inteiro = isto.converterValor(rawReg, inic.tipoC, tipoAlvo)
+        isto.emitirStoreTipo(addrBase, convReg, tipoAlvo)
+    }
+
+    baixarEndereco(expr: qualquer): inteiro {
+        escolha (expr.kind) {
+            caso isto.Kind.ExprLiteralComposto:
+            const offCL: inteiro = isto.alocarBytes(isto.tabela.tamanhoDe(expr.tipoC))
+            const ptrCL: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.AddrSlot, ptrCL, offCL, 0))
+            isto.baixarInicializador(ptrCL, expr.filhos[0], expr.tipoC)
+            retorna ptrCL
+            caso isto.Kind.ExprChamada:
+            se (expr.tipoC.ehAgregado()) retorna isto.baixarExpr(expr)
+            falhar isto.tMod.ErroC99("Linha ${expr.linha}: chamada escalar nao possui endereco")
+            caso isto.Kind.ExprVar:
+            const staticGlob: texto = isto.buscarStaticLocal(expr.nome)
+            se (staticGlob.tamanho() > 0) {
+                const dstSt: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.AddrGlobal, dstSt, inteiro(isto.modulo.mapaGlobais[staticGlob]),
+                    0, staticGlob))
+                retorna dstSt
+            }
+            const vlaInfo: qualquer = isto.buscarVlaInfo(expr.nome)
+            se (vlaInfo != nulo) {
+                const slotPtr: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.AddrSlot, slotPtr, inteiro(vlaInfo[0]), 0))
+                const baseVla: inteiro = isto.novoReg()
+                const ldV: InstSSA = InstSSA(isto.OpI.Load, baseVla, slotPtr, 0)
+                ldV.largura = 8
+                isto.emitir(ldV)
+                retorna baseVla
+            }
+            const offLoc: inteiro = isto.buscarOffsetLocal(expr.nome)
+            se (offLoc >= 0) {
+                const dst: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.AddrSlot, dst, offLoc, 0))
+                retorna dst
+            }
+            se (isto.modulo.mapaGlobais.contem(expr.nome)) {
+                const dstG: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.AddrGlobal, dstG, inteiro(isto.modulo.mapaGlobais[expr.nome]),
+                    0, expr.nome))
+                retorna dstG
+            }
+            const dstF: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.AddrFunc, dstF, 0, 0, expr.nome))
+            retorna dstF
+            caso isto.Kind.ExprUnaria:
+            se (expr.opUn == isto.OpU.Deref) retorna isto.baixarExpr(expr.filhos[0])
+            falhar isto.tMod.ErroC99("Linha ${expr.linha}: lvalue invalido")
+            caso isto.Kind.ExprIndice:
+            const basePtr: inteiro = isto.baixarExpr(expr.filhos[0])
+            const idxReg: inteiro = isto.baixarExpr(expr.filhos[1])
+            const elemTam: inteiro = isto.tabela.tamanhoDe(expr.tipoC)
+            var desloc: inteiro = idxReg
+            se (elemTam != 1) {
+                const tamReg: inteiro = isto.emitirConst(elemTam)
+                desloc = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.Mul, desloc, idxReg, tamReg))
+            }
+            const addrI: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.Add, addrI, basePtr, desloc))
+            retorna addrI
+            caso isto.Kind.ExprMembro:
+            const basePtrM: inteiro = expr.ehSeta ? isto.baixarExpr(expr.filhos[0]) : isto.baixarEndereco(expr.filhos[0])
+            se (expr.valor == 0) retorna basePtrM
+            const offReg: inteiro = isto.emitirConst(expr.valor)
+            const addrM: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.Add, addrM, basePtrM, offReg))
+            retorna addrM
+            padrao:
+            falhar isto.tMod.ErroC99("Linha ${expr.linha}: expressao nao possui endereco (lvalue invalido)")
+        }
+        retorna 0
+    }
+
+    baixarStmt(stmt: qualquer): vazio {
+        se (stmt.kind == isto.Kind.StmtLabel) {
+            const bbLbl: BlocoSSA = isto.obterOuCriarBlocoLabel(stmt.nome)
+            se (!isto.blocoAtual.terminado) {
+                isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbLbl.nome))
+            }
+            isto.blocoAtual = bbLbl
+            se (stmt.filhos.tamanho() > 0) {
+                isto.baixarStmt(stmt.filhos[0])
+            }
+            retorna
+        }
+        se (isto.blocoAtual.terminado) retorna
+
+        escolha (stmt.kind) {
+            caso isto.Kind.StmtVazio:
+            caso isto.Kind.DeclStruct:
+            caso isto.Kind.DeclUnion:
+            caso isto.Kind.DeclEnum:
+            retorna
+            caso isto.Kind.Bloco:
+            isto.escoposOffset.empilhar({})
+            isto.escoposStatic.empilhar({})
+            isto.escoposVla.empilhar({})
+            para (var i: inteiro = 0; i < stmt.filhos.tamanho(); i++) {
+                isto.baixarStmt(stmt.filhos[i])
+            }
+            isto.escoposOffset.removerUltimo()
+            isto.escoposStatic.removerUltimo()
+            isto.escoposVla.removerUltimo()
+            retorna
+            caso isto.Kind.VarDecl:
+            se (stmt.ehStatic) {
+                const nomeGlob: texto = "__static_${isto.fn.nome}_${stmt.nome}_${isto.contStatic}"
+                isto.contStatic++
+                const tamSt: inteiro = isto.tabela.tamanhoDe(stmt.tipoC)
+                const alinhSt: inteiro = isto.tabela.alinhamentoDe(stmt.tipoC)
+                const temInSt: logico = stmt.filhos.tamanho() > 0
+                const gSt: GlobalSSA = GlobalSSA(nomeGlob, tamSt, alinhSt, temInSt)
+                se (temInSt) {
+                    para (var z: inteiro = 0; z < tamSt; z++) gSt.bytesInit.empilhar(0)
+                    preencherBytesGlobal(gSt.bytesInit, 0, stmt.filhos[0], stmt.tipoC, isto.tabela,
+                        isto.Kind, isto.OpB, isto.OpU, isto.TB)
+                }
+                isto.modulo.registrarGlobal(gSt)
+                isto.escoposStatic[isto.escoposStatic.tamanho() - 1][stmt.nome] = nomeGlob
+                retorna
+            }
+            se (stmt.tipoC.base == isto.TB.Array e stmt.tipoC.ehVLA) {
+                const cntReg: inteiro = isto.baixarExpr(stmt.tipoC.exprTamVLA)
+                const elemTamV: inteiro = isto.tabela.tamanhoDe(stmt.tipoC.alvo)
+                var bytesReg: inteiro = cntReg
+                se (elemTamV != 1) {
+                    const tElemR: inteiro = isto.emitirConst(elemTamV)
+                    bytesReg = isto.novoReg()
+                    isto.emitir(InstSSA(isto.OpI.Mul, bytesReg, cntReg, tElemR))
+                }
+                const ptrVla: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.Alloca, ptrVla, bytesReg, 0))
+                const offPtrVla: inteiro = isto.alocarBytes(8)
+                const slotAddrV: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.AddrSlot, slotAddrV, offPtrVla, 0))
+                const stVla: InstSSA = InstSSA(isto.OpI.Store, -1, slotAddrV, ptrVla)
+                stVla.largura = 8
+                isto.emitir(stVla)
+                isto.escoposVla[isto.escoposVla.tamanho() - 1][stmt.nome] = tupla([offPtrVla,
+                    bytesReg])
+                retorna
+            }
+            const off: inteiro = isto.alocarVar(stmt.nome, stmt.tipoC)
+            se (stmt.filhos.tamanho() > 0) {
+                const ptrReg: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.AddrSlot, ptrReg, off, 0))
+                isto.baixarInicializador(ptrReg, stmt.filhos[0], stmt.tipoC)
+            }
+            retorna
+            caso isto.Kind.StmtExpr:
+            isto.baixarExpr(stmt.filhos[0])
+            retorna
+            caso isto.Kind.StmtIf:
+            const condRaw: inteiro = isto.baixarExpr(stmt.filhos[0])
+            const condReg: inteiro = isto.converterValor(condRaw, stmt.filhos[0].tipoC, isto.tMod.TipoC.tipoBool())
+            const bbSim: BlocoSSA = isto.criarBloco("if_sim")
+            const temElse: logico = stmt.filhos.tamanho() > 2
+            const bbNao: BlocoSSA = temElse ? isto.criarBloco("if_nao") : isto.criarBloco("if_fim")
+            const bbFim: BlocoSSA = temElse ? isto.criarBloco("if_fim") : bbNao
+
+            isto.emitir(InstSSA(isto.OpI.BrCond, -1, condReg, 0, bbSim.nome, bbNao.nome))
+
+            isto.blocoAtual = bbSim
+            isto.baixarStmt(stmt.filhos[1])
+            se (!isto.blocoAtual.terminado) isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbFim.nome))
+
+            se (temElse) {
+                isto.blocoAtual = bbNao
+                isto.baixarStmt(stmt.filhos[2])
+                se (!isto.blocoAtual.terminado) isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0,
+                    bbFim.nome))
+            }
+            isto.blocoAtual = bbFim
+            retorna
+            caso isto.Kind.StmtWhile:
+            const bbCond: BlocoSSA = isto.criarBloco("while_cond")
+            const bbCorpo: BlocoSSA = isto.criarBloco("while_corpo")
+            const bbFimW: BlocoSSA = isto.criarBloco("while_fim")
+
+            isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbCond.nome))
+
+            isto.blocoAtual = bbCond
+            const condWRaw: inteiro = isto.baixarExpr(stmt.filhos[0])
+            const condWReg: inteiro = isto.converterValor(condWRaw, stmt.filhos[0].tipoC,
+                isto.tMod.TipoC.tipoBool())
+            isto.emitir(InstSSA(isto.OpI.BrCond, -1, condWReg, 0, bbCorpo.nome, bbFimW.nome))
+
+            isto.alvosBreak.empilhar(bbFimW.nome)
+            isto.alvosContinue.empilhar(bbCond.nome)
+            isto.blocoAtual = bbCorpo
+            isto.baixarStmt(stmt.filhos[1])
+            se (!isto.blocoAtual.terminado) isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbCond.nome))
+            isto.alvosBreak.removerUltimo()
+            isto.alvosContinue.removerUltimo()
+
+            isto.blocoAtual = bbFimW
+            retorna
+            caso isto.Kind.StmtDoWhile:
+            const bbCorpoD: BlocoSSA = isto.criarBloco("do_corpo")
+            const bbCondD: BlocoSSA = isto.criarBloco("do_cond")
+            const bbFimD: BlocoSSA = isto.criarBloco("do_fim")
+
+            isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbCorpoD.nome))
+
+            isto.alvosBreak.empilhar(bbFimD.nome)
+            isto.alvosContinue.empilhar(bbCondD.nome)
+            isto.blocoAtual = bbCorpoD
+            isto.baixarStmt(stmt.filhos[0])
+            se (!isto.blocoAtual.terminado) isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbCondD.nome))
+            isto.alvosBreak.removerUltimo()
+            isto.alvosContinue.removerUltimo()
+
+            isto.blocoAtual = bbCondD
+            const condDRaw: inteiro = isto.baixarExpr(stmt.filhos[1])
+            const condDReg: inteiro = isto.converterValor(condDRaw, stmt.filhos[1].tipoC,
+                isto.tMod.TipoC.tipoBool())
+            isto.emitir(InstSSA(isto.OpI.BrCond, -1, condDReg, 0, bbCorpoD.nome, bbFimD.nome))
+
+            isto.blocoAtual = bbFimD
+            retorna
+            caso isto.Kind.StmtFor:
+            isto.escoposOffset.empilhar({})
+            isto.escoposStatic.empilhar({})
+            isto.escoposVla.empilhar({})
+            isto.baixarStmt(stmt.filhos[0])
+
+            const bbCondF: BlocoSSA = isto.criarBloco("for_cond")
+            const bbCorpoF: BlocoSSA = isto.criarBloco("for_corpo")
+            const bbPassoF: BlocoSSA = isto.criarBloco("for_passo")
+            const bbFimF: BlocoSSA = isto.criarBloco("for_fim")
+
+            isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbCondF.nome))
+
+            isto.blocoAtual = bbCondF
+            const condFRaw: inteiro = isto.baixarExpr(stmt.filhos[1])
+            const condFReg: inteiro = isto.converterValor(condFRaw, stmt.filhos[1].tipoC,
+                isto.tMod.TipoC.tipoBool())
+            isto.emitir(InstSSA(isto.OpI.BrCond, -1, condFReg, 0, bbCorpoF.nome, bbFimF.nome))
+
+            isto.alvosBreak.empilhar(bbFimF.nome)
+            isto.alvosContinue.empilhar(bbPassoF.nome)
+            isto.blocoAtual = bbCorpoF
+            isto.baixarStmt(stmt.filhos[3])
+            se (!isto.blocoAtual.terminado) isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbPassoF.nome))
+            isto.alvosBreak.removerUltimo()
+            isto.alvosContinue.removerUltimo()
+
+            isto.blocoAtual = bbPassoF
+            isto.baixarStmt(stmt.filhos[2])
+            se (!isto.blocoAtual.terminado) isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbCondF.nome))
+
+            isto.blocoAtual = bbFimF
+            isto.escoposOffset.removerUltimo()
+            isto.escoposStatic.removerUltimo()
+            isto.escoposVla.removerUltimo()
+            retorna
+            caso isto.Kind.StmtSwitch:
+            const valAlvo: inteiro = isto.baixarExpr(stmt.filhos[0])
+            const bbFimS: BlocoSSA = isto.criarBloco("sw_fim")
+            var blocosCasos: BlocoSSA[] = []
+            var idxDefault: inteiro = -1
+
+            para (var i: inteiro = 1; i < stmt.filhos.tamanho(); i++) {
+                const ramoCaso: qualquer = stmt.filhos[i]
+                const bbC: BlocoSSA = isto.criarBloco(ramoCaso.ehSeta ? "sw_def" : "sw_case")
+                blocosCasos.empilhar(bbC)
+                se (ramoCaso.ehSeta) idxDefault = i - 1
+            }
+
+            para (var i: inteiro = 1; i < stmt.filhos.tamanho(); i++) {
+                const ramoCaso: qualquer = stmt.filhos[i]
+                se (ramoCaso.ehSeta) continua
+                const valCaso: inteiro = isto.baixarExpr(ramoCaso.filhos[0])
+                const cmpReg: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.Eq, cmpReg, valAlvo, valCaso))
+                const bbProxTeste: BlocoSSA = isto.criarBloco("sw_next")
+                isto.emitir(InstSSA(isto.OpI.BrCond, -1, cmpReg, 0, blocosCasos[i - 1].nome,
+                    bbProxTeste.nome))
+                isto.blocoAtual = bbProxTeste
+            }
+            se (idxDefault >= 0) {
+                isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, blocosCasos[idxDefault].nome))
+            } senao {
+                isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbFimS.nome))
+            }
+
+            isto.alvosBreak.empilhar(bbFimS.nome)
+            para (var i: inteiro = 1; i < stmt.filhos.tamanho(); i++) {
+                const ramoCaso: qualquer = stmt.filhos[i]
+                isto.blocoAtual = blocosCasos[i - 1]
+                const corpoNo: qualquer = ramoCaso.ehSeta ? ramoCaso.filhos[0] : ramoCaso.filhos[1]
+                isto.baixarStmt(corpoNo)
+                se (!isto.blocoAtual.terminado) {
+                    const proxAlvo: texto = i < stmt.filhos.tamanho() - 1 ? blocosCasos[i].nome : bbFimS.nome
+                    isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, proxAlvo))
+                }
+            }
+            isto.alvosBreak.removerUltimo()
+            isto.blocoAtual = bbFimS
+            retorna
+            caso isto.Kind.StmtBreak:
+            isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, isto.alvosBreak[isto.alvosBreak.tamanho() - 1]))
+            retorna
+            caso isto.Kind.StmtContinue:
+            isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, isto.alvosContinue[isto.alvosContinue.tamanho() - 1]))
+            retorna
+            caso isto.Kind.StmtGoto:
+            const bbAlvoG: BlocoSSA = isto.obterOuCriarBlocoLabel(stmt.nome)
+            isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbAlvoG.nome))
+            retorna
+            caso isto.Kind.StmtReturn:
+            se (stmt.filhos.tamanho() == 0) {
+                const z: inteiro = isto.emitirConst(0)
+                isto.emitir(InstSSA(isto.OpI.Ret, -1, z, 0))
+            } senao {
+                se (stmt.filhos[0].tipoC.ehAgregado() e isto.tabela.tamanhoDe(stmt.filhos[0].tipoC) <= 8) {
+                    const addrRetAg: inteiro = isto.baixarEndereco(stmt.filhos[0])
+                    const valRetAg: inteiro = isto.novoReg()
+                    const ldRetAg: InstSSA = InstSSA(isto.OpI.Load, valRetAg, addrRetAg,
+                        0)
+                    ldRetAg.largura = 8
+                    isto.emitir(ldRetAg)
+                    isto.emitir(InstSSA(isto.OpI.Ret, -1, valRetAg, 0))
+                    retorna
+                }
+                const rawRet: inteiro = isto.baixarExpr(stmt.filhos[0])
+                se (isto.fn.retornaFloat) {
+                    const convF: inteiro = isto.converterValor(rawRet, stmt.filhos[0].tipoC,
+                        isto.tMod.TipoC.tipoDouble())
+                    isto.emitir(InstSSA(isto.OpI.FRet, -1, convF, 0))
+                } senao {
+                    const convI: inteiro = isto.converterValor(rawRet, stmt.filhos[0].tipoC,
+                        isto.tMod.TipoC.tipoLong())
+                    isto.emitir(InstSSA(isto.OpI.Ret, -1, convI, 0))
+                }
+            }
+            retorna
+            padrao:
+            retorna
+        }
+    }
+
+    mapearOpBinInt(opB: qualquer, semSinal: logico): qualquer {
+        escolha (opB) {
+            caso isto.OpB.Add: retorna isto.OpI.Add
+            caso isto.OpB.Sub: retorna isto.OpI.Sub
+            caso isto.OpB.Mul: retorna isto.OpI.Mul
+            caso isto.OpB.Div: retorna semSinal ? isto.OpI.UDiv : isto.OpI.SDiv
+            caso isto.OpB.Mod: retorna semSinal ? isto.OpI.UMod : isto.OpI.SMod
+            caso isto.OpB.BitAnd: retorna isto.OpI.BitAnd
+            caso isto.OpB.BitOr: retorna isto.OpI.BitOr
+            caso isto.OpB.BitXor: retorna isto.OpI.BitXor
+            caso isto.OpB.Shl: retorna isto.OpI.Shl
+            caso isto.OpB.Shr: retorna semSinal ? isto.OpI.LShr : isto.OpI.AShr
+            caso isto.OpB.Eq: retorna isto.OpI.Eq
+            caso isto.OpB.Neq: retorna isto.OpI.Neq
+            caso isto.OpB.Lt: retorna semSinal ? isto.OpI.ULt : isto.OpI.SLt
+            caso isto.OpB.Le: retorna semSinal ? isto.OpI.ULe : isto.OpI.SLe
+            caso isto.OpB.Gt: retorna semSinal ? isto.OpI.UGt : isto.OpI.SGt
+            padrao: retorna semSinal ? isto.OpI.UGe : isto.OpI.SGe
+        }
+        retorna isto.OpI.Add
+    }
+
+    mapearOpBinFloat(opB: qualquer): qualquer {
+        escolha (opB) {
+            caso isto.OpB.Add: retorna isto.OpI.FAdd
+            caso isto.OpB.Sub: retorna isto.OpI.FSub
+            caso isto.OpB.Mul: retorna isto.OpI.FMul
+            caso isto.OpB.Div: retorna isto.OpI.FDiv
+            caso isto.OpB.Eq: retorna isto.OpI.FEq
+            caso isto.OpB.Neq: retorna isto.OpI.FNeq
+            caso isto.OpB.Lt: retorna isto.OpI.FLt
+            caso isto.OpB.Le: retorna isto.OpI.FLe
+            caso isto.OpB.Gt: retorna isto.OpI.FGt
+            padrao: retorna isto.OpI.FGe
+        }
+        retorna isto.OpI.FAdd
+    }
+
+    mapearAtribComposta(opB: qualquer): qualquer {
+        escolha (opB) {
+            caso isto.OpB.AddAssign: retorna isto.OpB.Add
+            caso isto.OpB.SubAssign: retorna isto.OpB.Sub
+            caso isto.OpB.MulAssign: retorna isto.OpB.Mul
+            caso isto.OpB.DivAssign: retorna isto.OpB.Div
+            caso isto.OpB.ModAssign: retorna isto.OpB.Mod
+            caso isto.OpB.BitAndAssign: retorna isto.OpB.BitAnd
+            caso isto.OpB.BitOrAssign: retorna isto.OpB.BitOr
+            caso isto.OpB.BitXorAssign: retorna isto.OpB.BitXor
+            caso isto.OpB.ShlAssign: retorna isto.OpB.Shl
+            padrao: retorna isto.OpB.Shr
+        }
+        retorna isto.OpB.Add
+    }
+
+    baixarExpr(expr: qualquer): inteiro {
+        escolha (expr.kind) {
+            caso isto.Kind.ExprInt:
+            caso isto.Kind.ExprSizeofTipo:
+            retorna isto.emitirConst(expr.valor)
+            caso isto.Kind.ExprSizeofExpr:
+            se (expr.valor < 0 e expr.filhos[0].kind == isto.Kind.ExprVar) {
+                const vInfoSz: qualquer = isto.buscarVlaInfo(expr.filhos[0].nome)
+                se (vInfoSz != nulo) retorna inteiro(vInfoSz[1])
+            }
+            retorna isto.emitirConst(expr.valor)
+            caso isto.Kind.ExprFloat:
+            retorna isto.emitirFConst(expr.valorReal)
+            caso isto.Kind.ExprStr:
+            const idxStr: inteiro = isto.modulo.internarString(expr.textoLit)
+            const dstS: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.AddrStr, dstS, idxStr, 0))
+            retorna dstS
+            caso isto.Kind.ExprLiteralComposto:
+            const ptrCL: inteiro = isto.baixarEndereco(expr)
+            se (expr.tipoC.base == isto.TB.Array ou expr.tipoC.base == isto.TB.Struct ou expr.tipoC.base == isto.TB.Union) {
+                retorna ptrCL
+            }
+            retorna isto.emitirLoadTipo(ptrCL, expr.tipoC)
+            caso isto.Kind.ExprVaStart:
+            const apPtrS: inteiro = isto.baixarExpr(expr.filhos[0])
+            // +0: gp_offset = numFixedIntParams * 8 (u32)
+            const gpInit: inteiro = isto.emitirConst(isto.fn.numFixedIntParams * 8)
+            const stGp: InstSSA = InstSSA(isto.OpI.Store, -1, apPtrS, gpInit)
+            stGp.largura = 4
+            isto.emitir(stGp)
+            // +4: fp_offset = 48 + numFixedFltParams * 16 (u32)
+            const c4: inteiro = isto.emitirConst(4)
+            const ptrFpOff: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.Add, ptrFpOff, apPtrS, c4))
+            const fpInit: inteiro = isto.emitirConst(48 + isto.fn.numFixedFltParams * 16)
+            const stFp: InstSSA = InstSSA(isto.OpI.Store, -1, ptrFpOff, fpInit)
+            stFp.largura = 4
+            isto.emitir(stFp)
+            // +8: overflow_arg_area = rbp + 16 + numFixedStkParams * 8
+            const c8: inteiro = isto.emitirConst(8)
+            const ptrOvf: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.Add, ptrOvf, apPtrS, c8))
+            const ovfVal: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.AddrRbpDisp, ovfVal, 16 + isto.fn.numFixedStkParams * 8,
+                0))
+            const stOvf: InstSSA = InstSSA(isto.OpI.Store, -1, ptrOvf, ovfVal)
+            stOvf.largura = 8
+            isto.emitir(stOvf)
+            // +16: reg_save_area = rbp - regSaveOffset
+            const c16: inteiro = isto.emitirConst(16)
+            const ptrRegS: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.Add, ptrRegS, apPtrS, c16))
+            const saveVal: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.AddrSlot, saveVal, isto.fn.regSaveOffset, 0))
+            const stSav: InstSSA = InstSSA(isto.OpI.Store, -1, ptrRegS, saveVal)
+            stSav.largura = 8
+            isto.emitir(stSav)
+            retorna isto.emitirConst(0)
+            caso isto.Kind.ExprVaArg:
+            const apPtrA: inteiro = isto.baixarExpr(expr.filhos[0])
+            const ehFltVa: logico = expr.tipoC.ehFlutuante()
+            const resOffVa: inteiro = isto.alocarBytes(8)
+            const resSlotVa: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.AddrSlot, resSlotVa, resOffVa, 0))
+
+            const offCampo: inteiro = ehFltVa ? 4 : 0
+            const limiteReg: inteiro = ehFltVa ? 176 : 48
+            const passoReg: inteiro = ehFltVa ? 16 : 8
+
+            var ptrOffCampo: inteiro = apPtrA
+            se (offCampo > 0) {
+                const cOffC: inteiro = isto.emitirConst(offCampo)
+                ptrOffCampo = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.Add, ptrOffCampo, apPtrA, cOffC))
+            }
+            const curOffVa: inteiro = isto.novoReg()
+            const ldOffVa: InstSSA = InstSSA(isto.OpI.Load, curOffVa, ptrOffCampo, 0)
+            ldOffVa.largura = 4
+            ldOffVa.ehSemSinal = verdadeiro
+            isto.emitir(ldOffVa)
+
+            const limR: inteiro = isto.emitirConst(limiteReg)
+            const cabeNoReg: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.ULt, cabeNoReg, curOffVa, limR))
+
+            const bbVaReg: BlocoSSA = isto.criarBloco("va_reg")
+            const bbVaOvf: BlocoSSA = isto.criarBloco("va_ovf")
+            const bbVaFim: BlocoSSA = isto.criarBloco("va_fim")
+            isto.emitir(InstSSA(isto.OpI.BrCond, -1, cabeNoReg, 0, bbVaReg.nome, bbVaOvf.nome))
+
+            // Ramo 1: le da reg_save_area + curOffVa e incrementa offset
+            isto.blocoAtual = bbVaReg
+            const c16v: inteiro = isto.emitirConst(16)
+            const ptrSaveFld: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.Add, ptrSaveFld, apPtrA, c16v))
+            const saveBase: inteiro = isto.novoReg()
+            const ldSave: InstSSA = InstSSA(isto.OpI.Load, saveBase, ptrSaveFld, 0)
+            ldSave.largura = 8
+            isto.emitir(ldSave)
+            const elemAddrReg: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.Add, elemAddrReg, saveBase, curOffVa))
+            se (ehFltVa) {
+                const fv1: inteiro = isto.novoReg()
+                const fld1: InstSSA = InstSSA(isto.OpI.FLoad, fv1, elemAddrReg, 0)
+                fld1.largura = 8
+                fld1.ehFloatDst = verdadeiro
+                isto.emitir(fld1)
+                const fst1: InstSSA = InstSSA(isto.OpI.FStore, -1, resSlotVa, fv1)
+                fst1.largura = 8
+                isto.emitir(fst1)
+            } senao {
+                const iv1: inteiro = isto.emitirLoadTipo(elemAddrReg, expr.tipoC)
+                const ist1: InstSSA = InstSSA(isto.OpI.Store, -1, resSlotVa, iv1)
+                ist1.largura = 8
+                isto.emitir(ist1)
+            }
+            const passoR: inteiro = isto.emitirConst(passoReg)
+            const proxOff: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.Add, proxOff, curOffVa, passoR))
+            const stProxOff: InstSSA = InstSSA(isto.OpI.Store, -1, ptrOffCampo, proxOff)
+            stProxOff.largura = 4
+            isto.emitir(stProxOff)
+            isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbVaFim.nome))
+
+            // Ramo 2: le de overflow_arg_area e avanca ponteiro em +8
+            isto.blocoAtual = bbVaOvf
+            const c8v: inteiro = isto.emitirConst(8)
+            const ptrOvfFld: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.Add, ptrOvfFld, apPtrA, c8v))
+            const ovfBase: inteiro = isto.novoReg()
+            const ldOvf: InstSSA = InstSSA(isto.OpI.Load, ovfBase, ptrOvfFld, 0)
+            ldOvf.largura = 8
+            isto.emitir(ldOvf)
+            se (ehFltVa) {
+                const fv2: inteiro = isto.novoReg()
+                const fld2: InstSSA = InstSSA(isto.OpI.FLoad, fv2, ovfBase, 0)
+                fld2.largura = 8
+                fld2.ehFloatDst = verdadeiro
+                isto.emitir(fld2)
+                const fst2: InstSSA = InstSSA(isto.OpI.FStore, -1, resSlotVa, fv2)
+                fst2.largura = 8
+                isto.emitir(fst2)
+            } senao {
+                const iv2: inteiro = isto.emitirLoadTipo(ovfBase, expr.tipoC)
+                const ist2: InstSSA = InstSSA(isto.OpI.Store, -1, resSlotVa, iv2)
+                ist2.largura = 8
+                isto.emitir(ist2)
+            }
+            const proxOvf: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.Add, proxOvf, ovfBase, c8v))
+            const stProxOvf: InstSSA = InstSSA(isto.OpI.Store, -1, ptrOvfFld, proxOvf)
+            stProxOvf.largura = 8
+            isto.emitir(stProxOvf)
+            isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbVaFim.nome))
+
+            // Join: le valor final do slot temporario
+            isto.blocoAtual = bbVaFim
+            se (ehFltVa) {
+                const fRes: inteiro = isto.novoReg()
+                const fldF: InstSSA = InstSSA(isto.OpI.FLoad, fRes, resSlotVa, 0)
+                fldF.largura = 8
+                fldF.ehFloatDst = verdadeiro
+                isto.emitir(fldF)
+                retorna fRes
+            }
+            retorna isto.emitirLoadTipo(resSlotVa, expr.tipoC)
+            caso isto.Kind.ExprCast:
+            const origR: inteiro = isto.baixarExpr(expr.filhos[0])
+            retorna isto.converterValor(origR, expr.filhos[0].tipoC, expr.tipoC)
+            caso isto.Kind.ExprComma:
+            isto.baixarExpr(expr.filhos[0])
+            retorna isto.baixarExpr(expr.filhos[1])
+            caso isto.Kind.ExprVar:
+            se (expr.nome == "__func__") {
+                const idxFnN: inteiro = isto.modulo.internarString(isto.fn.nome)
+                const dstFnN: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.AddrStr, dstFnN, idxFnN, 0))
+                retorna dstFnN
+            }
+            se (isto.tabela.constantesEnum.contem(expr.nome)) {
+                retorna isto.emitirConst(inteiro(isto.tabela.constantesEnum[expr.nome]))
+            }
+            const addrV: inteiro = isto.baixarEndereco(expr)
+            se (expr.tipoC.base == isto.TB.Array ou expr.tipoC.base == isto.TB.Struct ou expr.tipoC.base == isto.TB.Union) {
+                retorna addrV
+            }
+            // Nome de funcao (sem ser variavel local, static, VLA ou global) ja retorna AddrFunc
+            se (isto.buscarStaticLocal(expr.nome).tamanho() == 0 e isto.buscarVlaInfo(expr.nome) == nulo e isto.buscarOffsetLocal(expr.nome) < 0 e !isto.modulo.mapaGlobais.contem(expr.nome)) {
+                retorna addrV
+            }
+            retorna isto.emitirLoadTipo(addrV, expr.tipoC)
+            caso isto.Kind.ExprMembro:
+            caso isto.Kind.ExprIndice:
+            const addrM: inteiro = isto.baixarEndereco(expr)
+            se (expr.tipoC.base == isto.TB.Array ou expr.tipoC.base == isto.TB.Struct ou expr.tipoC.base == isto.TB.Union) {
+                retorna addrM
+            }
+            retorna isto.emitirLoadTipo(addrM, expr.tipoC)
+            caso isto.Kind.ExprPosfixo:
+            const addrP: inteiro = isto.baixarEndereco(expr.filhos[0])
+            const antigo: inteiro = isto.emitirLoadTipo(addrP, expr.tipoC)
+            const passo: inteiro = expr.tipoC.base == isto.TB.Ponteiro ? isto.tabela.tamanhoDe(expr.tipoC.alvo) : 1
+            const um: inteiro = isto.emitirConst(passo)
+            const novoVal: inteiro = isto.novoReg()
+            const opP: qualquer = expr.opUn == isto.OpU.PostInc ? isto.OpI.Add : isto.OpI.Sub
+            isto.emitir(InstSSA(opP, novoVal, antigo, um))
+            isto.emitirStoreTipo(addrP, novoVal, expr.tipoC)
+            retorna antigo
+            caso isto.Kind.ExprAtrib:
+            const addrA: inteiro = isto.baixarEndereco(expr.filhos[0])
+            se (expr.opBin == isto.OpB.Assign e (expr.tipoC.base == isto.TB.Struct ou expr.tipoC.base == isto.TB.Union)) {
+                const srcAg: inteiro = isto.baixarEndereco(expr.filhos[1])
+                isto.emitirCopiaMemoria(addrA, srcAg, isto.tabela.tamanhoDe(expr.tipoC))
+                retorna addrA
+            }
+            const rhsRaw: inteiro = isto.baixarExpr(expr.filhos[1])
+            se (expr.opBin == isto.OpB.Assign) {
+                const rhsConv: inteiro = isto.converterValor(rhsRaw, expr.filhos[1].tipoC,
+                    expr.tipoC)
+                isto.emitirStoreTipo(addrA, rhsConv, expr.tipoC)
+                retorna rhsConv
+            }
+            const atualA: inteiro = isto.emitirLoadTipo(addrA, expr.tipoC)
+            const opSimples: qualquer = isto.mapearAtribComposta(expr.opBin)
+            se (expr.tipoC.ehFlutuante()) {
+                const rhsF: inteiro = isto.converterValor(rhsRaw, expr.filhos[1].tipoC, expr.tipoC)
+                const resF: inteiro = isto.novoReg()
+                const instF: InstSSA = InstSSA(isto.mapearOpBinFloat(opSimples), resF, atualA,
+                    rhsF)
+                instF.ehFloatDst = verdadeiro
+                isto.emitir(instF)
+                isto.emitirStoreTipo(addrA, resF, expr.tipoC)
+                retorna resF
+            }
+            const resI: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.mapearOpBinInt(opSimples, expr.tipoC.ehSemSinal), resI,
+                atualA, rhsRaw))
+            isto.emitirStoreTipo(addrA, resI, expr.tipoC)
+            retorna resI
+            caso isto.Kind.ExprUnaria:
+            se (expr.opUn == isto.OpU.AddrOf) retorna isto.baixarEndereco(expr.filhos[0])
+            se (expr.opUn == isto.OpU.Deref) {
+                const ptrD: inteiro = isto.baixarExpr(expr.filhos[0])
+                retorna isto.emitirLoadTipo(ptrD, expr.tipoC)
+            }
+            se (expr.opUn == isto.OpU.PreInc ou expr.opUn == isto.OpU.PreDec) {
+                const addrPre: inteiro = isto.baixarEndereco(expr.filhos[0])
+                const curPre: inteiro = isto.emitirLoadTipo(addrPre, expr.tipoC)
+                const passoPre: inteiro = expr.tipoC.base == isto.TB.Ponteiro ? isto.tabela.tamanhoDe(expr.tipoC.alvo) : 1
+                const stepR: inteiro = isto.emitirConst(passoPre)
+                const resPre: inteiro = isto.novoReg()
+                const opPre: qualquer = expr.opUn == isto.OpU.PreInc ? isto.OpI.Add : isto.OpI.Sub
+                isto.emitir(InstSSA(opPre, resPre, curPre, stepR))
+                isto.emitirStoreTipo(addrPre, resPre, expr.tipoC)
+                retorna resPre
+            }
+            const opnd: inteiro = isto.baixarExpr(expr.filhos[0])
+            se (expr.opUn == isto.OpU.Pos) retorna opnd
+            se (expr.opUn == isto.OpU.Neg e expr.filhos[0].tipoC.ehFlutuante()) {
+                const dstFN: inteiro = isto.novoReg()
+                const instFN: InstSSA = InstSSA(isto.OpI.FNeg, dstFN, opnd, 0)
+                instFN.ehFloatDst = verdadeiro
+                isto.emitir(instFN)
+                retorna dstFN
+            }
+            const dstU: inteiro = isto.novoReg()
+            var opU: qualquer = isto.OpI.Neg
+            se (expr.opUn == isto.OpU.LogNot) opU = isto.OpI.LogNot
+            senao se (expr.opUn == isto.OpU.BitNot) opU = isto.OpI.BitNot
+            isto.emitir(InstSSA(opU, dstU, opnd, 0))
+            retorna dstU
+            caso isto.Kind.ExprTernario:
+            const offRes: inteiro = isto.alocarBytes(8)
+            const cRaw: inteiro = isto.baixarExpr(expr.filhos[0])
+            const cReg: inteiro = isto.converterValor(cRaw, expr.filhos[0].tipoC, isto.tMod.TipoC.tipoBool())
+            const bbSim: BlocoSSA = isto.criarBloco("tern_sim")
+            const bbNao: BlocoSSA = isto.criarBloco("tern_nao")
+            const bbFim: BlocoSSA = isto.criarBloco("tern_fim")
+            isto.emitir(InstSSA(isto.OpI.BrCond, -1, cReg, 0, bbSim.nome, bbNao.nome))
+
+            isto.blocoAtual = bbSim
+            const rSim: inteiro = isto.baixarExpr(expr.filhos[1])
+            se (expr.tipoC.base != isto.TB.Void) {
+                const rSimC: inteiro = isto.converterValor(rSim, expr.filhos[1].tipoC, expr.tipoC)
+                const pSim: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.AddrSlot, pSim, offRes, 0))
+                isto.emitirStoreTipo(pSim, rSimC, expr.tipoC)
+            }
+            isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbFim.nome))
+
+            isto.blocoAtual = bbNao
+            const rNao: inteiro = isto.baixarExpr(expr.filhos[2])
+            se (expr.tipoC.base != isto.TB.Void) {
+                const rNaoC: inteiro = isto.converterValor(rNao, expr.filhos[2].tipoC, expr.tipoC)
+                const pNao: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.AddrSlot, pNao, offRes, 0))
+                isto.emitirStoreTipo(pNao, rNaoC, expr.tipoC)
+            }
+            isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbFim.nome))
+
+            isto.blocoAtual = bbFim
+            se (expr.tipoC.base == isto.TB.Void) retorna isto.emitirConst(0)
+            const pFim: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.OpI.AddrSlot, pFim, offRes, 0))
+            retorna isto.emitirLoadTipo(pFim, expr.tipoC)
+            caso isto.Kind.ExprBinaria:
+            se (expr.opBin == isto.OpB.LogAnd ou expr.opBin == isto.OpB.LogOr) {
+                const offLog: inteiro = isto.alocarBytes(8)
+                const esqRaw: inteiro = isto.baixarExpr(expr.filhos[0])
+                const esq: inteiro = isto.converterValor(esqRaw, expr.filhos[0].tipoC, isto.tMod.TipoC.tipoBool())
+                const bbDir: BlocoSSA = isto.criarBloco("log_dir")
+                const bbCurto: BlocoSSA = isto.criarBloco("log_curto")
+                const bbFimL: BlocoSSA = isto.criarBloco("log_fim")
+
+                se (expr.opBin == isto.OpB.LogAnd) {
+                    isto.emitir(InstSSA(isto.OpI.BrCond, -1, esq, 0, bbDir.nome, bbCurto.nome))
+                } senao {
+                    isto.emitir(InstSSA(isto.OpI.BrCond, -1, esq, 0, bbCurto.nome, bbDir.nome))
+                }
+
+                isto.blocoAtual = bbCurto
+                const cCurto: inteiro = isto.emitirConst(expr.opBin == isto.OpB.LogAnd ? 0 : 1)
+                const pCurto: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.AddrSlot, pCurto, offLog, 0))
+                isto.emitir(InstSSA(isto.OpI.Store, -1, pCurto, cCurto))
+                isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbFimL.nome))
+
+                isto.blocoAtual = bbDir
+                const dirRaw: inteiro = isto.baixarExpr(expr.filhos[1])
+                const norm: inteiro = isto.converterValor(dirRaw, expr.filhos[1].tipoC, isto.tMod.TipoC.tipoBool())
+                const pDir: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.AddrSlot, pDir, offLog, 0))
+                isto.emitir(InstSSA(isto.OpI.Store, -1, pDir, norm))
+                isto.emitir(InstSSA(isto.OpI.Br, -1, 0, 0, bbFimL.nome))
+
+                isto.blocoAtual = bbFimL
+                const pFimL: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.AddrSlot, pFimL, offLog, 0))
+                const outL: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.Load, outL, pFimL, 0))
+                retorna outL
+            }
+
+            const tEsq: qualquer = expr.filhos[0].tipoC
+            const tDir: qualquer = expr.filhos[1].tipoC
+            var a: inteiro = isto.baixarExpr(expr.filhos[0])
+            var b: inteiro = isto.baixarExpr(expr.filhos[1])
+
+            // Operacoes de ponto flutuante (double / float)
+            se (tEsq.ehFlutuante() ou tDir.ehFlutuante()) {
+                const tDouble: qualquer = isto.tMod.TipoC.tipoDouble()
+                a = isto.converterValor(a, tEsq, tDouble)
+                b = isto.converterValor(b, tDir, tDouble)
+                const opF: qualquer = isto.mapearOpBinFloat(expr.opBin)
+                const dstF: inteiro = isto.novoReg()
+                const instF: InstSSA = InstSSA(opF, dstF, a, b)
+                instF.ehFloatDst = expr.tipoC.ehFlutuante()
+                isto.emitir(instF)
+                retorna dstF
+            }
+
+            // Aritmetica de ponteiros
+            se ((expr.opBin == isto.OpB.Add ou expr.opBin == isto.OpB.Sub) e (tEsq.base == isto.TB.Ponteiro ou tEsq.base == isto.TB.Array)) {
+                const elemTam: inteiro = isto.tabela.tamanhoDe(tEsq.alvo)
+                se (expr.opBin == isto.OpB.Sub e (tDir.base == isto.TB.Ponteiro ou tDir.base == isto.TB.Array)) {
+                    const diff: inteiro = isto.novoReg()
+                    isto.emitir(InstSSA(isto.OpI.Sub, diff, a, b))
+                    se (elemTam <= 1) retorna diff
+                    const tamR: inteiro = isto.emitirConst(elemTam)
+                    const resPtrDiff: inteiro = isto.novoReg()
+                    isto.emitir(InstSSA(isto.OpI.SDiv, resPtrDiff, diff, tamR))
+                    retorna resPtrDiff
+                }
+                se (elemTam != 1) {
+                    const escala: inteiro = isto.emitirConst(elemTam)
+                    const bEscalado: inteiro = isto.novoReg()
+                    isto.emitir(InstSSA(isto.OpI.Mul, bEscalado, b, escala))
+                    b = bEscalado
+                }
+            }
+
+            const tComum: qualquer = (tEsq.ehInteiro() e tDir.ehInteiro()) ? isto.tMod.tipoAritmeticoComum(tEsq,
+                tDir) : expr.tipoC
+            const dstB: inteiro = isto.novoReg()
+            isto.emitir(InstSSA(isto.mapearOpBinInt(expr.opBin, tComum.ehSemSinal), dstB,
+                a, b))
+            retorna dstB
+            padrao:
+            // ExprChamada: direta, externa (libc) ou indireta (ponteiro para funcao)
+            se (expr.ehSeta) {
+                var ptrFnReg: inteiro = 0
+                var inicioArgs: inteiro = 0
+                se (expr.nome.tamanho() > 0) {
+                    const offFn: inteiro = isto.buscarOffsetLocal(expr.nome)
+                    const addrFnVar: inteiro = isto.novoReg()
+                    se (offFn >= 0) {
+                        isto.emitir(InstSSA(isto.OpI.AddrSlot, addrFnVar, offFn, 0))
+                    } senao {
+                        isto.emitir(InstSSA(isto.OpI.AddrGlobal, addrFnVar, inteiro(isto.modulo.mapaGlobais[expr.nome]),
+                            0, expr.nome))
+                    }
+                    ptrFnReg = isto.novoReg()
+                    isto.emitir(InstSSA(isto.OpI.Load, ptrFnReg, addrFnVar, 0))
+                    inicioArgs = 0
+                } senao {
+                    ptrFnReg = isto.baixarExpr(expr.filhos[0])
+                    inicioArgs = 1
+                }
+                var regsInd: inteiro[] = []
+                var floatsInd: logico[] = []
+                para (var i: inteiro = inicioArgs; i < expr.filhos.tamanho(); i++) {
+                    var rInd: inteiro = isto.baixarExpr(expr.filhos[i])
+                    const tInd: qualquer = expr.filhos[i].tipoC
+                    se (tInd.ehAgregado() e isto.tabela.tamanhoDe(tInd) <= 8) {
+                        const valAgInd: inteiro = isto.novoReg()
+                        const ldAgInd: InstSSA = InstSSA(isto.OpI.Load, valAgInd, rInd, 0)
+                        ldAgInd.largura = 8
+                        isto.emitir(ldAgInd)
+                        rInd = valAgInd
+                    }
+                    regsInd.empilhar(rInd)
+                    floatsInd.empilhar(tInd.ehFlutuante())
+                }
+                const dstInd: inteiro = isto.novoReg()
+                const instInd: InstSSA = InstSSA(isto.OpI.CallIndirect, dstInd, ptrFnReg,
+                    0)
+                instInd.callArgs = regsInd
+                instInd.callArgFloats = floatsInd
+                instInd.ehFloatDst = expr.tipoC.ehFlutuante()
+                isto.emitir(instInd)
+                se (expr.tipoC.ehAgregado() e isto.tabela.tamanhoDe(expr.tipoC) <= 8) {
+                    const offTmpI: inteiro = isto.alocarBytes(8)
+                    const ptrTmpI: inteiro = isto.novoReg()
+                    isto.emitir(InstSSA(isto.OpI.AddrSlot, ptrTmpI, offTmpI, 0))
+                    const stTmpI: InstSSA = InstSSA(isto.OpI.Store, -1, ptrTmpI, dstInd)
+                    stTmpI.largura = 8
+                    isto.emitir(stTmpI)
+                    retorna ptrTmpI
+                }
+                retorna dstInd
+            }
+
+            var regsArgs: inteiro[] = []
+            var floatsArgs: logico[] = []
+            const temAss: logico = isto.tabela.assinaturasFuncoes.contem(expr.nome)
+            para (var i: inteiro = 0; i < expr.filhos.tamanho(); i++) {
+                var rArg: inteiro = isto.baixarExpr(expr.filhos[i])
+                var tArg: qualquer = expr.filhos[i].tipoC
+                se (tArg.ehAgregado() e isto.tabela.tamanhoDe(tArg) <= 8) {
+                    const valAg: inteiro = isto.novoReg()
+                    const ldAg: InstSSA = InstSSA(isto.OpI.Load, valAg, rArg, 0)
+                    ldAg.largura = 8
+                    isto.emitir(ldAg)
+                    rArg = valAg
+                } senao se (temAss) {
+                    const infoAss: qualquer = isto.tabela.assinaturasFuncoes[expr.nome]
+                    se (i < infoAss.params.tamanho()) {
+                        const tParam: qualquer = infoAss.params[i]
+                        rArg = isto.converterValor(rArg, tArg, tParam)
+                        tArg = tParam
+                    }
+                }
+                regsArgs.empilhar(rArg)
+                floatsArgs.empilhar(tArg.ehFlutuante())
+            }
+            const dstC: inteiro = isto.novoReg()
+            const ehExt: logico = isto.tabela.funcoesExternas.contem(expr.nome)
+            se (ehExt) isto.modulo.registrarExterno(expr.nome)
+            const opCall: qualquer = ehExt ? isto.OpI.CallExtern : isto.OpI.Call
+            const instCall: InstSSA = InstSSA(opCall, dstC, 0, 0, expr.nome)
+            instCall.callArgs = regsArgs
+            instCall.callArgFloats = floatsArgs
+            instCall.ehFloatDst = expr.tipoC.ehFlutuante()
+            isto.emitir(instCall)
+            se (expr.tipoC.ehAgregado() e isto.tabela.tamanhoDe(expr.tipoC) <= 8) {
+                const offTmpC: inteiro = isto.alocarBytes(8)
+                const ptrTmpC: inteiro = isto.novoReg()
+                isto.emitir(InstSSA(isto.OpI.AddrSlot, ptrTmpC, offTmpC, 0))
+                const stTmpC: InstSSA = InstSSA(isto.OpI.Store, -1, ptrTmpC, dstC)
+                stTmpC.largura = 8
+                isto.emitir(stTmpC)
+                retorna ptrTmpC
+            }
+            retorna dstC
+        }
+        retorna 0
+    }
+}
+
+funcao avaliarConstGlobal(expr: qualquer, tabela: qualquer, Kind: qualquer, OpB: qualquer,
+    OpU: qualquer): inteiro {
+    se (expr.kind == Kind.ExprInt ou expr.kind == Kind.ExprSizeofTipo ou expr.kind == Kind.ExprSizeofExpr) retorna expr.valor
+    se (expr.kind == Kind.ExprVar e tabela.constantesEnum.contem(expr.nome)) retorna inteiro(tabela.constantesEnum[expr.nome])
+    se (expr.kind == Kind.ExprUnaria e expr.opUn == OpU.Neg) retorna -avaliarConstGlobal(expr.filhos[0],
+        tabela, Kind, OpB, OpU)
+    se (expr.kind == Kind.ExprCast) retorna avaliarConstGlobal(expr.filhos[0], tabela, Kind,
+        OpB, OpU)
+    se (expr.kind == Kind.ExprBinaria) {
+        const a: inteiro = avaliarConstGlobal(expr.filhos[0], tabela, Kind, OpB, OpU)
+        const b: inteiro = avaliarConstGlobal(expr.filhos[1], tabela, Kind, OpB, OpU)
+        se (expr.opBin == OpB.Add) retorna a + b
+        se (expr.opBin == OpB.Sub) retorna a - b
+        se (expr.opBin == OpB.Mul) retorna a * b
+    }
+
+    retorna 0
+}
+
+funcao preencherBytesGlobal(buf: inteiro[], baseOff: inteiro, inic: qualquer, tipoAlvo: qualquer,
+    tabela: qualquer, Kind: qualquer, OpB: qualquer, OpU: qualquer, TB: qualquer): vazio {
+    se (inic.kind == Kind.ExprInitList) {
+        var idxSeq: inteiro = 0
+        para (var i: inteiro = 0; i < inic.filhos.tamanho(); i++) {
+            const item: qualquer = inic.filhos[i]
+            var offItem: inteiro = 0
+            var subTipo: qualquer = tipoAlvo
+            var exprItem: qualquer = item
+            se (item.kind == Kind.ExprInicDesignado) {
+                exprItem = item.filhos[0]
+                se (item.ehSeta) {
+                    subTipo = tipoAlvo.alvo
+                    offItem = item.valor * tabela.tamanhoDe(subTipo)
+                    idxSeq = item.valor + 1
+                } senao {
+                    offItem = item.valor
+                    subTipo = item.tipoC
+                }
+            } senao se (tipoAlvo.base == TB.Array) {
+                subTipo = tipoAlvo.alvo
+                offItem = idxSeq * tabela.tamanhoDe(subTipo)
+                idxSeq++
+            } senao se (tipoAlvo.base == TB.Struct ou tipoAlvo.base == TB.Union) {
+                const ag: qualquer = tipoAlvo.base == TB.Struct ? tabela.structs[tipoAlvo.nomeAgregado] : tabela.unions[tipoAlvo.nomeAgregado]
+                const campoL: qualquer = ag.campos[ag.ordemCampos[idxSeq]]
+                offItem = campoL.offset
+                subTipo = campoL.tipoCampo
+                idxSeq++
+            }
+            preencherBytesGlobal(buf, baseOff + offItem, exprItem, subTipo, tabela, Kind,
+                OpB, OpU, TB)
+        }
+        retorna
+    }
+
+    se (inic.kind == Kind.ExprStr e tipoAlvo.base == TB.Array e tipoAlvo.alvo.base == TB.Char) {
+        const bytesModG: qualquer = importar("cgd:bytes")
+        const dadosG: inteiro[] = bytesModG.Bytes.deTexto(inic.textoLit).paraVetor()
+        const maxTamG: inteiro = tabela.tamanhoDe(tipoAlvo)
+        para (var i: inteiro = 0; i < dadosG.tamanho() e i < maxTamG; i++) {
+            se (baseOff + i < buf.tamanho()) buf[baseOff + i] = dadosG[i] & 255
+        }
+        retorna
+    }
+
+    se (tipoAlvo.ehFlutuante()) {
+        const tModG: qualquer = importar("tipos.delegua")
+        var fvalG: real = 0.0
+        se (inic.kind == Kind.ExprFloat) {
+            fvalG = inic.valorReal
+        } senao se (inic.kind == Kind.ExprUnaria e inic.opUn == OpU.Neg e inic.filhos[0].kind == Kind.ExprFloat) {
+            fvalG = -inic.filhos[0].valorReal
+        } senao {
+            fvalG = real(avaliarConstGlobal(inic, tabela, Kind, OpB, OpU))
+        }
+        se (tipoAlvo.base == TB.Float) {
+            gravarIntLE(buf, baseOff, tModG.floatParaBitsIEEE754(fvalG), 4)
+        } senao {
+            gravarIntLE(buf, baseOff, tModG.doubleParaBitsIEEE754(fvalG), 8)
+        }
+        retorna
+    }
+
+    const val: inteiro = avaliarConstGlobal(inic, tabela, Kind, OpB, OpU)
+    gravarIntLE(buf, baseOff, val, tabela.tamanhoDe(tipoAlvo))
+}
+
+funcao construirModuloSSA(prog: qualquer, tabela: qualquer): ModuloSSA {
+    const tMod: qualquer = importar("tipos.delegua")
+    const Kind: qualquer = tMod.NoKind
+    const OpB: qualquer = tMod.OpBin
+    const OpU: qualquer = tMod.OpUn
+    const OpI: qualquer = tMod.OpIR
+    const TB: qualquer = tMod.TipoBase
+    const modulo: ModuloSSA = ModuloSSA()
+
+    // 1. Variaveis globais (.data se inicializadas, .bss se zeradas)
+    para (var i: inteiro = 0; i < prog.filhos.tamanho(); i++) {
+        const no: qualquer = prog.filhos[i]
+        se (no.kind != Kind.VarGlobal ou no.ehExtern) continua
+        const tam: inteiro = tabela.tamanhoDe(no.tipoC)
+        const alinh: inteiro = tabela.alinhamentoDe(no.tipoC)
+        const temInit: logico = no.filhos.tamanho() > 0
+        const g: GlobalSSA = GlobalSSA(no.nome, tam, alinh, temInit)
+        se (temInit) {
+            para (var z: inteiro = 0; z < tam; z++) g.bytesInit.empilhar(0)
+            preencherBytesGlobal(g.bytesInit, 0, no.filhos[0], no.tipoC, tabela, Kind, OpB,
+                OpU, TB)
+        }
+        modulo.registrarGlobal(g)
+    }
+
+    // 2. Funcoes
+    para (var i: inteiro = 0; i < prog.filhos.tamanho(); i++) {
+        const no: qualquer = prog.filhos[i]
+        se (no.kind != Kind.Funcao) continua
+        const params: qualquer = no.filhos[0]
+        const fnSSA: FuncaoSSA = FuncaoSSA(no.nome, params.filhos.tamanho(), no.tipoC.ehFlutuante(),
+            no.ehVariadica)
+        const builder: ConstrutorSSA = ConstrutorSSA(modulo, fnSSA, tabela)
+        se (no.ehVariadica) {
+            fnSSA.regSaveOffset = builder.alocarBytes(176)
+        }
+        para (var p: inteiro = 0; p < params.filhos.tamanho(); p++) {
+            const pNo: qualquer = params.filhos[p]
+            const off: inteiro = builder.alocarVar(pNo.nome, pNo.tipoC)
+            fnSSA.paramOffsets.empilhar(off)
+            fnSSA.paramLarguras.empilhar(tabela.tamanhoDe(pNo.tipoC))
+            const ehFltP: logico = pNo.tipoC.ehFlutuante()
+            fnSSA.paramEhFloat.empilhar(ehFltP)
+            se (ehFltP) {
+                se (fnSSA.numFixedFltParams < 8) fnSSA.numFixedFltParams++
+                senao fnSSA.numFixedStkParams++
+            } senao {
+                se (fnSSA.numFixedIntParams < 6) fnSSA.numFixedIntParams++
+                senao fnSSA.numFixedStkParams++
+            }
+        }
+        builder.baixarStmt(no.filhos[1])
+        se (!builder.blocoAtual.terminado) {
+            se (fnSSA.retornaFloat) {
+                const zf: inteiro = builder.emitirFConst(0.0)
+                builder.emitir(InstSSA(OpI.FRet, -1, zf, 0))
+            } senao {
+                const z: inteiro = builder.emitirConst(0)
+                builder.emitir(InstSSA(OpI.Ret, -1, z, 0))
+            }
+        }
+        modulo.funcoes.empilhar(fnSSA)
+    }
+
+    retorna modulo
+}
+
+// --- Otimizador SSA (ConstProp, Simplificacao Algebrica, CopyProp, CFG Reachability, DCE) ---
+
+funcao ehOpBinariaIntPura(op: qualquer, OpI: qualquer): logico {
+    escolha (op) {
+        caso OpI.Add:
+        caso OpI.Sub:
+        caso OpI.Mul:
+        caso OpI.SDiv:
+        caso OpI.UDiv:
+        caso OpI.SMod:
+        caso OpI.UMod:
+        caso OpI.BitAnd:
+        caso OpI.BitOr:
+        caso OpI.BitXor:
+        caso OpI.Shl:
+        caso OpI.AShr:
+        caso OpI.LShr:
+        caso OpI.Eq:
+        caso OpI.Neq:
+        caso OpI.SLt:
+        caso OpI.SLe:
+        caso OpI.SGt:
+        caso OpI.SGe:
+        caso OpI.ULt:
+        caso OpI.ULe:
+        caso OpI.UGt:
+        caso OpI.UGe:
+        retorna verdadeiro
+        padrao:
+        retorna falso
+    }
+
+    retorna falso
+}
+
+funcao ehOpBinariaFloat(op: qualquer, OpI: qualquer): logico {
+    escolha (op) {
+        caso OpI.FAdd:
+        caso OpI.FSub:
+        caso OpI.FMul:
+        caso OpI.FDiv:
+        caso OpI.FEq:
+        caso OpI.FNeq:
+        caso OpI.FLt:
+        caso OpI.FLe:
+        caso OpI.FGt:
+        caso OpI.FGe:
+        retorna verdadeiro
+        padrao:
+        retorna falso
+    }
+
+    retorna falso
+}
+
+funcao dobrarOpInt(op: qualquer, OpI: qualquer, a: inteiro, b: inteiro): inteiro {
+    escolha (op) {
+        caso OpI.Add: retorna a + b
+        caso OpI.Sub: retorna a - b
+        caso OpI.Mul: retorna a * b
+        caso OpI.SDiv:
+        caso OpI.UDiv: retorna inteiro(a / b)
+        caso OpI.SMod:
+        caso OpI.UMod: retorna a % b
+        caso OpI.BitAnd: retorna a & b
+        caso OpI.BitOr: retorna a | b
+        caso OpI.BitXor: retorna a ^ b
+        caso OpI.Shl: retorna a << b
+        caso OpI.AShr:
+        caso OpI.LShr: retorna a >> b
+        caso OpI.Eq: retorna a == b ? 1 : 0
+        caso OpI.Neq: retorna a != b ? 1 : 0
+        caso OpI.SLt:
+        caso OpI.ULt: retorna a < b ? 1 : 0
+        caso OpI.SLe:
+        caso OpI.ULe: retorna a <= b ? 1 : 0
+        caso OpI.SGt:
+        caso OpI.UGt: retorna a > b ? 1 : 0
+        padrao: retorna a >= b ? 1 : 0
+    }
+
+    retorna 0
+}
+
+funcao substituirReg(reg: inteiro, copias: dicionario): inteiro {
+    var cur: inteiro = reg
+    var passos: inteiro = 0
+    enquanto (copias.contem(texto(cur)) e passos < 32) {
+        cur = inteiro(copias[texto(cur)])
+        passos++
+    }
+
+    retorna cur
+}
+
+funcao otimizarModuloSSA(modulo: ModuloSSA): StatsSSA {
+    const tMod: qualquer = importar("tipos.delegua")
+    const OpI: qualquer = tMod.OpIR
+    const stats: StatsSSA = StatsSSA()
+
+    para (var f: inteiro = 0; f < modulo.funcoes.tamanho(); f++) {
+        const fn: FuncaoSSA = modulo.funcoes[f]
+
+        // 1. Constant Propagation, Folding, Simplificacao Algebrica e Copy Propagation
+        var consts: dicionario = {}
+        var copias: dicionario = {}
+        para (var b: inteiro = 0; b < fn.blocos.tamanho(); b++) {
+            const bb: BlocoSSA = fn.blocos[b]
+            para (var i: inteiro = 0; i < bb.insts.tamanho(); i++) {
+                const inst: InstSSA = bb.insts[i]
+
+                // Aplica propagacao de copias nos operandos
+                se (inst.op != OpI.Const e inst.op != OpI.FConst e inst.op != OpI.AddrSlot e inst.op != OpI.AddrRbpDisp e inst.op != OpI.AddrGlobal e inst.op != OpI.AddrFunc e inst.op != OpI.AddrStr e inst.op != OpI.Br) {
+                    const novoA: inteiro = substituirReg(inst.a, copias)
+                    se (novoA != inst.a) {
+                        inst.a = novoA
+                        stats.copiasPropagadas++
+                    }
+                    se (inst.op == OpI.Store ou inst.op == OpI.FStore ou ehOpBinariaIntPura(inst.op,
+                        OpI) ou ehOpBinariaFloat(inst.op, OpI)) {
+                        const novoB: inteiro = substituirReg(inst.b, copias)
+                        se (novoB != inst.b) {
+                            inst.b = novoB
+                            stats.copiasPropagadas++
+                        }
+                    }
+                    se (inst.op == OpI.Call ou inst.op == OpI.CallExtern ou inst.op == OpI.CallIndirect) {
+                        para (var k: inteiro = 0; k < inst.callArgs.tamanho(); k++) {
+                            const nArg: inteiro = substituirReg(inst.callArgs[k], copias)
+                            se (nArg != inst.callArgs[k]) {
+                                inst.callArgs[k] = nArg
+                                stats.copiasPropagadas++
+                            }
+                        }
+                    }
+                }
+
+                se (inst.op == OpI.Const) {
+                    consts[texto(inst.dst)] = inst.a
+                } senao se (inst.op == OpI.Copy) {
+                    copias[texto(inst.dst)] = inst.a
+                } senao se (ehOpBinariaIntPura(inst.op, OpI)) {
+                    const ka: texto = texto(inst.a)
+                    const kb: texto = texto(inst.b)
+                    se (consts.contem(ka) e consts.contem(kb)) {
+                        const va: inteiro = inteiro(consts[ka])
+                        const vb: inteiro = inteiro(consts[kb])
+                        const opUnsigned: logico = inst.op == OpI.UDiv ou inst.op == OpI.UMod ou inst.op == OpI.LShr ou inst.op == OpI.ULt ou inst.op == OpI.ULe ou inst.op == OpI.UGt ou inst.op == OpI.UGe
+                        se (!opUnsigned e ((inst.op != OpI.SDiv e inst.op != OpI.SMod) ou vb != 0)) {
+                            const res: inteiro = dobrarOpInt(inst.op, OpI, va, vb)
+                            inst.op = OpI.Const
+                            inst.a = res
+                            inst.b = 0
+                            consts[texto(inst.dst)] = res
+                            stats.dobras++
+                        }
+                    } senao se (consts.contem(kb)) {
+                        const vb: inteiro = inteiro(consts[kb])
+                        // Simplificacoes algebricas: x + 0 -> x, x - 0 -> x, x * 1 -> x, x * 0 -> 0
+                        se ((inst.op == OpI.Add ou inst.op == OpI.Sub) e vb == 0) {
+                            inst.op = OpI.Copy
+                            inst.b = 0
+                            copias[texto(inst.dst)] = inst.a
+                            stats.simplificacoes++
+                        } senao se (inst.op == OpI.Mul e vb == 1) {
+                            inst.op = OpI.Copy
+                            inst.b = 0
+                            copias[texto(inst.dst)] = inst.a
+                            stats.simplificacoes++
+                        } senao se (inst.op == OpI.Mul e vb == 0) {
+                            inst.op = OpI.Const
+                            inst.a = 0
+                            inst.b = 0
+                            consts[texto(inst.dst)] = 0
+                            stats.simplificacoes++
+                        }
+                    }
+                } senao se (inst.op == OpI.Neg ou inst.op == OpI.LogNot ou inst.op == OpI.BitNot ou inst.op == OpI.ToBool) {
+                    const ka: texto = texto(inst.a)
+                    se (consts.contem(ka)) {
+                        const va: inteiro = inteiro(consts[ka])
+                        var res: inteiro = -va
+                        se (inst.op == OpI.LogNot) res = va == 0 ? 1 : 0
+                        senao se (inst.op == OpI.BitNot) res = ~va
+                        senao se (inst.op == OpI.ToBool) res = va != 0 ? 1 : 0
+                        inst.op = OpI.Const
+                        inst.a = res
+                        consts[texto(inst.dst)] = res
+                        stats.dobras++
+                    }
+                } senao se (inst.op == OpI.BrCond) {
+                    const ka: texto = texto(inst.a)
+                    se (consts.contem(ka)) {
+                        const condVal: inteiro = inteiro(consts[ka])
+                        inst.op = OpI.Br
+                        inst.alvo1 = condVal != 0 ? inst.alvo1 : inst.alvo2
+                        inst.alvo2 = ""
+                        inst.a = 0
+                        stats.dobras++
+                    }
+                }
+            }
+        }
+
+        // 2. Eliminacao de blocos inalcancaveis no CFG
+        var mapaBlocos: dicionario = {}
+        para (var b: inteiro = 0; b < fn.blocos.tamanho(); b++) {
+            mapaBlocos[fn.blocos[b].nome] = fn.blocos[b]
+        }
+        var alcancaveis: dicionario = {}
+        var fila: texto[] = [fn.blocos[0].nome]
+        alcancaveis[fn.blocos[0].nome] = verdadeiro
+        enquanto (fila.tamanho() > 0) {
+            const atualNome: texto = fila.removerUltimo()
+            const bb: BlocoSSA = mapaBlocos[atualNome]
+            para (var i: inteiro = 0; i < bb.insts.tamanho(); i++) {
+                const inst: InstSSA = bb.insts[i]
+                se (inst.op == OpI.Br ou inst.op == OpI.BrCond) {
+                    se (!alcancaveis.contem(inst.alvo1)) {
+                        alcancaveis[inst.alvo1] = verdadeiro
+                        fila.empilhar(inst.alvo1)
+                    }
+                }
+                se (inst.op == OpI.BrCond e !alcancaveis.contem(inst.alvo2)) {
+                    alcancaveis[inst.alvo2] = verdadeiro
+                    fila.empilhar(inst.alvo2)
+                }
+            }
+        }
+        var vivos: BlocoSSA[] = []
+        para (var b: inteiro = 0; b < fn.blocos.tamanho(); b++) {
+            se (alcancaveis.contem(fn.blocos[b].nome)) {
+                vivos.empilhar(fn.blocos[b])
+            } senao {
+                stats.blocosMortos++
+            }
+        }
+        fn.blocos = vivos
+
+        // 3. Dead Code Elimination (DCE) iterativa
+        var mudou: logico = verdadeiro
+        enquanto (mudou) {
+            mudou = falso
+            var usados: dicionario = {}
+            para (var b: inteiro = 0; b < fn.blocos.tamanho(); b++) {
+                const bb: BlocoSSA = fn.blocos[b]
+                para (var i: inteiro = 0; i < bb.insts.tamanho(); i++) {
+                    const inst: InstSSA = bb.insts[i]
+                    se (inst.op == OpI.Store ou inst.op == OpI.FStore) {
+                        usados[texto(inst.a)] = verdadeiro
+                        usados[texto(inst.b)] = verdadeiro
+                    } senao se (inst.op == OpI.Load ou inst.op == OpI.FLoad ou inst.op == OpI.Alloca ou inst.op == OpI.Ret ou inst.op == OpI.FRet ou inst.op == OpI.BrCond ou inst.op == OpI.Neg ou inst.op == OpI.FNeg ou inst.op == OpI.LogNot ou inst.op == OpI.BitNot ou inst.op == OpI.ItoF ou inst.op == OpI.FtoI ou inst.op == OpI.TruncSext ou inst.op == OpI.TruncZext ou inst.op == OpI.ToBool ou inst.op == OpI.Copy) {
+                        usados[texto(inst.a)] = verdadeiro
+                    } senao se (ehOpBinariaIntPura(inst.op, OpI) ou ehOpBinariaFloat(inst.op,
+                        OpI)) {
+                        usados[texto(inst.a)] = verdadeiro
+                        usados[texto(inst.b)] = verdadeiro
+                    } senao se (inst.op == OpI.Call ou inst.op == OpI.CallExtern ou inst.op == OpI.CallIndirect) {
+                        se (inst.op == OpI.CallIndirect) usados[texto(inst.a)] = verdadeiro
+                        para (var k: inteiro = 0; k < inst.callArgs.tamanho(); k++) {
+                            usados[texto(inst.callArgs[k])] = verdadeiro
+                        }
+                    }
+                }
+            }
+            para (var b: inteiro = 0; b < fn.blocos.tamanho(); b++) {
+                const bb: BlocoSSA = fn.blocos[b]
+                var novas: InstSSA[] = []
+                para (var i: inteiro = 0; i < bb.insts.tamanho(); i++) {
+                    const inst: InstSSA = bb.insts[i]
+                    const ehPura: logico = inst.dst >= 0 e inst.op != OpI.Call e inst.op != OpI.CallExtern e inst.op != OpI.CallIndirect e inst.op != OpI.Load e inst.op != OpI.FLoad e inst.op != OpI.Alloca
+                    se (ehPura e !usados.contem(texto(inst.dst))) {
+                        stats.dceRemovidas++
+                        mudou = verdadeiro
+                    } senao {
+                        novas.empilhar(inst)
+                    }
+                }
+                bb.insts = novas
+            }
+        }
+    }
+
+    retorna stats
+}
+
+// Verificador estrutural de invariantes da IR SSA / CFG
+funcao verificarModuloSSA(modulo: ModuloSSA): logico {
+    const tMod: qualquer = importar("tipos.delegua")
+    const OpI: qualquer = tMod.OpIR
+
+    para (var f: inteiro = 0; f < modulo.funcoes.tamanho(); f++) {
+        const fn: FuncaoSSA = modulo.funcoes[f]
+        var mapaBlocos: dicionario = {}
+        para (var b: inteiro = 0; b < fn.blocos.tamanho(); b++) {
+            mapaBlocos[fn.blocos[b].nome] = verdadeiro
+        }
+        var defs: dicionario = {}
+        para (var b: inteiro = 0; b < fn.blocos.tamanho(); b++) {
+            const bb: BlocoSSA = fn.blocos[b]
+            se (bb.insts.tamanho() == 0) {
+                falhar tMod.ErroC99("IR invalida: bloco vazio '${bb.nome}' em '${fn.nome}'")
+            }
+            para (var i: inteiro = 0; i < bb.insts.tamanho(); i++) {
+                const inst: InstSSA = bb.insts[i]
+                se (inst.dst >= 0) {
+                    const k: texto = texto(inst.dst)
+                    se (defs.contem(k)) {
+                        falhar tMod.ErroC99("IR invalida: violacao SSA no reg %${k} em '${fn.nome}'")
+                    }
+                    defs[k] = verdadeiro
+                }
+                se (inst.op == OpI.Br e !mapaBlocos.contem(inst.alvo1)) {
+                    falhar tMod.ErroC99("IR invalida: alvo Br inexistente '${inst.alvo1}' em '${fn.nome}'")
+                }
+                se (inst.op == OpI.BrCond e (!mapaBlocos.contem(inst.alvo1) ou !mapaBlocos.contem(inst.alvo2))) {
+                    falhar tMod.ErroC99("IR invalida: alvo BrCond inexistente em '${fn.nome}'")
+                }
+            }
+            const ult: InstSSA = bb.insts[bb.insts.tamanho() - 1]
+            se (ult.op != OpI.Br e ult.op != OpI.BrCond e ult.op != OpI.Ret e ult.op != OpI.FRet) {
+                falhar tMod.ErroC99("IR invalida: bloco '${bb.nome}' em '${fn.nome}' sem terminador")
+            }
+        }
+    }
+
+    retorna verdadeiro
+}

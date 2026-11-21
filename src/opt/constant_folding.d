@@ -40,6 +40,21 @@ final class CgdConstantFolding : AstRewriter
         return false;
     }
 
+    private bool isGuaranteedInt(Node n)
+    {
+        if (n is null)
+            return false;
+        if (cast(IntLit) n)
+            return true;
+        if (n.type_expr !is null)
+        {
+            dstring t = n.type_expr.toStr();
+            if (t == "inteiro" || t == "longo")
+                return true;
+        }
+        return false;
+    }
+
     override protected Node transform(Node node)
     {
         Node result;
@@ -109,6 +124,26 @@ final class CgdConstantFolding : AstRewriter
             }
             if (binary.op == TokenKind.Coalesce && literal(binary.left) !is null)
                 result = binary.left.kind == NodeKind.NullLit ? binary.right : binary.left;
+            if (result is null)
+            {
+                IntLit lInt = cast(IntLit) binary.left;
+                IntLit rInt = cast(IntLit) binary.right;
+                if (rInt !is null && rInt.value == 0 && isGuaranteedInt(binary.left)
+                        && (binary.op == TokenKind.Plus || binary.op == TokenKind.Minus
+                            || binary.op == TokenKind.BITOr || binary.op == TokenKind.BITXor
+                            || binary.op == TokenKind.BITSL || binary.op == TokenKind.BITSR))
+                    result = binary.left;
+                else if (lInt !is null && lInt.value == 0 && isGuaranteedInt(binary.right)
+                        && (binary.op == TokenKind.Plus || binary.op == TokenKind.BITOr || binary.op == TokenKind
+                            .BITXor))
+                    result = binary.right;
+                else if (rInt !is null && rInt.value == 1 && isGuaranteedInt(binary.left)
+                        && (binary.op == TokenKind.Star || binary.op == TokenKind.IntDiv))
+                    result = binary.left;
+                else if (lInt !is null && lInt.value == 1 && isGuaranteedInt(binary.right) && binary.op
+                        == TokenKind.Star)
+                    result = binary.right;
+            }
         }
         if (result is null)
             return node;

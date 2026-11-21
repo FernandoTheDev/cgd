@@ -1,0 +1,450 @@
+//! [1] Email simples 'dev2026@cgd.org': verdadeiro | 'invalido@': falso\n[2] Alternancia '(cat|dog)+s?': catdog=verdadeiro, dogcats=verdadeiro, bird=falso\n[3] Classe negada '^[^0-9]+$': delegua=verdadeiro, cgd9=falso\n[4] Sem explosao exponencial 'a?a?a?a?a?a?a?a?a?a?aaaaaaaaaa': verdadeiro\n[5] Busca em texto 'CGD [0-9]+\.[0-9]+': verdadeiro
+//? fase: execucao
+// Motor de Expressao Regular (Parser -> Bytecode NFA -> PikeVM de Thompson) em Delegua/CGD.
+// Executa em tempo linear O(n * m), imune a backtracking catastrofico.
+// Suporta: literais, '.', '*', '+', '?', '|', '(...)', '[a-z]', '[^...]', '^', '$' e escapes '\.'.
+// Compilar: ./cgd exemplos/regex_vm/regex_vm.delegua -s out/regex_vm
+// Executar: ./out/regex_vm
+
+enum OpRegex {
+    Char,
+    Qualquer,
+    Classe,
+    Split,
+    Jmp,
+    InicioLinha,
+    FimLinha,
+    Match
+}
+
+classe ErroRegex herda Excecao {
+    construtor(mensagem: texto) {
+        super(mensagem)
+    }
+}
+
+classe InstRegex {
+    op: OpRegex
+    ch: texto
+    alvo1: inteiro
+    alvo2: inteiro
+    conjunto: texto
+    negado: logico
+
+    construtor(op: OpRegex, ch: texto = "", alvo1: inteiro = 0, alvo2: inteiro = 0, conjunto: texto = "",
+        negado: logico = falso) {
+        isto.op = op
+        isto.ch = ch
+        isto.alvo1 = alvo1
+        isto.alvo2 = alvo2
+        isto.conjunto = conjunto
+        isto.negado = negado
+    }
+}
+
+// --- AST da Regex ---
+
+classe abstrata NoRegex {
+    abstrato emitir(codigo: InstRegex[]): vazio;
+}
+
+classe NoLiteral herda NoRegex {
+    ch: texto
+
+    construtor(ch: texto) {
+        isto.ch = ch
+    }
+
+    emitir(codigo: InstRegex[]): vazio {
+        codigo.empilhar(InstRegex(OpRegex.Char, isto.ch))
+    }
+}
+
+classe NoQualquer herda NoRegex {
+    emitir(codigo: InstRegex[]): vazio {
+        codigo.empilhar(InstRegex(OpRegex.Qualquer))
+    }
+}
+
+classe NoAncora herda NoRegex {
+    op: OpRegex
+
+    construtor(op: OpRegex) {
+        isto.op = op
+    }
+
+    emitir(codigo: InstRegex[]): vazio {
+        codigo.empilhar(InstRegex(isto.op))
+    }
+}
+
+classe NoClasse herda NoRegex {
+    conjunto: texto
+    negado: logico
+
+    construtor(conjunto: texto, negado: logico) {
+        isto.conjunto = conjunto
+        isto.negado = negado
+    }
+
+    emitir(codigo: InstRegex[]): vazio {
+        codigo.empilhar(InstRegex(OpRegex.Classe, "", 0, 0, isto.conjunto, isto.negado))
+    }
+}
+
+classe NoSeq herda NoRegex {
+    itens: NoRegex[]
+
+    construtor(itens: NoRegex[]) {
+        isto.itens = itens
+    }
+
+    emitir(codigo: InstRegex[]): vazio {
+        para (var i: inteiro = 0; i < isto.itens.tamanho(); i++) {
+            isto.itens[i].emitir(codigo)
+        }
+    }
+}
+
+classe NoAlt herda NoRegex {
+    esq: NoRegex
+    dir: NoRegex
+
+    construtor(esq: NoRegex, dir: NoRegex) {
+        isto.esq = esq
+        isto.dir = dir
+    }
+
+    emitir(codigo: InstRegex[]): vazio {
+        const posSplit: inteiro = codigo.tamanho()
+        codigo.empilhar(InstRegex(OpRegex.Split, "", 0, 0))
+        const inicioEsq: inteiro = codigo.tamanho()
+        isto.esq.emitir(codigo)
+        const posJmp: inteiro = codigo.tamanho()
+        codigo.empilhar(InstRegex(OpRegex.Jmp, "", 0, 0))
+        const inicioDir: inteiro = codigo.tamanho()
+        isto.dir.emitir(codigo)
+        const fim: inteiro = codigo.tamanho()
+        codigo[posSplit].alvo1 = inicioEsq
+        codigo[posSplit].alvo2 = inicioDir
+        codigo[posJmp].alvo1 = fim
+    }
+}
+
+classe NoQuant herda NoRegex {
+    sub: NoRegex
+    tipoQuant: texto
+
+    construtor(sub: NoRegex, tipoQuant: texto) {
+        isto.sub = sub
+        isto.tipoQuant = tipoQuant
+    }
+
+    emitir(codigo: InstRegex[]): vazio {
+        se (isto.tipoQuant == "?") {
+            const posSplit: inteiro = codigo.tamanho()
+            codigo.empilhar(InstRegex(OpRegex.Split, "", 0, 0))
+            const inicio: inteiro = codigo.tamanho()
+            isto.sub.emitir(codigo)
+            const fim: inteiro = codigo.tamanho()
+            codigo[posSplit].alvo1 = inicio
+            codigo[posSplit].alvo2 = fim
+            retorna
+        }
+        se (isto.tipoQuant == "*") {
+            const posSplit: inteiro = codigo.tamanho()
+            codigo.empilhar(InstRegex(OpRegex.Split, "", 0, 0))
+            const inicio: inteiro = codigo.tamanho()
+            isto.sub.emitir(codigo)
+            codigo.empilhar(InstRegex(OpRegex.Jmp, "", posSplit, 0))
+            const fim: inteiro = codigo.tamanho()
+            codigo[posSplit].alvo1 = inicio
+            codigo[posSplit].alvo2 = fim
+            retorna
+        }
+        // '+'
+        const inicio: inteiro = codigo.tamanho()
+        isto.sub.emitir(codigo)
+        const posSplit: inteiro = codigo.tamanho()
+        codigo.empilhar(InstRegex(OpRegex.Split, "", inicio, posSplit + 1))
+    }
+}
+
+// --- Parser de Expressao Regular ---
+
+funcao expandirFaixa(inicio: texto, fim: texto): texto {
+    const ascii: texto = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+    var idxA: inteiro = -1
+    var idxB: inteiro = -1
+    para (var i: inteiro = 0; i < ascii.tamanho(); i++) {
+        se (ascii[i] == inicio) idxA = i
+        se (ascii[i] == fim) idxB = i
+    }
+
+    se (idxA < 0 ou idxB < 0 ou idxA > idxB) {
+        falhar ErroRegex("Faixa invalida em classe de caracteres: ${inicio}-${fim}")
+    }
+
+    var out: texto[] = []
+    para (var i: inteiro = idxA; i <= idxB; i++) {
+        out.empilhar(ascii[i])
+    }
+
+    retorna out.juntar("")
+}
+
+classe ParserRegex {
+    expressao: texto
+    pos: inteiro
+    limite: inteiro
+
+    construtor(expressao: texto) {
+        isto.expressao = expressao
+        isto.pos = 0
+        isto.limite = expressao.tamanho()
+    }
+
+    compilar(): InstRegex[] {
+        const raiz: NoRegex = isto.parseAlt()
+        se (isto.pos < isto.limite) {
+            falhar ErroRegex("Caractere inesperado '${isto.expressao[isto.pos]}' na posicao ${isto.pos}")
+        }
+        var codigo: InstRegex[] = []
+        raiz.emitir(codigo)
+        codigo.empilhar(InstRegex(OpRegex.Match))
+        retorna codigo
+    }
+
+    parseAlt(): NoRegex {
+        var esq: NoRegex = isto.parseSeq()
+        enquanto (isto.pos < isto.limite e isto.expressao[isto.pos] == "|") {
+            isto.pos++
+            const dir: NoRegex = isto.parseSeq()
+            esq = NoAlt(esq, dir)
+        }
+        retorna esq
+    }
+
+    parseSeq(): NoRegex {
+        var itens: NoRegex[] = []
+        enquanto (isto.pos < isto.limite) {
+            const c: texto = isto.expressao[isto.pos]
+            se (c == ")" ou c == "|") sustar
+            itens.empilhar(isto.parseQuant())
+        }
+        retorna NoSeq(itens)
+    }
+
+    parseQuant(): NoRegex {
+        var atomo: NoRegex = isto.parseAtomo()
+        enquanto (isto.pos < isto.limite) {
+            const c: texto = isto.expressao[isto.pos]
+            se (c == "*" ou c == "+" ou c == "?") {
+                isto.pos++
+                atomo = NoQuant(atomo, c)
+            } senao {
+                sustar
+            }
+        }
+        retorna atomo
+    }
+
+    parseClasse(): NoRegex {
+        isto.pos++
+        var negado: logico = falso
+        se (isto.pos < isto.limite e isto.expressao[isto.pos] == "^") {
+            negado = verdadeiro
+            isto.pos++
+        }
+        var chars: texto[] = []
+        enquanto (isto.pos < isto.limite e isto.expressao[isto.pos] != "]") {
+            const c: texto = isto.expressao[isto.pos]
+            isto.pos++
+            se (isto.pos + 1 < isto.limite e isto.expressao[isto.pos] == "-" e isto.expressao[isto.pos + 1] != "]") {
+                isto.pos++
+                const fimFaixa: texto = isto.expressao[isto.pos]
+                isto.pos++
+                chars.empilhar(expandirFaixa(c, fimFaixa))
+            } senao {
+                chars.empilhar(c)
+            }
+        }
+        se (isto.pos >= isto.limite) falhar ErroRegex("Classe '[' sem fechamento ']'")
+        isto.pos++
+        retorna NoClasse(chars.juntar(""), negado)
+    }
+
+    parseAtomo(): NoRegex {
+        const c: texto = isto.expressao[isto.pos]
+        se (c == "(") {
+            isto.pos++
+            const interna: NoRegex = isto.parseAlt()
+            se (isto.pos >= isto.limite ou isto.expressao[isto.pos] != ")") {
+                falhar ErroRegex("Grupo '(' sem fechamento ')'")
+            }
+            isto.pos++
+            retorna interna
+        }
+        se (c == "[") retorna isto.parseClasse()
+        se (c == ".") {
+            isto.pos++
+            retorna NoQualquer()
+        }
+        se (c == "^") {
+            isto.pos++
+            retorna NoAncora(OpRegex.InicioLinha)
+        }
+        se (c == "$") {
+            isto.pos++
+            retorna NoAncora(OpRegex.FimLinha)
+        }
+        se (c == "\\") {
+            isto.pos++
+            se (isto.pos >= isto.limite) falhar ErroRegex("Escape incompleto no fim do expressao")
+            const esc: texto = isto.expressao[isto.pos]
+            isto.pos++
+            retorna NoLiteral(esc)
+        }
+        isto.pos++
+        retorna NoLiteral(c)
+    }
+}
+
+// --- PikeVM (simulacao lockstep de NFA em tempo linear O(n * m)) ---
+
+classe PikeVM {
+    codigo: InstRegex[]
+
+    construtor(expressao: texto) {
+        isto.codigo = ParserRegex(expressao).compilar()
+    }
+
+    adicionarThread(lista: inteiro[], visitado: logico[], pc: inteiro, posTexto: inteiro,
+        tamTexto: inteiro): vazio {
+        se (visitado[pc]) retorna
+        visitado[pc] = verdadeiro
+        const inst: InstRegex = isto.codigo[pc]
+        se (inst.op == OpRegex.Jmp) {
+            isto.adicionarThread(lista, visitado, inst.alvo1, posTexto, tamTexto)
+            retorna
+        }
+        se (inst.op == OpRegex.Split) {
+            isto.adicionarThread(lista, visitado, inst.alvo1, posTexto, tamTexto)
+            isto.adicionarThread(lista, visitado, inst.alvo2, posTexto, tamTexto)
+            retorna
+        }
+        se (inst.op == OpRegex.InicioLinha) {
+            se (posTexto == 0) {
+                isto.adicionarThread(lista, visitado, pc + 1, posTexto, tamTexto)
+            }
+            retorna
+        }
+        se (inst.op == OpRegex.FimLinha) {
+            se (posTexto == tamTexto) {
+                isto.adicionarThread(lista, visitado, pc + 1, posTexto, tamTexto)
+            }
+            retorna
+        }
+        lista.empilhar(pc)
+    }
+
+    criarVisitados(): logico[] {
+        var v: logico[] = []
+        para (var i: inteiro = 0; i < isto.codigo.tamanho(); i++) {
+            v.empilhar(falso)
+        }
+        retorna v
+    }
+
+    casarCompleto(entrada: texto): logico {
+        const n: inteiro = entrada.tamanho()
+        var atual: inteiro[] = []
+        isto.adicionarThread(atual, isto.criarVisitados(), 0, 0, n)
+
+        para (var i: inteiro = 0; i < n; i++) {
+            const c: texto = entrada[i]
+            var proxima: inteiro[] = []
+            const visProx: logico[] = isto.criarVisitados()
+
+            para (var t: inteiro = 0; t < atual.tamanho(); t++) {
+                const pc: inteiro = atual[t]
+                const inst: InstRegex = isto.codigo[pc]
+                se (inst.op == OpRegex.Char e inst.ch == c) {
+                    isto.adicionarThread(proxima, visProx, pc + 1, i + 1, n)
+                } senao se (inst.op == OpRegex.Qualquer e c != "\n") {
+                    isto.adicionarThread(proxima, visProx, pc + 1, i + 1, n)
+                } senao se (inst.op == OpRegex.Classe) {
+                    const contido: logico = inst.conjunto.contem(c)
+                    const casou: logico = inst.negado ? !contido : contido
+                    se (casou) {
+                        isto.adicionarThread(proxima, visProx, pc + 1, i + 1, n)
+                    }
+                }
+            }
+            atual = proxima
+            se (atual.tamanho() == 0) retorna falso
+        }
+
+        para (var t: inteiro = 0; t < atual.tamanho(); t++) {
+            se (isto.codigo[atual[t]].op == OpRegex.Match) retorna verdadeiro
+        }
+        retorna falso
+    }
+
+    buscar(entrada: texto): logico {
+        const n: inteiro = entrada.tamanho()
+        var atual: inteiro[] = []
+        var visAtual: logico[] = isto.criarVisitados()
+        isto.adicionarThread(atual, visAtual, 0, 0, n)
+
+        para (var i: inteiro = 0; i <= n; i++) {
+            para (var t: inteiro = 0; t < atual.tamanho(); t++) {
+                se (isto.codigo[atual[t]].op == OpRegex.Match) retorna verdadeiro
+            }
+            se (i == n) sustar
+
+            const c: texto = entrada[i]
+            var proxima: inteiro[] = []
+            const visProx: logico[] = isto.criarVisitados()
+            isto.adicionarThread(proxima, visProx, 0, i + 1, n)
+
+            para (var t: inteiro = 0; t < atual.tamanho(); t++) {
+                const pc: inteiro = atual[t]
+                const inst: InstRegex = isto.codigo[pc]
+                se (inst.op == OpRegex.Char e inst.ch == c) {
+                    isto.adicionarThread(proxima, visProx, pc + 1, i + 1, n)
+                } senao se (inst.op == OpRegex.Qualquer e c != "\n") {
+                    isto.adicionarThread(proxima, visProx, pc + 1, i + 1, n)
+                } senao se (inst.op == OpRegex.Classe) {
+                    const contido: logico = inst.conjunto.contem(c)
+                    const casou: logico = inst.negado ? !contido : contido
+                    se (casou) {
+                        isto.adicionarThread(proxima, visProx, pc + 1, i + 1, n)
+                    }
+                }
+            }
+            atual = proxima
+        }
+        retorna falso
+    }
+}
+
+const rEmail: PikeVM = PikeVM("^[a-z0-9]+@[a-z]+\\.[a-z]+$")
+escreva("[1] Email simples 'dev2026@cgd.org': ${rEmail.casarCompleto("dev2026@cgd.org")} | 'invalido@': ${rEmail.casarCompleto("invalido@")}")
+
+const rAlt: PikeVM = PikeVM("(cat|dog)+s?")
+escreva("[2] Alternancia '(cat|dog)+s?': catdog=${rAlt.casarCompleto("catdog")}, dogcats=${rAlt.casarCompleto("dogcats")}, bird=${rAlt.casarCompleto("bird")}")
+
+const rNeg: PikeVM = PikeVM("^[^0-9]+$")
+escreva("[3] Classe negada '^[^0-9]+$': delegua=${rNeg.casarCompleto("delegua")}, cgd9=${rNeg.casarCompleto("cgd9")}")
+
+// Teste classico de Russ Cox: O(2^n) em engines backtracking, O(n^2) instantaneo na PikeVM
+const rPatologico: PikeVM = PikeVM("a?a?a?a?a?a?a?a?a?a?aaaaaaaaaa")
+escreva("[4] Sem explosao exponencial 'a?a?a?a?a?a?a?a?a?a?aaaaaaaaaa': ${rPatologico.casarCompleto("aaaaaaaaaa")}")
+
+const rBusca: PikeVM = PikeVM("CGD [0-9]+\\.[0-9]+")
+const achouVersao: logico = rBusca.buscar("Compilado com CGD 0.9 nativo!")
+assercao(rEmail.casarCompleto("dev2026@cgd.org") e !rEmail.casarCompleto("invalido@"), "Regex email incorreta")
+assercao(rPatologico.casarCompleto("aaaaaaaaaa"), "Regex PikeVM patologica deveria casar")
+assercao(achouVersao, "Regex busca deveria encontrar versao")
+escreva("[5] Busca em texto 'CGD [0-9]+\\.[0-9]+': ${achouVersao}")

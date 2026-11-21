@@ -1,0 +1,657 @@
+//! [Mini-Rust] Borrow Checker: OK (programa.rs aprovado)\n16\nCGD+Rust\n50\n49\n[BorrowChecker] E0382 capturado: error[E0382]: uso de valor movido 's'\n[BorrowChecker] E0596 capturado: error[E0596]: nao e possivel emprestar 'x' como mutavel sem 'let mut'\n[BorrowChecker] E0502 capturado: error[E0502]: nao e possivel emprestar 's' como mutavel pois ja esta emprestado como imutavel\n[BorrowChecker] E0499 capturado: error[E0499]: nao e possivel emprestar 'x' como mutavel mais de uma vez simultaneamente\n[BorrowChecker] E0506 capturado: error[E0506]: nao e possivel atribuir a 'x' enquanto esta emprestado
+//? fase: execucao
+//? diretorio: fonte
+// Mini-Rust: compilador de subconjunto de Rust com Borrow Checker real em Delegua/CGD.
+// Verifica ownership/move (String vs Copy i64), mutabilidade (let mut),
+// aliasing XOR mutability (&T vs &mut T) e liberacao lexical de emprestimos ({ ... }),
+// com codigos de erro E0382, E0596, E0502, E0499 e E0506, mais compilacao para VM.
+// Compilar na raiz: ./cgd exemplos/compiladores_e_vms/compiladores/mini_rust/mini_rust.delegua -s out/mini_rust
+// Executar: cd exemplos/compiladores_e_vms/compiladores/mini_rust && ../../../../out/mini_rust
+
+enum TokRs {
+    IntLit,
+    StrLit,
+    Ident,
+    KwFn,
+    KwLet,
+    KwMut,
+    KwReturn,
+    KwPrintln,
+    KwI64,
+    KwString,
+    Arrow,
+    Scope,
+    Amp,
+    Star,
+    Mais,
+    Menos,
+    Igual,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    Colon,
+    Semi,
+    Comma,
+    Bang,
+    Fim
+}
+
+classe ErroRust herda Excecao {
+    construtor(mensagem: texto) {
+        super(mensagem)
+    }
+}
+
+classe TokenRs {
+    tag: TokRs
+    lexema: texto
+
+    construtor(tag: TokRs, lexema: texto) {
+        isto.tag = tag
+        isto.lexema = lexema
+    }
+}
+
+classe LexerRs {
+    fonte: texto
+    pos: inteiro
+    n: inteiro
+
+    construtor(fonte: texto) {
+        isto.fonte = fonte
+        isto.pos = 0
+        isto.n = fonte.tamanho()
+    }
+
+    tokenizar(): TokenRs[] {
+        var out: TokenRs[] = []
+        enquanto (isto.pos < isto.n) {
+            const c: texto = isto.fonte[isto.pos]
+            se (c == " " ou c == "\t" ou c == "\r" ou c == "\n") {
+                isto.pos++
+                continua
+            }
+            se (c == "/" e isto.pos + 1 < isto.n e isto.fonte[isto.pos + 1] == "/") {
+                enquanto (isto.pos < isto.n e isto.fonte[isto.pos] != "\n") isto.pos++
+                continua
+            }
+            se (c == "\"") {
+                isto.pos++
+                var buf: texto[] = []
+                enquanto (isto.pos < isto.n e isto.fonte[isto.pos] != "\"") {
+                    buf.empilhar(isto.fonte[isto.pos])
+                    isto.pos++
+                }
+                se (isto.pos >= isto.n) falhar ErroRust("String nao terminada")
+                isto.pos++
+                out.empilhar(TokenRs(TokRs.StrLit, buf.juntar("")))
+                continua
+            }
+            se ("0123456789".contem(c)) {
+                var buf: texto[] = []
+                enquanto (isto.pos < isto.n e "0123456789".contem(isto.fonte[isto.pos])) {
+                    buf.empilhar(isto.fonte[isto.pos])
+                    isto.pos++
+                }
+                out.empilhar(TokenRs(TokRs.IntLit, buf.juntar("")))
+                continua
+            }
+            se ("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contem(c)) {
+                var buf: texto[] = []
+                enquanto (isto.pos < isto.n e "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789".contem(isto.fonte[isto.pos])) {
+                    buf.empilhar(isto.fonte[isto.pos])
+                    isto.pos++
+                }
+                const w: texto = buf.juntar("")
+                se (w == "fn") out.empilhar(TokenRs(TokRs.KwFn, w))
+                senao se (w == "let") out.empilhar(TokenRs(TokRs.KwLet, w))
+                senao se (w == "mut") out.empilhar(TokenRs(TokRs.KwMut, w))
+                senao se (w == "return") out.empilhar(TokenRs(TokRs.KwReturn, w))
+                senao se (w == "println") out.empilhar(TokenRs(TokRs.KwPrintln, w))
+                senao se (w == "i64") out.empilhar(TokenRs(TokRs.KwI64, w))
+                senao se (w == "String") out.empilhar(TokenRs(TokRs.KwString, w))
+                senao out.empilhar(TokenRs(TokRs.Ident, w))
+                continua
+            }
+            const prox: texto = isto.pos + 1 < isto.n ? isto.fonte[isto.pos + 1] : ""
+            se (c == "-" e prox == ">") {
+                isto.pos = isto.pos + 2
+                out.empilhar(TokenRs(TokRs.Arrow, "->"))
+                continua
+            }
+            se (c == ":" e prox == ":") {
+                isto.pos = isto.pos + 2
+                out.empilhar(TokenRs(TokRs.Scope, "::"))
+                continua
+            }
+            isto.pos++
+            se (c == "&") out.empilhar(TokenRs(TokRs.Amp, c))
+            senao se (c == "*") out.empilhar(TokenRs(TokRs.Star, c))
+            senao se (c == "+") out.empilhar(TokenRs(TokRs.Mais, c))
+            senao se (c == "-") out.empilhar(TokenRs(TokRs.Menos, c))
+            senao se (c == "=") out.empilhar(TokenRs(TokRs.Igual, c))
+            senao se (c == "(") out.empilhar(TokenRs(TokRs.LParen, c))
+            senao se (c == ")") out.empilhar(TokenRs(TokRs.RParen, c))
+            senao se (c == "{") out.empilhar(TokenRs(TokRs.LBrace, c))
+            senao se (c == "}") out.empilhar(TokenRs(TokRs.RBrace, c))
+            senao se (c == ":") out.empilhar(TokenRs(TokRs.Colon, c))
+            senao se (c == ";") out.empilhar(TokenRs(TokRs.Semi, c))
+            senao se (c == ",") out.empilhar(TokenRs(TokRs.Comma, c))
+            senao se (c == "!") out.empilhar(TokenRs(TokRs.Bang, c))
+            senao falhar ErroRust("Caractere Rust invalido: " + c)
+        }
+        out.empilhar(TokenRs(TokRs.Fim, ""))
+        retorna out
+    }
+}
+
+// --- Estado do Borrow Checker ---
+
+classe BindingRs {
+    nome: texto
+    tipoRs: texto
+    ehMutavel: logico
+    movida: logico
+    leituraAtiva: inteiro
+    mutavelAtivo: logico
+    slot: inteiro
+    escopoNivel: inteiro
+    emprestaDe: texto
+    emprestimoMut: logico
+
+    construtor(nome: texto, tipoRs: texto, ehMutavel: logico, slot: inteiro, escopoNivel: inteiro) {
+        isto.nome = nome
+        isto.tipoRs = tipoRs
+        isto.ehMutavel = ehMutavel
+        isto.movida = falso
+        isto.leituraAtiva = 0
+        isto.mutavelAtivo = falso
+        isto.slot = slot
+        isto.escopoNivel = escopoNivel
+        isto.emprestaDe = ""
+        isto.emprestimoMut = falso
+    }
+}
+
+funcao ehTipoCopy(tipoRs: texto): logico {
+    retorna tipoRs == "i64" ou tipoRs == "&i64" ou tipoRs == "&String"
+}
+
+classe ChunkRs {
+    nome: texto
+    numLocais: inteiro
+    codigo: texto[]
+
+    construtor(nome: texto, numLocais: inteiro, codigo: texto[]) {
+        isto.nome = nome
+        isto.numLocais = numLocais
+        isto.codigo = codigo
+    }
+}
+
+// --- Compilador + Borrow Checker integrado ---
+
+classe CompiladorRust {
+    tokens: TokenRs[]
+    pos: inteiro
+    chunks: dicionario
+    assinaturas: dicionario
+
+    construtor(tokens: TokenRs[]) {
+        isto.tokens = tokens
+        isto.pos = 0
+        isto.chunks = {}
+        isto.assinaturas = {}
+    }
+
+    atual(): TokenRs {
+        retorna isto.tokens[isto.pos]
+    }
+
+    avancar(): TokenRs {
+        const t: TokenRs = isto.tokens[isto.pos]
+        isto.pos++
+        retorna t
+    }
+
+    consumir(tag: TokRs, msg: texto): TokenRs {
+        se (isto.atual().tag != tag) {
+            falhar ErroRust(msg + ", encontrado '" + isto.atual().lexema + "'")
+        }
+        retorna isto.avancar()
+    }
+
+    lerTipoRs(): texto {
+        var prefixo: texto = ""
+        se (isto.atual().tag == TokRs.Amp) {
+            isto.avancar()
+            se (isto.atual().tag == TokRs.KwMut) {
+                isto.avancar()
+                prefixo = "&mut "
+            } senao {
+                prefixo = "&"
+            }
+        }
+        se (isto.atual().tag == TokRs.KwI64) {
+            isto.avancar()
+            retorna prefixo + "i64"
+        }
+        se (isto.atual().tag == TokRs.KwString) {
+            isto.avancar()
+            retorna prefixo + "String"
+        }
+        falhar ErroRust("Tipo Rust esperado, encontrado '" + isto.atual().lexema + "'")
+    }
+
+    compilarModulo(): vazio {
+        enquanto (isto.atual().tag != TokRs.Fim) {
+            isto.compilarFuncao()
+        }
+    }
+
+    compilarFuncao(): vazio {
+        isto.consumir(TokRs.KwFn, "esperado 'fn'")
+        const nome: texto = isto.consumir(TokRs.Ident, "esperado nome de funcao").lexema
+        isto.consumir(TokRs.LParen, "esperado '('")
+
+        var bindings: dicionario = {}
+        var nomesOrdem: texto[] = []
+        var proxSlot: inteiro = 0
+
+        se (isto.atual().tag != TokRs.RParen) {
+            enquanto (verdadeiro) {
+                var pMut: logico = falso
+                se (isto.atual().tag == TokRs.KwMut) {
+                    isto.avancar()
+                    pMut = verdadeiro
+                }
+                const pNome: texto = isto.consumir(TokRs.Ident, "esperado parametro").lexema
+                isto.consumir(TokRs.Colon, "esperado ':'")
+                const pTipo: texto = isto.lerTipoRs()
+                bindings[pNome] = BindingRs(pNome, pTipo, pMut, proxSlot, 0)
+                nomesOrdem.empilhar(pNome)
+                proxSlot++
+                se (isto.atual().tag == TokRs.Comma) isto.avancar()
+                senao sustar
+            }
+        }
+        isto.consumir(TokRs.RParen, "esperado ')'")
+        var retTipo: texto = "i64"
+        se (isto.atual().tag == TokRs.Arrow) {
+            isto.avancar()
+            retTipo = isto.lerTipoRs()
+        }
+        isto.assinaturas[nome] = retTipo
+
+        var codigo: texto[] = []
+        proxSlot = isto.compilarBloco(codigo, bindings, nomesOrdem, proxSlot, 1)
+        codigo.empilhar("PUSH_INT|0")
+        codigo.empilhar("RET")
+        isto.chunks[nome] = ChunkRs(nome, proxSlot, codigo)
+    }
+
+    liberarEscopo(bindings: dicionario, nomesOrdem: texto[], nivel: inteiro): vazio {
+        para (var i: inteiro = nomesOrdem.tamanho() - 1; i >= 0; i--) {
+            const nome: texto = nomesOrdem[i]
+            se (!bindings.contem(nome)) continua
+            const b: BindingRs = bindings[nome]
+            se (b.escopoNivel == nivel) {
+                se (b.emprestaDe.tamanho() > 0 e bindings.contem(b.emprestaDe)) {
+                    const dono: BindingRs = bindings[b.emprestaDe]
+                    se (b.emprestimoMut) {
+                        dono.mutavelAtivo = falso
+                    } senao se (dono.leituraAtiva > 0) {
+                        dono.leituraAtiva--
+                    }
+                }
+            }
+        }
+    }
+
+    compilarBloco(codigo: texto[], bindings: dicionario, nomesOrdem: texto[], proxSlot: inteiro,
+        nivel: inteiro): inteiro {
+        isto.consumir(TokRs.LBrace, "esperado '{'")
+        var proximo: inteiro = proxSlot
+        enquanto (isto.atual().tag != TokRs.RBrace e isto.atual().tag != TokRs.Fim) {
+            proximo = isto.compilarStmt(codigo, bindings, nomesOrdem, proximo, nivel)
+        }
+        isto.consumir(TokRs.RBrace, "esperado '}'")
+        isto.liberarEscopo(bindings, nomesOrdem, nivel)
+        retorna proximo
+    }
+
+    registrarEmprestimo(dono: BindingRs, mutavel: logico): vazio {
+        se (dono.movida) {
+            falhar ErroRust("error[E0382]: uso de valor movido '${dono.nome}'")
+        }
+        se (mutavel) {
+            se (!dono.ehMutavel) {
+                falhar ErroRust("error[E0596]: nao e possivel emprestar '${dono.nome}' como mutavel sem 'let mut'")
+            }
+            se (dono.mutavelAtivo) {
+                falhar ErroRust("error[E0499]: nao e possivel emprestar '${dono.nome}' como mutavel mais de uma vez simultaneamente")
+            }
+            se (dono.leituraAtiva > 0) {
+                falhar ErroRust("error[E0502]: nao e possivel emprestar '${dono.nome}' como mutavel pois ja esta emprestado como imutavel")
+            }
+            dono.mutavelAtivo = verdadeiro
+        } senao {
+            se (dono.mutavelAtivo) {
+                falhar ErroRust("error[E0502]: nao e possivel emprestar '${dono.nome}' como imutavel pois ja esta emprestado como mutavel")
+            }
+            dono.leituraAtiva++
+        }
+    }
+
+    compilarStmt(codigo: texto[], bindings: dicionario, nomesOrdem: texto[], proxSlot: inteiro,
+        nivel: inteiro): inteiro {
+        const tag: TokRs = isto.atual().tag
+        se (tag == TokRs.LBrace) {
+            retorna isto.compilarBloco(codigo, bindings, nomesOrdem, proxSlot, nivel + 1)
+        }
+        se (tag == TokRs.KwLet) {
+            isto.avancar()
+            var mutavel: logico = falso
+            se (isto.atual().tag == TokRs.KwMut) {
+                isto.avancar()
+                mutavel = verdadeiro
+            }
+            const nome: texto = isto.consumir(TokRs.Ident, "esperado nome apos let").lexema
+            isto.consumir(TokRs.Colon, "esperado ':'")
+            const tipoDecl: texto = isto.lerTipoRs()
+            isto.consumir(TokRs.Igual, "esperado '='")
+
+            var emprestaDe: texto = ""
+            var emprestimoMut: logico = falso
+            se (isto.atual().tag == TokRs.Amp) {
+                isto.avancar()
+                se (isto.atual().tag == TokRs.KwMut) {
+                    isto.avancar()
+                    emprestimoMut = verdadeiro
+                }
+                const alvo: texto = isto.consumir(TokRs.Ident, "esperado variavel apos '&'").lexema
+                se (!bindings.contem(alvo)) falhar ErroRust("Variavel indefinida: " + alvo)
+                const dono: BindingRs = bindings[alvo]
+                isto.registrarEmprestimo(dono, emprestimoMut)
+                emprestaDe = alvo
+                codigo.empilhar("LOAD_REF|" + texto(dono.slot))
+            } senao {
+                isto.compilarExpr(codigo, bindings)
+            }
+            isto.consumir(TokRs.Semi, "esperado ';'")
+
+            const novoBinding: BindingRs = BindingRs(nome, tipoDecl, mutavel, proxSlot, nivel)
+            novoBinding.emprestaDe = emprestaDe
+            novoBinding.emprestimoMut = emprestimoMut
+            bindings[nome] = novoBinding
+            nomesOrdem.empilhar(nome)
+            codigo.empilhar("STORE|" + texto(proxSlot))
+            retorna proxSlot + 1
+        }
+        se (tag == TokRs.Star) {
+            // Desreferencia para escrita: *x = expr;
+            isto.avancar()
+            const refNome: texto = isto.consumir(TokRs.Ident, "esperado referencia apos '*'").lexema
+            se (!bindings.contem(refNome)) falhar ErroRust("Referencia indefinida: " + refNome)
+            const refB: BindingRs = bindings[refNome]
+            se (refB.tipoRs != "&mut i64") {
+                falhar ErroRust("error[E0594]: nao e possivel modificar atraves de referencia imutavel '${refNome}'")
+            }
+            isto.consumir(TokRs.Igual, "esperado '='")
+            codigo.empilhar("LOAD|" + texto(refB.slot))
+            isto.compilarExpr(codigo, bindings)
+            isto.consumir(TokRs.Semi, "esperado ';'")
+            codigo.empilhar("STORE_DEREF")
+            retorna proxSlot
+        }
+        se (tag == TokRs.KwPrintln) {
+            isto.avancar()
+            isto.consumir(TokRs.Bang, "esperado '!' em println!")
+            isto.consumir(TokRs.LParen, "esperado '('")
+            isto.compilarExpr(codigo, bindings)
+            isto.consumir(TokRs.RParen, "esperado ')'")
+            isto.consumir(TokRs.Semi, "esperado ';'")
+            codigo.empilhar("PRINT")
+            retorna proxSlot
+        }
+        se (tag == TokRs.KwReturn) {
+            isto.avancar()
+            isto.compilarExpr(codigo, bindings)
+            isto.consumir(TokRs.Semi, "esperado ';'")
+            codigo.empilhar("RET")
+            retorna proxSlot
+        }
+        se (tag == TokRs.Ident) {
+            const nome: texto = isto.avancar().lexema
+            se (isto.atual().tag == TokRs.Igual) {
+                isto.avancar()
+                se (!bindings.contem(nome)) falhar ErroRust("Variavel indefinida: " + nome)
+                const b: BindingRs = bindings[nome]
+                se (!b.ehMutavel) {
+                    falhar ErroRust("error[E0384]: nao e possivel reatribuir variavel imutavel '${nome}'")
+                }
+                se (b.leituraAtiva > 0 ou b.mutavelAtivo) {
+                    falhar ErroRust("error[E0506]: nao e possivel atribuir a '${nome}' enquanto esta emprestado")
+                }
+                isto.compilarExpr(codigo, bindings)
+                isto.consumir(TokRs.Semi, "esperado ';'")
+                b.movida = falso
+                codigo.empilhar("STORE|" + texto(b.slot))
+                retorna proxSlot
+            }
+            se (isto.atual().tag == TokRs.LParen) {
+                isto.compilarChamada(nome, codigo, bindings)
+                isto.consumir(TokRs.Semi, "esperado ';'")
+                codigo.empilhar("POP")
+                retorna proxSlot
+            }
+        }
+        falhar ErroRust("Comando Rust inesperado: " + isto.atual().lexema)
+    }
+
+    compilarChamada(nomeFn: texto, codigo: texto[], bindings: dicionario): vazio {
+        isto.consumir(TokRs.LParen, "esperado '('")
+        var argc: inteiro = 0
+        se (isto.atual().tag != TokRs.RParen) {
+            enquanto (verdadeiro) {
+                isto.compilarExpr(codigo, bindings)
+                argc++
+                se (isto.atual().tag == TokRs.Comma) isto.avancar()
+                senao sustar
+            }
+        }
+        isto.consumir(TokRs.RParen, "esperado ')'")
+        se (nomeFn == "len") {
+            codigo.empilhar("LEN")
+        } senao {
+            codigo.empilhar("CALL|" + nomeFn + "|" + texto(argc))
+        }
+    }
+
+    compilarExpr(codigo: texto[], bindings: dicionario): vazio {
+        isto.compilarAdicao(codigo, bindings)
+    }
+
+    compilarAdicao(codigo: texto[], bindings: dicionario): vazio {
+        isto.compilarFator(codigo, bindings)
+        enquanto (isto.atual().tag == TokRs.Mais ou isto.atual().tag == TokRs.Menos) {
+            const op: TokRs = isto.avancar().tag
+            isto.compilarFator(codigo, bindings)
+            se (op == TokRs.Mais) codigo.empilhar("ADD")
+            senao codigo.empilhar("SUB")
+        }
+    }
+
+    compilarFator(codigo: texto[], bindings: dicionario): vazio {
+        isto.compilarPrimario(codigo, bindings)
+        enquanto (isto.atual().tag == TokRs.Star) {
+            isto.avancar()
+            isto.compilarPrimario(codigo, bindings)
+            codigo.empilhar("MUL")
+        }
+    }
+
+    compilarPrimario(codigo: texto[], bindings: dicionario): vazio {
+        const t: TokenRs = isto.atual()
+        se (t.tag == TokRs.IntLit) {
+            isto.avancar()
+            codigo.empilhar("PUSH_INT|" + t.lexema)
+            retorna
+        }
+        se (t.tag == TokRs.StrLit) {
+            isto.avancar()
+            codigo.empilhar("PUSH_STR|" + t.lexema)
+            retorna
+        }
+        se (t.tag == TokRs.KwString) {
+            isto.avancar()
+            isto.consumir(TokRs.Scope, "esperado '::'")
+            isto.consumir(TokRs.Ident, "esperado 'from'")
+            isto.consumir(TokRs.LParen, "esperado '('")
+            const txt: texto = isto.consumir(TokRs.StrLit, "esperado literal texto").lexema
+            isto.consumir(TokRs.RParen, "esperado ')'")
+            codigo.empilhar("PUSH_STR|" + txt)
+            retorna
+        }
+        se (t.tag == TokRs.Star) {
+            isto.avancar()
+            const refNome: texto = isto.consumir(TokRs.Ident, "esperado referencia apos '*'").lexema
+            se (!bindings.contem(refNome)) falhar ErroRust("Referencia indefinida: " + refNome)
+            const b: BindingRs = bindings[refNome]
+            codigo.empilhar("LOAD|" + texto(b.slot))
+            codigo.empilhar("DEREF")
+            retorna
+        }
+        se (t.tag == TokRs.Ident) {
+            const nome: texto = isto.avancar().lexema
+            se (isto.atual().tag == TokRs.LParen) {
+                isto.compilarChamada(nome, codigo, bindings)
+                retorna
+            }
+            se (!bindings.contem(nome)) falhar ErroRust("Variavel indefinida: " + nome)
+            const b: BindingRs = bindings[nome]
+            se (b.movida) {
+                falhar ErroRust("error[E0382]: uso de valor movido '${nome}'")
+            }
+            se (!ehTipoCopy(b.tipoRs) e b.tipoRs != "&mut i64") {
+                se (b.leituraAtiva > 0 ou b.mutavelAtivo) {
+                    falhar ErroRust("error[E0505]: nao e possivel mover '${nome}' enquanto esta emprestado")
+                }
+                b.movida = verdadeiro
+            }
+            codigo.empilhar("LOAD|" + texto(b.slot))
+            retorna
+        }
+        falhar ErroRust("Expressao Rust invalida: " + t.lexema)
+    }
+}
+
+// --- VM Rust (celulas mutaveis para suportar &mut T com deref real) ---
+
+classe CelulaRs {
+    valor: qualquer
+
+    construtor(valor: qualquer) {
+        isto.valor = valor
+    }
+}
+
+classe VMRust {
+    chunks: dicionario
+
+    construtor(chunks: dicionario) {
+        isto.chunks = chunks
+    }
+
+    desembrulhar(v: qualquer): qualquer {
+        se (v.eInstanciaDe(CelulaRs)) {
+            const c: CelulaRs = v
+            retorna c.valor
+        }
+        retorna v
+    }
+
+    executar(nome: texto, args: qualquer[]): qualquer {
+        const ch: ChunkRs = isto.chunks[nome]
+        var locais: CelulaRs[] = []
+        para (var i: inteiro = 0; i < ch.numLocais; i++) locais.empilhar(CelulaRs(0))
+        para (var i: inteiro = 0; i < args.tamanho(); i++) locais[i].valor = args[i]
+
+        var pilha: qualquer[] = []
+        var pc: inteiro = 0
+        const insts: texto[] = ch.codigo
+
+        enquanto (pc < insts.tamanho()) {
+            const p: texto[] = insts[pc].dividir("|")
+            pc++
+            const op: texto = p[0]
+
+            se (op == "PUSH_INT") pilha.empilhar(inteiro(p[1]))
+            senao se (op == "PUSH_STR") pilha.empilhar(p[1])
+            senao se (op == "LOAD") pilha.empilhar(locais[inteiro(p[1])].valor)
+            senao se (op == "LOAD_REF") pilha.empilhar(locais[inteiro(p[1])])
+            senao se (op == "STORE") locais[inteiro(p[1])].valor = pilha.removerUltimo()
+            senao se (op == "DEREF") pilha.empilhar(isto.desembrulhar(pilha.removerUltimo()))
+            senao se (op == "STORE_DEREF") {
+                const novoVal: qualquer = pilha.removerUltimo()
+                const cel: CelulaRs = pilha.removerUltimo()
+                cel.valor = novoVal
+            } senao se (op == "LEN") {
+                const txt: texto = texto(isto.desembrulhar(pilha.removerUltimo()))
+                pilha.empilhar(txt.tamanho())
+            } senao se (op == "PRINT") {
+                escreva(texto(isto.desembrulhar(pilha.removerUltimo())))
+            } senao se (op == "POP") {
+                pilha.removerUltimo()
+            } senao se (op == "CALL") {
+                const alvo: texto = p[1]
+                const argc: inteiro = inteiro(p[2])
+                var callArgs: qualquer[] = []
+                para (var k: inteiro = 0; k < argc; k++) callArgs.empilhar(0)
+                para (var k: inteiro = argc - 1; k >= 0; k--) callArgs[k] = pilha.removerUltimo()
+                pilha.empilhar(isto.executar(alvo, callArgs))
+            } senao se (op == "RET") {
+                retorna pilha.removerUltimo()
+            } senao {
+                const b: inteiro = inteiro(isto.desembrulhar(pilha.removerUltimo()))
+                const a: inteiro = inteiro(isto.desembrulhar(pilha.removerUltimo()))
+                se (op == "ADD") pilha.empilhar(a + b)
+                senao se (op == "SUB") pilha.empilhar(a - b)
+                senao se (op == "MUL") pilha.empilhar(a * b)
+            }
+        }
+        retorna 0
+    }
+}
+
+funcao testarErroBorrow(codigoErro: texto, fonteRust: texto): vazio {
+    tente {
+        const toks: TokenRs[] = LexerRs(fonteRust).tokenizar()
+        CompiladorRust(toks).compilarModulo()
+        falhar "Esperado erro ${codigoErro}, mas compilou sem erro!"
+    } pegue (erro: ErroRust) {
+        escreva("[BorrowChecker] ${codigoErro} capturado: " + erro.mensagem)
+    }
+}
+
+const arquivos: qualquer = importar("cgd:arquivos")
+const caminho: texto = "programa.rs"
+const arquivo: qualquer = arquivos.Arquivo(caminho)
+se (!arquivo.existe()) falhar "Arquivo Rust nao encontrado: ${caminho}"
+
+const toks: TokenRs[] = LexerRs(arquivo.ler()).tokenizar()
+const rustc: CompiladorRust = CompiladorRust(toks)
+rustc.compilarModulo()
+escreva("[Mini-Rust] Borrow Checker: OK (programa.rs aprovado)")
+
+var semArgs: qualquer[] = []
+const retRust: qualquer = VMRust(rustc.chunks).executar("main", semArgs)
+assercao(inteiro(retRust) == 0, "main() Mini-Rust deveria retornar 0")
+
+// Bateria de testes negativos provando as 5 regras do Borrow Checker
+testarErroBorrow("E0382", "fn main() -> i64 { let s: String = String::from(\"oi\"); let s2: String = s; println!(s); return 0; }")
+testarErroBorrow("E0596", "fn main() -> i64 { let x: i64 = 10; let r: &mut i64 = &mut x; return 0; }")
+testarErroBorrow("E0502", "fn main() -> i64 { let mut s: String = String::from(\"a\"); let r1: &String = &s; let r2: &mut String = &mut s; return 0; }")
+testarErroBorrow("E0499", "fn main() -> i64 { let mut x: i64 = 1; let r1: &mut i64 = &mut x; let r2: &mut i64 = &mut x; return 0; }")
+testarErroBorrow("E0506", "fn main() -> i64 { let mut x: i64 = 1; let r: &i64 = &x; x = 2; return 0; }")

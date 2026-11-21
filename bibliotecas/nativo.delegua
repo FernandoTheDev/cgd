@@ -49,9 +49,9 @@ classe estrangeira Primitivas {
     codigoUnicode(caractere: texto): inteiro;
     @definicao(simbolo = "delegua_ffi_cgdCaractereUnicode")
     caractereUnicode(codigo: inteiro): texto;
-    @definicao(simbolo = "delegua_ffi_cgdNumeroFinito")
+    @definicao(simbolo = "delegua_ffi_cgdNumeroFinito", paralelo = verdadeiro)
     numeroFinito(valor: qualquer): logico;
-    @definicao(simbolo = "delegua_ffi_cgdNumeroTexto")
+    @definicao(simbolo = "delegua_ffi_cgdNumeroTexto", paralelo = verdadeiro)
     numeroTexto(valor: qualquer): texto;
     @definicao(simbolo = "delegua_ffi_cgdArquivoLer")
     arquivoLer(caminho: texto, limite: inteiro): texto;
@@ -71,6 +71,12 @@ classe estrangeira Primitivas {
     sistemaDiretorio(): texto;
     @definicao(simbolo = "delegua_ffi_sistemaInfo")
     sistemaInfo(): dicionario;
+    @definicao(simbolo = "delegua_ffi_sistemaRecursos")
+    sistemaRecursos(): dicionario;
+    @definicao(simbolo = "delegua_ffi_sistemaMemoria")
+    sistemaMemoria(): dicionario;
+    @definicao(simbolo = "delegua_ffi_sistemaColetarGC")
+    sistemaColetarGC(desmapear: logico): vazio;
     @definicao(simbolo = "delegua_ffi_sistemaRelogio")
     sistemaRelogio(monotonico: logico): real;
     @definicao(simbolo = "delegua_ffi_sistemaDormir")
@@ -78,6 +84,8 @@ classe estrangeira Primitivas {
     @definicao(simbolo = "delegua_ffi_sistemaExecutar")
     sistemaExecutar(programa: texto, argumentos: texto[], diretorio: texto, ambiente: dicionario,
         timeout: inteiro, limite: inteiro, entrada: texto): dicionario;
+    @definicao(simbolo = "delegua_ffi_sistemaExecutarLote")
+    sistemaExecutarLote(tarefas: dicionario[], maxConcorrencia: inteiro): dicionario[];
     @definicao(simbolo = "delegua_ffi_sistemaEscrever")
     sistemaEscrever(valor: texto, erro: logico): inteiro;
     @definicao(simbolo = "delegua_ffi_sistemaLerLinha")

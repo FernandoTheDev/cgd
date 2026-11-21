@@ -1,0 +1,252 @@
+//! [Preproc] Includes reais resolvidos: 11\n[Frontend] Funcoes: 6 | Structs: 3 | Unions: 1 | Analise semantica: OK\n[IR SSA] Verificada: verdadeiro | Blocos CFG: 28 | Dobras: 10 | Blocos mortos: 1 | DCE: 19 | Globais: 2 | Externs: 10\n[Backend 1 - Assembly x86_64] Linhas: 1286 | Secoes .rodata/.data/.bss + libc: verdadeiro\n[Backend 2 - ELF64 Dinamico] Magic: 7f454c46 | Tamanho: 13464 bytes | Segmentos RX+RW + Section Headers\n[Execucao ELF64 - stdout da libc] ELF64 dinamico C99 linkado a libc.so.6 oficial!\nArea=37 Heap=CGD-C99 Len=7 Cmp=0 Abs=15 Media=32.50 Ok=1\n[Execucao ELF64 - exit code real] main() = 175\n[Semantica] Erro 1 capturado: Campo 'z' nao existe em 'Ponto'\n[Semantica] Erro 2 capturado: Linha 1: desreferencia '*' exige ponteiro ou array
+//? fase: execucao
+//? diretorio: fonte
+// Compilador ISO C99 nativo em Delegua/CGD (x86_64 Linux / System V AMD64 ABI):
+//   - Pre-processador C99 real (fases 1-4, trigraphs, #include com -I, macros objeto/funcao/variadicas,
+//     #, ##, hide-set, #if/#elif/#else/defined, #undef, #line, #error, #pragma once, _Pragma, -D)
+//   - Headers C99 reais em include/ (stddef, stdint, stdbool, limits, iso646, ctype, string, stdlib, stdio, ...)
+//   - Frontend C99 / LP64: larguras 1/2/4/8B, signed/unsigned, float/double, structs/unions com alinhamento,
+//     typedefs, enums, globais (.data/.bss), ponteiros de funcao, inicializadores designados, goto, switch
+//   - Middle-end: Lowering AST -> CFG + IR SSA tipada + Otimizador (ConstProp, Simplificacao, CopyProp, CFG, DCE) + Verificador
+//   - Backend 1: Assembly x86_64 (-S)
+//   - Backend 2: ELF64 Dinamico x86_64 (PT_LOAD RX + PT_LOAD RW + Section Headers) linkado a libc.so.6 oficial
+//
+// Uso CLI:
+//   c99cc [opcoes] arquivo1.c [arquivo2.c ...]
+//   Opcoes: -o <saida>, -I <dir>, -D <MACRO[=VAL]>, -S (assembly), -E (pre-processador), -O0, -O1
+//   Sem argumentos: executa o auto-teste completo de programa.c.
+
+funcao gravarBinarioExecutavel(caminhoSaida: texto, elfVetor: inteiro[]): vazio {
+    const bytesMod: qualquer = importar("cgd:bytes")
+    const procMod: qualquer = importar("cgd:processo")
+    const elfBytes: qualquer = bytesMod.Bytes.deVetor(elfVetor)
+    const res: qualquer = procMod.Processo.executar("/bin/sh", ["-c", "base64 -d > \"$1\" && chmod +x \"$1\"",
+        "_", caminhoSaida], "", {}, 10000, 65536, elfBytes.paraBase64())
+    res.exigirSucesso()
+}
+
+funcao extrairSubtexto(s: texto, inicio: inteiro, fim: inteiro): texto {
+    var out: texto[] = []
+    para (var i: inteiro = inicio; i < fim e i < s.tamanho(); i++) {
+        out.empilhar(s[i])
+    }
+
+    retorna out.juntar("")
+}
+
+funcao executarModoCLI(args: texto[]): vazio {
+    const pre: qualquer = importar("preproc.delegua")
+    const lex: qualquer = importar("lexer.delegua")
+    const par: qualquer = importar("parser.delegua")
+    const sem: qualquer = importar("sema.delegua")
+    const ir: qualquer = importar("ir_ssa.delegua")
+    const asmBe: qualquer = importar("backend_asm.delegua")
+    const elfBe: qualquer = importar("backend_elf.delegua")
+    const tMod: qualquer = importar("tipos.delegua")
+    const arquivos: qualquer = importar("cgd:arquivos")
+
+    var arquivosEntrada: texto[] = []
+    var dirsInclude: texto[] = []
+    var defsCli: texto[] = []
+    var libsCli: texto[] = []
+    var caminhoSaida: texto = "a.out"
+    var somentePreproc: logico = falso
+    var somenteAsm: logico = falso
+    var otimizar: logico = verdadeiro
+
+    var i: inteiro = 0
+    enquanto (i < args.tamanho()) {
+        const a: texto = args[i]
+        se (a == "-o" e i + 1 < args.tamanho()) {
+            caminhoSaida = args[i + 1]
+            i = i + 2
+        } senao se (a == "-I" e i + 1 < args.tamanho()) {
+            dirsInclude.empilhar(args[i + 1])
+            i = i + 2
+        } senao se (a.tamanho() > 2 e a[0] == "-" e a[1] == "I") {
+            dirsInclude.empilhar(extrairSubtexto(a, 2, a.tamanho()))
+            i++
+        } senao se (a == "-D" e i + 1 < args.tamanho()) {
+            defsCli.empilhar(args[i + 1])
+            i = i + 2
+        } senao se (a.tamanho() > 2 e a[0] == "-" e a[1] == "D") {
+            defsCli.empilhar(extrairSubtexto(a, 2, a.tamanho()))
+            i++
+        } senao se (a == "-l" e i + 1 < args.tamanho()) {
+            libsCli.empilhar(args[i + 1])
+            i = i + 2
+        } senao se (a.tamanho() > 2 e a[0] == "-" e a[1] == "l") {
+            libsCli.empilhar(extrairSubtexto(a, 2, a.tamanho()))
+            i++
+        } senao se (a == "-E") {
+            somentePreproc = verdadeiro
+            i++
+        } senao se (a == "-S") {
+            somenteAsm = verdadeiro
+            i++
+        } senao se (a == "-O0") {
+            otimizar = falso
+            i++
+        } senao se (a == "-O1" ou a == "-O2") {
+            otimizar = verdadeiro
+            i++
+        } senao se (a == "-std=c99" ou a == "-Wall" ou a == "-Wextra") {
+            i++
+        } senao {
+            arquivosEntrada.empilhar(a)
+            i++
+        }
+    }
+
+    se (arquivosEntrada.tamanho() == 0) {
+        falhar tMod.ErroC99("Nenhum arquivo de entrada .c informado")
+    }
+
+    // Diretorios padrao dos headers C99 embutidos
+    dirsInclude.empilhar("include")
+    dirsInclude.empilhar("exemplos/compiladores_e_vms/compiladores/c_nativo/include")
+
+    se (somentePreproc) {
+        var blocosPP: texto[] = []
+        para (var k: inteiro = 0; k < arquivosEntrada.tamanho(); k++) {
+            const arq: qualquer = arquivos.Arquivo(arquivosEntrada[k])
+            se (!arq.existe()) falhar tMod.ErroC99("Arquivo nao encontrado: ${arquivosEntrada[k]}")
+            const resP: (texto, inteiro) = pre.preprocessarFonteC99(arq.ler(), arquivosEntrada[k],
+                dirsInclude, defsCli)
+            blocosPP.empilhar(resP[0])
+        }
+        const textoPP: texto = blocosPP.juntar("\n")
+        se (caminhoSaida != "a.out") {
+            arquivos.Arquivo(caminhoSaida).escrever(textoPP)
+        } senao {
+            escreva(textoPP)
+        }
+        retorna
+    }
+
+    // Multi-TU: pre-processa e analisa sintaticamente cada arquivo .c em escopo de macro independente
+    const astCombinada: qualquer = par.NoAST(tMod.NoKind.Programa, 1)
+    para (var k: inteiro = 0; k < arquivosEntrada.tamanho(); k++) {
+        const arq: qualquer = arquivos.Arquivo(arquivosEntrada[k])
+        se (!arq.existe()) falhar tMod.ErroC99("Arquivo nao encontrado: ${arquivosEntrada[k]}")
+        const resP: (texto, inteiro) = pre.preprocessarFonteC99(arq.ler(), arquivosEntrada[k],
+            dirsInclude, defsCli)
+        const toks: qualquer[] = lex.tokenizarC99(resP[0])
+        const astTU: qualquer = par.analisarSintaxeC99(toks)
+        para (var f: inteiro = 0; f < astTU.filhos.tamanho(); f++) {
+            astCombinada.filhos.empilhar(astTU.filhos[f])
+        }
+    }
+
+    const resSema: qualquer = sem.analisarSemanticaC99(astCombinada, verdadeiro)
+    const moduloSSA: qualquer = ir.construirModuloSSA(astCombinada, resSema.tabela)
+    para (var k: inteiro = 0; k < libsCli.tamanho(); k++) {
+        const nomeL: texto = libsCli[k]
+        se (nomeL == "m") moduloSSA.registrarBiblioteca("libm.so.6")
+        senao se (nomeL == "pthread") moduloSSA.registrarBiblioteca("libpthread.so.0")
+        senao se (nomeL == "dl") moduloSSA.registrarBiblioteca("libdl.so.2")
+        senao moduloSSA.registrarBiblioteca("lib" + nomeL + ".so")
+    }
+
+    se (otimizar) {
+        ir.otimizarModuloSSA(moduloSSA)
+    }
+
+    ir.verificarModuloSSA(moduloSSA)
+
+    se (somenteAsm) {
+        const codigoAsm: texto = asmBe.emitirAssemblyX86_64(moduloSSA)
+        const destinoAsm: texto = caminhoSaida == "a.out" ? "a.s" : caminhoSaida
+        arquivos.Arquivo(destinoAsm).escrever(codigoAsm)
+        retorna
+    }
+
+    const elfVetor: inteiro[] = elfBe.emitirELF64Nativo(moduloSSA)
+    gravarBinarioExecutavel(caminhoSaida, elfVetor)
+}
+
+funcao executarAutoTeste(): vazio {
+    const pre: qualquer = importar("preproc.delegua")
+    const lex: qualquer = importar("lexer.delegua")
+    const par: qualquer = importar("parser.delegua")
+    const sem: qualquer = importar("sema.delegua")
+    const ir: qualquer = importar("ir_ssa.delegua")
+    const asmBe: qualquer = importar("backend_asm.delegua")
+    const elfBe: qualquer = importar("backend_elf.delegua")
+    const arquivos: qualquer = importar("cgd:arquivos")
+    const bytesMod: qualquer = importar("cgd:bytes")
+    const procMod: qualquer = importar("cgd:processo")
+
+    const caminhoC: texto = "programa.c"
+    const arqC: qualquer = arquivos.Arquivo(caminhoC)
+    se (!arqC.existe()) falhar "Arquivo C99 nao encontrado: ${caminhoC}"
+
+    const dirsInc: texto[] = ["include", "exemplos/compiladores_e_vms/compiladores/c_nativo/include"]
+    const resPre: (texto, inteiro) = pre.preprocessarFonteC99(arqC.ler(), caminhoC, dirsInc,
+        [])
+    const fonteExpandida: texto = resPre[0]
+    const totalIncludes: inteiro = resPre[1]
+    escreva("[Preproc] Includes reais resolvidos: ${totalIncludes}")
+
+    const tokens: qualquer[] = lex.tokenizarC99(fonteExpandida)
+    const ast: qualquer = par.analisarSintaxeC99(tokens)
+    const resSema: qualquer = sem.analisarSemanticaC99(ast, verdadeiro)
+    escreva("[Frontend] Funcoes: ${resSema.numFuncoes} | Structs: ${resSema.numStructs} | Unions: ${resSema.numUnions} | Analise semantica: OK")
+
+    const moduloSSA: qualquer = ir.construirModuloSSA(ast, resSema.tabela)
+    const stats: qualquer = ir.otimizarModuloSSA(moduloSSA)
+    const irValida: logico = ir.verificarModuloSSA(moduloSSA)
+    var totalBlocos: inteiro = 0
+    para (var i: inteiro = 0; i < moduloSSA.funcoes.tamanho(); i++) {
+        totalBlocos = totalBlocos + moduloSSA.funcoes[i].blocos.tamanho()
+    }
+
+    escreva("[IR SSA] Verificada: ${irValida} | Blocos CFG: ${totalBlocos} | Dobras: ${stats.dobras} | Blocos mortos: ${stats.blocosMortos} | DCE: ${stats.dceRemovidas} | Globais: ${moduloSSA.globais.tamanho()} | Externs: ${moduloSSA.externos.tamanho()}")
+
+    const codigoAsm: texto = asmBe.emitirAssemblyX86_64(moduloSSA)
+    const linhasAsm: texto[] = codigoAsm.dividir("\n")
+    const asmOk: logico = codigoAsm.contem("extern printf") e codigoAsm.contem("section .rodata") e codigoAsm.contem("section .data") e codigoAsm.contem("section .bss")
+    escreva("[Backend 1 - Assembly x86_64] Linhas: ${linhasAsm.tamanho()} | Secoes .rodata/.data/.bss + libc: ${asmOk}")
+
+    const elfVetor: inteiro[] = elfBe.emitirELF64Nativo(moduloSSA)
+    const elfBytes: qualquer = bytesMod.Bytes.deVetor(elfVetor)
+    const magicHex: texto = elfBytes.fatiar(0, 4).paraHex()
+    escreva("[Backend 2 - ELF64 Dinamico] Magic: ${magicHex} | Tamanho: ${elfBytes.tamanho()} bytes | Segmentos RX+RW + Section Headers")
+
+    const pid: inteiro = procMod.Processo.identificador()
+    const caminhoElf: texto = "/tmp/cgd_c99_libc_${pid}.elf"
+    gravarBinarioExecutavel(caminhoElf, elfVetor)
+    const resExec: qualquer = procMod.Processo.executar(caminhoElf)
+    arquivos.Arquivo(caminhoElf).remover()
+
+    const saidaElf: texto = resExec.saidaPadrao().aparar()
+    const codigoReal: inteiro = resExec.codigoSaida()
+    assercao(codigoReal == 175, "Exit code inesperado do ELF64: ${codigoReal}")
+    assercao(saidaElf == "ELF64 dinamico C99 linkado a libc.so.6 oficial!\nArea=37 Heap=CGD-C99 Len=7 Cmp=0 Abs=15 Media=32.50 Ok=1",
+        "Stdout inesperado do ELF64: ${saidaElf}")
+
+    escreva("[Execucao ELF64 - stdout da libc] " + saidaElf)
+    escreva("[Execucao ELF64 - exit code real] main() = ${codigoReal}")
+
+    tente {
+        const t1: qualquer[] = lex.tokenizarC99("struct Ponto { int x; }; int main(void) { struct Ponto p; return p.z; }")
+        sem.analisarSemanticaC99(par.analisarSintaxeC99(t1))
+    } pegue (erro: Excecao) {
+        escreva("[Semantica] Erro 1 capturado: " + erro.mensagem)
+    }
+
+    tente {
+        const t2: qualquer[] = lex.tokenizarC99("int main(void) { int x = 1; return *x; }")
+        sem.analisarSemanticaC99(par.analisarSintaxeC99(t2))
+    } pegue (erro: Excecao) {
+        escreva("[Semantica] Erro 2 capturado: " + erro.mensagem)
+    }
+}
+
+const procInicial: qualquer = importar("cgd:processo")
+const cliArgs: texto[] = procInicial.Processo.argumentos()
+se (cliArgs.tamanho() > 0) {
+    executarModoCLI(cliArgs)
+} senao {
+    executarAutoTeste()
+}

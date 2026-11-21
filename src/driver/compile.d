@@ -67,7 +67,9 @@ void compile(CGDArguments args, string filename)
         cgd_erro("Falha no frontend: " ~ e.msg);
     }
 
+    timer.start("Carregamento de módulos");
     new ModuleLoader(diag).load(program, filename);
+    timer.show();
     verificar_erros(diag);
     validateStructure(program, diag);
     verificar_erros(diag);
@@ -133,9 +135,15 @@ void compile(CGDArguments args, string filename)
         if (node is null || node in nativeVisited)
             return;
         nativeVisited[node] = true;
+        if (cast(ModuleUnit) node && !cg.isReachable(node))
+            return;
         if (ClassDecl declaration = cast(ClassDecl) node)
+        {
+            if (!cg.isReachable(declaration))
+                return;
             if (declaration.foreignLibrary.length && declaration.foreignLibrary != "cgd-runtime")
                 args.linkFlags ~= "-l" ~ declaration.foreignLibrary.to!string;
+        }
         foreach (Node child; childNodes(node))
             nativeLibraries(child);
     }
