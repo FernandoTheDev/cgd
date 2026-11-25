@@ -157,9 +157,18 @@ public:
             p.advance();
         Token name = p.consume(TokenKind.Identifier, "Esperado nome da classe.");
         dstring parent;
+        dstring[] parentQualifier;
         if (p.match(TokenKind.Extends))
+        {
             parent = p.consume(TokenKind.Identifier, "Esperado nome da superclasse.").value.s;
+            while (p.match(TokenKind.Dot))
+            {
+                parentQualifier ~= parent;
+                parent = p.consume(TokenKind.Identifier, "Esperado nome da superclasse após '.'.").value.s;
+            }
+        }
         ClassDecl node = new ClassDecl(name.value.s, parent, name.pos);
+        node.superQualifier = parentQualifier;
         node.isAbstract = isAbstract;
         node.isInterface = isInterface;
         node.isForeign = isForeign;
@@ -303,12 +312,33 @@ public:
                 method.access = access;
                 method.decorators = decorators;
                 foreach (Decorator d; decorators)
+                {
                     if (d.name == "puro")
                     {
                         if (d.keys.length)
                             p.err.error(name.pos, "O decorador @puro não aceita argumentos.");
                         method.ctfe_flags |= CTFEFlags.Pure;
                     }
+                    else if (d.name == "nativo")
+                    {
+                        if (d.keys.length)
+                            p.err.error(name.pos, "O decorador @nativo não aceita argumentos.");
+                        method.isNative = true;
+                    }
+                    else if (d.name == "gpu")
+                    {
+                        if (d.keys.length)
+                            p.err.error(name.pos, "O decorador @gpu não aceita argumentos.");
+                        method.isGpu = true;
+                    }
+                    else if (d.name == "operador")
+                    {
+                        if (d.values.length != 1 || cast(StringLit) d.values[0] is null)
+                            p.err.errorCode(name.pos, invalidOperatorSymbol, "");
+                        else
+                            method.operatorSymbol = (cast(StringLit) d.values[0]).value;
+                    }
+                }
                 node.methods ~= method;
             }
         }

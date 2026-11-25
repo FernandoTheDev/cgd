@@ -1,0 +1,116 @@
+modulo principal
+
+importar cgd.matematica.algebra como Alg
+importar cgd.matematica.base como Mat
+importar cgd.tempo como TempoMod
+
+classe Esfera {
+    centro: Alg.Vetor3
+    raio: real
+    r: real
+    g: real
+    b: real
+
+    construtor(cx: real, cy: real, cz: real, raio: real, r: real, g: real, b: real) {
+        isto.centro = Alg.Vetor3(cx, cy, cz)
+        isto.raio = raio
+        isto.r = r
+        isto.g = g
+        isto.b = b
+    }
+
+    intersecao(orig: Alg.Vetor3, dir: Alg.Vetor3): real {
+        var oc: Alg.Vetor3 = orig.subtrair(isto.centro)
+        var bVal: real = oc.produtoEscalar(dir)
+        var cVal: real = oc.produtoEscalar(oc) - isto.raio * isto.raio
+        var disc: real = bVal * bVal - cVal
+        se disc < 0.0 {
+            retorna -1.0
+        }
+        var t: real = -bVal - Mat.Matematica.raizQuadrada(disc)
+        retorna t > 0.001 ? t : -1.0
+    }
+}
+
+funcao limitarByte(v: real): inteiro {
+    var n: inteiro = inteiro(v * 255.0)
+    se n < 0 {
+        retorna 0
+    }
+    se n > 255 {
+        retorna 255
+    }
+    retorna n
+}
+
+funcao renderizar(largura: inteiro, altura: inteiro): dicionario {
+    var esferas: Esfera[] = [
+        Esfera(-1.1, 0.2, -3.5, 0.9, 0.25, 0.85, 0.45),
+        Esfera(1.1, 0.0, -3.2, 0.75, 0.85, 0.30, 0.35),
+        Esfera(0.0, -100.8, -3.5, 100.0, 0.65, 0.70, 0.72)
+    ]
+    var luz: Alg.Vetor3 = Alg.Vetor3(-4.0, 6.0, 1.0).normalizar()
+    var orig: Alg.Vetor3 = Alg.Vetor3(0.0, 0.4, 0.5)
+    var somaR: inteiro = 0
+    var somaG: inteiro = 0
+    var somaB: inteiro = 0
+    var acertos: inteiro = 0
+
+    para (var y: inteiro = 0; y < altura; y++) {
+        var ny: real = 1.0 - 2.0 * (real(y) + 0.5) / real(altura)
+        para (var x: inteiro = 0; x < largura; x++) {
+            var nx: real = (2.0 * (real(x) + 0.5) / real(largura) - 1.0) * (real(largura) / real(altura))
+            var dir: Alg.Vetor3 = Alg.Vetor3(nx, ny, -1.6).normalizar()
+
+            var melhorT: real = 1000000.0
+            var atingida: inteiro = -1
+            para (var i: inteiro = 0; i < tamanho(esferas); i++) {
+                var t: real = esferas[i].intersecao(orig, dir)
+                se t > 0.0 e t < melhorT {
+                    melhorT = t
+                    atingida = i
+                }
+            }
+
+            var cr: real = 0.12
+            var cg: real = 0.18
+            var cb: real = 0.26
+            se atingida >= 0 {
+                acertos = acertos + 1
+                var esf: Esfera = esferas[atingida]
+                var ponto: Alg.Vetor3 = orig.somar(dir.escalar(melhorT))
+                var normal: Alg.Vetor3 = ponto.subtrair(esf.centro).normalizar()
+                var difusa: real = normal.produtoEscalar(luz)
+                se difusa < 0.0 {
+                    difusa = 0.0
+                }
+                // Sombra simples
+                var emSombra: logico = falso
+                para (var j: inteiro = 0; j < tamanho(esferas); j++) {
+                    se j != atingida e esferas[j].intersecao(ponto, luz) > 0.0 {
+                        emSombra = verdadeiro
+                        sustar
+                    }
+                }
+                var intensidade: real = emSombra ? 0.15 : (0.15 + 0.85 * difusa)
+                cr = esf.r * intensidade
+                cg = esf.g * intensidade
+                cb = esf.b * intensidade
+            }
+            somaR = somaR + limitarByte(cr)
+            somaG = somaG + limitarByte(cg)
+            somaB = somaB + limitarByte(cb)
+        }
+    }
+    retorna { acertos: acertos, checksum: somaR * 3 + somaG * 5 + somaB * 7 }
+}
+
+funcao main(): vazio {
+    var t0: real = TempoMod.Tempo.agoraMs()
+    var res: dicionario = renderizar(160, 90)
+    var dt: real = TempoMod.Tempo.agoraMs() - t0
+    assercao(res["acertos"] > 1000 e res["checksum"] > 0)
+    escreva("RAYTRACER-OK pixels=14400 acertos=", res["acertos"], " checksum=", res["checksum"], " ms=", inteiro(dt), "\n")
+}
+
+main()

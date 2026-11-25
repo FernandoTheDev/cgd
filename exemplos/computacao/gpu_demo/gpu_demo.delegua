@@ -1,0 +1,49 @@
+//# 0
+//? saida: GPU_DEMO_OK
+// Exemplo completo GPU: descoberta CPU/Vulkan, buffers, kernels e comparação verificada
+importar cgd.computacao.gpu como GPU
+
+const devs = GPU.descobrirDispositivos()
+assercao(tamanho(devs) >= 1)
+
+const filaCpu = GPU.criarFila(falso)
+const filaGpu = GPU.criarFila(verdadeiro)
+
+const n: inteiro = 256
+var dadosA: real[] = []
+var dadosB: real[] = []
+para var i: inteiro = 0; i < n; i = i + 1 {
+    dadosA.adicionar(real(i) * 0.5)
+    dadosB.adicionar(real(n - i) * 0.25)
+}
+
+const a1 = filaCpu.criarBuffer(n, "cf64")
+const b1 = filaCpu.criarBuffer(n, "cf64")
+const out1 = filaCpu.criarBuffer(n, "cf64")
+a1.enviar(dadosA)
+b1.enviar(dadosB)
+const ev1 = filaCpu.somar(a1, b1, out1)
+
+const a2 = filaGpu.criarBuffer(n, "cf64")
+const b2 = filaGpu.criarBuffer(n, "cf64")
+const out2 = filaGpu.criarBuffer(n, "cf64")
+a2.enviar(dadosA)
+b2.enviar(dadosB)
+const ev2 = filaGpu.somar(a2, b2, out2)
+
+para var i: inteiro = 0; i < n; i = i + 1 {
+    assercao(Matematica.absoluto(out1.obter(i) - out2.obter(i)) < 0.0000001)
+}
+
+const dot1 = filaCpu.produtoEscalar(a1, b1)
+const dot2 = filaGpu.produtoEscalar(a2, b2)
+assercao(Matematica.absoluto(dot1 - dot2) < 0.000001)
+
+a1.liberar()
+b1.liberar()
+out1.liberar()
+a2.liberar()
+b2.liberar()
+out2.liberar()
+
+escreva("GPU_DEMO_OK dispositivos=", tamanho(devs), " dot=", dot1)

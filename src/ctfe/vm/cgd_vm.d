@@ -13,6 +13,7 @@ enum CGDTypeKind : ubyte
     Texto,
     Real,
     Logico,
+    Vetor,
 }
 
 struct CGDValue
@@ -24,12 +25,48 @@ struct CGDValue
         dstring s;
         double d;
         bool b1;
+        CGDValue[] arr;
     }
 
-    static CGDValue inteiro(long n) => CGDValue(CGDTypeKind.Inteiro, i: n);
-    static CGDValue real_(double n) => CGDValue(CGDTypeKind.Real, d: n);
-    static CGDValue logico(bool n) => CGDValue(CGDTypeKind.Logico, b1: n);
-    static CGDValue texto(dstring n) => CGDValue(CGDTypeKind.Texto, s: n);
+    static CGDValue inteiro(long n)
+    {
+        CGDValue v;
+        v.type = CGDTypeKind.Inteiro;
+        v.i = n;
+        return v;
+    }
+
+    static CGDValue real_(double n)
+    {
+        CGDValue v;
+        v.type = CGDTypeKind.Real;
+        v.d = n;
+        return v;
+    }
+
+    static CGDValue logico(bool n)
+    {
+        CGDValue v;
+        v.type = CGDTypeKind.Logico;
+        v.b1 = n;
+        return v;
+    }
+
+    static CGDValue texto(dstring n)
+    {
+        CGDValue v;
+        v.type = CGDTypeKind.Texto;
+        v.s = n;
+        return v;
+    }
+
+    static CGDValue vetor(CGDValue[] elems)
+    {
+        CGDValue v;
+        v.type = CGDTypeKind.Vetor;
+        v.arr = elems;
+        return v;
+    }
 }
 
 enum VMOpCode : ubyte
@@ -50,6 +87,7 @@ enum VMOpCode : ubyte
     Mul,
     Div,
     IDiv,
+    Pow,
     Le,
     Lt,
     Mod,
@@ -67,6 +105,10 @@ enum VMOpCode : ubyte
     Neg,
     Not,
     BNot,
+
+    MakeArray,
+    IndexGet,
+    Dup,
 
     Call,
     Ret,
@@ -132,9 +174,9 @@ alias VMHandleFn = void function(VMInstruction*, VM*);
 enum VMOpCode[] OpCodes = [EnumMembers!VMOpCode];
 const VMHandleFn[OpCodes.length] handlers = [
     &vmLoadParam, &vmLoad, &vmStore, &vmValidate, &vmPush, &vmJmp, &vmJz, &vmJnz, &vmAdd,
-    &vmSub, &vmMul, &vmDiv, &vmIDiv, &vmLe, &vmLt, &vmMod, &vmGt, &vmGe, &vmEq, &vmNeq,
-    &vmBAnd, &vmBOr, &vmBXor, &vmShl, &vmShr, &vmNeg, &vmNot, &vmBNot, &vmCall, &vmRet, &vmHalt,
-    &vmDrop,
+    &vmSub, &vmMul, &vmDiv, &vmIDiv, &vmPow, &vmLe, &vmLt, &vmMod, &vmGt, &vmGe, &vmEq, &vmNeq,
+    &vmBAnd, &vmBOr, &vmBXor, &vmShl, &vmShr, &vmNeg, &vmNot, &vmBNot, &vmMakeArray, &vmIndexGet,
+    &vmDup, &vmCall, &vmRet, &vmHalt, &vmDrop,
 ];
 
 // validação
@@ -231,7 +273,8 @@ pragma(inline, true) private long coerceToInteiro(CGDValue v)
         case CGDTypeKind.Logico:
             return v.b1 ? 1 : 0;
         case CGDTypeKind.Texto:
-            throw new Exception("operador bitwise nao suporta Texto");
+        case CGDTypeKind.Vetor:
+            throw new Exception("operador bitwise nao suporta Texto/Vetor");
     }
 }
 
@@ -244,6 +287,7 @@ pragma(inline, true) private bool isTruthy(CGDValue v)
         case CGDTypeKind.Inteiro:
         case CGDTypeKind.Real:
         case CGDTypeKind.Texto:
+        case CGDTypeKind.Vetor:
             return true;
     }
 }
@@ -276,7 +320,8 @@ void vmAdd(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Logico:
-            throw new Exception("operador + nao suportado entre Logico e Logico");
+        case CGDTypeKind.Vetor:
+            throw new Exception("operador + nao suportado para este tipo");
     }
 
 }
@@ -301,7 +346,8 @@ void vmSub(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            throw new Exception("operador - nao suportado para Texto");
+        case CGDTypeKind.Vetor:
+            throw new Exception("operador - nao suportado para Texto/Vetor");
 
         case CGDTypeKind.Logico:
             throw new Exception("operador - nao suportado para Logico");
@@ -329,7 +375,8 @@ void vmMul(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            throw new Exception("operador * nao suportado para Texto");
+        case CGDTypeKind.Vetor:
+            throw new Exception("operador * nao suportado para Texto/Vetor");
 
         case CGDTypeKind.Logico:
             throw new Exception("operador * nao suportado para Logico");
@@ -358,7 +405,8 @@ void vmDiv(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            throw new Exception("operador / nao suportado para Texto");
+        case CGDTypeKind.Vetor:
+            throw new Exception("operador / nao suportado para Texto/Vetor");
 
         case CGDTypeKind.Logico:
             throw new Exception("operador / nao suportado para Logico");
@@ -387,6 +435,49 @@ void vmIDiv(VMInstruction* instr, VM* vm)
         throw new Exception("Divisão inteira exige números.");
 }
 
+void vmPow(VMInstruction* instr, VM* vm)
+{
+    import std.math : pow, isFinite;
+
+    CGDValue right = vm.pop();
+    CGDValue left = vm.pop();
+    promote(left, right);
+    if (left.type == CGDTypeKind.Inteiro && right.i >= 0 && right.i <= 62)
+    {
+        long acc = 1;
+        long base = left.i;
+        long exp = right.i;
+        while (exp > 0)
+        {
+            if (exp & 1)
+            {
+                bool ov;
+                acc = muls(acc, base, ov);
+                enforce(!ov, "Overflow na potência inteira em CTFE.");
+            }
+            exp >>= 1;
+            if (exp > 0)
+            {
+                bool ov;
+                base = muls(base, base, ov);
+                enforce(!ov, "Overflow na potência inteira em CTFE.");
+            }
+        }
+        vm.push(CGDValue.inteiro(acc));
+        return;
+    }
+    if (left.type == CGDTypeKind.Inteiro || left.type == CGDTypeKind.Real)
+    {
+        double lv = left.type == CGDTypeKind.Real ? left.d : cast(double) left.i;
+        double rv = right.type == CGDTypeKind.Real ? right.d : cast(double) right.i;
+        double res = pow(lv, rv);
+        enforce(isFinite(res), "Potência não finita em CTFE.");
+        vm.push(CGDValue.real_(res));
+        return;
+    }
+    throw new Exception("operador ** exige números em CTFE.");
+}
+
 void vmMod(VMInstruction* instr, VM* vm)
 {
     CGDValue right = vm.pop();
@@ -404,7 +495,8 @@ void vmMod(VMInstruction* instr, VM* vm)
             throw new Exception("Módulo real não é suportado pelo runtime.");
 
         case CGDTypeKind.Texto:
-            throw new Exception("operador % nao suportado para Texto");
+        case CGDTypeKind.Vetor:
+            throw new Exception("operador % nao suportado para Texto/Vetor");
 
         case CGDTypeKind.Logico:
             throw new Exception("operador % nao suportado para Logico");
@@ -433,7 +525,8 @@ void vmLt(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Logico:
-            throw new Exception("operador < nao suportado para Logico");
+        case CGDTypeKind.Vetor:
+            throw new Exception("operador < nao suportado para Logico/Vetor");
     }
 
 }
@@ -459,7 +552,8 @@ void vmLe(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Logico:
-            throw new Exception("operador <= nao suportado para Logico");
+        case CGDTypeKind.Vetor:
+            throw new Exception("operador <= nao suportado para Logico/Vetor");
     }
 
 }
@@ -485,7 +579,8 @@ void vmGt(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Logico:
-            throw new Exception("operador > nao suportado para Logico");
+        case CGDTypeKind.Vetor:
+            throw new Exception("operador > nao suportado para Logico/Vetor");
     }
 
 }
@@ -511,7 +606,8 @@ void vmGe(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Logico:
-            throw new Exception("operador >= nao suportado para Logico");
+        case CGDTypeKind.Vetor:
+            throw new Exception("operador >= nao suportado para Logico/Vetor");
     }
 
 }
@@ -546,6 +642,9 @@ void vmEq(VMInstruction* instr, VM* vm)
         case CGDTypeKind.Logico:
             vm.push(CGDValue.logico(left.b1 == right.b1));
             break;
+
+        case CGDTypeKind.Vetor:
+            throw new Exception("Comparação direta de vetores preservada para runtime.");
     }
 
 }
@@ -580,6 +679,9 @@ void vmNeq(VMInstruction* instr, VM* vm)
         case CGDTypeKind.Logico:
             vm.push(CGDValue.logico(left.b1 != right.b1));
             break;
+
+        case CGDTypeKind.Vetor:
+            throw new Exception("Comparação direta de vetores preservada para runtime.");
     }
 
 }
@@ -659,7 +761,8 @@ void vmNeg(VMInstruction* instr, VM* vm)
             break;
 
         case CGDTypeKind.Texto:
-            throw new Exception("operador unario - nao suportado para Texto");
+        case CGDTypeKind.Vetor:
+            throw new Exception("operador unario - nao suportado para Texto/Vetor");
 
         case CGDTypeKind.Logico:
             throw new Exception("operador unario - nao suportado para Logico");
@@ -680,6 +783,7 @@ void vmNot(VMInstruction* instr, VM* vm)
         case CGDTypeKind.Inteiro:
         case CGDTypeKind.Real:
         case CGDTypeKind.Texto:
+        case CGDTypeKind.Vetor:
             vm.push(CGDValue.logico(!isTruthy(v)));
             break;
     }
@@ -693,6 +797,51 @@ void vmBNot(VMInstruction* instr, VM* vm)
     long l = coerceToInteiro(v);
 
     vm.push(CGDValue.inteiro(~l));
+}
+
+void vmMakeArray(VMInstruction* instr, VM* vm)
+{
+    size_t count = instr.param;
+    if (count > 4096)
+        throw new CTFELimitException("Limite de elementos de vetor constante na CTFE excedido.");
+    CGDValue[] elems = new CGDValue[count];
+    foreach_reverse (size_t i; 0 .. count)
+        elems[i] = vm.pop();
+    vm.push(CGDValue.vetor(elems));
+}
+
+void vmIndexGet(VMInstruction* instr, VM* vm)
+{
+    CGDValue idxVal = vm.pop();
+    CGDValue container = vm.pop();
+    enforce(idxVal.type == CGDTypeKind.Inteiro, "Índice em CTFE exige inteiro.");
+    long idx = idxVal.i;
+    if (container.type == CGDTypeKind.Vetor)
+    {
+        long len = cast(long) container.arr.length;
+        if (idx < 0)
+            idx += len;
+        enforce(idx >= 0 && idx < len, "Índice fora dos limites em vetor constante CTFE.");
+        vm.push(container.arr[cast(size_t) idx]);
+        return;
+    }
+    if (container.type == CGDTypeKind.Texto)
+    {
+        long len = cast(long) container.s.length;
+        if (idx < 0)
+            idx += len;
+        enforce(idx >= 0 && idx < len, "Índice fora dos limites em texto constante CTFE.");
+        dchar ch = container.s[cast(size_t) idx];
+        vm.push(CGDValue.texto([ch].idup));
+        return;
+    }
+    throw new Exception("Indexação em CTFE exige vetor ou texto.");
+}
+
+void vmDup(VMInstruction* instr, VM* vm)
+{
+    enforce(vm.stack.length > 0, "CTFE: pilha vazia em Dup.");
+    vm.push(vm.stack[$ - 1]);
 }
 
 void vmHalt(VMInstruction* instr, VM* vm)
@@ -718,6 +867,8 @@ pragma(inline, true) void vmHandle(VM* vm)
 
 pragma(inline, true) void promote(ref CGDValue left, ref CGDValue right)
 {
+    if (left.type == CGDTypeKind.Vetor || right.type == CGDTypeKind.Vetor)
+        return;
     // A formatação de valores mistos usa o runtime; não aproxime sua representação.
     if ((left.type == CGDTypeKind.Texto || right.type == CGDTypeKind.Texto) && left.type != right.type)
         throw new Exception("Conversão textual mista preservada para execução nativa.");
@@ -739,6 +890,7 @@ pragma(inline, true) void promote(ref CGDValue left, ref CGDValue right)
                     return;
 
                 case CGDTypeKind.Texto:
+                case CGDTypeKind.Vetor:
                     return;
             }
 
@@ -757,6 +909,7 @@ pragma(inline, true) void promote(ref CGDValue left, ref CGDValue right)
                     return;
 
                 case CGDTypeKind.Texto:
+                case CGDTypeKind.Vetor:
                     return;
             }
 
@@ -775,10 +928,12 @@ pragma(inline, true) void promote(ref CGDValue left, ref CGDValue right)
                     return;
 
                 case CGDTypeKind.Texto:
+                case CGDTypeKind.Vetor:
                     return;
             }
 
         case CGDTypeKind.Texto:
+        case CGDTypeKind.Vetor:
             return;
     }
 }

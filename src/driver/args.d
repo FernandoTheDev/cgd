@@ -3,8 +3,9 @@ module driver.args;
 struct CGDArguments
 {
     bool help, showVersion, showDebug, showHelp, opt, showPerf;
-    bool checkOnly, emitC;
+    bool checkOnly, emitC, debugInfo, memReport;
     string explain;
     string output, diagnostics = "texto", cc, target, sysroot, runtimeRoot, runtimeObject, pkgConfig;
-    string[] cFlags, linkFlags;
+    string debugMapPath, gcBackend, memOpts, memReportPath;
+    string[] cFlags, linkFlags, moduleRoots, nativePackages, extraObjects, features;
 }

@@ -36,9 +36,36 @@ def main():
     parser.add_argument("--once", action="store_true", help="Usa somente o modo sem -o.")
     parser.add_argument("--examples-dir", type=Path, default=ROOT / "exemplos")
     args = parser.parse_args()
-    files = sorted(args.examples_dir.rglob("*.delegua"))
+    project_manifests = sorted(args.examples_dir.rglob("projeto.json"))
+    project_dirs = [m.parent.resolve() for m in project_manifests]
+
+    def in_project(path: Path) -> bool:
+        resolved = path.resolve()
+        return any(resolved.is_relative_to(pdir) for pdir in project_dirs)
+
+    files = [f for f in sorted(args.examples_dir.rglob("*.delegua")) if not in_project(f)]
     failures = []
     checks = 0
+    for manifest in project_manifests:
+        pdir = manifest.parent
+        env = dict(os.environ)
+        env.setdefault("SDL_VIDEODRIVER", "dummy")
+        data = manifest.read_text()
+        if '"gtk4"' in data and not (env.get("DISPLAY") or env.get("WAYLAND_DISPLAY")):
+            compiled = run([str(args.compiler.resolve()), "compilar", "--forcar"], cwd=pdir, env=env)
+            if compiled.returncode != 0:
+                failures.append(f"{pdir.relative_to(ROOT)}: compilar falhou: {compiled.stderr}")
+            checks += 1
+            continue
+        executed = run([str(args.compiler.resolve()), "rodar", "--forcar", "--", "--teste"], cwd=pdir, env=env)
+        if executed.returncode != 0:
+            failures.append(f"{pdir.relative_to(ROOT)}: rodar --teste falhou: {executed.stderr}{executed.stdout}")
+        checks += 1
+        if (pdir / "testes").is_dir():
+            tested = run([str(args.compiler.resolve()), "testar"], cwd=pdir, env=env)
+            if tested.returncode != 0:
+                failures.append(f"{pdir.relative_to(ROOT)}: testar falhou: {tested.stderr}{tested.stdout}")
+            checks += 1
     with tempfile.TemporaryDirectory(prefix="cgd exemplos ") as tmp:
         for index, file in enumerate(files):
             lines = file.read_text().splitlines()

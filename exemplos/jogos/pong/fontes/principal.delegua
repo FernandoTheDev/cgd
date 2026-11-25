@@ -1,0 +1,110 @@
+modulo principal
+
+importar cgd.interface.sdl como SDL
+importar cgd.nativo como Nat
+
+funcao main(): vazio {
+    var args: texto[] = Nat.Primitivas.sistemaArgumentos()
+    var maxQuadros: inteiro = -1
+    para cada a: texto em args {
+        se a == "--teste" {
+            maxQuadros = 30
+        }
+    }
+
+    SDL.inicializar(falso)
+    tente {
+        var janela: SDL.Janela = SDL.Janela("Pong CGD (SDL3)", 800, 480, verdadeiro)
+        var rend: SDL.Renderizador = janela.criarRenderizador()
+        rend.definirEscalaLogica(800, 480)
+
+        var raqEsqY: real = 190.0
+        var raqDirY: real = 190.0
+        var bolaX: real = 400.0
+        var bolaY: real = 240.0
+        var vx: real = 6.0
+        var vy: real = 3.5
+        var pontosEsq: inteiro = 0
+        var pontosDir: inteiro = 0
+        var quadros: inteiro = 0
+        var executando: logico = verdadeiro
+
+        enquanto executando {
+            para cada ev: SDL.EventoSDL em SDL.obterEventos() {
+                se ev.ehSaida() ou (ev.ehTeclaPressionada() e ev.tecla == "Escape") {
+                    executando = falso
+                }
+            }
+            se SDL.teclaPressionada("W") e raqEsqY > 10.0 {
+                raqEsqY = raqEsqY - 7.0
+            }
+            se SDL.teclaPressionada("S") e raqEsqY < 370.0 {
+                raqEsqY = raqEsqY + 7.0
+            }
+
+            // IA simples da raquete direita
+            se bolaY > raqDirY + 55.0 e raqDirY < 370.0 {
+                raqDirY = raqDirY + 5.0
+            } senao se bolaY < raqDirY + 45.0 e raqDirY > 10.0 {
+                raqDirY = raqDirY - 5.0
+            }
+
+            // Física da bola
+            bolaX = bolaX + vx
+            bolaY = bolaY + vy
+            se bolaY <= 10.0 ou bolaY >= 460.0 {
+                vy = -vy
+            }
+            se bolaX <= 38.0 e bolaX >= 20.0 e bolaY + 12.0 >= raqEsqY e bolaY <= raqEsqY + 100.0 {
+                vx = vx < 0.0 ? -vx : vx
+            }
+            se bolaX >= 750.0 e bolaX <= 768.0 e bolaY + 12.0 >= raqDirY e bolaY <= raqDirY + 100.0 {
+                vx = vx > 0.0 ? -vx : vx
+            }
+            se bolaX < 0.0 {
+                pontosDir = pontosDir + 1
+                bolaX = 400.0
+                bolaY = 240.0
+                vx = 6.0
+            } senao se bolaX > 800.0 {
+                pontosEsq = pontosEsq + 1
+                bolaX = 400.0
+                bolaY = 240.0
+                vx = -6.0
+            }
+
+            // Renderização em lote (raquetes + bola + linha central tracejada)
+            rend.definirCor(15, 22, 20, 255)
+            rend.limpar()
+            rend.definirCor(70, 220, 140, 255)
+            var lote: real[] = [
+                24.0, raqEsqY, 14.0, 100.0,
+                762.0, raqDirY, 14.0, 100.0,
+                bolaX, bolaY, 14.0, 14.0
+            ]
+            para (var y: inteiro = 10; y < 470; y += 28) {
+                lote.adicionar(398.0)
+                lote.adicionar(real(y))
+                lote.adicionar(4.0)
+                lote.adicionar(14.0)
+            }
+            rend.preencherRetangulosLote(lote)
+            rend.apresentar()
+
+            quadros = quadros + 1
+            se maxQuadros > 0 e quadros >= maxQuadros {
+                sustar
+            }
+            SDL.atrasar(16)
+        }
+        se maxQuadros > 0 {
+            escreva("PONG-SDL-OK quadros=", quadros, " bolaX=", inteiro(bolaX), "\n")
+        }
+        rend.fechar()
+        janela.fechar()
+    } finalmente {
+        SDL.finalizar()
+    }
+}
+
+main()

@@ -1,0 +1,93 @@
+modulo principal
+
+importar cgd.interface.tui como TUI
+importar cgd.interface.terminal como Term
+importar cgd.nativo como Nat
+
+funcao renderizarPainel(tela: TUI.Tela, tarefas: dicionario[], menu: TUI.Menu): inteiro {
+    tela.limpar()
+    var estTit: texto = TUI.Estilo.rgb(110, 240, 160, -1, -1, -1, verdadeiro).codigoAnsi()
+    var estSel: texto = TUI.Estilo.rgb(15, 25, 20, 110, 230, 150, verdadeiro).codigoAnsi()
+    tela.caixa(0, 0, 64, 16, "Gerenciador de Tarefas CGD", "", estTit)
+
+    var concluidas: inteiro = 0
+    para cada item: dicionario em tarefas {
+        se item["feita"] {
+            concluidas = concluidas + 1
+        }
+    }
+    var frac: real = tamanho(tarefas) > 0 ? (real(concluidas) / real(tamanho(tarefas))) : 0.0
+    tela.escrever(2, 2, "Progresso: " + texto(concluidas) + "/" + texto(tamanho(tarefas)))
+    tela.barraProgresso(20, 2, 40, frac)
+
+    var rotulos: texto[] = []
+    para cada item: dicionario em tarefas {
+        var marca: texto = item["feita"] ? "[x] " : "[ ] "
+        rotulos.adicionar(marca + texto(item["titulo"]))
+    }
+    menu.itens = rotulos
+    menu.desenhar(tela, 2, 4, 58, 9, "", estSel)
+    tela.escrever(2, 14, "Setas: navegar | Espaço: alternar | Q: sair", estTit)
+    retorna tela.apresentar()
+}
+
+funcao main(): vazio {
+    var args: texto[] = Nat.Primitivas.sistemaArgumentos()
+    var teste: logico = falso
+    para cada a: texto em args {
+        se a == "--teste" {
+            teste = verdadeiro
+        }
+    }
+
+    var tarefas: dicionario[] = [
+        { titulo: "Sistema de projetos projeto.json", feita: verdadeiro },
+        { titulo: "Biblioteca TUI com double buffering", feita: verdadeiro },
+        { titulo: "Motor de Xadrez com IA", feita: verdadeiro },
+        { titulo: "Debugger nativo DAP", feita: falso }
+    ]
+    var menu: TUI.Menu = TUI.Menu([])
+
+    se teste ou !Term.Terminal.ehInterativo() {
+        var telaSim: TUI.Tela = TUI.Tela(64, 16, verdadeiro, verdadeiro)
+        var alt: inteiro = renderizarPainel(telaSim, tarefas, menu)
+        assercao(alt > 0)
+        var txt: texto = telaSim.renderizarTexto()
+        assercao(txt.contem("Gerenciador de Tarefas CGD") e txt.contem("Progresso: 3/4"))
+        escreva("TAREFAS-TUI-OK\n")
+        retorna
+    }
+
+    var tela: TUI.Tela = TUI.Tela(64, 16, falso, verdadeiro)
+    tela.iniciar(falso)
+    tente {
+        enquanto verdadeiro {
+            renderizarPainel(tela, tarefas, menu)
+            var ev: qualquer = tela.lerEvento(250)
+            se ev == nulo {
+                continua
+            }
+            se ev["tipo"] == "eof" {
+                sustar
+            }
+            se ev["tipo"] == "tecla" {
+                var t: texto = ev["tecla"]
+                se t == "q" ou t == "Q" ou t == "Escape" {
+                    sustar
+                }
+                se t == " " ou t == "Enter" {
+                    var idx: inteiro = menu.selecionado
+                    se idx >= 0 e idx < tamanho(tarefas) {
+                        tarefas[idx]["feita"] = !tarefas[idx]["feita"]
+                    }
+                } senao {
+                    menu.processarEvento(ev)
+                }
+            }
+        }
+    } finalmente {
+        tela.finalizar()
+    }
+}
+
+main()

@@ -1,0 +1,59 @@
+modulo principal
+
+importar cgd.rede.websocket como WS
+importar cgd.nativo como Nat
+
+classe SalaChat {
+    servidor: WS.ServidorWebSocket
+    mensagens: texto[]
+
+    construtor() {
+        isto.servidor = WS.ServidorWebSocket(5000)
+        isto.mensagens = []
+        isto.servidor.aoMensagem(isto.tratarMensagem)
+    }
+
+    tratarMensagem(conn: qualquer, msg: texto): vazio {
+        var linha: texto = "[#" + texto(conn.id()) + "] " + msg
+        isto.mensagens.adicionar(linha)
+        conn.enviarTexto("OK:" + linha)
+    }
+}
+
+assincrona funcao executarTeste(): vazio {
+    var sala: SalaChat = SalaChat()
+    sala.servidor.abrir("127.0.0.1", 0)
+    var porta: inteiro = sala.servidor.portaLocal()
+    var tarefa: Promessa<vazio> = sala.servidor.escutarAsync("127.0.0.1", porta)
+
+    var sock: qualquer = importar("cgd:sockets")
+    var cli: qualquer = aguardar sock.conectarAsync("127.0.0.1", porta, 5000)
+    aguardar cli.enviarAsync("GET /chat HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n", 5000)
+    var hs: texto = aguardar cli.receberAsync(4096, 5000)
+    assercao(hs.contem("101"))
+
+    aguardar cli.enviarAsync(WS.ProtocoloWS.codificarQuadro(WS.OpcodeWS.TEXTO, "Olá chat!", verdadeiro), 5000)
+    var raw: texto = aguardar cli.receberAsync(4096, 5000)
+    var dec: dicionario = WS.ProtocoloWS.decodificarQuadro(raw)
+    assercao(!dec["incompleto"] e dec["quadro"].payload == "OK:[#1] Olá chat!")
+
+    cli.fechar()
+    sala.servidor.fechar()
+    aguardar tarefa
+    escreva("CHAT-WS-OK\n")
+}
+
+funcao main(): vazio {
+    var args: texto[] = Nat.Primitivas.sistemaArgumentos()
+    para cada a: texto em args {
+        se a == "--teste" {
+            executarTeste()
+            retorna
+        }
+    }
+    var sala: SalaChat = SalaChat()
+    escreva("Servidor WebSocket de chat escutando em ws://127.0.0.1:8081\n")
+    sala.servidor.escutarAsync("127.0.0.1", 8081)
+}
+
+main()

@@ -127,6 +127,103 @@ enum MessageSpec routineTransfer = MessageSpec("E3403",
 enum MessageSpec routineAsync = MessageSpec("E3404",
             "Função assíncrona não pode ser iniciada diretamente com rotina; use chamada normal e aguardar.",
             "Corrotinas assíncronas executam no loop cooperativo da thread principal, não no pool paralelo.");
+
+// Compilação condicional e CTFE avançado (E35xx)
+enum MessageSpec conditionalNonConstant = MessageSpec("E3501",
+            "Condição de @quando deve ser uma expressão constante pura avaliável em compilação: %s.",
+            "Use apenas constantes literais, operadores puros e consultas de Compilacao.* em @quando(...).");
+enum MessageSpec conditionalArity = MessageSpec("E3502",
+            "O decorador @quando exige exatamente uma expressão lógica constante.",
+            "Escreva @quando(Compilacao.sistemaOperacional() == \"linux\") ou uma condição booleana constante.");
+enum MessageSpec invalidCompileQuery = MessageSpec("E3503",
+            "Consulta de compilação inválida ou desconhecida em Compilacao.%s.",
+            "Consultas disponíveis: sistemaOperacional, arquitetura, tamanhoPonteiro, abi, compiladorC, modo, temRecurso.");
+
+// Código nativo @nativo e tipos C (E36xx)
+enum MessageSpec nativeUnsupportedOp = MessageSpec("E3601",
+            "Operação incompatível com @nativo (sem fallback silencioso): %s.",
+            "Funções @nativo operam diretamente sobre tipos C, structs @pilha e containers nativos sem GC.");
+enum MessageSpec nativeInvalidType = MessageSpec("E3602",
+            "Tipo '%s' incompatível com função @nativo.",
+            "Use tipos C (ci8..ci64, cu8..cu64, cf32, cf64, csize, cbool, ...), structs @pilha ou containers nativos.");
+enum MessageSpec nativeForbiddenCall = MessageSpec("E3603",
+            "Chamada a '%s' proibida dentro de @nativo: exige runtime gerenciado/GC.",
+            "Marque o alvo como @nativo ou cruze a fronteira gerenciada fora da região nativa.");
+enum MessageSpec nativeUnsafeConversion = MessageSpec("E3604",
+            "Conversão implícita potencialmente insegura entre '%s' e '%s' em @nativo.",
+            "Use conversão explícita (ex.: ci32(valor), cf64(valor), csize(valor)) para deixar a intenção clara.");
+enum MessageSpec nativeInvalidTarget = MessageSpec("E3605",
+            "O decorador @nativo não pode ser aplicado neste alvo: %s.",
+            "@nativo aplica-se a funções e métodos concretos síncronos sem envelopes dinâmicos.");
+
+// Classes por valor @pilha / @valor (E37xx)
+enum MessageSpec valueClassInvalidStructure = MessageSpec("E3701",
+            "Classe @pilha '%s' incompatível com %s.",
+            "Tipos @pilha possuem layout C estático plano e não suportam herança dinâmica, interfaces, mesclas ou classes estrangeiras.");
+enum MessageSpec valueClassInvalidField = MessageSpec("E3702",
+            "Campo '%s' da classe @pilha '%s' exige tipo com layout estático conhecido; recebeu '%s'.",
+            "Use tipos C, escalares nativos (inteiro, real, logico), outros tipos @pilha ou containers nativos.");
+enum MessageSpec valueClassRecursive = MessageSpec("E3703",
+            "Recursão de layout detectada na classe @pilha '%s'.",
+            "Uma struct por valor não pode conter diretamente a si mesma com tamanho infinito.");
+enum MessageSpec valueClassInvalidFeature = MessageSpec("E3704",
+            "Recurso não permitido em classe @pilha '%s': %s.",
+            "Tipos @pilha exigem campos de instância concretos sem acessores dinâmicos nem campos estáticos.");
+
+// Ownership, empréstimos, escapes e lifetimes inferidos (E38xx)
+enum MessageSpec useAfterMove = MessageSpec("E3801",
+            "Uso da variável '%s' após transferência de ownership.",
+            "O recurso proprietário já foi movido; use .clonar() antes de transferir se precisar manter uma cópia.");
+enum MessageSpec useAfterFree = MessageSpec("E3802",
+            "Uso do recurso '%s' após liberação explícita.",
+            "Não acesse nem modifique um container ou recurso nativo depois de chamar liberar()/destruir().");
+enum MessageSpec forbiddenImplicitCopy = MessageSpec("E3803",
+            "Cópia implícita proibida para o tipo proprietário '%s'.",
+            "Recursos com ownership exclusivo não podem ser duplicados implicitamente; transfira ou chame .clonar().");
+enum MessageSpec danglingReturn = MessageSpec("E3804",
+            "Retorno de visão ou referência pendurada '%s' vinculada ao recurso local '%s'.",
+            "O recurso local é destruído ao sair da função; retorne um valor proprietário em vez de uma visão.");
+enum MessageSpec mutableBorrowConflict = MessageSpec("E3805",
+            "Conflito de empréstimo em '%s': não é possível modificar ou realocar enquanto '%s' estiver ativo.",
+            "Finalize o uso da visão/iteração ativa antes de alterar ou redimensionar o container proprietário.");
+enum MessageSpec unsafeEscape = MessageSpec("E3806",
+            "Escape inseguro de recurso ou visão '%s': %s.",
+            "Visões emprestadas e recursos locais não podem escapar por closures ou campos que vivem além do dono.");
+enum MessageSpec doubleFree = MessageSpec("E3807",
+            "Liberação duplicada demonstrável do recurso '%s'.",
+            "O recurso já foi liberado ou destruído neste caminho de execução.");
+enum MessageSpec uninitializedNativeUse = MessageSpec("E3808",
+            "Uso de variável ou recurso nativo '%s' antes de inicialização completa.",
+            "Inicialize todos os campos ou atribua um valor antes da primeira leitura.");
+enum MessageSpec nativeBoundsOrOverflow = MessageSpec("E3809",
+            "Acesso fora dos limites ou overflow de capacidade demonstrável em '%s': %s.",
+            "Garanta índices dentro de [0, tamanho) e capacidades positivas dentro do limite de 64 bits.");
+
+// Operadores personalizados @operador (E39xx)
+enum MessageSpec invalidOperatorSymbol = MessageSpec("E3901",
+            "Operador '%s' não é suportado em @operador(...).",
+            "Operadores suportados: +, -, *, /, %, ==, !=, <, <=, >, >=, [], []=, unario-, unario+, unario!.");
+enum MessageSpec invalidOperatorSignature = MessageSpec("E3902",
+            "Assinatura inválida para @operador(\"%s\") no método '%s': %s.",
+            "Binários e [] exigem 1 parâmetro; []= exige 2 parâmetros; unários exigem 0 parâmetros; não podem ser estáticos.");
+enum MessageSpec inaccessibleOperator = MessageSpec("E3903",
+            "Operador '%s' da classe '%s' não é acessível neste contexto.",
+            "Declare o método @operador como público (ou protegido quando usado em subclasse).");
+enum MessageSpec ambiguousOrDuplicateOperator = MessageSpec("E3904",
+            "Operador '%s' duplicado ou ambíguo: %s.",
+            "Defina apenas uma sobrecarga inequívoca para cada combinação de operador e tipos.");
+enum MessageSpec invalidOperatorReturn = MessageSpec("E3905",
+            "Operador relacional/igualdade '%s' em '%s' deve retornar logico ou cbool; recebeu '%s'.",
+            "Operadores ==, !=, <, <=, >, >= exigem retorno booleano para preservar coerência semântica.");
+enum MessageSpec incompatibleNativeOperator = MessageSpec("E3906",
+            "Operador '%s' de '%s' não pode ser invocado em contexto @nativo: %s.",
+            "Marque o método operador de uma classe @pilha como @nativo ou elegível para compilação nativa.");
+
+// GPU (E395x)
+enum MessageSpec gpuUnsupportedFeature = MessageSpec("E3951",
+            "Recurso incompatível com kernel @gpu: %s.",
+            "Kernels @gpu aceitam apenas operações numéricas determinísticas sobre tipos C escalares e buffers.");
+
 immutable MessageSpec[] messages = [
     routineTarget, routineEffect, routineTransfer, routineAsync, asyncBudget, asyncVoid,
     asyncContext, awaitOperand, asyncPure,
@@ -138,7 +235,14 @@ immutable MessageSpec[] messages = [
     implicitReturn, zeroDivision, integerOverflow, invalidIndex, typeContract, invalidOperation,
     invalidConversion, invalidShift, invalidSlice, unknownMember, immutableMutation, nullOperation,
     notCallable, impureState, invalidDestructor, inaccessibleMember, instanceMember, invalidArity,
-    invalidAssignment
+    invalidAssignment,
+    conditionalNonConstant, conditionalArity, invalidCompileQuery,
+    nativeUnsupportedOp, nativeInvalidType, nativeForbiddenCall, nativeUnsafeConversion, nativeInvalidTarget,
+    valueClassInvalidStructure, valueClassInvalidField, valueClassRecursive, valueClassInvalidFeature,
+    useAfterMove, useAfterFree, forbiddenImplicitCopy, danglingReturn, mutableBorrowConflict,
+    unsafeEscape, doubleFree, uninitializedNativeUse, nativeBoundsOrOverflow,
+    invalidOperatorSymbol, invalidOperatorSignature, inaccessibleOperator, ambiguousOrDuplicateOperator,
+    invalidOperatorReturn, incompatibleNativeOperator, gpuUnsupportedFeature
 ];
 
 const(MessageSpec)* lookupMessage(string code)

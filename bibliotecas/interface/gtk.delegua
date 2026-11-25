@@ -1,0 +1,407 @@
+// Wrappers GTK4 em português sobre ponte nativa opcional com handles geracionais seguros.
+
+@definicao(biblioteca = "cgd-gtk4", abi = "delegua")
+classe estrangeira PrimitivasGTK4 {
+    @definicao(simbolo = "delegua_gtk_app_criar")
+    appCriar(id: texto): inteiro;
+    @definicao(simbolo = "delegua_gtk_app_ao_ativar")
+    appAoAtivar(app: inteiro, tratar: funcao): vazio;
+    @definicao(simbolo = "delegua_gtk_app_executar")
+    appExecutar(app: inteiro): inteiro;
+    @definicao(simbolo = "delegua_gtk_app_sair")
+    appSair(app: inteiro): vazio;
+    @definicao(simbolo = "delegua_gtk_temporizador")
+    temporizador(ms: inteiro, tratar: funcao): inteiro;
+
+    @definicao(simbolo = "delegua_gtk_janela_criar")
+    janelaCriar(app: inteiro): inteiro;
+    @definicao(simbolo = "delegua_gtk_janela_titulo")
+    janelaTitulo(win: inteiro, titulo: texto): vazio;
+    @definicao(simbolo = "delegua_gtk_janela_tamanho")
+    janelaTamanho(win: inteiro, largura: inteiro, altura: inteiro): vazio;
+    @definicao(simbolo = "delegua_gtk_janela_conteudo")
+    janelaConteudo(win: inteiro, filho: inteiro): vazio;
+    @definicao(simbolo = "delegua_gtk_janela_cabecalho")
+    janelaCabecalho(win: inteiro, barra: inteiro): vazio;
+    @definicao(simbolo = "delegua_gtk_janela_mostrar")
+    janelaMostrar(win: inteiro): vazio;
+    @definicao(simbolo = "delegua_gtk_janela_fechar")
+    janelaFechar(win: inteiro): vazio;
+
+    @definicao(simbolo = "delegua_gtk_caixa_criar")
+    caixaCriar(vertical: logico, espacamento: inteiro): inteiro;
+    @definicao(simbolo = "delegua_gtk_caixa_adicionar")
+    caixaAdicionar(caixa: inteiro, filho: inteiro): vazio;
+    @definicao(simbolo = "delegua_gtk_caixa_remover")
+    caixaRemover(caixa: inteiro, filho: inteiro): vazio;
+
+    @definicao(simbolo = "delegua_gtk_widget_margem")
+    widgetMargem(w: inteiro, pixels: inteiro): vazio;
+    @definicao(simbolo = "delegua_gtk_widget_expandir")
+    widgetExpandir(w: inteiro, horizontal: logico, vertical: logico): vazio;
+    @definicao(simbolo = "delegua_gtk_widget_habilitado")
+    widgetHabilitado(w: inteiro, ativo: logico): vazio;
+    @definicao(simbolo = "delegua_gtk_widget_classe_css")
+    widgetClasseCss(w: inteiro, nomeClasse: texto): vazio;
+
+    @definicao(simbolo = "delegua_gtk_rotulo_criar")
+    rotuloCriar(conteudo: texto): inteiro;
+    @definicao(simbolo = "delegua_gtk_rotulo_definir")
+    rotuloDefinir(w: inteiro, conteudo: texto): vazio;
+    @definicao(simbolo = "delegua_gtk_rotulo_obter")
+    rotuloObter(w: inteiro): texto;
+
+    @definicao(simbolo = "delegua_gtk_botao_criar")
+    botaoCriar(rotulo: texto): inteiro;
+    @definicao(simbolo = "delegua_gtk_botao_rotulo")
+    botaoRotulo(w: inteiro, rotulo: texto): vazio;
+    @definicao(simbolo = "delegua_gtk_botao_ao_clicar")
+    botaoAoClicar(w: inteiro, tratar: funcao): vazio;
+    @definicao(simbolo = "delegua_gtk_botao_simular_clique")
+    botaoSimularClique(w: inteiro): vazio;
+
+    @definicao(simbolo = "delegua_gtk_campo_criar")
+    campoCriar(placeholder: texto): inteiro;
+    @definicao(simbolo = "delegua_gtk_campo_obter")
+    campoObter(w: inteiro): texto;
+    @definicao(simbolo = "delegua_gtk_campo_definir")
+    campoDefinir(w: inteiro, conteudo: texto): vazio;
+    @definicao(simbolo = "delegua_gtk_campo_ao_alterar")
+    campoAoAlterar(w: inteiro, tratar: funcao): vazio;
+
+    @definicao(simbolo = "delegua_gtk_area_texto_criar")
+    areaTextoCriar(): inteiro;
+    @definicao(simbolo = "delegua_gtk_area_texto_obter")
+    areaTextoObter(w: inteiro): texto;
+    @definicao(simbolo = "delegua_gtk_area_texto_definir")
+    areaTextoDefinir(w: inteiro, conteudo: texto): vazio;
+
+    @definicao(simbolo = "delegua_gtk_check_criar")
+    checkCriar(rotulo: texto): inteiro;
+    @definicao(simbolo = "delegua_gtk_check_marcado")
+    checkMarcado(w: inteiro): logico;
+    @definicao(simbolo = "delegua_gtk_check_definir")
+    checkDefinir(w: inteiro, marcado: logico): vazio;
+    @definicao(simbolo = "delegua_gtk_check_ao_alternar")
+    checkAoAlternar(w: inteiro, tratar: funcao): vazio;
+
+    @definicao(simbolo = "delegua_gtk_rolagem_criar")
+    rolagemCriar(): inteiro;
+    @definicao(simbolo = "delegua_gtk_rolagem_conteudo")
+    rolagemConteudo(w: inteiro, filho: inteiro): vazio;
+
+    @definicao(simbolo = "delegua_gtk_lista_criar")
+    listaCriar(): inteiro;
+    @definicao(simbolo = "delegua_gtk_lista_adicionar")
+    listaAdicionar(w: inteiro, filho: inteiro): vazio;
+    @definicao(simbolo = "delegua_gtk_lista_limpar")
+    listaLimpar(w: inteiro): vazio;
+    @definicao(simbolo = "delegua_gtk_lista_ao_selecionar")
+    listaAoSelecionar(w: inteiro, tratar: funcao): vazio;
+
+    @definicao(simbolo = "delegua_gtk_cabecalho_criar")
+    cabecalhoCriar(): inteiro;
+    @definicao(simbolo = "delegua_gtk_cabecalho_inicio")
+    cabecalhoInicio(w: inteiro, filho: inteiro): vazio;
+    @definicao(simbolo = "delegua_gtk_cabecalho_fim")
+    cabecalhoFim(w: inteiro, filho: inteiro): vazio;
+
+    @definicao(simbolo = "delegua_gtk_separador_criar")
+    separadorCriar(vertical: logico): inteiro;
+    @definicao(simbolo = "delegua_gtk_imagem_criar")
+    imagemCriar(caminho: texto): inteiro;
+    @definicao(simbolo = "delegua_gtk_aplicar_css")
+    aplicarCss(css: texto): logico;
+    @definicao(simbolo = "delegua_gtk_dialogo_mensagem")
+    dialogoMensagem(win: inteiro, titulo: texto, mensagem: texto): vazio;
+}
+
+classe Componente {
+    protegido {
+        _handle: inteiro
+    }
+
+    construtor(handle: inteiro) {
+        isto._handle = handle
+    }
+
+    idInterno(): inteiro {
+        retorna isto._handle
+    }
+
+    definirMargem(pixels: inteiro): Componente {
+        PrimitivasGTK4.widgetMargem(isto._handle, pixels)
+        retorna isto
+    }
+
+    definirExpandir(horizontal: logico = verdadeiro, vertical: logico = verdadeiro): Componente {
+        PrimitivasGTK4.widgetExpandir(isto._handle, horizontal, vertical)
+        retorna isto
+    }
+
+    definirHabilitado(ativo: logico): Componente {
+        PrimitivasGTK4.widgetHabilitado(isto._handle, ativo)
+        retorna isto
+    }
+
+    adicionarClasseCss(nomeClasse: texto): Componente {
+        PrimitivasGTK4.widgetClasseCss(isto._handle, nomeClasse)
+        retorna isto
+    }
+}
+
+classe Aplicacao {
+    privado {
+        _handle: inteiro
+    }
+
+    construtor(identificador: texto = "dev.cgd.aplicativo") {
+        isto._handle = PrimitivasGTK4.appCriar(identificador)
+    }
+
+    idInterno(): inteiro {
+        retorna isto._handle
+    }
+
+    aoAtivar(tratar: funcao): Aplicacao {
+        PrimitivasGTK4.appAoAtivar(isto._handle, tratar)
+        retorna isto
+    }
+
+    aoTemporizador(ms: inteiro, tratar: funcao): inteiro {
+        retorna PrimitivasGTK4.temporizador(ms, tratar)
+    }
+
+    executar(): inteiro {
+        retorna PrimitivasGTK4.appExecutar(isto._handle)
+    }
+
+    sair(): vazio {
+        PrimitivasGTK4.appSair(isto._handle)
+    }
+}
+
+classe Janela herda Componente {
+    construtor(aplicacao: Aplicacao) {
+        super(PrimitivasGTK4.janelaCriar(aplicacao.idInterno()))
+    }
+
+    definirTitulo(titulo: texto): Janela {
+        PrimitivasGTK4.janelaTitulo(isto._handle, titulo)
+        retorna isto
+    }
+
+    definirTamanho(largura: inteiro, altura: inteiro): Janela {
+        PrimitivasGTK4.janelaTamanho(isto._handle, largura, altura)
+        retorna isto
+    }
+
+    definirConteudo(filho: Componente): Janela {
+        PrimitivasGTK4.janelaConteudo(isto._handle, filho.idInterno())
+        retorna isto
+    }
+
+    definirBarraCabecalho(barra: Componente): Janela {
+        PrimitivasGTK4.janelaCabecalho(isto._handle, barra.idInterno())
+        retorna isto
+    }
+
+    mostrar(): Janela {
+        PrimitivasGTK4.janelaMostrar(isto._handle)
+        retorna isto
+    }
+
+    fechar(): vazio {
+        PrimitivasGTK4.janelaFechar(isto._handle)
+    }
+
+    mostrarMensagem(titulo: texto, mensagem: texto): vazio {
+        PrimitivasGTK4.dialogoMensagem(isto._handle, titulo, mensagem)
+    }
+}
+
+classe Caixa herda Componente {
+    construtor(vertical: logico = verdadeiro, espacamento: inteiro = 8) {
+        super(PrimitivasGTK4.caixaCriar(vertical, espacamento))
+    }
+
+    adicionar(filho: Componente): Caixa {
+        PrimitivasGTK4.caixaAdicionar(isto._handle, filho.idInterno())
+        retorna isto
+    }
+
+    remover(filho: Componente): Caixa {
+        PrimitivasGTK4.caixaRemover(isto._handle, filho.idInterno())
+        retorna isto
+    }
+}
+
+classe CaixaVertical herda Caixa {
+    construtor(espacamento: inteiro = 8) {
+        super(verdadeiro, espacamento)
+    }
+}
+
+classe CaixaHorizontal herda Caixa {
+    construtor(espacamento: inteiro = 8) {
+        super(falso, espacamento)
+    }
+}
+
+classe Rotulo herda Componente {
+    construtor(conteudo: texto = "") {
+        super(PrimitivasGTK4.rotuloCriar(conteudo))
+    }
+
+    definirTexto(conteudo: texto): Rotulo {
+        PrimitivasGTK4.rotuloDefinir(isto._handle, conteudo)
+        retorna isto
+    }
+
+    obterTexto(): texto {
+        retorna PrimitivasGTK4.rotuloObter(isto._handle)
+    }
+}
+
+classe Botao herda Componente {
+    construtor(rotulo: texto = "") {
+        super(PrimitivasGTK4.botaoCriar(rotulo))
+    }
+
+    definirRotulo(rotulo: texto): Botao {
+        PrimitivasGTK4.botaoRotulo(isto._handle, rotulo)
+        retorna isto
+    }
+
+    aoClicar(tratar: funcao): Botao {
+        PrimitivasGTK4.botaoAoClicar(isto._handle, tratar)
+        retorna isto
+    }
+
+    simularClique(): vazio {
+        PrimitivasGTK4.botaoSimularClique(isto._handle)
+    }
+}
+
+classe CampoTexto herda Componente {
+    construtor(placeholder: texto = "") {
+        super(PrimitivasGTK4.campoCriar(placeholder))
+    }
+
+    obterTexto(): texto {
+        retorna PrimitivasGTK4.campoObter(isto._handle)
+    }
+
+    definirTexto(conteudo: texto): CampoTexto {
+        PrimitivasGTK4.campoDefinir(isto._handle, conteudo)
+        retorna isto
+    }
+
+    aoAlterar(tratar: funcao): CampoTexto {
+        PrimitivasGTK4.campoAoAlterar(isto._handle, tratar)
+        retorna isto
+    }
+}
+
+classe AreaTexto herda Componente {
+    construtor() {
+        super(PrimitivasGTK4.areaTextoCriar())
+    }
+
+    obterTexto(): texto {
+        retorna PrimitivasGTK4.areaTextoObter(isto._handle)
+    }
+
+    definirTexto(conteudo: texto): AreaTexto {
+        PrimitivasGTK4.areaTextoDefinir(isto._handle, conteudo)
+        retorna isto
+    }
+}
+
+classe CaixaSelecao herda Componente {
+    construtor(rotulo: texto = "") {
+        super(PrimitivasGTK4.checkCriar(rotulo))
+    }
+
+    marcado(): logico {
+        retorna PrimitivasGTK4.checkMarcado(isto._handle)
+    }
+
+    definirMarcado(valor: logico): CaixaSelecao {
+        PrimitivasGTK4.checkDefinir(isto._handle, valor)
+        retorna isto
+    }
+
+    aoAlternar(tratar: funcao): CaixaSelecao {
+        PrimitivasGTK4.checkAoAlternar(isto._handle, tratar)
+        retorna isto
+    }
+}
+
+classe Rolagem herda Componente {
+    construtor() {
+        super(PrimitivasGTK4.rolagemCriar())
+    }
+
+    definirConteudo(filho: Componente): Rolagem {
+        PrimitivasGTK4.rolagemConteudo(isto._handle, filho.idInterno())
+        retorna isto
+    }
+}
+
+classe Lista herda Componente {
+    construtor() {
+        super(PrimitivasGTK4.listaCriar())
+    }
+
+    adicionar(filho: Componente): Lista {
+        PrimitivasGTK4.listaAdicionar(isto._handle, filho.idInterno())
+        retorna isto
+    }
+
+    limpar(): Lista {
+        PrimitivasGTK4.listaLimpar(isto._handle)
+        retorna isto
+    }
+
+    aoSelecionar(tratar: funcao): Lista {
+        PrimitivasGTK4.listaAoSelecionar(isto._handle, tratar)
+        retorna isto
+    }
+}
+
+classe BarraCabecalho herda Componente {
+    construtor() {
+        super(PrimitivasGTK4.cabecalhoCriar())
+    }
+
+    adicionarInicio(filho: Componente): BarraCabecalho {
+        PrimitivasGTK4.cabecalhoInicio(isto._handle, filho.idInterno())
+        retorna isto
+    }
+
+    adicionarFim(filho: Componente): BarraCabecalho {
+        PrimitivasGTK4.cabecalhoFim(isto._handle, filho.idInterno())
+        retorna isto
+    }
+}
+
+classe Separador herda Componente {
+    construtor(vertical: logico = falso) {
+        super(PrimitivasGTK4.separadorCriar(vertical))
+    }
+}
+
+classe Imagem herda Componente {
+    construtor(caminho: texto) {
+        super(PrimitivasGTK4.imagemCriar(caminho))
+    }
+}
+
+funcao aplicarCSS(css: texto): logico {
+    retorna PrimitivasGTK4.aplicarCss(css)
+}
+
+funcao temporizador(ms: inteiro, tratar: funcao): inteiro {
+    retorna PrimitivasGTK4.temporizador(ms, tratar)
+}

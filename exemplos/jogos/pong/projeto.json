@@ -1,0 +1,9 @@
+{
+  "nome": "pong-sdl",
+  "versao": "1.0.0",
+  "tipo": "sdl",
+  "entrada": "fontes/principal.delegua",
+  "saida": "compilacao/pong-sdl",
+  "compilacao": { "modo": "producao", "otimizacao": 2, "depuracao": false },
+  "bibliotecasNativas": ["sdl3"]
+}

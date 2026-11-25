@@ -1,0 +1,8 @@
+{
+  "nome": "tarefas-tui",
+  "versao": "1.0.0",
+  "tipo": "tui",
+  "entrada": "fontes/principal.delegua",
+  "saida": "compilacao/tarefas-tui",
+  "compilacao": { "modo": "producao", "otimizacao": 2, "depuracao": false }
+}

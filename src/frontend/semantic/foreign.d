@@ -42,7 +42,8 @@ void resolveForeignClass(ClassDecl declaration, Diagnostics diagnostics)
         diagnostics.error(declaration.pos, "FFI C exige @definicao(biblioteca=...).");
     foreach (dchar letter; declaration.foreignLibrary)
         if (!(letter >= 'a' && letter <= 'z' || letter >= 'A' && letter <= 'Z' || letter >= '0'
-                && letter <= '9' || letter == '_' || letter == '.' || letter == '+' || letter == '-'))
+                && letter <= '9' || letter == '_' || letter == '.' || letter == '+' || letter == '-'
+                || letter == ':' || letter == '/'))
             diagnostics.error(declaration.pos, "Nome de biblioteca C inválido.");
     bool instanceField;
     foreach (ClassField field; declaration.fields)
@@ -57,15 +58,25 @@ void resolveForeignClass(ClassDecl declaration, Diagnostics diagnostics)
     {
         dstring name = type is null ? "" : type.toStr();
         return name == "numero" || name == "número" || name == "real" || name == "inteiro"
-            || name == "longo" || name == "texto" || name == "logico" || name == "lógico" || result && name == "vazio";
+            || name == "longo" || name == "texto" || name == "logico" || name == "lógico"
+            || name == "ci8" || name == "cu8" || name == "ci16" || name == "cu16"
+            || name == "ci32" || name == "cu32" || name == "ci64" || name == "cu64"
+            || name == "cchar" || name == "cschar" || name == "cuchar"
+            || name == "cshort" || name == "cushort" || name == "cint" || name == "cuint"
+            || name == "clong" || name == "culong" || name == "csize"
+            || name == "cf32" || name == "cf64" || name == "cfloat" || name == "cdouble"
+            || name == "cbool" || name == "cponteiro" || (result && name == "vazio");
     }
 
+    bool classDeclared = boolMetadata(declaration.decorators, "declarado")
+        || metadata(declaration.decorators, "cabecalho").length > 0;
     foreach (FnDecl method; declaration.methods)
     {
         method.foreignManaged = abi == "delegua";
         method.foreignSymbol = prefix ~ metadata(method.decorators, "simbolo");
         method.foreignParallelSafe = declaration.foreignLibrary == "cgd-runtime"
             && method.foreignManaged && boolMetadata(method.decorators, "paralelo");
+        method.foreignDeclared = classDeclared || boolMetadata(method.decorators, "declarado");
         if (!identifier(method.foreignSymbol))
             diagnostics.error(method.pos, "FFI exige @definicao(simbolo=...) com identificador C válido.");
         if (!method.foreignManaged && !supported(method.type_expr, true))

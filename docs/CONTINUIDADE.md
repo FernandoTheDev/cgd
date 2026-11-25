@@ -1,3 +1,88 @@
+# Gerenciamento Híbrido de Memória e Coletor Especializado (`CGD-GC`) — 24/11/2026
+
+Solicitação ativa: projetar, implementar, integrar, testar, auditar, medir e documentar um sistema híbrido de gerenciamento de memória e garbage collector especializado (`CGD-GC`) nativo do runtime C99 do CGD (`vendor/delegua-runtime`), substituindo a dependência obrigatória do Boehm GC (`libgc`), preservando o Boehm como backend de referência (`--gc=boehm`), e integrando análise interprocedimental de escape, alocação automática em stack (`StackLocal`), liberação determinística (`DeterministicHeap`), fusão de coleções, desvirtualização de classes fechadas e Especialização Nativa Automática (ANS) — sem novas palavras-chave reservadas e sem modificar o DCC.
+
+## Implementação entregue
+
+- **Runtime C99 (`vendor/delegua-runtime/src/gc/` e integração total do runtime)**:
+  - Novos módulos: `cgd_gc.h`, `cgd_gc_internal.h`, `gc_platform.c`, `gc_radix.c`, `gc_regions.c`, `gc_allocator.c`, `gc_roots_threads.c`, `gc_collector.c`, `gc_verifier.c`, `gc_runtime_bridge.c`, `gc_boehm_compat.c`.
+  - Regiões *slab* de 64 KiB com cabeçalho de 0 B por objeto (24 classes `16 B .. 16 KiB`), Radix Map de 2 níveis (48 bits), TLABs *lock-free* por thread, coleta menor geracional (*nursery* adaptativo 8–32 MiB + *card table* 512 B + *LOS remembered set* + promoção $O(1)$), marcação paralela em heaps grandes, suporte nativo ao *fake stack* do ASan, `cgd_gc_free_deterministic`/`cgd_gc_free_det_value`, `cgd_gc_verify_heap` (`CGD_GC_PROFILE=verify`) e telemetria `p50/p95/p99/p99.9/max`.
+  - 100% dos arquivos `.c` do runtime migrados para `cgd_gc_*` (0 referências a `GC_*` fora de `gc_boehm_compat.c`); `build-runtime` gera `libdelegua_rt.o` (padrão `CGD-GC`, 0 dependência de `libgc`) e `libdelegua_rt_boehm.o` (referência).
+- **Compilador D (`src/`) — zero `auto` e zero novas keywords**:
+  - Novos módulos: `src/middle/memory_model.d`, `src/frontend/semantic/interprocedural.d` (grafo de chamadas + Tarjan SCC + ponto fixo + análise ANS e escape conservador), `src/middle/ans.d` (gerador ANS com aritmética verificada de 64 bits, limite de recursão 1024 e *safepoints* amortizados).
+  - Integrados: `src/backend/c/codegen.d` (scanner preciso de raízes globais/IC `cgd_gc_scan_generated_roots`, *safepoints* em laços, ANS, `delegua_init_stack_objeto`, `cgd_gc_free_det_value` com desenrolamento em `return`/`break`/`continue`, fusão `create_tupla`, `create_vetor_cap` e desvirtualização `delegua_chamar_metodo_fn`), `src/driver/{args,compile,toolchain}.d`, `src/cli.d` (`--gc=cgd|boehm`, `--opcoes-memoria`, `--relatorio-memoria`, `--relatorio-memoria-json`).
+- **Testes, Benchmarks e Documentação**:
+  - Suíte industrial C com oráculo baseado em propriedades (24.000 ops) e stress multithread: `vendor/delegua-runtime/tests/gc_suite.c`.
+  - Suíte end-to-end + fuzzing diferencial: `testes/gc_hibrido.py`.
+  - Benchmark de ablação A/B/C/D/E: `scripts/bench_gc_hibrido.py` (dados em `out/bench/`).
+  - Documentação: `docs/AUDITORIA_GC_HIBRIDO.md`, `docs/ARQUITETURA_MEMORIA_GC.md`, `docs/RELATORIO_FINAL_GC_HIBRIDO.md`.
+
+## Testes e resultados reais executados
+
+- `vendor/delegua-runtime/tests/gc_suite.c` (`CGD_GC_PROFILE=verify`): **OK** em Clang e GCC (`-O0/-O1/-O2/-O3`, `p50=11–12 us`, `p99=17–21 us`), **ASan+UBSan+LSan (0 erros, 0 vazamentos)** e **TSan (0 *data races* em 2.126 ciclos e 6 threads)**.
+- `dub test` (DMD e LDC2): **10/10 módulos**.
+- Suítes CGD: `gc_hibrido.py`, `driver.py` (26), `memoria.py` (9), `integracao.py` (439), `bibliotecas.py` (342), `stdlib.py` (122), `stdlib_avancada.py` (11), `rotinas.py` (15), `async_linguagem.py` (30), `assincronismo.py` (Clang/GCC/ASan/TSan), `enums.py`, `expansao.py`, `linguagem_nova.py`, `projetos_modulos.py` (17), `runtime_diagnosticos.py`, `processo.py`, `sockets.py`, `http_parser.py`, `servidor.py`, `lsp.py`, `lsp_projetos.py`, `dap.py` (3/3), `prompt_mestre_x.py` (314/314), `prompt_mestre_x_extremo.py`, `prompt_mestre_x_ide.py` (15/15) — **todas aprovadas**.
+- **DCC sem modificações (`/home/fernandodev/dcc`)**: `tests/run_tests.py` **86/86 aprovadas (0 falhas)**; `ldd` confirma `libgc=False`; assembly idêntico byte-a-byte entre A/B/C/D/E; tempo `hello_libc.c` **214,7 → 169,8 ms (1,26×)** com RSS **220,9 → 22,3 MB (-89,9%)**, `vm_pilha.c` **258,9 → 205,5 ms (1,26×)** com RSS **231,2 → 30,2 MB (-86,9%)**, `interpretador.c` **231,9 → 231,2 ms (1,00×)** com RSS **136,0 → 31,5 MB (-76,8%)**.
+- **Microbenchmarks & 118 exemplos elegíveis**: `ans_numeric_fib` **10,57×**, `stack_det_fusion_devirt` **1,61×**, `multithread_routines` **1,40×**, `graph_cycles_retention` **1,22×**, `alloc_nursery_churn` **1,18×**; 118 exemplos **520,9 → 454,7 ms (1,15×)** com RSS mediano **-7,7%**.
+
+## Pendências e próximos comandos sugeridos
+
+- Commits separados (primeiro no submódulo `vendor/delegua-runtime`, depois no repositório principal CGD) aguardam autorização explícita do usuário.
+- Para instalar globalmente o novo compilador e runtime sem dependência de `libgc`, executar `./instalar --no-build`.
+
+---
+
+# Prompt Mestre X (Revisão Definitiva) — CTFE Inteligente, `@nativo`, `@pilha`, Ownership/RAII Inferidos, `@operador`, GPU/ML, IDE e Testes Extremos — 23/11/2026
+
+Solicitação ativa: evoluir o CGD com CTFE expandido, compilação condicional estrutural (`@quando`, `Compilacao.*`), código nativo C99 direto (`@nativo`), tipos escalares C explícitos, classes por valor na pilha (`@pilha` / alias `@valor`), inferência estática de ownership/empréstimos/escapes/lifetimes/RAII, operadores personalizados (`@operador`), containers nativos, fronteira gerenciado ↔ nativo, computação GPU/Tensores/ML (`cgd.computacao.{gpu,tensores,ml}` + `@gpu`), gerador de documentação automática (`cgd documentar`), integração LSP/DAP/VS Code, 5 exemplos grandes e suíte massiva de 300+ testes independentes — **sem adicionar nenhuma nova palavra-chave reservada**.
+
+## Decisões arquiteturais registradas
+
+- **Zero novas keywords**: `src/frontend/lexer/keywords.d` inalterado (0 linhas modificadas); nenhuma keyword artificial na gramática VS Code.
+- **`@pilha` canônico + `@valor` alias**: ambas as anotações produzem classes por valor compiladas para `typedef struct` em C99.
+- **Preservação de contratos legados**: `destruir()` em classes gerenciadas GC mantém semântica idempotente; defaults tipados gerenciados preservados (`lackedExplicitInit` restringe `E3808` ao contexto `@nativo`).
+- **Relatório detalhado**: consultar `docs/ESPECIFICACAO_NATIVA_X.md` e `docs/RELATORIO_PROMPT_MESTRE_X.md`.
+
+## Implementação entregue
+
+- **Compilador D (`src/`)**:
+  - Novos módulos (todos sem `auto`): `src/driver/target_info.d`, `src/driver/docgen.d`, `src/frontend/conditional.d`, `src/frontend/semantic/value_types.d`, `src/frontend/semantic/native_validation.d`, `src/frontend/semantic/operators.d`, `src/frontend/semantic/ownership.d`, `src/frontend/semantic/gpu_validation.d`, `src/backend/c/native_codegen.d`.
+  - Módulos estendidos: `src/diagnostics/catalog.d` (`E3501`–`E3951`), `src/ctfe/{compile,context,vm/cgd_vm}.d`, `src/opt/constant_folding.d`, `src/frontend/{modules,type_sema,type_expr,type_registry,type_resolver}.d`, `src/frontend/parser/{parser,parse_decl,parse_expr,parse_type,ast}.d`, `src/frontend/semantic/{analyzer,declarations,defaults,foreign,pipeline,purity,static_safety}.d`, `src/middle/lowering.d`, `src/backend/c/{codegen,descriptors,foreign}.d`, `src/driver/{args,compile}.d`, `src/cli.d`, `src/main.d`, `src/lsp/{completion,server}.d`, `src/dap/server.d`.
+- **Runtime C (`vendor/delegua-runtime/`)**:
+  - `src/gpu_rt.c` (novo): descoberta dinâmica Vulkan (`dlopen("libvulkan.so.1")`) + backend nativo CPU C99 para buffers alinhados fora do GC e kernels numéricos/matmul/redução, compilado limpo sob `-std=c99 -Wall -Wextra -Werror -pedantic -Wconversion -Wshadow`.
+  - `src/delegua_rt.h`, `src/objetos.c`: `delegua_instanciar_sem_construtor` para boxing eficiente de `@pilha`.
+- **Biblioteca Padrão e Ferramentas**:
+  - `bibliotecas/computacao/{gpu,tensores,ml}.delegua` (formatadas com `--verificar-formatacao` e com exemplos executáveis validados via `cgd documentar --bibliotecas --validar`).
+  - `extensao-vscode/syntaxes/delegua.tmLanguage.json` e `extensao-vscode/snippets/delegua.json`.
+- **Exemplos e Testes Criados**:
+  - 5 exemplos grandes: `exemplos/nativo/algebra_vetorial/algebra_vetorial.delegua`, `exemplos/algoritmos/raytracer/fontes/nativo.delegua`, `exemplos/jogos/xadrez/fontes/perft_nativo.delegua`, `exemplos/computacao/ml_demo/ml_demo.delegua`, `exemplos/computacao/gpu_demo/gpu_demo.delegua`.
+  - 3 suítes novas: `testes/prompt_mestre_x.py` (314 casos independentes), `testes/prompt_mestre_x_ide.py` (15 casos LSP/DAP/VS Code), `testes/prompt_mestre_x_extremo.py` (matriz ABI, ASan+UBSan, oráculo diferencial e fuzzing).
+
+## Testes e benchmarks realmente executados
+
+- `testes/prompt_mestre_x.py`: **314/314** aprovados (46 CTFE/condicional, 46 `@nativo`/tipos C, 46 `@pilha`, 62 ownership/escapes/lifetimes, 46 `@operador`, 28 containers nativos, 22 interop/ABI, 18 GPU/ML/doc).
+- `testes/prompt_mestre_x_ide.py`: **15/15** aprovados (8 LSP, 4 DAP com breakpoint/variáveis dentro de `@nativo`, 3 extensão VS Code).
+- `testes/prompt_mestre_x_extremo.py`:
+  - Matriz ABI idêntica (`ABI_RES=891189`) em `clang -O0`, `clang -o`, `gcc -O0`, `gcc -o`, `tcc -O0`; Ray Tracer GCC (`0,390 ms`) vs Clang (`0,405 ms`) idêntico ao gerenciado (`36 ms`, **~90× speedup**) e C99 manual (`0,395 ms`, **~1,0× paridade**).
+  - Xadrez `perft_nativo.delegua`: `perft(1..4) = 20, 400, 8902, 197281` em **8,41–8,85 ms**.
+  - ASan + UBSan: 0 erros em `stress_raii` (1.500 ciclos), `raytracer nativo`, `perft_nativo`, `algebra_vetorial` e `gpu_demo`.
+  - Oráculo diferencial aleatório: 1.100 ops em `VetorNativo` + `MapaNativo` idênticas ao Python (`ORACULO=61707`).
+  - Fuzzing sintático/semântico: 250 programas aleatórios em 0,58s, **0 crashes**.
+- `cgd documentar --bibliotecas --formato markdown|html --validar`: 40 módulos gerados, 3/3 exemplos validados, 0 falhas.
+- Regressões completas em build **LDC2 release** (`dub build --compiler=ldc2 --build=release`):
+  - `(cd vendor/delegua-runtime && ./tests/run.sh)`: OK.
+  - `dub test --compiler=dmd --config=unittest` e `dub test --compiler=ldc2 --config=unittest`: 10/10 módulos.
+  - `driver.py` (26), `integracao.py` (439), `bibliotecas.py` (342), `stdlib.py` (122), `memoria.py` (9), `rotinas.py` (15), `assincronismo.py` (Clang/GCC/ASan/UBSan/TSan), `lsp.py`, `dap.py` (3/3), `exemplos.py` (**158 exemplos, 324 verificações, 0 falhas**).
+- Regressão DCC (`/home/fernandodev/dcc`): `build.sh` OK, `verify.sh` smoke fora da árvore (`DCC-OK`), **`86/86` verificações C99/ABI/linker vs GCC+Clang aprovadas** e `test_unidades` OK (4 exemplos extras pré-existentes no repo do DCC fora de `CASOS` em `test_examples.py`).
+
+## Pendências e próximos comandos sugeridos
+
+- Caso queira sincronizar o novo binário `cgd` (LDC2 release) e as novas bibliotecas `cgd.computacao.*` em `~/.delegua/cgd`, executar `./instalar --no-build`.
+- Commits separados (primeiro no submódulo `vendor/delegua-runtime`, depois no CGD) aguardam autorização explícita do usuário.
+- Evolução futura opcional: backend Vulkan compute SPIR-V real para execução em `VkQueue` (além da descoberta real Vulkan e execução CPU C99 auditável já entregues).
+
+---
+
 # Quarta Auditoria Técnica — Paralelismo Nativo, `cgd:memoria` e Otimização Profunda CGD × DCC (Ciclo IV — Prompt Mestre VIII) — 21/11/2026
 
 Solicitação ativa: auditar integralmente o runtime de rotinas do CGD (25 perguntas §4.1 com evidência de código e microbenchmarks), projetar e implementar a biblioteca padrão segura `cgd:memoria`, evoluir o runtime paralelo (`Bytes` congelado *zero-copy*, pool dinâmico configurável, detecção de recursos via afinidade/cgroups/RAM, `Processo.executarLote` e correções de thread-safety), e integrar tudo ao DCC Ciclo V reduzindo tempo e memória simultaneamente com determinismo bit a bit.
@@ -1648,3 +1733,57 @@ Não alegar equivalência total com o interpretador ou formatação via AST comp
 - Próximos passos concretos: conferir testes LSP expandidos; corrigir regressões;
   formatar; rodar DMD/LDC2 e testes de runtime/bibliotecas; documentar APIs e limites;
   testar VSIX instalado/Extension Host final; publicar commits runtime/CGD dev.
+
+
+---
+
+## Ciclo IX — Expansão Massiva do Ecossistema Delégua (23/11/2026)
+
+### Solicitação ativa
+Execução integral do **PROMPT MESTRE IX — CGD: Expansão Massiva do Ecossistema Delégua**, transformando o CGD em uma plataforma completa de desenvolvimento em português com sistema de projetos, módulos qualificados, stdlib hierárquica e expandida, pontes opcionais GTK4/SDL3, motor de xadrez TUI + 6 projetos reais, depurador nativo (DWARF + DAP + VS Code) e LSP avançado, mantendo 100% de compatibilidade com o DCC (`/home/fernandodev/dcc`).
+
+### Implementação concluída por marco
+
+- **Marco A (Auditoria e baseline)**: ambiente auditado (DMD 2.111.0, LDC2 1.42.0, GCC 16.2.1, Clang 22.1.8, TinyCC 0.9.28rc, GDB 17.2, GTK4 4.22.5, SDL3 3.4.16, Boehm GC 8.2.6, libcurl 8.22.0, OpenSSL 3.5.8). Baseline completa registrada com 0 falhas.
+- **Marco B (Projetos, módulos e tipos qualificados)**:
+  - `projeto.json` com validação estrita e proteção anti-traversal (`src/driver/project.d`), cache incremental (`compilacao/.cgd-cache`), subcomandos CLI (`iniciar`, `compilar`, `rodar`, `testar`, `limpar`, `verificar`, `formatar`, `projeto`, `depurar`, `dap`) preservando a CLI legada.
+  - Keywords contextuais `modulo`/`módulo` e `como`, `importar a.b.c [como Alias]`, tipos qualificados `a.b.c.Tipo`, herança qualificada `herda a.b.Classe`, `SymbolModule` sem disparo falso de captura e validação preservada dentro de `rotina`.
+  - Correções colaterais importantes: `Parser.arrowParametersAhead()` não confunde ternário `? (expr) : val` com arrow function; `ClassDecl.analyzed` evita reanálise duplicada de superclasses entre módulos; `isStaticEnumReceiver()` em `analyzer.d` preserva efeitos colaterais em `criar(efeitos).Estado.Fim` ao mesmo tempo que permite dobramento estático de enums em módulos/classes.
+- **Marco C (Stdlib hierárquica e expansão real)**:
+  - 34 aliases hierárquicos canônicos em `src/frontend/modules.d` (sem duplicação de código nem quebra de identidade de tipos).
+  - Runtime C (`vendor/delegua-runtime/src/`): novos `terminal_posix.c` (termios/raw/atexit/SIGWINCH/mouse SGR/largura visual Unicode) e `regex_posix.c` (`<regex.h>` `REG_EXTENDED`), mais `delegua_ffi_criptoWebsocketAccept` em `cripto.c`.
+  - Novas bibliotecas em `bibliotecas/`: `interface/terminal`, `interface/tui` (double buffering incremental + modo headless + fallback ASCII), `rede/http` (HTTP/1.1 assíncrono em português), `rede/websocket` (RFC 6455 completo com buffers `Bytes`), `dados/csv`, `dados/toml`, `texto/regex`, `nucleo/colecoes` (`Deque`, `HeapMin`, `FilaPrioridade`), `matematica/algebra` (`Vetor2`, `Vetor3`, `Matriz`), `matematica/grafos` (`Grafo`).
+- **Marco D (GTK4 e SDL3 opcionais)**:
+  - Pontes separadas `vendor/delegua-runtime/bridges/gtk4_bridge.c` (`lib/libdelegua_gtk4.o`) e `sdl3_bridge.c` (`lib/libdelegua_sdl3.o`), compiladas apenas se detectadas por `pkg-config`, com handles geracionais anti-UAF e ancoragem GC.
+  - Wrappers em português `bibliotecas/interface/gtk.delegua` e `bibliotecas/interface/sdl.delegua`, com vínculo sob demanda em `src/driver/toolchain.d` (isolamento `ldd` provado).
+- **Marco E (Motor de Xadrez TUI + 6 projetos reais)**:
+  - `exemplos/jogos/xadrez/` (8 módulos + suíte de 13 testes + `perft(1..4)` = 20, 400, 8902, 197281 exato + Kiwipete + busca alpha-beta determinística + TUI Unicode/ASCII).
+  - 6 projetos adicionais: `exemplos/rede/http/api_tarefas/`, `exemplos/rede/websocket/chat/`, `exemplos/graficos/gtk/calculadora/`, `exemplos/jogos/pong/`, `exemplos/terminal/tui/tarefas_tui/`, `exemplos/algoritmos/raytracer/`.
+- **Marco F (Depurador nativo + DAP + VS Code)**:
+  - Emissão `#line` por linha física e materialização de `ReturnStmt` em `--depuracao` (`src/backend/c/codegen.d`), mapa `.cgd.dbg.json`, servidor DAP sobre GDB/MI2 com thread leitora dedicada (`src/dap/server.d`), CLI `cgd depurar` e integração F5 em `extensao-vscode/`.
+- **Marco G (LSP avançado)**:
+  - `src/lsp/model.d`, `src/lsp/completion.d`, `src/lsp/server.d`: suporte a `projeto.json`, módulos qualificados, `textDocument/declaration`, `textDocument/typeDefinition`, `textDocument/rangeFormatting`, `workspace/symbol` multi-arquivo sob demanda, completion de `importar a.b.c` e namespaces/aliases com digitação incompleta, e `documentLink` para statement imports.
+- **Marco H (Validação, DCC e documentação)**:
+  - Documentação criada: `docs/PROJETOS.md`, `docs/MODULOS.md`, `docs/BIBLIOTECA_PADRAO.md`, `docs/BIBLIOTECAS_NATIVAS.md`, `docs/TUI.md`, `docs/GTK.md`, `docs/SDL.md`, `docs/SERVIDORES_ASSINCRONOS.md`, `docs/DEPURADOR.md`, `docs/LSP.md` e `README.md` atualizado.
+
+### Testes e medições efetivamente executados (23/11/2026)
+
+| Validação | Resultado | Tempo / Medição |
+| --- | --- | --- |
+| `dub test --compiler=dmd --config=unittest` | **10/10 OK** | `1.73s` |
+| `dub test --compiler=ldc2 --config=unittest` | **10/10 OK** | `5.40s` |
+| `vendor/delegua-runtime/tests/run.sh` | **OK** (`rt` + `gtk4` + `sdl3` opcionais) | `5.98s` |
+| 19 suítes Python (`driver`, `projetos_modulos`, `stdlib`, `stdlib_avancada`, `stdlib_expansao`, `graficos`, `dap`, `lsp`, `lsp_projetos`, `linguagem_nova`, `enums`, `rotinas`, `memoria`, `async_linguagem`, `sockets`, `servidor`, `bibliotecas`, `integracao`, `exemplos`) | **19/19 OK** (incl. 439 integração, 342 bibliotecas, 155 exemplos standalone + 7 projetos novos = 318 verificações) | `~132s` total |
+| Matriz Clang / Clang `-o` / GCC / GCC `-o` / TinyCC (`xadrez_teste` + `raytracer`) | **10/10 OK** (`tcc`: xadrez `0.17s`, raytracer `0.05s`) | Checagem exata de checksum e 13/13 testes |
+| `python3 scripts/sanitizadores.py --rede` (ASan + UBSan + NDEBUG + restauração) | **OK** (runtime C + bridges + 50.000 entradas HTTP + servidor + sockets) | 0 erros ASan/UBSan |
+| Regressão DCC (`/home/fernandodev/dcc`, sem modificações): `./bootstrap/build.sh` | **OK** (`build/dcc` gerado) | `max_rss=352.4 MiB` |
+| Regressão DCC: `python3 tests/run_tests.py` | **86/86 OK** | `13.82s`, `max_rss=216.0 MiB` |
+| Benchmark Xadrez `perft(4) = 197281` (`-o`) | **OK** | `0.98s`, `max_rss=8.9 MiB` (~201k nós/s) |
+| Benchmark Ray Tracer 3D (`--teste`, `-o`, 14.400 pixels) | **OK** (`checksum=17445089`) | `0.04s` (`40ms`), `max_rss=8.3 MiB` |
+
+### Pendências e observações transparentes
+
+- Commits no submódulo `vendor/delegua-runtime` e no repositório principal `cgd` (branch `dev`) aguardam decisão explícita do usuário antes de publicar/push.
+- Regerar `docs/livro` via `scripts/gerar_referencia.py` / `scripts/gerar_livro.py` se desejar publicar os novos guias no GitHub Pages (`dev/docs`).
+- `exemplos/jogos/xadrez/fontes/{pecas,regras,avaliacao}.delegua` emitem avisos não-bloqueantes `W3002` porque `frontend/flow.d` ainda não trata `escolha ... padrao:` com `retorna` em todos os ramos como retorno garantido (oportunidade futura de aprimoramento em `frontend/flow.d`).
+- Extensão VS Code: validação de sintaxe (`node --check`, `package.json`, `delegua.tmLanguage.json`) concluída; testes dentro do Extension Host gráfico completo do VS Code requerem janela interativa do VS Code.

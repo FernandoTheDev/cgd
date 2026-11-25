@@ -91,6 +91,8 @@ abstract class Node
 class Program : Node
 {
     Node[] body;
+    dstring[] modulePath;
+    Position modulePos;
 
     this(Node[] body)
     {
@@ -115,7 +117,7 @@ class VarDecl : Node
 {
     dstring name;
     Node value;
-    bool isConst, uninitialized, isEnum;
+    bool isConst, uninitialized, lackedExplicitInit, isEnum;
 
     this(dstring name, Node value, bool isConst, TypeExpr texpr, Position pos)
     {
@@ -222,6 +224,8 @@ class Identifier : Node
     VarDecl variableRef;
     FnDecl functionRef;
     ClassDecl classRef;
+    ModuleUnit moduleRef;
+    dstring[] namespacePath;
     dstring value;
 
     this(dstring val, Position pos)
@@ -242,6 +246,8 @@ class BinaryExpr : Node
 {
     Node left, right;
     TokenKind op;
+    FnDecl resolvedOperator;
+    bool operatorSwapped;
 
     this(Node l, Node r, TokenKind o, Position pos)
     {
@@ -269,6 +275,7 @@ class UnaryExpr : Node
     Node value;
     TokenKind op;
     bool post;
+    FnDecl resolvedOperator;
 
     this(Node val, TokenKind o, bool post, Position pos)
     {
@@ -352,7 +359,11 @@ class FnDecl : Node
     dstring foreignSymbol;
     bool foreignManaged;
     bool foreignParallelSafe;
+    bool foreignDeclared;
     bool isAsync;
+    bool isNative;
+    bool isGpu;
+    dstring operatorSymbol;
     bool analyzed, isMethod, isStatic, accessor, anonymous, decoratorEnvelope, isAbstract;
     ClassDecl ownerClass, classFactory;
     int access;
@@ -510,6 +521,7 @@ class AssignStmt : Node
 {
     Node left, value;
     TokenKind op;
+    FnDecl resolvedIndexSetOperator;
 
     this(Node left, Node val, TokenKind op, Position pos)
     {
@@ -585,6 +597,7 @@ class ArrayLit : Node
 class IndexExpr : Node
 {
     Node value, idx;
+    FnDecl resolvedOperator;
 
     this(Node value, Node idx, Position pos)
     {
@@ -633,6 +646,8 @@ class MemberExpr : Node
     bool readonly;
     MapLit enumMembers;
     IntLit enumValue;
+    ModuleUnit resolvedModule;
+    dstring[] namespacePath;
 
     this(Node left, Node right, Position pos)
     {
@@ -813,7 +828,14 @@ Node[] childNodes(Node node)
     if (ModuleUnit n = cast(ModuleUnit) node)
         return [n.program];
     if (ImportExpr n = cast(ImportExpr) node)
-        return n.target is null ? [n.path] : [n.path, cast(Node) n.target];
+    {
+        Node[] result;
+        if (n.path !is null)
+            result ~= n.path;
+        if (n.target !is null)
+            result ~= cast(Node) n.target;
+        return result;
+    }
     if (TryStmt n = cast(TryStmt) node)
     {
         Node[] result = n.body ~ n.finalBody;
@@ -902,8 +924,12 @@ struct ClassField
 class ClassDecl : Node
 {
     dstring name, superName;
+    dstring[] superQualifier;
     ClassDecl superClass;
-    bool isAbstract, isInterface, isForeign;
+    bool isAbstract, isInterface, isForeign, analyzed;
+    bool isValueType;
+    bool isTrivialCopy = true;
+    bool hasNonTrivialDrop;
     dstring foreignLibrary;
     dstring[] interfaceNames;
     ClassDecl[] interfaces;
@@ -1009,6 +1035,9 @@ class ImportExpr : Node
 {
     Node path;
     ModuleUnit target;
+    dstring[] modulePath;
+    dstring aliasName;
+    bool isStatementImport;
     this(Node path, Position pos)
     {
         super(NodeKind.ImportExpr, pos);

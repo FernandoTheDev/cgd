@@ -173,6 +173,30 @@ classe estrangeira Primitivas {
     criptoHexAleatorio(quantidade: inteiro): texto;
     @definicao(simbolo = "delegua_ffi_criptoCompararConstante")
     criptoCompararConstante(a: texto, b: texto): logico;
+    @definicao(simbolo = "delegua_ffi_criptoWebsocketAccept")
+    criptoWebsocketAccept(chave: texto): texto;
+    @definicao(simbolo = "delegua_ffi_termEhTty")
+    termEhTty(): logico;
+    @definicao(simbolo = "delegua_ffi_termTamanho")
+    termTamanho(): dicionario;
+    @definicao(simbolo = "delegua_ffi_termEntrarRaw")
+    termEntrarRaw(mouse: logico): logico;
+    @definicao(simbolo = "delegua_ffi_termSairRaw")
+    termSairRaw(): vazio;
+    @definicao(simbolo = "delegua_ffi_termEscrever")
+    termEscrever(dados: texto): inteiro;
+    @definicao(simbolo = "delegua_ffi_termLerEvento")
+    termLerEvento(timeoutMs: inteiro): qualquer;
+    @definicao(simbolo = "delegua_ffi_termLarguraVisual")
+    termLarguraVisual(valor: texto): inteiro;
+    @definicao(simbolo = "delegua_ffi_regexValidar")
+    regexValidar(expressao: texto, ignorarCaso: logico): logico;
+    @definicao(simbolo = "delegua_ffi_regexEncontrar")
+    regexEncontrar(expressao: texto, alvo: texto, inicio: inteiro, ignorarCaso: logico): qualquer;
+    @definicao(simbolo = "delegua_ffi_regexEncontrarTodos")
+    regexEncontrarTodos(expressao: texto, alvo: texto, ignorarCaso: logico, limite: inteiro): dicionario[];
+    @definicao(simbolo = "delegua_ffi_regexSubstituir")
+    regexSubstituir(expressao: texto, alvo: texto, substituto: texto, ignorarCaso: logico, todos: logico): texto;
     @definicao(simbolo = "delegua_ffi_compressaoGzipComprimir")
     compressaoGzipComprimir(dados: texto, nivel: inteiro): texto;
     @definicao(simbolo = "delegua_ffi_compressaoGzipDescomprimir")

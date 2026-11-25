@@ -10,17 +10,74 @@ string nativeType(TypeExpr type)
     {
         case "inteiro":
         case "longo":
+        case "ci64":
             return "int64_t";
+        case "cu64":
+            return "uint64_t";
+        case "ci32":
+            return "int32_t";
+        case "cu32":
+            return "uint32_t";
+        case "ci16":
+            return "int16_t";
+        case "cu16":
+            return "uint16_t";
+        case "ci8":
+            return "int8_t";
+        case "cu8":
+            return "uint8_t";
+        case "cchar":
+            return "char";
+        case "cschar":
+            return "signed char";
+        case "cuchar":
+            return "unsigned char";
+        case "cshort":
+            return "short";
+        case "cushort":
+            return "unsigned short";
+        case "cint":
+            return "int";
+        case "cuint":
+            return "unsigned int";
+        case "clong":
+            return "long";
+        case "culong":
+            return "unsigned long";
+        case "csize":
+            return "size_t";
+        case "cf32":
+        case "cfloat":
+            return "float";
+        case "cf64":
+        case "cdouble":
+            return "double";
         case "logico":
         case "lógico":
+        case "cbool":
             return "bool";
         case "texto":
             return "const char *";
+        case "cponteiro":
+            return "void *";
         case "vazio":
             return "void";
         default:
             return "double";
     }
+}
+
+bool isCIntegerTypeName(string t)
+{
+    return t == "int8_t" || t == "uint8_t" || t == "int16_t" || t == "uint16_t"
+        || t == "int32_t" || t == "uint32_t" || t == "int64_t" || t == "uint64_t"
+        || t == "short" || t == "unsigned short" || t == "int" || t == "unsigned int"
+        || t == "long" || t == "unsigned long" || t == "size_t";
+}
+
+bool isCFloatTypeName(string t)
+{
+    return t == "float" || t == "double";
 }
 
 private dstring fastCheckHelper(TypeExpr type)
@@ -62,6 +119,42 @@ private dstring fastCheckHelper(TypeExpr type)
     }
 }
 
+private bool isStdHeaderSymbol(dstring sym)
+{
+    switch (sym)
+    {
+        case "fopen":
+        case "fclose":
+        case "fseek":
+        case "ftell":
+        case "fgetc":
+        case "fputc":
+        case "fflush":
+        case "fread":
+        case "fwrite":
+        case "ferror":
+        case "feof":
+        case "clearerr":
+        case "rewind":
+        case "remove":
+        case "rename":
+        case "malloc":
+        case "calloc":
+        case "realloc":
+        case "free":
+        case "memcpy":
+        case "memmove":
+        case "memset":
+        case "memcmp":
+        case "strlen":
+        case "strcmp":
+        case "strncmp":
+            return true;
+        default:
+            return false;
+    }
+}
+
 dstring foreignWrapper(FnDecl method, dstring prototype, dstring descriptor, dstring[] parameterContracts)
 {
     dstring checks;
@@ -86,30 +179,48 @@ dstring foreignWrapper(FnDecl method, dstring prototype, dstring descriptor, dst
     }
     dstring[] types, arguments;
     dstring setup;
+    bool skipExtern = method.foreignDeclared || isStdHeaderSymbol(method.foreignSymbol);
     bool isPosixExit = method.foreignSymbol == "_exit" && method.args.length == 1
         && method.type_expr !is null && method.type_expr.toStr() == "vazio";
     foreach (size_t index, FnArg argument; method.args)
     {
         string type = isPosixExit ? "int" : nativeType(argument.type_expr);
         types ~= formatD("%s", type);
-        string kind = type == "double" ? "DELEGUA_T_REAL" : (type == "int64_t" || type == "int")
-            ? "DELEGUA_T_NUM" : type == "bool" ? "DELEGUA_T_BOOL" : "DELEGUA_T_TEXT";
-        string field = type == "double" ? "real" : (type == "int64_t" || type == "int")
-            ? "num" : type == "bool" ? "b1" : "text.ptr";
+        bool isPtr = type == "void *";
+        bool isInt = isCIntegerTypeName(type);
+        bool isFlt = isCFloatTypeName(type);
+        string kind = isFlt ? "DELEGUA_T_REAL" : (isInt || isPtr) ? "DELEGUA_T_NUM" : type == "bool"
+            ? "DELEGUA_T_BOOL" : "DELEGUA_T_TEXT";
+        string field = isFlt ? "real" : (isInt || isPtr) ? "num" : type == "bool" ? "b1" : "text.ptr";
         dstring local = formatD("cgd_ffi_arg_%s", index);
         dstring boxed = local ~ "_boxed";
         setup ~= formatD("delegua_value %s=delegua_op_cast(argv[%s],%s);\n", boxed, index, kind);
         if (type == "const char *")
             setup ~= formatD("if(memchr(%s.value.text.ptr,0,%s.value.text.len)) delegua_panic(\"Texto FFI C contém byte nulo.\");\n",
                     boxed, boxed);
-        setup ~= formatD("%s %s=%s%s.value.%s;\n", type, local, type == "int" ? "(int)" : "", boxed, field);
+        if (isPtr)
+            setup ~= formatD("void *%s=(void *)(intptr_t)(%s.value.num);\n", local, boxed);
+        else
+            setup ~= formatD("%s %s=(%s)(%s.value.%s);\n", type, local, type, boxed, field);
         arguments ~= local;
     }
     string resultType = nativeType(method.type_expr);
     dstring call = method.foreignSymbol ~ "(" ~ arguments.join(",") ~ ")";
-    dstring result = resultType == "void" ? call ~ "; return create_nulo();" : "return "d ~ (resultType == "double"
-            ? "create_real("d : resultType == "int64_t"
-            ? "create_num("d : resultType == "bool" ? "create_bool("d : "create_text("d) ~ call ~ ");";
+    dstring result;
+    if (resultType == "void")
+        result = call ~ "; return create_nulo();"d;
+    else if (resultType == "void *")
+        result = formatD("return create_num((int64_t)(intptr_t)(const void *)(%s));", call);
+    else if (isCFloatTypeName(resultType))
+        result = formatD("return create_real((double)(%s));", call);
+    else if (isCIntegerTypeName(resultType))
+        result = formatD("return create_num((int64_t)(%s));", call);
+    else if (resultType == "bool")
+        result = formatD("return create_bool(%s);", call);
+    else
+        result = formatD("return create_text(%s);", call);
+    if (skipExtern)
+        return formatD("%s { (void)argc; (void)argv; %s }", prototype, checks ~ setup ~ result);
     return formatD("extern %s %s(%s);\n%s { (void)argc; (void)argv; %s }", resultType,
             method.foreignSymbol, types.length ? types.join(",") : "void", prototype, checks ~ setup ~ result);
 }

@@ -1,0 +1,9 @@
+{
+  "nome": "calculadora-gtk",
+  "versao": "1.0.0",
+  "tipo": "gtk",
+  "entrada": "fontes/principal.delegua",
+  "saida": "compilacao/calculadora-gtk",
+  "compilacao": { "modo": "producao", "otimizacao": 2, "depuracao": false },
+  "bibliotecasNativas": ["gtk4"]
+}

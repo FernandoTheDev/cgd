@@ -111,6 +111,36 @@ final class CgdConstantFolding : AstRewriter
             if (BoolLit condition = cast(BoolLit) conditional.condition)
                 result = condition.value ? conditional.yes : conditional.no;
         }
+        else if (IndexExpr idx = cast(IndexExpr) node)
+        {
+            ArrayLit sourceArr = cast(ArrayLit) idx.value;
+            if (sourceArr is null)
+            {
+                if (Identifier arrId = cast(Identifier) idx.value)
+                    if (arrId.variableRef !is null && arrId.variableRef.isConst && !arrId.variableRef.uninitialized)
+                        sourceArr = cast(ArrayLit) arrId.variableRef.value;
+            }
+            if (sourceArr !is null)
+            {
+                if (IntLit indexLit = cast(IntLit) idx.idx)
+                {
+                    long len = cast(long) sourceArr.elements.length;
+                    long posIdx = indexLit.value < 0 ? indexLit.value + len : indexLit.value;
+                    if (posIdx >= 0 && posIdx < len)
+                    {
+                        Node el = sourceArr.elements[cast(size_t) posIdx];
+                        if (IntLit n = cast(IntLit) el)
+                            result = new IntLit(n.value, node.pos);
+                        else if (DoubleLit n = cast(DoubleLit) el)
+                            result = new DoubleLit(n.value, node.pos);
+                        else if (StringLit n = cast(StringLit) el)
+                            result = new StringLit(n.value, node.pos);
+                        else if (BoolLit n = cast(BoolLit) el)
+                            result = new BoolLit(n.value, node.pos);
+                    }
+                }
+            }
+        }
         else if (CallExpr call = cast(CallExpr) node)
             result = evaluatePureCall(call, ctfe);
         if (BinaryExpr binary = cast(BinaryExpr) node)

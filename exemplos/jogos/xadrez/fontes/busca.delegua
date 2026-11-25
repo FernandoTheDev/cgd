@@ -1,0 +1,313 @@
+modulo busca
+
+importar pecas
+importar tabuleiro
+importar movimentos
+importar regras
+importar avaliacao
+
+// Flags de entrada da tabela de transposições
+enum TipoTT {
+    EXATO = 0,
+    LIMITE_INFERIOR = 1,
+    LIMITE_SUPERIOR = 2
+}
+
+classe ResultadoBusca {
+    melhorLance: inteiro = 0
+    pontuacao: inteiro = 0
+    profundidade: inteiro = 0
+    nos: inteiro = 0
+    tempoMs: real = 0.0
+    nosPorSegundo: inteiro = 0
+
+    construtor(melhorLance: inteiro = 0, pontuacao: inteiro = 0, profundidade: inteiro = 0,
+        nos: inteiro = 0, tempoMs: real = 0.0) {
+        isto.melhorLance = melhorLance
+        isto.pontuacao = pontuacao
+        isto.profundidade = profundidade
+        isto.nos = nos
+        isto.tempoMs = tempoMs
+        se tempoMs > 0.5 {
+            isto.nosPorSegundo = inteiro(nos * 1000.0 / tempoMs)
+        } senao {
+            isto.nosPorSegundo = nos * 1000
+        }
+    }
+}
+
+classe MotorBusca {
+    nos: inteiro = 0
+    limiteTempoMs: real = 0.0
+    inicioMs: real = 0.0
+    cancelado: logico = falso
+    ttTamanho: inteiro = 16384
+    ttChaves: inteiro[]
+    ttProf: inteiro[]
+    ttValor: inteiro[]
+    ttFlag: inteiro[]
+    ttLance: inteiro[]
+
+    construtor(tamanhoTT: inteiro = 16384) {
+        isto.ttTamanho = tamanhoTT
+        isto.ttChaves = []
+        isto.ttProf = []
+        isto.ttValor = []
+        isto.ttFlag = []
+        isto.ttLance = []
+        para (var i: inteiro = 0; i < tamanhoTT; i++) {
+            isto.ttChaves.adicionar(0)
+            isto.ttProf.adicionar(-1)
+            isto.ttValor.adicionar(0)
+            isto.ttFlag.adicionar(0)
+            isto.ttLance.adicionar(0)
+        }
+    }
+
+    limparTabela(): vazio {
+        para (var i: inteiro = 0; i < isto.ttTamanho; i++) {
+            isto.ttProf[i] = -1
+            isto.ttLance[i] = 0
+        }
+    }
+
+    indiceTT(hash: inteiro): inteiro {
+        var idx: inteiro = hash & (isto.ttTamanho - 1)
+        retorna idx < 0 ? -idx : idx
+    }
+
+    verificarTempo(): logico {
+        se isto.cancelado {
+            retorna verdadeiro
+        }
+        se isto.limiteTempoMs > 0.0 e (isto.nos & 1023) == 0 {
+            var tempo: qualquer = importar("cgd:tempo").Tempo
+            se tempo.agoraMs() - isto.inicioMs >= isto.limiteTempoMs {
+                isto.cancelado = verdadeiro
+                retorna verdadeiro
+            }
+        }
+        retorna falso
+    }
+
+    pontuarLance(tab: tabuleiro.Tabuleiro, lance: inteiro, lanceTT: inteiro): inteiro {
+        se lance == lanceTT e lanceTT != 0 {
+            retorna 1000000
+        }
+        var orig: inteiro = movimentos.lanceOrigem(lance)
+        var dest: inteiro = movimentos.lanceDestino(lance)
+        var promo: inteiro = movimentos.lancePromocao(lance)
+        var pontos: inteiro = 0
+        var vitima: inteiro = tab.casas[dest]
+        se vitima != 0 {
+            var atacante: inteiro = tab.casas[orig]
+            // MVV-LVA: Most Valuable Victim - Least Valuable Attacker
+            pontos = 10000 + pecas.valorMaterial(pecas.tipoDaPeca(vitima)) * 10 - pecas.valorMaterial(pecas.tipoDaPeca(atacante))
+        }
+        se promo != 0 {
+            pontos = pontos + 8000 + pecas.valorMaterial(promo)
+        }
+        retorna pontos
+    }
+
+    ordenarLances(tab: tabuleiro.Tabuleiro, lances: inteiro[], lanceTT: inteiro): vazio {
+        var n: inteiro = tamanho(lances)
+        var notas: inteiro[] = []
+        para (var i: inteiro = 0; i < n; i++) {
+            notas.adicionar(isto.pontuarLance(tab, lances[i], lanceTT))
+        }
+        // Insertion sort: excelente para 20..40 lances típicos do xadrez
+        para (var i: inteiro = 1; i < n; i++) {
+            var l: inteiro = lances[i]
+            var sc: inteiro = notas[i]
+            var j: inteiro = i - 1
+            enquanto j >= 0 e notas[j] < sc {
+                lances[j + 1] = lances[j]
+                notas[j + 1] = notas[j]
+                j = j - 1
+            }
+            lances[j + 1] = l
+            notas[j + 1] = sc
+        }
+    }
+
+    quiescence(tab: tabuleiro.Tabuleiro, alfa: inteiro, beta: inteiro, maxProfQ: inteiro): inteiro {
+        isto.nos = isto.nos + 1
+        se isto.verificarTempo() {
+            retorna 0
+        }
+        var standPat: inteiro = avaliacao.avaliar(tab)
+        se standPat >= beta {
+            retorna beta
+        }
+        var a: inteiro = alfa
+        se standPat > a {
+            a = standPat
+        }
+        se maxProfQ <= 0 {
+            retorna a
+        }
+        var capturas: inteiro[] = movimentos.gerarLancesLegais(tab, verdadeiro)
+        isto.ordenarLances(tab, capturas, 0)
+        para (var i: inteiro = 0; i < tamanho(capturas); i++) {
+            var l: inteiro = capturas[i]
+            tab.fazerLance(movimentos.lanceOrigem(l), movimentos.lanceDestino(l), movimentos.lancePromocao(l))
+            var score: inteiro = -isto.quiescence(tab, -beta, -a, maxProfQ - 1)
+            tab.desfazerLance()
+            se isto.cancelado {
+                retorna 0
+            }
+            se score >= beta {
+                retorna beta
+            }
+            se score > a {
+                a = score
+            }
+        }
+        retorna a
+    }
+
+    negamax(tab: tabuleiro.Tabuleiro, profundidade: inteiro, alfa: inteiro, beta: inteiro,
+        ply: inteiro): inteiro {
+        isto.nos = isto.nos + 1
+        se isto.verificarTempo() {
+            retorna 0
+        }
+        se ply > 0 {
+            se tab.meioMovimentos >= 100 ou regras.contarRepeticoes(tab) >= 2 {
+                retorna 0
+            }
+        }
+
+        var alfaOrig: inteiro = alfa
+        var a: inteiro = alfa
+        var b: inteiro = beta
+        var idx: inteiro = isto.indiceTT(tab.hashAtual)
+        var lanceTT: inteiro = 0
+        se isto.ttProf[idx] >= 0 e isto.ttChaves[idx] == tab.hashAtual {
+            lanceTT = isto.ttLance[idx]
+            se isto.ttProf[idx] >= profundidade e ply > 0 {
+                var valTT: inteiro = isto.ttValor[idx]
+                var flgTT: inteiro = isto.ttFlag[idx]
+                se flgTT == TipoTT.EXATO {
+                    retorna valTT
+                } senao se flgTT == TipoTT.LIMITE_INFERIOR {
+                    se valTT > a {
+                        a = valTT
+                    }
+                } senao se flgTT == TipoTT.LIMITE_SUPERIOR {
+                    se valTT < b {
+                        b = valTT
+                    }
+                }
+                se a >= b {
+                    retorna valTT
+                }
+            }
+        }
+
+        se profundidade <= 0 {
+            retorna isto.quiescence(tab, a, b, 4)
+        }
+
+        var legais: inteiro[] = movimentos.gerarLancesLegais(tab, falso)
+        se tamanho(legais) == 0 {
+            se movimentos.reiEmXeque(tab, tab.turno) {
+                retorna -30000 + ply
+            }
+            retorna 0
+        }
+
+        isto.ordenarLances(tab, legais, lanceTT)
+        var melhorScore: inteiro = -999999
+        var melhorLance: inteiro = legais[0]
+
+        para (var i: inteiro = 0; i < tamanho(legais); i++) {
+            var l: inteiro = legais[i]
+            tab.fazerLance(movimentos.lanceOrigem(l), movimentos.lanceDestino(l), movimentos.lancePromocao(l))
+            var score: inteiro = -isto.negamax(tab, profundidade - 1, -b, -a, ply + 1)
+            tab.desfazerLance()
+            se isto.cancelado {
+                retorna 0
+            }
+            se score > melhorScore {
+                melhorScore = score
+                melhorLance = l
+            }
+            se score > a {
+                a = score
+            }
+            se a >= b {
+                sustar
+            }
+        }
+
+        var flag: inteiro = TipoTT.EXATO
+        se melhorScore <= alfaOrig {
+            flag = TipoTT.LIMITE_SUPERIOR
+        } senao se melhorScore >= b {
+            flag = TipoTT.LIMITE_INFERIOR
+        }
+        isto.ttChaves[idx] = tab.hashAtual
+        isto.ttProf[idx] = profundidade
+        isto.ttValor[idx] = melhorScore
+        isto.ttFlag[idx] = flag
+        isto.ttLance[idx] = melhorLance
+        retorna melhorScore
+    }
+
+    /// Busca iterativa em profundidade com controle opcional de tempo (ms).
+    buscarMelhorLance(tab: tabuleiro.Tabuleiro, profundidadeMax: inteiro = 3,
+        tempoMaxMs: real = 0.0): ResultadoBusca {
+        var tempo: qualquer = importar("cgd:tempo").Tempo
+        isto.inicioMs = tempo.agoraMs()
+        isto.limiteTempoMs = tempoMaxMs
+        isto.cancelado = falso
+        isto.nos = 0
+
+        var legais: inteiro[] = movimentos.gerarLancesLegais(tab, falso)
+        se tamanho(legais) == 0 {
+            retorna ResultadoBusca(0, 0, 0, 0, tempo.agoraMs() - isto.inicioMs)
+        }
+
+        var melhorGlobal: inteiro = legais[0]
+        var pontuacaoGlobal: inteiro = 0
+        var profAlcancada: inteiro = 0
+
+        para (var prof: inteiro = 1; prof <= profundidadeMax; prof++) {
+            var melhorProf: inteiro = melhorGlobal
+            var melhorScore: inteiro = -999999
+            var alfa: inteiro = -50000
+            var beta: inteiro = 50000
+
+            isto.ordenarLances(tab, legais, melhorGlobal)
+            para (var i: inteiro = 0; i < tamanho(legais); i++) {
+                var l: inteiro = legais[i]
+                tab.fazerLance(movimentos.lanceOrigem(l), movimentos.lanceDestino(l), movimentos.lancePromocao(l))
+                var score: inteiro = -isto.negamax(tab, prof - 1, -beta, -alfa, 1)
+                tab.desfazerLance()
+                se isto.cancelado {
+                    sustar
+                }
+                se score > melhorScore {
+                    melhorScore = score
+                    melhorProf = l
+                }
+                se score > alfa {
+                    alfa = score
+                }
+            }
+            se isto.cancelado {
+                sustar
+            }
+            melhorGlobal = melhorProf
+            pontuacaoGlobal = melhorScore
+            profAlcancada = prof
+            se pontuacaoGlobal > 29000 ou pontuacaoGlobal < -29000 {
+                sustar
+            }
+        }
+        var decorrido: real = tempo.agoraMs() - isto.inicioMs
+        retorna ResultadoBusca(melhorGlobal, pontuacaoGlobal, profAlcancada, isto.nos, decorrido)
+    }
+}

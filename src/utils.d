@@ -56,6 +56,8 @@ Position getPosFromSymbol(Symbol* sym)
             return (cast(SymbolParam*) sym).node.pos;
         case Fn:
             return (cast(SymbolFn*) sym).node.pos;
+        case Module:
+            return (cast(SymbolModule*) sym).pos;
     }
 }
 

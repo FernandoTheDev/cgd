@@ -16,6 +16,22 @@
       "include": "#strings"
     },
     {
+      "match": "^\\s*(modulo|módulo)\\s+([\\p{L}_][\\p{L}\\p{M}\\p{N}_.]*)",
+      "captures": {
+        "1": { "name": "keyword.control.delegua" },
+        "2": { "name": "entity.name.namespace.delegua" }
+      }
+    },
+    {
+      "match": "^\\s*(importar)\\s+([\\p{L}_][\\p{L}\\p{M}\\p{N}_.]*)(?:\\s+(como)\\s+([\\p{L}_][\\p{L}\\p{M}\\p{N}_]*))?",
+      "captures": {
+        "1": { "name": "keyword.control.delegua" },
+        "2": { "name": "entity.name.namespace.delegua" },
+        "3": { "name": "keyword.control.delegua" },
+        "4": { "name": "entity.name.namespace.delegua" }
+      }
+    },
+    {
       "name": "keyword.control.delegua",
       "match": "(?<![\\p{L}\\p{M}\\p{N}_])(?:estrangeira|finalmente|construtor|enumeracao|enumeração|implementa|assincrona|verdadeiro|constante|destrutor|interface|protegido|variavel|variável|enquanto|assercao|asserção|importar|estatico|estático|abstrata|abstrato|continua|aguardar|escolha|publico|público|privado|retorne|retorna|funcao|função|padrao|padrão|falhar|classe|sustar|contem|contém|rotina|mescla|const|senao|senão|tente|pegue|herda|super|fazer|falso|fixo|para|caso|enum|isto|cada|nulo|tipo|var|nao|não|se|ou|em|de|e)(?![\\p{L}\\p{M}\\p{N}_])"
     },
@@ -25,7 +41,7 @@
     },
     {
       "name": "storage.type.delegua",
-      "match": "\\b(?:inteiro|numero|número|longo|real|decimal|texto|qualquer|vazio|logico|lógico|booleano|tupla|dicionario|dicionário|Promessa|Tarefa)\\b"
+      "match": "\\b(?:inteiro|numero|número|longo|real|decimal|texto|qualquer|vazio|logico|lógico|booleano|tupla|dicionario|dicionário|Promessa|Tarefa|Compilacao|Compilação|ci8|cu8|ci16|cu16|ci32|cu32|ci64|cu64|cchar|cschar|cuchar|cshort|cushort|cint|cuint|clong|culong|csize|cf32|cf64|cfloat|cdouble|cbool|VetorNativo|MapaNativo|FatiaNativa|StringNativa|VisaoTexto|ResultadoNativo|OpcionalNativo|MatrizNativa)\\b"
     },
     {
       "name": "entity.name.function.delegua",

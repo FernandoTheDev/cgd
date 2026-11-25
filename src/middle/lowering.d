@@ -29,6 +29,7 @@ private:
     ];
 
     Diagnostics err;
+    size_t opTmpId;
 
     void lowerDecorators(ref Decorator[] decorators)
     {
@@ -105,6 +106,8 @@ private:
             case NodeKind.ClassDecl:
                 ClassDecl c = cast(ClassDecl) node;
                 lowerDecorators(c.decorators);
+                if (c.isValueType)
+                    return node;
                 foreach (ref ClassField field; c.fields)
                 {
                     if (field.isStatic && field.value !is null)
@@ -117,6 +120,8 @@ private:
             case NodeKind.FnDecl:
                 FnDecl fn = cast(FnDecl) node;
                 lowerDecorators(fn.decorators);
+                if (fn.isNative || (fn.ownerClass !is null && fn.ownerClass.isValueType))
+                    return node;
                 foreach (FnArg arg; fn.args)
                     if (arg.value !is null)
                         arg.value = loweringExpr(arg.value);
@@ -130,6 +135,18 @@ private:
 
             case NodeKind.AssignStmt:
                 AssignStmt ass = cast(AssignStmt) node;
+                if (ass.resolvedIndexSetOperator !is null)
+                {
+                    IndexExpr idxLeft = cast(IndexExpr) ass.left;
+                    Node recv = loweringExpr(idxLeft.value);
+                    Node indexArg = loweringExpr(idxLeft.idx);
+                    Node valArg = loweringExpr(ass.value);
+                    Identifier methId = new Identifier(ass.resolvedIndexSetOperator.fn, ass.pos);
+                    methId.functionRef = ass.resolvedIndexSetOperator;
+                    CallExpr opCall = new CallExpr(new MemberExpr(recv, methId, ass.pos), [indexArg, valArg], ass.pos);
+                    opCall.type_sema = ass.type_sema;
+                    return opCall;
+                }
                 if (MemberExpr member = cast(MemberExpr) ass.left)
                     member.left = loweringExpr(member.left);
                 if (IndexExpr idx = cast(IndexExpr) ass.left)
@@ -283,6 +300,14 @@ private:
                 IndexExpr idx = cast(IndexExpr) node;
                 idx.value = loweringExpr(idx.value);
                 idx.idx = loweringExpr(idx.idx);
+                if (idx.resolvedOperator !is null)
+                {
+                    Identifier methId = new Identifier(idx.resolvedOperator.fn, idx.pos);
+                    methId.functionRef = idx.resolvedOperator;
+                    CallExpr opCall = new CallExpr(new MemberExpr(idx.value, methId, idx.pos), [idx.idx], idx.pos);
+                    opCall.type_sema = idx.type_sema;
+                    return opCall;
+                }
                 return node;
             case NodeKind.MemberExpr:
                 MemberExpr member = cast(MemberExpr) node;
@@ -314,6 +339,14 @@ private:
     Node loweringUnaryExpr(UnaryExpr un)
     {
         un.value = loweringExpr(un.value);
+        if (un.resolvedOperator !is null)
+        {
+            Identifier methId = new Identifier(un.resolvedOperator.fn, un.pos);
+            methId.functionRef = un.resolvedOperator;
+            CallExpr opCall = new CallExpr(new MemberExpr(un.value, methId, un.pos), [], un.pos);
+            opCall.type_sema = un.type_sema;
+            return opCall;
+        }
         switch (un.op)
         {
             case TokenKind.BITNot:
@@ -337,6 +370,31 @@ private:
     {
         Node left = loweringExpr(node.left);
         Node right = loweringExpr(node.right);
+
+        if (node.resolvedOperator !is null)
+        {
+            Identifier methId = new Identifier(node.resolvedOperator.fn, node.pos);
+            methId.functionRef = node.resolvedOperator;
+            if (!node.operatorSwapped)
+            {
+                CallExpr opCall = new CallExpr(new MemberExpr(left, methId, node.pos), [right], node.pos);
+                opCall.type_sema = node.type_sema;
+                return opCall;
+            }
+            // Preserva ordem de avaliação esquerda -> direita e avaliação única quando comutativo (`2.0 * v`)!
+            import std.conv : to;
+
+            dstring lhsTmp = "#opl_"d ~ (opTmpId++).to!dstring;
+            dstring rhsTmp = "#opr_"d ~ (opTmpId++).to!dstring;
+            VarDecl d1 = new VarDecl(lhsTmp, left, true, null, node.pos);
+            VarDecl d2 = new VarDecl(rhsTmp, right, true, null, node.pos);
+            CallExpr opCall = new CallExpr(new MemberExpr(new Identifier(rhsTmp, node.pos), methId, node.pos),
+                    [new Identifier(lhsTmp, node.pos)], node.pos);
+            opCall.type_sema = node.type_sema;
+            BlockStmt blk = new BlockStmt([cast(Node) d1, cast(Node) d2, cast(Node) opCall], node.pos);
+            blk.type_sema = node.type_sema;
+            return blk;
+        }
 
         if (node.op == TokenKind.And || node.op == TokenKind.Or || node.op == TokenKind.Coalesce)
         {

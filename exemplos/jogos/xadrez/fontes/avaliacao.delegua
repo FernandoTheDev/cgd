@@ -1,0 +1,144 @@
+modulo avaliacao
+
+importar pecas
+importar tabuleiro
+
+// Piece-Square Tables (perspectiva das Brancas; Pretas espelham verticalmente).
+funcao pstPeao(idx: inteiro): inteiro {
+    var t: inteiro[] = [
+        0, 0, 0, 0, 0, 0, 0, 0,
+        50, 50, 50, 50, 50, 50, 50, 50,
+        10, 10, 20, 30, 30, 20, 10, 10,
+        5, 5, 10, 25, 25, 10, 5, 5,
+        0, 0, 0, 20, 20, 0, 0, 0,
+        5, -5, -10, 0, 0, -10, -5, 5,
+        5, 10, 10, -20, -20, 10, 10, 5,
+        0, 0, 0, 0, 0, 0, 0, 0
+    ]
+    retorna t[idx]
+}
+
+funcao pstCavalo(idx: inteiro): inteiro {
+    var t: inteiro[] = [
+        -50, -40, -30, -30, -30, -30, -40, -50,
+        -40, -20, 0, 0, 0, 0, -20, -40,
+        -30, 0, 10, 15, 15, 10, 0, -30,
+        -30, 5, 15, 20, 20, 15, 5, -30,
+        -30, 0, 15, 20, 20, 15, 0, -30,
+        -30, 5, 10, 15, 15, 10, 5, -30,
+        -40, -20, 0, 5, 5, 0, -20, -40,
+        -50, -40, -30, -30, -30, -30, -40, -50
+    ]
+    retorna t[idx]
+}
+
+funcao pstBispo(idx: inteiro): inteiro {
+    var t: inteiro[] = [
+        -20, -10, -10, -10, -10, -10, -10, -20,
+        -10, 0, 0, 0, 0, 0, 0, -10,
+        -10, 0, 5, 10, 10, 5, 0, -10,
+        -10, 5, 5, 10, 10, 5, 5, -10,
+        -10, 0, 10, 10, 10, 10, 0, -10,
+        -10, 10, 10, 10, 10, 10, 10, -10,
+        -10, 5, 0, 0, 0, 0, 5, -10,
+        -20, -10, -10, -10, -10, -10, -10, -20
+    ]
+    retorna t[idx]
+}
+
+funcao pstTorre(idx: inteiro): inteiro {
+    var t: inteiro[] = [
+        0, 0, 0, 0, 0, 0, 0, 0,
+        5, 10, 10, 10, 10, 10, 10, 5,
+        -5, 0, 0, 0, 0, 0, 0, -5,
+        -5, 0, 0, 0, 0, 0, 0, -5,
+        -5, 0, 0, 0, 0, 0, 0, -5,
+        -5, 0, 0, 0, 0, 0, 0, -5,
+        -5, 0, 0, 0, 0, 0, 0, -5,
+        0, 0, 0, 5, 5, 0, 0, 0
+    ]
+    retorna t[idx]
+}
+
+funcao pstDama(idx: inteiro): inteiro {
+    var t: inteiro[] = [
+        -20, -10, -10, -5, -5, -10, -10, -20,
+        -10, 0, 0, 0, 0, 0, 0, -10,
+        -10, 0, 5, 5, 5, 5, 0, -10,
+        -5, 0, 5, 5, 5, 5, 0, -5,
+        0, 0, 5, 5, 5, 5, 0, -5,
+        -10, 5, 5, 5, 5, 5, 0, -10,
+        -10, 0, 5, 0, 0, 0, 0, -10,
+        -20, -10, -10, -5, -5, -10, -10, -20
+    ]
+    retorna t[idx]
+}
+
+funcao pstRei(idx: inteiro): inteiro {
+    var t: inteiro[] = [
+        -30, -40, -40, -50, -50, -40, -40, -30,
+        -30, -40, -40, -50, -50, -40, -40, -30,
+        -30, -40, -40, -50, -50, -40, -40, -30,
+        -30, -40, -40, -50, -50, -40, -40, -30,
+        -20, -30, -30, -40, -40, -30, -30, -20,
+        -10, -20, -20, -20, -20, -20, -20, -10,
+        20, 20, 0, 0, 0, 0, 20, 20,
+        20, 30, 10, 0, 0, 10, 30, 20
+    ]
+    retorna t[idx]
+}
+
+funcao bonusPosicional(tp: inteiro, idx: inteiro): inteiro {
+    escolha tp {
+        caso 1:
+            retorna pstPeao(idx)
+        caso 2:
+            retorna pstCavalo(idx)
+        caso 3:
+            retorna pstBispo(idx)
+        caso 4:
+            retorna pstTorre(idx)
+        caso 5:
+            retorna pstDama(idx)
+        caso 6:
+            retorna pstRei(idx)
+        padrao:
+            retorna 0
+    }
+}
+
+/// Avalia a posição em centipeões do ponto de vista do jogador da vez (`tab.turno`).
+funcao avaliar(tab: tabuleiro.Tabuleiro): inteiro {
+    var pontuacaoBrancas: inteiro = 0
+    var bisposB: inteiro = 0
+    var bisposP: inteiro = 0
+    var casas: inteiro[] = tab.casas
+
+    para (var sq: inteiro = 0; sq < 64; sq++) {
+        var p: inteiro = casas[sq]
+        se p == 0 {
+            continua
+        }
+        var tp: inteiro = pecas.tipoDaPeca(p)
+        var base: inteiro = pecas.valorMaterial(tp)
+        se p > 0 {
+            pontuacaoBrancas = pontuacaoBrancas + base + bonusPosicional(tp, sq)
+            se tp == pecas.TipoPeca.BISPO {
+                bisposB = bisposB + 1
+            }
+        } senao {
+            var espelho: inteiro = (7 - (sq \ 8)) * 8 + (sq % 8)
+            pontuacaoBrancas = pontuacaoBrancas - (base + bonusPosicional(tp, espelho))
+            se tp == pecas.TipoPeca.BISPO {
+                bisposP = bisposP + 1
+            }
+        }
+    }
+    se bisposB >= 2 {
+        pontuacaoBrancas = pontuacaoBrancas + 30
+    }
+    se bisposP >= 2 {
+        pontuacaoBrancas = pontuacaoBrancas - 30
+    }
+    retorna tab.turno == pecas.Cor.BRANCAS ? pontuacaoBrancas : -pontuacaoBrancas
+}

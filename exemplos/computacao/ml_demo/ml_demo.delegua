@@ -1,0 +1,36 @@
+//# 0
+//? saida: ML_DEMO_OK
+// Exemplo completo de Machine Learning e Tensores Nativos no CGD
+importar cgd.computacao.tensores como Tensores
+importar cgd.computacao.ml como ML
+
+// 1) Multiplicação matricial 2D com Tensor nativo
+const a = Tensores.Tensor.deVetor([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
+const b = Tensores.Tensor.deVetor([7.0, 8.0, 9.0, 10.0, 11.0, 12.0], [3, 2])
+const c = a.matmul(b)
+// [1*7+2*9+3*11=58, 1*8+2*10+3*12=64; 4*7+5*9+6*11=139, 4*8+5*10+6*12=154]
+assercao(c.obter([0, 0]) == 58.0 e c.obter([0, 1]) == 64.0)
+assercao(c.obter([1, 0]) == 139.0 e c.obter([1, 1]) == 154.0)
+a.liberar()
+b.liberar()
+c.liberar()
+
+// 2) Regressão Linear: y = 2.5*x1 - 1.5*x2 + 4.0
+const rl = ML.RegressaoLinear(2)
+const perdaRL = rl.treinar([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [2.0, 1.0], [3.0, 2.0]],
+    [4.0, 6.5, 2.5, 7.5, 8.5], 1500, 0.05, verdadeiro)
+assercao(perdaRL < 0.0005)
+const predRL = rl.prever([4.0, 2.0])
+// Esperado: 2.5*4 - 1.5*2 + 4 = 11.0
+assercao(Matematica.absoluto(predRL - 11.0) < 0.05)
+
+// 3) MLP resolvendo XOR + serialização/desserialização
+const mlp = ML.MLP(2, 4, 1, 11)
+const perdaXor = mlp.treinar([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]], [[0.0], [1.0],
+    [1.0], [0.0]], 4000, 0.8)
+assercao(perdaXor < 0.02)
+const copia = ML.MLP.desserializar(mlp.serializar())
+assercao(copia.prever([0.0, 1.0])[0] > 0.85)
+assercao(copia.prever([1.0, 1.0])[0] < 0.15)
+
+escreva("ML_DEMO_OK perdaRL=", perdaRL, " perdaXor=", perdaXor)

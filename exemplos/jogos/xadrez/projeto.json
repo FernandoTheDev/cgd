@@ -1,0 +1,19 @@
+{
+  "nome": "xadrez",
+  "versao": "1.0.0",
+  "tipo": "tui",
+  "entrada": "fontes/principal.delegua",
+  "saida": "compilacao/xadrez",
+  "compilacao": {
+    "modo": "producao",
+    "otimizacao": 2,
+    "depuracao": false,
+    "compiladorC": "auto",
+    "paralelismo": "auto"
+  },
+  "dependencias": {},
+  "bibliotecasNativas": [],
+  "testes": {
+    "diretorio": "testes"
+  }
+}

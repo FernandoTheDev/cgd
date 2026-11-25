@@ -15,8 +15,8 @@ import std.algorithm.searching : count;
 import std.conv : to;
 import std.algorithm : sort, filter, canFind, min;
 import std.array : array, join;
-import std.file : exists, readText;
-import std.path : absolutePath, asNormalizedPath;
+import std.file : DirEntry, FileException, SpanMode, dirEntries, exists, isDir, isFile, readText;
+import std.path : absolutePath, asNormalizedPath, buildPath, dirName, extension;
 import std.utf : validate;
 
 immutable string[] tokenTypes = semanticTokenTypes;
@@ -25,6 +25,8 @@ immutable string[] tokenModifiers = semanticTokenModifiers;
 class LanguageServer
 {
     Document[string] documents;
+    string[] workspaceRoots;
+    bool[string] indexedProjects;
     bool shutdownRequested;
     size_t analysisCount;
     JSONValue notify(string method, JSONValue params)
@@ -89,8 +91,89 @@ class LanguageServer
         doc.expressionTypes = null;
         doc.declarationScopes = null;
         doc.variableDeclarations = null;
+        doc.symbolTypeDecls = null;
+        doc.offsetTypeDecls = null;
+        doc.modulePositions = null;
+        doc.statementImports = null;
         doc.index(doc.analysis.program);
         doc.finishIndex();
+    }
+
+    string findProjectRoot(string startDir)
+    {
+        if (!startDir.length)
+            return null;
+        string cursor = absolutePath(startDir).asNormalizedPath.to!string;
+        if (exists(cursor) && isFile(cursor))
+            cursor = dirName(cursor);
+        for (size_t i = 0; i < 16; i++)
+        {
+            string manifest = buildPath(cursor, "projeto.json");
+            if (exists(manifest) && isFile(manifest))
+                return cursor;
+            string parent = dirName(cursor);
+            if (parent == cursor || !parent.length)
+                break;
+            cursor = parent;
+        }
+        return null;
+    }
+
+    void indexProjectRoot(string projectRoot)
+    {
+        if (!projectRoot.length || projectRoot in indexedProjects)
+            return;
+        indexedProjects[projectRoot] = true;
+        string[] dirs = [
+            buildPath(projectRoot, "fontes"),
+            buildPath(projectRoot, "src"),
+            buildPath(projectRoot, "testes")
+        ];
+        size_t loaded = 0;
+        foreach (string dir; dirs)
+        {
+            if (!exists(dir) || !isDir(dir))
+                continue;
+            try
+            {
+                foreach (DirEntry entry; dirEntries(dir, SpanMode.breadth))
+                {
+                    if (loaded >= 256)
+                        return;
+                    if (!entry.isFile || extension(entry.name) != ".delegua")
+                        continue;
+                    string normPath = absolutePath(entry.name).asNormalizedPath.to!string;
+                    string uri = fileURI(normPath);
+                    if (uri in documents)
+                        continue;
+                    Document d = new Document(uri, readText(normPath), 0);
+                    d.isOpen = false;
+                    documents[uri] = d;
+                    analyze(d);
+                    loaded++;
+                }
+            }
+            catch (FileException)
+            {
+                continue;
+            }
+        }
+    }
+
+    void ensureProjectIndexed(string hintPath = null)
+    {
+        if (hintPath.length)
+        {
+            string root = findProjectRoot(hintPath);
+            if (root.length)
+                indexProjectRoot(root);
+        }
+        foreach (string wsRoot; workspaceRoots)
+        {
+            string root = findProjectRoot(wsRoot);
+            if (root.length)
+                indexProjectRoot(root);
+        }
     }
 
     void publish(Document doc)
@@ -145,8 +228,30 @@ class LanguageServer
         return JSONValue(["uri": JSONValue(target), "range": origin.positionRange(position, length)]);
     }
 
-    JSONValue initialize()
+    JSONValue initialize(JSONValue params)
     {
+        workspaceRoots = null;
+        string rootUri = str(params, "rootUri");
+        if (rootUri.length)
+            workspaceRoots ~= uriPath(rootUri);
+        else
+        {
+            string rootPath = str(params, "rootPath");
+            if (rootPath.length)
+                workspaceRoots ~= rootPath;
+        }
+        JSONValue folders = get(params, "workspaceFolders");
+        if (folders.type == JSONType.array)
+            foreach (JSONValue folder; folders.array)
+            {
+                string furi = str(folder, "uri");
+                if (furi.length)
+                {
+                    string fpath = uriPath(furi);
+                    if (!workspaceRoots.canFind(fpath))
+                        workspaceRoots ~= fpath;
+                }
+            }
         JSONValue[string] capabilities;
         capabilities["positionEncoding"] = JSONValue("utf-16");
         capabilities["textDocumentSync"] = JSONValue([
@@ -155,7 +260,8 @@ class LanguageServer
             "save": JSONValue(["includeText": JSONValue(false)])
         ]);
         foreach (string name; [
-            "hoverProvider", "definitionProvider", "referencesProvider",
+            "hoverProvider", "definitionProvider", "declarationProvider",
+            "typeDefinitionProvider", "referencesProvider",
             "documentHighlightProvider", "documentSymbolProvider",
             "workspaceSymbolProvider", "foldingRangeProvider", "selectionRangeProvider",
             "codeActionProvider"
@@ -163,13 +269,14 @@ class LanguageServer
             capabilities[name] = JSONValue(true);
         capabilities["renameProvider"] = JSONValue(["prepareProvider": JSONValue(true)]);
         capabilities["completionProvider"] = JSONValue([
-            "triggerCharacters": arrayJSON([JSONValue("."), JSONValue(":"), JSONValue("/")]),
+            "triggerCharacters": arrayJSON([JSONValue("."), JSONValue(":"), JSONValue("/"), JSONValue("@")]),
             "resolveProvider": JSONValue(false)
         ]);
         capabilities["signatureHelpProvider"] = JSONValue([
             "triggerCharacters": arrayJSON([JSONValue("("), JSONValue(",")])
         ]);
         capabilities["documentFormattingProvider"] = JSONValue(true);
+        capabilities["documentRangeFormattingProvider"] = JSONValue(true);
         capabilities["inlayHintProvider"] = JSONValue(true);
         capabilities["codeLensProvider"] = JSONValue(["resolveProvider": JSONValue(false)]);
         capabilities["documentLinkProvider"] = JSONValue(["resolveProvider": JSONValue(false)]);
@@ -188,6 +295,86 @@ class LanguageServer
         ]);
     }
 
+    private FnDecl operatorAt(Document doc, JSONValue position, out Position opPos)
+    {
+        opPos = null;
+        if (doc is null || doc.analysis.program is null)
+            return null;
+        long line = integer(position, "line") + 1;
+        uint col = doc.codepoints(cast(uint)(line - 1), cast(uint) integer(position, "character")) + 1;
+        FnDecl best = null;
+        ulong bestSpan = ulong.max;
+        bool[Node] seen;
+
+        void scan(Node n)
+        {
+            if (n is null || n in seen)
+                return;
+            seen[n] = true;
+            FnDecl resolved = null;
+            if (BinaryExpr bin = cast(BinaryExpr) n)
+                resolved = bin.resolvedOperator;
+            else if (UnaryExpr un = cast(UnaryExpr) n)
+                resolved = un.resolvedOperator;
+            else if (IndexExpr idx = cast(IndexExpr) n)
+                resolved = idx.resolvedOperator;
+            else if (AssignStmt ass = cast(AssignStmt) n)
+                resolved = ass.resolvedIndexSetOperator;
+            if (resolved !is null && n.pos !is null && n.pos.filename == doc.path)
+            {
+                bool afterStart = line > n.pos.start.line || (line == n.pos.start.line && col >= n.pos.start.offset);
+                bool beforeEnd = line < n.pos.end.line || (line == n.pos.end.line && col <= n.pos.end.offset);
+                if (afterStart && beforeEnd)
+                {
+                    ulong span = (cast(ulong)(n.pos.end.line - n.pos.start.line) << 32)
+                        | cast(ulong)(n.pos.end.offset >= n.pos.start.offset ? n.pos.end.offset - n.pos.start.offset : 0);
+                    if (span <= bestSpan)
+                    {
+                        bestSpan = span;
+                        best = resolved;
+                        opPos = n.pos;
+                    }
+                }
+            }
+            foreach (Node ch; childNodes(n))
+                scan(ch);
+        }
+
+        scan(doc.analysis.program);
+        return best;
+    }
+
+    private Position[] operatorUsagePositions(Document doc, FnDecl opMethod)
+    {
+        Position[] hits;
+        if (doc is null || doc.analysis.program is null || opMethod is null)
+            return hits;
+        bool[Node] seen;
+        void scan(Node n)
+        {
+            if (n is null || n in seen)
+                return;
+            seen[n] = true;
+            FnDecl resolved = null;
+            if (BinaryExpr bin = cast(BinaryExpr) n)
+                resolved = bin.resolvedOperator;
+            else if (UnaryExpr un = cast(UnaryExpr) n)
+                resolved = un.resolvedOperator;
+            else if (IndexExpr idx = cast(IndexExpr) n)
+                resolved = idx.resolvedOperator;
+            else if (AssignStmt ass = cast(AssignStmt) n)
+                resolved = ass.resolvedIndexSetOperator;
+            if (resolved !is null && resolved.linkName == opMethod.linkName && n.pos !is null
+                    && n.pos.filename == doc.path)
+                hits ~= n.pos;
+            foreach (Node ch; childNodes(n))
+                scan(ch);
+        }
+
+        scan(doc.analysis.program);
+        return hits;
+    }
+
     JSONValue semanticTokens(Document doc)
     {
         return buildSemanticTokens(doc);
@@ -196,7 +383,7 @@ class LanguageServer
     JSONValue request(string method, JSONValue params)
     {
         if (method == "initialize")
-            return initialize();
+            return initialize(params);
         if (method == "shutdown")
         {
             shutdownRequested = true;
@@ -209,17 +396,23 @@ class LanguageServer
         ]);
         if (method == "workspace/symbol")
         {
+            ensureProjectIndexed();
             JSONValue[] symbols;
+            bool[string] seenKeys;
             string query = str(params, "query");
             foreach (Document doc; documents)
                 foreach (SymbolEntry symbol; doc.symbols)
-                    if (symbol.declaration && symbol.name.canFind(query))
+                    if (symbol.declaration && symbol.position.filename == doc.path
+                            && symbol.name.canFind(query) && symbol.key !in seenKeys)
+                    {
+                        seenKeys[symbol.key] = true;
                         symbols ~= JSONValue([
-                        "name": JSONValue(symbol.name),
-                        "kind": JSONValue(symbol.kind == "class" ? 5 : symbol.kind == "function"
-                                ? 12 : 13),
-                        "location": location(doc, symbol.position, symbol.name.to!dstring.length)
-            ]);
+                            "name": JSONValue(symbol.name),
+                            "kind": JSONValue(symbol.kind == "class" ? 5 : symbol.kind == "function"
+                                    ? 12 : symbol.kind == "method" ? 6 : 13),
+                            "location": location(doc, symbol.position, symbol.name.to!dstring.length)
+                        ]);
+                    }
             return arrayJSON(symbols);
         }
         Document doc = ensure(params);
@@ -249,12 +442,70 @@ class LanguageServer
                 ])
             ]);
         }
+        if (method == "textDocument/rangeFormatting")
+        {
+            import frontend.formatter : formatDelegua;
+
+            JSONValue reqRange = get(params, "range");
+            JSONValue startPos = get(reqRange, "start");
+            JSONValue endPos = get(reqRange, "end");
+            long startLine = integer(startPos, "line");
+            long endLine = integer(endPos, "line");
+            long endChar = integer(endPos, "character");
+            if (startLine < 0)
+                startLine = 0;
+            if (endChar == 0 && endLine > startLine)
+                endLine--;
+            if (!doc.lines.length || startLine >= cast(long) doc.lines.length)
+                return arrayJSON([]);
+            if (endLine >= cast(long) doc.lines.length)
+                endLine = cast(long) doc.lines.length - 1;
+            if (endLine < startLine)
+                return arrayJSON([]);
+            string[] slice = doc.lines[cast(size_t) startLine .. cast(size_t) endLine + 1];
+            string indent = "";
+            size_t minIndent = size_t.max;
+            foreach (string ln; slice)
+            {
+                if (!ln.strip.length)
+                    continue;
+                size_t sp = 0;
+                while (sp < ln.length && (ln[sp] == ' ' || ln[sp] == '\t'))
+                    sp++;
+                if (sp < minIndent)
+                {
+                    minIndent = sp;
+                    indent = ln[0 .. sp];
+                }
+            }
+            string rawSlice = slice.join("\n") ~ "\n";
+            string formattedSlice = formatDelegua(rawSlice);
+            string[] fmtLines = formattedSlice.splitLines();
+            if (indent.length)
+            {
+                foreach (ref string ln; fmtLines)
+                    if (ln.length)
+                        ln = indent ~ ln;
+            }
+            string replacement = fmtLines.join("\n");
+            string original = slice.join("\n");
+            if (replacement == original)
+                return arrayJSON([]);
+            uint lastLen = doc.utf16(cast(uint) endLine, cast(uint) doc.lines[cast(size_t) endLine].to!dstring.length);
+            return arrayJSON([
+                JSONValue([
+                    "range": rangeJSON(point(cast(uint) startLine, 0), point(cast(uint) endLine, lastLen)),
+                    "newText": JSONValue(replacement)
+                ])
+            ]);
+        }
         if (method == "textDocument/completion")
             return completions(doc, params);
         if (method == "textDocument/hover")
         {
             import ctfe.ctfe_flags : CTFEFlags;
             import ctfe.evaluation : pureCallTarget;
+            import frontend.semantic.value_types : hasOwnershipResource, isBorrowedViewType;
 
             string content = selected is null ? "" : "```delegua\n" ~ selected.detail ~ "\n```";
             JSONValue hoverRange = selected is null ? JSONValue.init
@@ -263,6 +514,50 @@ class LanguageServer
             if (selected !is null && (selected.kind == "function" || selected.kind == "method"))
                 if (FnDecl* functionNode = selected.key in doc.functions)
                     target = *functionNode;
+            if (target !is null)
+            {
+                if (target.isGpu)
+                    content ~= "\n\nContrato `@gpu`: kernel numérico verificável (backend CPU/GPU, sem GC).";
+                else if (target.isNative)
+                    content ~= "\n\nContrato `@nativo`: geração C99 direta sem boxing e sem GC interno.";
+                if (target.operatorSymbol.length)
+                    content ~= "\n\nOperador personalizado: `@operador(\"" ~ target.operatorSymbol.to!string ~ "\")`.";
+                if (target.ownerClass !is null && target.ownerClass.isValueType)
+                    content ~= "\n\nMétodo de classe por valor `@pilha` (executado diretamente sobre struct C).";
+            }
+            if (selected !is null)
+            {
+                if (ClassDecl* clsPtr = selected.key in doc.symbolTypeDecls)
+                {
+                    ClassDecl cls = *clsPtr;
+                    if (cls !is null && cls.isValueType)
+                        content ~= cls.isTrivialCopy
+                            ? "\n\nMemória: `@pilha` (`Copy` trivial, sem alocação individual no GC)."
+                            : "\n\nMemória: `@pilha` (`Owned` não-trivial, destruição determinística RAII).";
+                }
+                if (VarDecl* varPtr = selected.key in doc.variableDeclarations)
+                {
+                    VarDecl vd = *varPtr;
+                    if (vd !is null && vd.type_sema !is null)
+                    {
+                        if (isBorrowedViewType(vd.type_sema))
+                            content ~= "\n\nMemória: visão emprestada (`BorrowedView`, não pode escapar do escopo do dono).";
+                        else if (hasOwnershipResource(vd.type_sema))
+                            content ~= "\n\nMemória: recurso proprietário (`Owned`, destruição determinística RAII e transferência por move).";
+                    }
+                }
+            }
+            if (selected is null)
+            {
+                Position opPos;
+                if (FnDecl opMethod = operatorAt(doc, position, opPos))
+                {
+                    string owner = opMethod.ownerClass !is null ? opMethod.ownerClass.name.to!string ~ "." : "";
+                    content = "```delegua\n@operador(\"" ~ opMethod.operatorSymbol.to!string ~ "\") "
+                        ~ owner ~ doc.signature(opMethod) ~ "\n```\n\nOperador personalizado resolvido estaticamente.";
+                    hoverRange = doc.positionRange(opPos);
+                }
+            }
             if (target !is null && target.classFactory is null && (target.ctfe_flags & CTFEFlags.Pure))
             {
                 bool proven;
@@ -299,20 +594,38 @@ class LanguageServer
             ]);
         }
 
-        if (method == "textDocument/definition")
+        if (method == "textDocument/definition" || method == "textDocument/declaration")
         {
             if (selected is null || !selected.key.length)
+            {
+                Position opPos;
+                if (FnDecl opMethod = operatorAt(doc, position, opPos))
+                    if (opMethod.pos !is null)
+                        return location(doc, opMethod.pos, opMethod.fn.length);
                 return JSONValue.init;
+            }
+            if (Position* modPos = selected.key in doc.modulePositions)
+                return location(doc, *modPos, 1);
             foreach (SymbolEntry symbol; doc.symbols)
                 if (symbol.declaration && symbol.key == selected.key)
                     return location(doc, symbol.position, symbol.name.to!dstring.length);
             return JSONValue.init;
+        }
+        if (method == "textDocument/typeDefinition")
+        {
+            ClassDecl cls = doc.typeDeclAt(position);
+            if (cls is null || cls.pos is null)
+                return JSONValue.init;
+            return location(doc, cls.pos, cls.name.to!dstring.length);
         }
         if (method == "textDocument/references" || method == "textDocument/documentHighlight")
         {
             JSONValue[] result;
             if (selected is null || !selected.key.length)
                 return arrayJSON();
+            if (method == "textDocument/references")
+                ensureProjectIndexed(doc.path);
+            bool[string] seenRef;
             foreach (Document other; documents)
                 foreach (SymbolEntry symbol; other.symbols)
                     if (symbol.key == selected.key && (method != "textDocument/documentHighlight"
@@ -325,8 +638,39 @@ class LanguageServer
                             "kind": JSONValue(1)
                         ]);
                         else
+                        {
+                            string refId = Document.identity(symbol.position);
+                            if (refId in seenRef)
+                                continue;
+                            seenRef[refId] = true;
                             result ~= location(other, symbol.position, symbol.name.to!dstring.length);
+                        }
                     }
+            if (FnDecl* fnPtr = selected.key in doc.functions)
+            {
+                FnDecl opFn = *fnPtr;
+                if (opFn !is null && opFn.operatorSymbol.length)
+                {
+                    foreach (Document other; documents)
+                        foreach (Position usePos; operatorUsagePositions(other, opFn))
+                        {
+                            string refId = Document.identity(usePos);
+                            if (refId in seenRef)
+                                continue;
+                            seenRef[refId] = true;
+                            if (method == "textDocument/documentHighlight")
+                            {
+                                if (other.path == doc.path)
+                                    result ~= JSONValue([
+                                        "range": doc.positionRange(usePos),
+                                        "kind": JSONValue(1)
+                                    ]);
+                            }
+                            else
+                                result ~= location(other, usePos, 1);
+                        }
+                }
+            }
             return arrayJSON(result);
         }
         if (method == "textDocument/prepareRename")
@@ -340,6 +684,7 @@ class LanguageServer
         }
         if (method == "textDocument/rename")
         {
+            ensureProjectIndexed(doc.path);
             string name = str(params, "newName");
             Diagnostics diagnostics = new Diagnostics;
             Token[] tokens = new Lexer(name, "rename", diagnostics).tokenizer();
@@ -552,12 +897,16 @@ class LanguageServer
                     return;
                 seen[node] = true;
                 if (ImportExpr imported = cast(ImportExpr) node)
-                    if (imported.target !is null && imported.pos.filename == doc.path)
+                    if (imported.target !is null && imported.pos !is null && imported.pos.filename == doc.path)
+                    {
+                        Position linkPos = (imported.path !is null && imported.path.pos !is null)
+                            ? imported.path.pos : imported.pos;
                         links ~= JSONValue([
-                        "range": doc.positionRange(imported.path.pos),
-                        "target": JSONValue(fileURI(imported.target.path)),
-                        "tooltip": JSONValue("Abrir módulo Delégua")
-                ]);
+                            "range": doc.positionRange(linkPos),
+                            "target": JSONValue(fileURI(imported.target.path)),
+                            "tooltip": JSONValue("Abrir módulo Delégua")
+                        ]);
+                    }
                 foreach (Node child; childNodes(node))
                     visit(child);
             }

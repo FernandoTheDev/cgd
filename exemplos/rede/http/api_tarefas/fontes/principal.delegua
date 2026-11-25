@@ -1,0 +1,121 @@
+modulo principal
+
+importar cgd.rede.http como HTTP
+importar cgd.nativo como Nat
+
+classe ApiTarefas {
+    servidor: HTTP.Servidor
+    tarefas: dicionario[]
+    proximoId: inteiro = 1
+
+    construtor() {
+        isto.servidor = HTTP.Servidor()
+        isto.tarefas = []
+        isto.configurarRotas()
+    }
+
+    saude(req: qualquer, res: qualquer): vazio {
+        res.json({ status: "ok", totalTarefas: tamanho(isto.tarefas) })
+    }
+
+    listar(req: qualquer, res: qualquer): vazio {
+        res.json({ itens: isto.tarefas })
+    }
+
+    criar(req: qualquer, res: qualquer): vazio {
+        var dados: dicionario = req.json()
+        var titulo: texto = texto(dados.obter("titulo", "")).aparar()
+        se tamanho(titulo) == 0 {
+            res.status(400).json({ erro: "Campo 'titulo' é obrigatório" })
+            retorna
+        }
+        var nova: dicionario = { id: isto.proximoId, titulo: titulo, concluida: falso }
+        isto.proximoId = isto.proximoId + 1
+        isto.tarefas.adicionar(nova)
+        res.status(201).json(nova)
+    }
+
+    concluir(req: qualquer, res: qualquer): vazio {
+        var idAlvo: inteiro = inteiro(req.parametro("id", "0"))
+        para cada item: dicionario em isto.tarefas {
+            se item["id"] == idAlvo {
+                item["concluida"] = verdadeiro
+                res.json(item)
+                retorna
+            }
+        }
+        res.status(404).json({ erro: "Tarefa não encontrada" })
+    }
+
+    encerrar(req: qualquer, res: qualquer): vazio {
+        res.json({ encerrando: verdadeiro }).pararServidor()
+    }
+
+    configurarRotas(): vazio {
+        isto.servidor.obter("/saude", isto.saude)
+        isto.servidor.obter("/tarefas", isto.listar)
+        isto.servidor.publicar("/tarefas", isto.criar)
+        isto.servidor.atualizar("/tarefas/:id/concluir", isto.concluir)
+        isto.servidor.publicar("/encerrar", isto.encerrar)
+    }
+}
+
+assincrona funcao requisitar(porta: inteiro, metodo: texto, caminho: texto, corpo: texto = ""): texto {
+    var sock: qualquer = importar("cgd:sockets")
+    var c: qualquer = aguardar sock.conectarAsync("127.0.0.1", porta, 5000)
+    var req: texto = metodo + " " + caminho + " HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n"
+    se tamanho(corpo) > 0 {
+        req = req + "Content-Type: application/json\r\nContent-Length: " + texto(tamanho(corpo)) + "\r\n\r\n" + corpo
+    } senao {
+        req = req + "\r\n"
+    }
+    aguardar c.enviarAsync(req, 5000)
+    var resp: texto = ""
+    enquanto verdadeiro {
+        var ped: texto = aguardar c.receberAsync(4096, 5000)
+        se tamanho(ped) == 0 {
+            sustar
+        }
+        resp = resp + ped
+    }
+    c.fechar()
+    retorna resp
+}
+
+assincrona funcao executarAutoTeste(): vazio {
+    var api: ApiTarefas = ApiTarefas()
+    api.servidor.abrir("127.0.0.1", 0)
+    var porta: inteiro = api.servidor.portaLocal()
+    api.servidor.fechar()
+    var srvTask: Promessa<vazio> = api.servidor.escutarAsync("127.0.0.1", porta)
+
+    var r1: texto = aguardar requisitar(porta, "POST", "/tarefas", '{"titulo":"Compilar CGD"}')
+    assercao(r1.contem("201") e r1.contem("Compilar CGD"))
+    var r2: texto = aguardar requisitar(porta, "PUT", "/tarefas/1/concluir")
+    assercao(r2.contem('"concluida":true'))
+    var r3: texto = aguardar requisitar(porta, "GET", "/saude")
+    assercao(r3.contem('"totalTarefas":1'))
+    var r4: texto = aguardar requisitar(porta, "POST", "/encerrar")
+    assercao(r4.contem("encerrando"))
+    aguardar srvTask
+    escreva("API-TAREFAS-OK\n")
+}
+
+funcao main(): vazio {
+    var args: texto[] = Nat.Primitivas.sistemaArgumentos()
+    var teste: logico = falso
+    para cada a: texto em args {
+        se a == "--teste" {
+            teste = verdadeiro
+        }
+    }
+    se teste {
+        executarAutoTeste()
+        retorna
+    }
+    var api: ApiTarefas = ApiTarefas()
+    escreva("API de Tarefas escutando em http://127.0.0.1:8080\n")
+    api.servidor.escutar("127.0.0.1", 8080)
+}
+
+main()

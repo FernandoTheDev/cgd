@@ -17,6 +17,11 @@ import backend.c.async_codegen;
 import backend.c.descriptors;
 import backend.c.lvalue;
 import backend.c.foreign;
+import backend.c.native_codegen;
+import middle.memory_model;
+import middle.ans;
+import frontend.semantic.native_validation : isNativeCastName;
+import frontend.semantic.ownership : OwnershipInfo;
 import frontend.parser;
 import backend.c.utils;
 
@@ -45,7 +50,182 @@ private:
     bool[ClassDecl] classesWithSubclasses;
     bool[dstring] referencedNames;
     bool dynamicMethodDispatch = false;
+    public bool emitDebugLines = false;
+    public string[string] debugFunctionNames;
+    public OwnershipInfo ownershipInfo;
+    public MemoryPlan memoryPlan;
+    private NativeCodegen nativeCg;
+    private AnsCodegen ansCg;
+    private dstring[][] detFreeScopes;
+    private size_t[] loopDetScopeDepth;
+    private size_t[] breakDetScopeDepth;
     package ClassDecl currentClass;
+
+    private bool isSubclassOrSame(ClassDecl sub, ClassDecl base)
+    {
+        if (sub is null || base is null)
+            return false;
+        ClassDecl cur = sub;
+        size_t guard = 0;
+        while (cur !is null && guard < 64)
+        {
+            if (cur is base)
+                return true;
+            cur = cur.superClass;
+            guard++;
+        }
+        return false;
+    }
+
+    private void pushDetScope()
+    {
+        detFreeScopes ~= (dstring[]).init;
+    }
+
+    private dstring popDetScopeCode()
+    {
+        if (detFreeScopes.length == 0)
+            return ""d;
+        dstring[] vars = detFreeScopes[$ - 1];
+        detFreeScopes.length--;
+        if (vars.length == 0)
+            return ""d;
+        dstring[] lines;
+        foreach_reverse (dstring v; vars)
+            lines ~= formatD("cgd_gc_free_det_value(%s);", v);
+        return lines.join("\n");
+    }
+
+    private dstring detFreeCode(size_t limit)
+    {
+        dstring[] lines;
+        for (size_t i = detFreeScopes.length; i > limit; --i)
+        {
+            dstring[] vars = detFreeScopes[i - 1];
+            foreach_reverse (dstring v; vars)
+                lines ~= formatD("cgd_gc_free_det_value(%s);", v);
+        }
+        return lines.join("\n");
+    }
+
+    private bool hasDetFreeVars(size_t limit = 0)
+    {
+        for (size_t i = detFreeScopes.length; i > limit; --i)
+            if (detFreeScopes[i - 1].length > 0)
+                return true;
+        return false;
+    }
+
+    private bool isValueTypeExpr(Node n)
+    {
+        if (n is null || n.type_sema is null)
+            return false;
+        if (TypeSemaClass cls = cast(TypeSemaClass) n.type_sema)
+            return cls.declaration !is null && cls.declaration.isValueType;
+        return false;
+    }
+
+    private dstring emitManagedMathCall(dstring fnName, Node[] args)
+    {
+        dstring numArg(Node a)
+        {
+            return formatD("(delegua_op_cast(%s, DELEGUA_T_REAL).value.real)", materialize(a, true));
+        }
+
+        switch (fnName)
+        {
+            case "raiz":
+            case "raizQuadrada":
+                return formatD("create_real(sqrt(%s))", numArg(args[0]));
+            case "seno":
+                return formatD("create_real(sin(%s))", numArg(args[0]));
+            case "cosseno":
+                return formatD("create_real(cos(%s))", numArg(args[0]));
+            case "tangente":
+                return formatD("create_real(tan(%s))", numArg(args[0]));
+            case "absoluto":
+                return formatD("create_real(fabs(%s))", numArg(args[0]));
+            case "piso":
+                return formatD("create_real(floor(%s))", numArg(args[0]));
+            case "teto":
+                return formatD("create_real(ceil(%s))", numArg(args[0]));
+            case "arredondar":
+                return formatD("create_real(round(%s))", numArg(args[0]));
+            case "logaritmo":
+                return formatD("create_real(log(%s))", numArg(args[0]));
+            case "exponencial":
+                return formatD("create_real(exp(%s))", numArg(args[0]));
+            case "arcoSeno":
+                return formatD("create_real(asin(%s))", numArg(args[0]));
+            case "arcoCosseno":
+                return formatD("create_real(acos(%s))", numArg(args[0]));
+            case "arcoTangente":
+                return formatD("create_real(atan(%s))", numArg(args[0]));
+            case "potencia":
+            case "potência":
+                return formatD("create_real(pow(%s, %s))", numArg(args[0]), numArg(args[1]));
+            case "minimo":
+            case "mínimo":
+                return formatD("create_real(fmin(%s, %s))", numArg(args[0]), numArg(args[1]));
+            case "maximo":
+            case "máximo":
+                return formatD("create_real(fmax(%s, %s))", numArg(args[0]), numArg(args[1]));
+            case "arcoTangente2":
+                return formatD("create_real(atan2(%s, %s))", numArg(args[0]), numArg(args[1]));
+            default:
+                return "create_real(0.0)"d;
+        }
+    }
+
+    private dstring emitManagedCCast(dstring ctype, dstring argExpr)
+    {
+        switch (ctype)
+        {
+            case "ci8":
+                return formatD("create_num((int64_t)(int8_t)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "cu8":
+                return formatD("create_num((int64_t)(uint8_t)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "cchar":
+                return formatD("create_num((int64_t)(char)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "cschar":
+                return formatD("create_num((int64_t)(signed char)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "cuchar":
+                return formatD("create_num((int64_t)(unsigned char)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "ci16":
+                return formatD("create_num((int64_t)(int16_t)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "cu16":
+                return formatD("create_num((int64_t)(uint16_t)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "ci32":
+                return formatD("create_num((int64_t)(int32_t)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "cu32":
+                return formatD("create_num((int64_t)(uint32_t)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "ci64":
+            case "clong":
+                return formatD("create_num((int64_t)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "cu64":
+            case "culong":
+            case "csize":
+                return formatD("create_num((int64_t)(size_t)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "cshort":
+                return formatD("create_num((int64_t)(short)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "cushort":
+                return formatD("create_num((int64_t)(unsigned short)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "cint":
+                return formatD("create_num((int64_t)(int)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "cuint":
+                return formatD("create_num((int64_t)(unsigned int)(delegua_op_cast(%s, DELEGUA_T_NUM).value.num))", argExpr);
+            case "cf32":
+            case "cfloat":
+                return formatD("create_real((double)(float)(delegua_op_cast(%s, DELEGUA_T_REAL).value.real))", argExpr);
+            case "cf64":
+            case "cdouble":
+                return formatD("create_real((double)(delegua_op_cast(%s, DELEGUA_T_REAL).value.real))", argExpr);
+            case "cbool":
+                return formatD("create_bool(delegua_is_truthy(%s))", argExpr);
+            default:
+                return argExpr;
+        }
+    }
     TypeExpr functionReturn;
     package dstring asyncSelf;
     package dstring descriptor(TypeExpr type)
@@ -147,8 +327,15 @@ private:
             return null;
         if (ImportExpr imp = cast(ImportExpr) expr)
             return imp.target;
+        if (MemberExpr member = cast(MemberExpr) expr)
+        {
+            if (member.resolvedModule !is null)
+                return member.resolvedModule;
+        }
         if (Identifier id = cast(Identifier) expr)
         {
+            if (id.moduleRef !is null)
+                return id.moduleRef;
             if (id.variableRef !is null && id.variableRef.isConst && !id.variableRef.uninitialized
                     && id.variableRef.value !is null)
                 return staticModuleOf(id.variableRef.value, depth + 1);
@@ -616,6 +803,7 @@ private:
     {
         dstring output, label;
         size_t depth;
+        size_t detDepth;
     }
 
     Collector[] collectors;
@@ -624,11 +812,13 @@ private:
     {
         continueLabels ~= label;
         loopTryDepth ~= cleanups.length;
+        loopDetScopeDepth ~= detFreeScopes.length;
         breakLabels ~= label ~ "_break";
         breakTryDepth ~= cleanups.length;
+        breakDetScopeDepth ~= detFreeScopes.length;
         if (pendingCollector.length)
         {
-            collectors ~= Collector(pendingCollector, label, cleanups.length);
+            collectors ~= Collector(pendingCollector, label, cleanups.length, detFreeScopes.length);
             pendingCollector = "";
         }
     }
@@ -637,8 +827,10 @@ private:
     {
         continueLabels.length--;
         loopTryDepth.length--;
+        loopDetScopeDepth.length--;
         breakLabels.length--;
         breakTryDepth.length--;
+        breakDetScopeDepth.length--;
         if (collectors.length && collectors[$ - 1].label == label)
             collectors.length--;
     }
@@ -648,8 +840,12 @@ private:
         LValue lv = resolveLValue(assign.left, assign.value);
         dstring value;
         if (assign.op == TokenKind.Equals)
+        {
             value = (!resultNeeded && lv.kind == LValueKind.Var) ? compileExpr(assign.value) : materialize(assign.value,
                     true);
+            if (isValueTypeExpr(assign.value))
+                value = formatD("delegua_clonar(%s)", value);
+        }
         else
         {
             dstring old = lv.kind == LValueKind.Var && !canMutateVar(assign.value,
@@ -700,6 +896,7 @@ private:
             done = formatD("cgd_done_%s", tmp++);
         breakLabels ~= label;
         breakTryDepth ~= cleanups.length;
+        breakDetScopeDepth ~= detFreeScopes.length;
         dstring[] result = [formatD("{bool %s=false;", done)];
         foreach (SwitchCase c; node.cases)
         {
@@ -724,6 +921,7 @@ private:
         result ~= labelDeclaration(label) ~ " }";
         breakLabels.length--;
         breakTryDepth.length--;
+        breakDetScopeDepth.length--;
         return result.join("\n");
     }
 
@@ -735,7 +933,7 @@ private:
     }
 
     Cleanup[] cleanups;
-    dstring classValue(ClassDecl c)
+    dstring classValue(const(ClassDecl) c)
     {
         return c.signature.builtinName.length ? formatD("delegua_builtin(%s)",
                 cString(c.signature.builtinName)) : cName(c.signature.linkName);
@@ -994,18 +1192,30 @@ private:
     dstring loopCode(Node condition, Node[] body, Node step = null, bool post = false)
     {
         dstring label = formatD("cgd_continue_%d", tmp++);
+        bool emitSp = memoryPlan is null || memoryPlan.config.enableSafepoints;
+        dstring spCounter = emitSp ? formatD("cgd_sp_%d", tmp++) : ""d;
         enterLoop(label);
+        pushDetScope();
         dstring setup;
         dstring testExpr = condition is null ? ""d : compileCondition(condition, setup);
         dstring check = ""d;
         if (condition !is null)
             check = setup.length ? setup ~ formatD("\nif (!(%s)) break;",
                     testExpr) : formatD("if (!(%s)) break;", testExpr);
-        dstring[] result = ["while (1) {"d];
+        dstring[] result;
+        if (emitSp)
+            result ~= formatD("{ u32 %s = 0; while (1) {", spCounter);
+        else
+            result ~= "while (1) {"d;
+        if (emitSp)
+            result ~= formatD("if (DELEGUA_UNLIKELY((++%s & 1023U) == 0U)) cgd_gc_safepoint();", spCounter);
         if (!post && check.length)
             result ~= check;
         foreach (Node child; body)
             result ~= compileStmtOrdered(child);
+        dstring detBodyFree = popDetScopeCode();
+        if (detBodyFree.length)
+            result ~= detBodyFree;
         dstring contLabel = labelDeclaration(label);
         if (contLabel.length)
             result ~= contLabel;
@@ -1017,11 +1227,14 @@ private:
         dstring brkLabel = labelDeclaration(label ~ "_break");
         if (brkLabel.length)
             result ~= brkLabel;
+        if (emitSp)
+            result ~= "}";
         leaveLoop(label);
         return result.join("\n");
     }
 
     dstring[] includes = [
+        `#include <math.h>`,
         `#include "vendor/delegua-runtime/src/delegua_rt.h"`,
         `#include "vendor/delegua-runtime/src/assincrono.h"`
     ];
@@ -1092,8 +1305,12 @@ private:
                 dstring iterable = materialize(loop.iterable, false);
                 dstring idx = formatD("cgd_idx_%d", tmp++);
                 dstring label = formatD("cgd_continue_%d", tmp++);
+                bool emitSp = memoryPlan is null || memoryPlan.config.enableSafepoints;
                 enterLoop(label);
+                pushDetScope();
                 dstring[] body;
+                if (emitSp)
+                    body ~= formatD("if (DELEGUA_UNLIKELY((%s & 1023U) == 0U)) cgd_gc_safepoint();", idx);
                 if (loop.bindingType !is null && loop.bindingType.toStr() != "qualquer")
                     body ~= atSite(formatD("%s=%s", cName(loop.name), checked(cName(loop.name),
                             loop.bindingType)), loop.pos) ~ ";";
@@ -1106,6 +1323,9 @@ private:
                 }
                 foreach (Node child; loop.body)
                     body ~= compileStmtOrdered(child);
+                dstring detEachFree = popDetScopeCode();
+                if (detEachFree.length)
+                    body ~= detEachFree;
                 leaveLoop(label);
                 return formatD("for (sz %s = 0; %s < delegua_tamanho(%s); ++%s) {\n%s %s = delegua_iterar(%s, %s);\n%s\n%s\n%s\n}\n%s",
                         idx, idx, iterable, idx, localValueDecl(), cName(loop.name), iterable,
@@ -1126,42 +1346,79 @@ private:
                 return loopCode(loop.condition, loop.body, null, true);
             case NodeKind.BreakStmt:
                 referencedLabels[breakLabels[$ - 1]] = true;
+                dstring bDet = detFreeCode(breakDetScopeDepth[$ - 1]);
                 dstring bClean = cleanupCode(breakTryDepth[$ - 1]);
-                return bClean.length ? bClean ~ "\ngoto " ~ breakLabels[$ - 1] ~ ";" : "goto " ~ breakLabels[$ - 1]
+                dstring bPrefix = bDet.length ? (bClean.length ? bDet ~ "\n" ~ bClean : bDet) : bClean;
+                return bPrefix.length ? bPrefix ~ "\ngoto " ~ breakLabels[$ - 1] ~ ";" : "goto " ~ breakLabels[$ - 1]
                     ~ ";";
             case NodeKind.ContinueStmt:
                 referencedLabels[continueLabels[$ - 1]] = true;
+                dstring cDet = detFreeCode(loopDetScopeDepth[$ - 1]);
                 dstring cClean = cleanupCode(loopTryDepth[$ - 1]);
-                return cClean.length ? cClean ~ "\ngoto " ~ continueLabels[$ - 1] ~ ";" : "goto "
+                dstring cPrefix = cDet.length ? (cClean.length ? cDet ~ "\n" ~ cClean : cDet) : cClean;
+                return cPrefix.length ? cPrefix ~ "\ngoto " ~ continueLabels[$ - 1] ~ ";" : "goto "
                     ~ continueLabels[$ - 1] ~ ";";
             case NodeKind.VarDecl:
                 VarDecl var = cast(VarDecl) node;
+                const(LocalAllocPlan)* lp = memoryPlan !is null ? memoryPlan.localPlanOf(var) : null;
+                if (lp !is null && lp.domain == StorageDomain.StackLocal && lp.stackClass !is null)
+                {
+                    if (CallExpr ctorCall = cast(CallExpr) var.value)
+                    {
+                        dstring prevDeclaringS = currentDeclaringVar;
+                        currentDeclaringVar = var.name;
+                        dstring stkBuf = formatD("cgd_stk_%s", tmp++);
+                        dstring cargs = nodesToStr(ctorCall.args);
+                        currentDeclaringVar = prevDeclaringS;
+                        size_t bufSlots = lp.stackSlots + 1;
+                        emitLocal(formatD("union { long double _a; delegua_value _v; unsigned char _b[128 + %s * sizeof(delegua_value)]; } %s;",
+                                bufSlots, stkBuf));
+                        dstring initCall = formatD("delegua_init_stack_objeto(%s._b, sizeof(%s._b), %s, %s, %s)",
+                                stkBuf, stkBuf, classValue(lp.stackClass), ctorCall.args.length,
+                                ctorCall.args.length ? "(delegua_value[]){" ~ cargs ~ "}" : "NULL");
+                        dstring siteInit = atSite(initCall, ctorCall.pos);
+                        return formatD("%s %s = %s;", localValueDecl(), cName(var.name), checked(siteInit,
+                                var.uninitialized ? null : var.type_expr, var.pos, var.value)) ~ acknowledgeLocal(
+                                cName(var.name));
+                    }
+                }
                 dstring prevDeclaring = currentDeclaringVar;
                 currentDeclaringVar = var.name;
                 bool selfRef = exprReferencesVar(var.value, var.name);
                 dstring initial = selfRef ? materialize(var.value, false) : compileExpr(var.value);
                 currentDeclaringVar = prevDeclaring;
+                if (!var.uninitialized && isValueTypeExpr(var.value))
+                    initial = formatD("delegua_clonar(%s)", initial);
+                if (lp !is null && lp.domain == StorageDomain.DeterministicHeap && lp.freeAtScopeExit
+                        && detFreeScopes.length > 0)
+                    detFreeScopes[$ - 1] ~= cName(var.name);
                 return formatD("%s %s = %s;", localValueDecl(), cName(var.name), checked(initial,
                         var.uninitialized ? null : var.type_expr, var.pos, var.value)) ~ acknowledgeLocal(
                         cName(var.name));
 
             case NodeKind.ReturnStmt:
                 ReturnStmt ret = cast(ReturnStmt) node;
-                bool needsSnapshot = cleanups.length > 0 || ret.collectionReturn;
+                bool anyDetFree = hasDetFreeVars(ret.collectionReturn ? collectors[$ - 1].detDepth : 0);
+                bool needsSnapshot = cleanups.length > 0 || anyDetFree || ret.collectionReturn || emitDebugLines;
                 dstring value = ret.val is null ? "create_nulo()"d : (needsSnapshot
-                        ? materialize(ret.val, cleanups.length == 0) : compileExpr(ret.val));
+                        ? materialize(ret.val, !emitDebugLines && cleanups.length == 0 && !anyDetFree)
+                        : compileExpr(ret.val));
                 if (ret.collectionReturn)
                 {
                     Collector collector = collectors[$ - 1];
                     referencedLabels[collector.label] = true;
+                    dstring rDet = detFreeCode(collector.detDepth);
                     dstring rClean = cleanupCode(collector.depth);
+                    dstring rPrefix = rDet.length ? (rClean.length ? rDet ~ "\n" ~ rClean : rDet) : rClean;
                     dstring stmt = formatD("delegua_vetor_adicionar(&%s,%s); goto %s;",
                             collector.output, value, collector.label);
-                    return rClean.length ? rClean ~ "\n" ~ stmt : stmt;
+                    return rPrefix.length ? rPrefix ~ "\n" ~ stmt : stmt;
                 }
+                dstring rDetAll = detFreeCode(0);
                 dstring clean = cleanupCode(0);
+                dstring prefix = rDetAll.length ? (clean.length ? rDetAll ~ "\n" ~ clean : rDetAll) : clean;
                 dstring retStmt = formatD("return %s;", checked(value, functionReturn, ret.pos, ret.val));
-                return clean.length ? clean ~ "\n" ~ retStmt : retStmt;
+                return prefix.length ? prefix ~ "\n" ~ retStmt : retStmt;
 
             case NodeKind.UnaryExpr:
                 UnaryExpr unary = cast(UnaryExpr) node;
@@ -1188,10 +1445,14 @@ private:
                 return ";";
             case NodeKind.BlockStmt:
                 BlockStmt block = cast(BlockStmt) node;
+                pushDetScope();
                 dstring[] body;
 
                 foreach (Node child; block.body)
                     body ~= compileStmtOrdered(child);
+                dstring detBlkFree = popDetScopeCode();
+                if (detBlkFree.length)
+                    body ~= detBlkFree;
 
                 return "{\n" ~ body.join("\n") ~ "\n}";
 
@@ -1238,16 +1499,51 @@ private:
     // nunca vazem para antes de statements anteriores do mesmo
     // bloco (o bug do `i++` saindo antes de `a_bits`/`b_bits`).
     // -------------------------------------------------------------
+    private dstring debugLineDirective(Node node)
+    {
+        if (!emitDebugLines || node is null || node.pos is null || !node.pos.filename.length || node.pos.start.line == 0)
+            return ""d;
+        import std.path : absolutePath, asNormalizedPath;
+
+        string absFile = absolutePath(node.pos.filename).asNormalizedPath.to!string;
+        dstring escaped;
+        foreach (char ch; absFile)
+        {
+            if (ch == '\\' || ch == '"')
+                escaped ~= '\\';
+            escaped ~= ch;
+        }
+        return formatD("\n#line %s \"%s\"\n", node.pos.start.line, escaped);
+    }
+
     dstring compileStmtOrdered(Node node)
     {
         pushFrame();
         dstring result = compileStmt(node);
         dstring[] sideEffects = popFrame();
 
-        if (sideEffects.length == 0)
-            return result;
+        dstring lineDir = debugLineDirective(node);
+        if (!lineDir.length)
+        {
+            if (sideEffects.length == 0)
+                return result;
+            return (sideEffects ~ result).join("\n");
+        }
+        dstring combined = sideEffects.length == 0 ? result : (sideEffects ~ result).join("\n");
+        // Em modo de depuração, prefixa cada linha física gerada para este statement com o mesmo #line
+        // para que declarações multi-linha (ex: vetores/mapas) não desloquem o número da linha no DWARF.
+        if (cast(IfStmt) node || cast(WhileStmt) node || cast(ForStmt) node || cast(DoStmt) node
+                || cast(EachStmt) node || cast(TryStmt) node || cast(SwitchStmt) node
+                || cast(BlockStmt) node || cast(SequenceStmt) node)
+            return lineDir ~ combined;
+        import std.string : splitLines;
 
-        return (sideEffects ~ result).join("\n");
+        dstring[] physLines = combined.splitLines();
+        dstring[] tagged;
+        foreach (dstring l; physLines)
+            if (l.length)
+                tagged ~= lineDir ~ l;
+        return tagged.join("\n");
     }
 
     private ptrdiff_t siteIndex(Position pos)
@@ -1408,6 +1704,11 @@ private:
                 return resultName;
             case NodeKind.Identifier:
                 Identifier id = cast(Identifier) node;
+                if (id.moduleRef !is null)
+                {
+                    dstring modName = cName(id.moduleRef.linkName);
+                    return formatD("(%s_init(), %s)", modName, modName);
+                }
                 if (id.classRef !is null)
                     return classValue(id.classRef);
                 return id.functionRef is null ? cName(id.value) : functionValue(id.functionRef);
@@ -1482,6 +1783,11 @@ private:
                 MemberExpr member = cast(MemberExpr) node;
                 if (member.enumValue !is null)
                     return compileExpr(member.enumValue);
+                if (member.resolvedModule !is null)
+                {
+                    dstring modName = cName(member.resolvedModule.linkName);
+                    return formatD("(%s_init(), %s)", modName, modName);
+                }
                 dstring receiver = materialize(member.left, true);
                 return formatD("delegua_prop_ic(%s, %s, %s, %s)", receiver,
                         cString((cast(Identifier) member.right).value), lexicalClass(), nextIcSlot());
@@ -1538,9 +1844,39 @@ private:
                             if (b == "destruir")
                                 return formatD("delegua_destruir(%s)", nodesToStr(call.args));
                             if (b == "tupla")
+                            {
+                                if (memoryPlan is null || memoryPlan.config.enableCollectionFusion)
+                                {
+                                    if (ArrayLit al = cast(ArrayLit) call.args[0])
+                                    {
+                                        if (al.elements.length >= 2 && al.elements.length <= 10
+                                                && !al.elements.any!((Node e) => e.kind == NodeKind.SpreadExpr))
+                                        {
+                                            if (memoryPlan !is null)
+                                                memoryPlan.fusedTuplesCount++;
+                                            return formatD("create_tupla(%s, (delegua_value[]){%s})",
+                                                    al.elements.length, nodesToStr(al.elements));
+                                        }
+                                    }
+                                }
                                 return formatD("delegua_para_tupla(%s)", nodesToStr(call.args));
+                            }
                             if (b == "leia")
                                 return formatD("delegua_leia(%s)", nodesToStr(call.args));
+                            if (isNativeCastName(b))
+                                return emitManagedCCast(b, nodesToStr(call.args));
+                        }
+                        if (fnId.functionRef is null && fnId.classRef is null)
+                        {
+                            if (TypeSemaNativeContainer nc = cast(TypeSemaNativeContainer) call.type_sema)
+                            {
+                                if (nc.containerKind == NativeContainerKind.VetorNativo)
+                                    return "create_vetor()"d;
+                                if (nc.containerKind == NativeContainerKind.MapaNativo)
+                                    return "create_map()"d;
+                                if (nc.containerKind == NativeContainerKind.StringNativa)
+                                    return `create_text("")`d;
+                            }
                         }
                     }
                     bool needsModInit;
@@ -1554,6 +1890,24 @@ private:
                     }
                     if (FnDecl target = resolveDirectCallee(call, needsModInit, modLinkName))
                     {
+                        if (target.ownerClass !is null && target.ownerClass.signature.builtinName == "Matematica"d)
+                            return emitManagedMathCall(target.fn, call.args);
+                        if (ansCg !is null && ansCg.canSpecialize(target) && call.args.length == target.args.length)
+                        {
+                            dstring[] cargs;
+                            cargs.reserve(call.args.length);
+                            foreach (size_t ai, Node argNode; call.args)
+                            {
+                                if (isPureConstantNode(argNode))
+                                    cargs ~= compileExpr(argNode);
+                                else if (Identifier aid = cast(Identifier) argNode)
+                                    cargs ~= materialize(argNode, !siblingsCanMutateVar(call.args[ai + 1 .. $], aid.value));
+                                else
+                                    cargs ~= materialize(argNode, true);
+                            }
+                            dstring ansCall = ansCg.emitDirectCallFromManaged(target, cargs);
+                            return needsModInit ? formatD("(%s_init(), %s)", cName(modLinkName), ansCall) : ansCall;
+                        }
                         dstring dargs = nodesToStr(call.args);
                         dstring directCall = formatD("delegua_chamar_direto(%s, %s, %s)", cName(target.linkName),
                                 call.args.length, call.args.length ? "(delegua_value[]){" ~ dargs ~ "}" : "NULL");
@@ -1564,11 +1918,93 @@ private:
                         if (member.enumValue is null)
                         {
                             Identifier rightId = cast(Identifier) member.right;
+                            if (Identifier leftId = cast(Identifier) member.left)
+                            {
+                                if (rightId !is null && leftId.value == "StringNativa"d)
+                                {
+                                    if (rightId.value == "vazia"d)
+                                        return `create_text("")`d;
+                                    if (rightId.value == "criar"d && call.args.length == 1)
+                                        return formatD("delegua_op_cast(%s, DELEGUA_T_TEXT)", nodesToStr(call.args));
+                                }
+                            }
+                            if (rightId !is null && cast(TypeSemaNativeContainer) member.left.type_sema !is null)
+                            {
+                                TypeSemaNativeContainer mnc = cast(TypeSemaNativeContainer) member.left.type_sema;
+                                dstring mrecv = materialize(member.left, true);
+                                if (rightId.value == "paraVetor"d || rightId.value == "paraTexto"d
+                                        || rightId.value == "paraDicionario"d)
+                                    return formatD("delegua_clonar(%s)", mrecv);
+                                if (rightId.value == "clonar"d)
+                                    return formatD("delegua_clonar(%s)", mrecv);
+                                if (rightId.value == "tamanho"d)
+                                    return formatD("delegua_tamanho_val(%s)", mrecv);
+                                if (rightId.value == "vazio"d || rightId.value == "vazia"d)
+                                    return formatD("create_bool(delegua_tamanho(%s) == 0)", mrecv);
+                                if (rightId.value == "liberar"d || rightId.value == "reservar"d)
+                                    return "create_null()"d;
+                                if (mnc.containerKind == NativeContainerKind.MapaNativo)
+                                {
+                                    if (rightId.value == "definir"d && call.args.length == 2)
+                                        return formatD("delegua_map_setar(%s, %s, %s)", mrecv,
+                                                materialize(call.args[0], true), materialize(call.args[1], true));
+                                    if (rightId.value == "obter"d && call.args.length == 1)
+                                        return formatD("delegua_map_obter(%s, %s)", mrecv,
+                                                materialize(call.args[0], true));
+                                }
+                                if (mnc.containerKind == NativeContainerKind.StringNativa
+                                        && rightId.value == "anexar"d && call.args.length == 1)
+                                {
+                                    if (Identifier sid = cast(Identifier) member.left)
+                                        return formatD("(%s = delegua_op_add(%s, %s))", cName(sid.value),
+                                                cName(sid.value), materialize(call.args[0], true));
+                                    return formatD("delegua_op_add(%s, %s)", mrecv, materialize(call.args[0], true));
+                                }
+                            }
                             bool allowRecv = true;
                             if (Identifier recvId = cast(Identifier) member.left)
                                 allowRecv = !siblingsCanMutateVar(call.args, recvId.value);
                             dstring receiver = materialize(member.left, allowRecv);
                             dstring margs = nodesToStr(call.args);
+                            if ((memoryPlan is null || memoryPlan.config.enableDevirt)
+                                    && reachabilityComputed && rightId !is null)
+                            {
+                                if (TypeSemaClass leftCls = cast(TypeSemaClass) member.left.type_sema)
+                                {
+                                    ClassDecl cls = leftCls.declaration;
+                                    if (cls !is null && !cls.isAbstract && !cls.isInterface && !cls.isValueType
+                                            && !cls.isForeign && cls !in classesWithSubclasses
+                                            && !cls.signature.builtinName.length)
+                                    {
+                                        ClassMember cm = resolveClassMember(cls, rightId.value);
+                                        if (cm.method !is null && !cm.method.isStatic && !cm.method.isAbstract
+                                                && !cm.method.accessor && !hasEnvelope(cm.method)
+                                                && !cm.method.builtinName.length && cm.method.linkName.length
+                                                && isReachable(cm.method) && arityMatches(cm.method, call.args))
+                                        {
+                                            bool accessOk = cm.method.access == 0
+                                                || (cm.method.access == 1 && currentClass is cm.method.ownerClass)
+                                                || (cm.method.access == 2 && currentClass !is null
+                                                    && isSubclassOrSame(currentClass, cm.method.ownerClass));
+                                            if (accessOk)
+                                            {
+                                                size_t minA = 0;
+                                                foreach (FnArg fa; cm.method.args)
+                                                    if (fa.value is null && !fa.rest)
+                                                        minA++;
+                                                dstring maxA = cm.method.args.length && cm.method.args[$ - 1].rest
+                                                    ? "((sz)-1)"d : cm.method.args.length.to!dstring;
+                                                if (memoryPlan !is null)
+                                                    memoryPlan.devirtCallSitesCount++;
+                                                return formatD("delegua_chamar_metodo_fn(&%s, %s, %s, %s, %s, %s)",
+                                                        cName(cm.method.linkName), minA, maxA, receiver,
+                                                        call.args.length,
+                                                        call.args.length ? "(delegua_value[]){" ~ margs ~ "}" : "NULL");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                             return formatD("delegua_chamar_ic(%s, %s, %s, %s, %s, %s)", receiver,
                                     cString(rightId.value),
                                     lexicalClass(), call.args.length, call.args.length
@@ -1597,10 +2033,29 @@ private:
             case NodeKind.TupleLit:
             case NodeKind.ArrayLit:
                 ArrayLit arr = cast(ArrayLit) node;
+                bool hasSpread = arr.elements.any!((Node e) => e.kind == NodeKind.SpreadExpr);
+                bool allowFusion = memoryPlan is null || memoryPlan.config.enableCollectionFusion;
+                if (node.kind == NodeKind.TupleLit && allowFusion && !hasSpread
+                        && arr.elements.length >= 2 && arr.elements.length <= 10)
+                {
+                    if (memoryPlan !is null)
+                        memoryPlan.fusedTuplesCount++;
+                    return formatD("create_tupla(%s, (delegua_value[]){%s})",
+                            arr.elements.length, nodesToStr(arr.elements));
+                }
 
                 dstring temp = formatD("t%d", tmp++);
                 // cria uma variavel temporaria
-                emitLocal(formatD("%s %s = create_vetor();", VALUE, temp));
+                if (node.kind == NodeKind.ArrayLit && allowFusion && !hasSpread && arr.elements.length > 4)
+                {
+                    if (memoryPlan !is null)
+                        memoryPlan.preSizedArraysCount++;
+                    emitLocal(formatD("%s %s = create_vetor_cap(%s);", VALUE, temp, arr.elements.length));
+                }
+                else
+                {
+                    emitLocal(formatD("%s %s = create_vetor();", VALUE, temp));
+                }
 
                 foreach (Node element; arr.elements)
                     if (SpreadExpr spread = cast(SpreadExpr) element)
@@ -1615,6 +2070,7 @@ private:
 
             case NodeKind.BlockStmt:
                 BlockStmt block = cast(BlockStmt) node;
+                pushDetScope();
                 dstring[] body;
 
                 foreach (Node child; block.body)
@@ -1623,7 +2079,16 @@ private:
                 for (size_t i; i + 1 < block.body.length; i++)
                     emitLocal(body[i]);
 
-                return compileExpr(block.body[$ - 1]);
+                dstring lastVal = compileExpr(block.body[$ - 1]);
+                dstring detExprFree = popDetScopeCode();
+                if (detExprFree.length)
+                {
+                    dstring tmpRes = formatD("cgd_blk_%s", tmp++);
+                    emitLocal(formatD("%s %s = %s;", VALUE, tmpRes, lastVal));
+                    emitLocal(detExprFree);
+                    return tmpRes;
+                }
+                return lastVal;
 
             default:
                 node.print();
@@ -1718,12 +2183,37 @@ private:
             emit(proto ~ " { (void)argc; (void)argv; delegua_panic(\"Método abstrato.\"); return create_nulo(); }");
             return;
         }
+        if (node.ownerClass !is null && node.ownerClass.isValueType && !node.accessor)
+        {
+            if (node.fn == "construtor"d)
+                emit(nativeCg.emitManagedValueConstructor(node.ownerClass, proto));
+            else
+                emit(nativeCg.emitManagedThunk(node, proto));
+            return;
+        }
+        if (node.isNative)
+        {
+            if (emitDebugLines)
+                emit("#line 1 \"<cgd-runtime-init>\"");
+            emit(nativeCg.emitManagedThunk(node, proto));
+            return;
+        }
+        if (ansCg !is null && ansCg.canSpecialize(node))
+        {
+            if (emitDebugLines)
+                emit("#line 1 \"<cgd-runtime-init>\"");
+            emit(ansCg.emitManagedWrapper(node, proto));
+            return;
+        }
         ClassDecl previousClass = currentClass;
         currentClass = node.ownerClass;
         TypeExpr previousReturn = functionReturn;
         functionReturn = node.type_expr;
         bool previousHasTry = currentFnHasTry;
         currentFnHasTry = node.body.any!((Node n) => containsTryStmt(n));
+        dstring[][] savedDetScopes = detFreeScopes;
+        detFreeScopes = null;
+        pushDetScope();
         emit(proto ~ " {\n(void)argc; (void)argv;");
         if (node.isMethod && !node.isStatic)
             emit(formatD("%s %s=argv[0];", localValueDecl(), cName("isto")) ~ acknowledgeLocal(cName("isto")));
@@ -1753,19 +2243,30 @@ private:
         foreach (FnArg arg; node.args)
             emit(acknowledgeLocal(cName(arg.name)));
         foreach (FnArg arg; node.args)
+        {
             if (arg.type_expr !is null && arg.type_expr.toStr() != "qualquer")
                 emit(formatD("%s=%s;", cName(arg.name), checked(cName(arg.name), arg.rest
                         ? new TypeExprArray(arg.type_expr, arg.pos) : arg.type_expr)));
+            if (TypeSemaClass argCls = cast(TypeSemaClass) arg.type_sema)
+                if (argCls.declaration !is null && argCls.declaration.isValueType)
+                    emit(formatD("%s=delegua_clonar(%s);", cName(arg.name), cName(arg.name)));
+        }
         foreach (Node n; node.body)
             emit(compileStmtOrdered(n), 4);
+        dstring detFnFree = popDetScopeCode();
         bool endsInDirectReturn = false;
         if (node.body.length > 0 && cleanups.length == 0)
             if (ReturnStmt lastRet = cast(ReturnStmt) node.body[$ - 1])
                 endsInDirectReturn = !lastRet.collectionReturn;
         if (!endsInDirectReturn)
+        {
+            if (detFnFree.length)
+                emit(detFnFree, 4);
             emit("return " ~ checked("create_nulo()", functionReturn, null, new NullLit(node.pos)) ~ ";\n}");
+        }
         else
             emit("}");
+        detFreeScopes = savedDetScopes;
         currentClass = previousClass;
         functionReturn = previousReturn;
         currentFnHasTry = previousHasTry;
@@ -1891,15 +2392,31 @@ private:
             createClassShell(contract);
             emit(formatD("delegua_classe_interface(%s,%s);", name, classValue(contract)));
         }
+        bool hasExplicitCtor = false;
         foreach (FnDecl method; c.methods)
             if (!method.accessor && (!reachabilityComputed || method in reachableNodes))
             {
+                if (method.fn == "construtor"d)
+                    hasExplicitCtor = true;
                 if (method.decorators.length)
                     initializeFunction(method);
                 emit(formatD(method.isStatic
                         ? "delegua_classe_metodo_estatico(%s,%s,%s,%s);" : "delegua_classe_metodo_acesso(%s,%s,%s,%s);",
                         name, cString(method.fn), functionValue(method), method.access));
             }
+        if (c.isValueType && !hasExplicitCtor)
+        {
+            dstring autoCtorSym = name ~ "_auto_ctor"d;
+            dstring autoProto = formatD("static delegua_value %s(sz argc, delegua_value *argv)", autoCtorSym);
+            emitProto(autoProto ~ ";");
+            nativeCg.addExtraDef(nativeCg.emitManagedValueConstructor(c, autoProto));
+            size_t fieldCount = 0;
+            foreach (ClassField field; c.fields)
+                if (!field.isEnum && !field.isStatic)
+                    fieldCount++;
+            emit(formatD("delegua_classe_metodo_acesso(%s,\"construtor\",create_funcao_intervalo(&%s,0,%s),0);",
+                    name, autoCtorSym, fieldCount + 1));
+        }
     }
 
     void compileModule(ModuleUnit m)
@@ -1983,6 +2500,18 @@ private:
             collectFunctions(child);
         if (FnDecl fn = cast(FnDecl) node)
         {
+            if (emitDebugLines)
+            {
+                string cSym = cName(fn.linkName).to!string;
+                string displayName = fn.ownerClass !is null
+                    ? (fn.ownerClass.name.to!string ~ "." ~ fn.fn.to!string)
+                    : fn.fn.to!string;
+                if (fn.operatorSymbol.length)
+                    displayName ~= " [@operador(\"" ~ fn.operatorSymbol.to!string ~ "\")]";
+                debugFunctionNames[cSym] = displayName;
+                if (fn.isNative || (fn.ownerClass !is null && fn.ownerClass.isValueType))
+                    debugFunctionNames["cgd_nat_" ~ cSym] = displayName ~ " [@nativo]";
+            }
             functions ~= fn;
             compileFnDecl(fn);
         }
@@ -1990,9 +2519,13 @@ private:
 
     dstring compileIfStmt(IfStmt node, bool fromIf = false)
     {
+        pushDetScope();
         dstring[] body;
         foreach (Node child; node.body)
             body ~= compileStmtOrdered(child);
+        dstring detIfFree = popDetScopeCode();
+        if (detIfFree.length)
+            body ~= detIfFree;
         if (node.expr is null)
             return "{\n" ~ body.join("\n") ~ "\n}";
         dstring setup;
@@ -2110,6 +2643,12 @@ private:
             if (TypeExprTuple tup = cast(TypeExprTuple) type)
             {
                 foreach (TypeExpr child; tup.types)
+                    markTypeExpr(child);
+                return;
+            }
+            if (TypeExprGeneric gen = cast(TypeExprGeneric) type)
+            {
+                foreach (TypeExpr child; gen.typeArgs)
                     markTypeExpr(child);
             }
         }
@@ -2236,6 +2775,7 @@ private:
             {
                 enqueue(id.classRef);
                 enqueue(id.functionRef);
+                enqueue(id.moduleRef);
             }
             else if (FunctionExpr fnExpr = cast(FunctionExpr) n)
             {
@@ -2250,8 +2790,25 @@ private:
             {
                 addReferencedName(sup.name);
             }
+            else if (BinaryExpr bin = cast(BinaryExpr) n)
+            {
+                enqueue(bin.resolvedOperator);
+            }
+            else if (UnaryExpr un = cast(UnaryExpr) n)
+            {
+                enqueue(un.resolvedOperator);
+            }
+            else if (IndexExpr idx = cast(IndexExpr) n)
+            {
+                enqueue(idx.resolvedOperator);
+            }
+            else if (AssignStmt ass = cast(AssignStmt) n)
+            {
+                enqueue(ass.resolvedIndexSetOperator);
+            }
             else if (MemberExpr member = cast(MemberExpr) n)
             {
+                enqueue(member.resolvedModule);
                 if (Identifier rightId = cast(Identifier) member.right)
                     addReferencedName(rightId.value);
             }
@@ -2363,7 +2920,8 @@ private:
                 }
                 foreach (FnDecl m; c.methods)
                 {
-                    if (!m.accessor && (dynamicMethodDispatch || c.isInterface || m.fn in referencedNames))
+                    if (!m.accessor && (dynamicMethodDispatch || c.isInterface || c.isValueType
+                            || m.operatorSymbol.length || m.fn in referencedNames))
                         enqueue(m);
                 }
             }
@@ -2396,8 +2954,18 @@ private:
 public:
     dstring compile(Program prog)
     {
+        nativeCg = new NativeCodegen(ownershipInfo);
+        nativeCg.emitDebugLines = emitDebugLines;
+        if (memoryPlan !is null && memoryPlan.config.enableAns)
+            ansCg = new AnsCodegen(memoryPlan);
+        else
+            ansCg = null;
+        emitProto("static void cgd_gc_scan_generated_roots(cgd_gc_visit_fn visit_ptr, void (*visit_val)(const void *, void *), void *gc_ctx);"d);
         computeReachability(prog);
         collectFunctions(prog);
+        foreach (ClassDecl c; classes)
+            if (c.isValueType)
+                nativeCg.emitValueClassBodies(c);
         foreach (ModuleUnit m; modules)
         {
             currentFnHasTry = true;
@@ -2405,7 +2973,10 @@ public:
         }
 
         currentFnHasTry = prog.body.any!((Node n) => containsTryStmt(n));
+        if (emitDebugLines)
+            emit("#line 1 \"<cgd-runtime-init>\"");
         emit(formatD("void %s(void) {", ENTRY));
+        emit("cgd_gc_register_root_scanner(cgd_gc_scan_generated_roots);"d, 4);
         foreach (ClassDecl c; classes)
             createClassShell(c);
         foreach (ClassDecl c; classes)
@@ -2413,13 +2984,54 @@ public:
         foreach (FnDecl fn; functions)
             initializeFunction(fn);
 
+        detFreeScopes = null;
+        pushDetScope();
         foreach (Node node; prog.body)
             if (!isDecl(node.kind))
                 emit(compileStmtOrdered(node), 4);
+        dstring detMainFree = popDetScopeCode();
+        if (detMainFree.length)
+            emit(detMainFree, 4);
 
         emit("}");
 
+        dstring[] rootScanLines;
+        rootScanLines ~= "static void cgd_gc_scan_generated_roots(cgd_gc_visit_fn visit_ptr, void (*visit_val)(const void *, void *), void *gc_ctx) {"d;
+        rootScanLines ~= "    (void)visit_ptr; (void)visit_val; (void)gc_ctx;"d;
+        size_t totalGlobalRoots = 0;
+        if (classes.length || modules.length || functionSlots.length)
+        {
+            rootScanLines ~= "    if (visit_val) {"d;
+            foreach (ClassDecl c; classes)
+            {
+                rootScanLines ~= formatD("        visit_val(&%s, gc_ctx);", cName(c.signature.linkName));
+                totalGlobalRoots++;
+            }
+            foreach (ModuleUnit m; modules)
+            {
+                rootScanLines ~= formatD("        visit_val(&%s, gc_ctx);", cName(m.linkName));
+                totalGlobalRoots++;
+            }
+            foreach (FnDecl fn; functionSlots.byKey())
+            {
+                rootScanLines ~= formatD("        visit_val(&%s_slot, gc_ctx);", cName(fn.linkName));
+                totalGlobalRoots++;
+            }
+            rootScanLines ~= "    }"d;
+        }
+        if (icCount > 0)
+        {
+            rootScanLines ~= formatD("    if (visit_ptr) { for (sz i = 0; i < %s; ++i) { if (cgd_ic[i]) visit_ptr(cgd_ic[i], gc_ctx); } }",
+                    icCount);
+            totalGlobalRoots += icCount;
+        }
+        rootScanLines ~= "}"d;
+        if (memoryPlan !is null)
+            memoryPlan.globalRootsRegistered = totalGlobalRoots;
+        emit(rootScanLines.join("\n"));
+
         dstring source = includes.join("\n");
+        source ~= "\n" ~ nativeCg.emitTypePreamble();
         if (sourceFileDecls.length)
             source ~= "\n" ~ sourceFileDecls.join("\n");
         if (sourceSites.length)
@@ -2427,6 +3039,12 @@ public:
         if (icCount > 0)
             source ~= formatD("static const void *cgd_ic[%s];\n", icCount);
         source ~= prototypes.join("\n");
+        source ~= "\n" ~ nativeCg.emitPrototypes();
+        if (ansCg !is null)
+            source ~= ansCg.emitPrototypes();
+        source ~= nativeCg.emitDefinitions();
+        if (ansCg !is null)
+            source ~= ansCg.emitDefinitions();
         source ~= code.join("\n");
         return source;
     }

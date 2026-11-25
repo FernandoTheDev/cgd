@@ -8,6 +8,10 @@ classe Tempo {
         retorna nativo.sistemaRelogio(verdadeiro)
     }
 
+    estatico agoraMs(): real {
+        retorna Tempo.monotonico() * 1000.0
+    }
+
     estatico unix(): real {
         var nativo: qualquer = importar("cgd:nativo").Primitivas
         retorna nativo.sistemaRelogio(falso)

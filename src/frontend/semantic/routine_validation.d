@@ -113,22 +113,21 @@ void validateRoutines(Program program, Diagnostics diagnostics)
                 return null;
             seen[node] = true;
 
-            if (Identifier id = cast(Identifier) node)
+            string auditModuleUnit(ModuleUnit target)
             {
-                if (id.variableRef !is null && (id.variableRef in mutableGlobals) !is null)
-                    return "acessa variável global mutável '" ~ id.value.to!string ~ "'";
-                if (id.classRef !is null && id.classRef.isForeign)
-                    return "referencia classe estrangeira '" ~ id.classRef.name.to!string ~ "'";
-                return null;
-            }
-            if (ImportExpr imported = cast(ImportExpr) node)
-            {
-                if (imported.target is null || imported.target.program is null)
+                if (target is null || target.program is null)
                     return "importa módulo desconhecido dentro da rotina";
-                foreach (Node stmt; imported.target.program.body)
+                foreach (Node stmt; target.program.body)
                 {
                     if (cast(ClassDecl) stmt || cast(FnDecl) stmt)
                         continue;
+                    if (ImportExpr subImp = cast(ImportExpr) stmt)
+                    {
+                        string subErr = auditModuleUnit(subImp.target);
+                        if (subErr.length)
+                            return subErr;
+                        continue;
+                    }
                     if (VarDecl vd = cast(VarDecl) stmt)
                     {
                         if (!vd.isConst && !vd.isEnum)
@@ -141,6 +140,26 @@ void validateRoutines(Program program, Diagnostics diagnostics)
                     return "importa módulo com código executável de topo dentro da rotina";
                 }
                 return null;
+            }
+
+            if (Identifier id = cast(Identifier) node)
+            {
+                if (id.variableRef !is null && (id.variableRef in mutableGlobals) !is null)
+                    return "acessa variável global mutável '" ~ id.value.to!string ~ "'";
+                if (id.classRef !is null && id.classRef.isForeign)
+                    return "referencia classe estrangeira '" ~ id.classRef.name.to!string ~ "'";
+                if (id.moduleRef !is null)
+                    return auditModuleUnit(id.moduleRef);
+                return null;
+            }
+            if (MemberExpr member = cast(MemberExpr) node)
+            {
+                if (member.resolvedModule !is null)
+                    return auditModuleUnit(member.resolvedModule);
+            }
+            if (ImportExpr imported = cast(ImportExpr) node)
+            {
+                return auditModuleUnit(imported.target);
             }
             if (cast(AwaitExpr) node)
                 return "usa aguardar dentro da rotina";

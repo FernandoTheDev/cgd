@@ -191,6 +191,22 @@ vez, usa HTTP/1.1 com fechamento por requisição e não oferece TLS ou HTTP/2.
 
 O [assincronismo experimental](docs/assincronismo.md) já possui assincrona/aguardar,
 Promessa<T>, microtasks, cancelamento e tratamento de suspensão na mesma thread.
-`cgd:assincrono` acrescenta timers, HTTP e TCP por reactor Linux. As mudanças
-mais recentes aguardam testes; [rotinas paralelas](docs/rotinas.md) estão na fase
-de contrato e transferência interna de valores.
+`cgd:assincrono` acrescenta timers, HTTP e TCP por reactor Linux; [rotinas paralelas](docs/rotinas.md)
+oferecem `rotina`, `Tarefa<T>` e `Canal` isolados sobre pool de workers.
+
+## Ecossistema completo (Projetos, Módulos, GUI/TUI, Rede e Depuração)
+
+O CGD conta com fluxo completo de projetos multi-arquivo, bibliotecas nativas opcionais e ferramentas de editor:
+
+- **Projetos e módulos**: `cgd iniciar`, `cgd compilar`, `cgd rodar`, `cgd testar`, `cgd verificar`, `cgd formatar`, `cgd limpar` e `cgd projeto`, com manifesto `projeto.json`, cache incremental, `modulo a.b.c`, `importar a.b.c [como Alias]` e tipos qualificados ([Projetos](docs/PROJETOS.md), [Módulos](docs/MODULOS.md)).
+- **Biblioteca padrão hierárquica**: aliases sem duplicação (`cgd:sistema/*`, `cgd:dados/*`, `cgd:rede/*`, `cgd:matematica/*`, `cgd:texto/*`, `cgd:concorrencia/*`, `cgd:interface/*`, `cgd:seguranca/*`), preservando `cgd:*` legados; inclui TUI com *double buffering*, HTTP/1.1 assíncrono, WebSocket RFC 6455, CSV, TOML, Regex POSIX, Deque/Heap/FilaPrioridade, Álgebra e Grafos ([Biblioteca Padrão](docs/BIBLIOTECA_PADRAO.md), [TUI](docs/TUI.md), [Servidores Assíncronos](docs/SERVIDORES_ASSINCRONOS.md)).
+- **Gráficos nativos opcionais (GTK4 e SDL3)**: vinculação sob demanda via `libdelegua_gtk4.o` e `libdelegua_sdl3.o` apenas quando importados — zero dependência obrigatória no compilador principal ou em programas comuns ([Bibliotecas Nativas](docs/BIBLIOTECAS_NATIVAS.md), [GTK4](docs/GTK.md), [SDL3](docs/SDL.md)).
+- **Depurador nativo (DAP/GDB) e LSP avançado**: `cgd depurar`, servidor DAP (`cgd dap --stdio`) integrado à extensão VS Code (F5 com breakpoints, pilha, variáveis Delégua expansíveis, *evaluate* e exceções) e LSP com suporte a `projeto.json`, `declaration`, `typeDefinition`, `rangeFormatting` e `workspace/symbol` ([Depurador](docs/DEPURADOR.md), [LSP](docs/LSP.md)).
+- **Projetos reais de demonstração em `exemplos/`**:
+  - [Motor de Xadrez TUI com IA Alpha-Beta e perft validado](exemplos/jogos/xadrez/README.md) (`exemplos/jogos/xadrez/`)
+  - [API REST de Tarefas (HTTP/1.1 assíncrono)](exemplos/rede/http/api_tarefas/)
+  - [Chat WebSocket RFC 6455](exemplos/rede/websocket/chat/)
+  - [Calculadora desktop GTK4](exemplos/graficos/gtk/calculadora/)
+  - [Pong gráfico em SDL3](exemplos/jogos/pong/)
+  - [Gerenciador de Tarefas TUI](exemplos/terminal/tui/tarefas_tui/)
+  - [Ray Tracer 3D com sombras e reflexões](exemplos/algoritmos/raytracer/)

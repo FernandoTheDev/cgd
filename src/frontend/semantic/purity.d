@@ -52,6 +52,22 @@ private:
         return status;
     }
 
+    private bool isPureConstLiteral(Node node)
+    {
+        if (node is null)
+            return false;
+        if (cast(IntLit) node || cast(DoubleLit) node || cast(BoolLit) node || cast(StringLit) node)
+            return true;
+        if (ArrayLit arr = cast(ArrayLit) node)
+        {
+            foreach (Node el; arr.elements)
+                if (!isPureConstLiteral(el))
+                    return false;
+            return true;
+        }
+        return false;
+    }
+
     bool nodeAnalysis(Node node)
     {
         if (node is null)
@@ -60,11 +76,9 @@ private:
         {
             case NodeKind.TupleLit:
             case NodeKind.SequenceStmt:
-            case NodeKind.ConditionalExpr:
             case NodeKind.SpreadExpr:
             case NodeKind.SliceExpr:
             case NodeKind.Comprehension:
-            case NodeKind.SwitchStmt:
             case NodeKind.LoopExpr:
             case NodeKind.TypeOfExpr:
             case NodeKind.AwaitExpr:
@@ -79,12 +93,34 @@ private:
             case NodeKind.MapLit:
             case NodeKind.EachStmt:
             case NodeKind.NullLit:
-            case NodeKind.ForStmt:
-            case NodeKind.DoStmt:
-            case NodeKind.BreakStmt:
-            case NodeKind.ContinueStmt:
                 err.error(node.pos, "Esse recurso ainda não é suportado na avaliação em tempo de compilação.");
                 return false;
+            case NodeKind.ConditionalExpr:
+                ConditionalExpr cond = cast(ConditionalExpr) node;
+                return nodeAnalysis(cond.condition) && nodeAnalysis(cond.yes) && nodeAnalysis(cond.no);
+            case NodeKind.ForStmt:
+                ForStmt f = cast(ForStmt) node;
+                return nodeAnalysis(f.init) && nodeAnalysis(f.condition) && nodeAnalysis(f.step)
+                    && nodeAnalysisBlockStmt(f.body);
+            case NodeKind.DoStmt:
+                DoStmt d = cast(DoStmt) node;
+                return nodeAnalysisBlockStmt(d.body) && nodeAnalysis(d.condition);
+            case NodeKind.BreakStmt:
+            case NodeKind.ContinueStmt:
+                return true;
+            case NodeKind.SwitchStmt:
+                SwitchStmt sw = cast(SwitchStmt) node;
+                if (!nodeAnalysis(sw.value))
+                    return false;
+                foreach (SwitchCase c; sw.cases)
+                {
+                    foreach (Node v; c.values)
+                        if (!nodeAnalysis(v))
+                            return false;
+                    if (!nodeAnalysisBlockStmt(c.body))
+                        return false;
+                }
+                return nodeAnalysisBlockStmt(sw.fallback);
             case NodeKind.Identifier:
                 Identifier identifier = cast(Identifier) node;
                 if (identifier.variableRef !is null && identifier.variableRef.isEnum)
@@ -98,8 +134,15 @@ private:
                             "Valor de função ainda não é representável na avaliação em tempo de compilação.");
                     return false;
                 }
-                if ((identifier.variableRef !is null && identifier.variableRef !in locals)
-                        || (identifier.parameterRef !is null && identifier.parameterRef !in locals))
+                if (identifier.variableRef !is null && identifier.variableRef !in locals)
+                {
+                    if (identifier.variableRef.isConst && !identifier.variableRef.uninitialized
+                            && isPureConstLiteral(identifier.variableRef.value))
+                        return true;
+                    err.errorCode(node.pos, impureState, identifier.value);
+                    return false;
+                }
+                if (identifier.parameterRef !is null && identifier.parameterRef !in locals)
                 {
                     err.errorCode(node.pos, impureState, identifier.value);
                     return false;
@@ -118,8 +161,7 @@ private:
                 BinaryExpr binary = cast(BinaryExpr) node;
                 import frontend.lexer : TokenKind;
 
-                if (binary.op == TokenKind.And || binary.op == TokenKind.Or
-                        || binary.op == TokenKind.Coalesce || binary.op == TokenKind.Pow || binary.op == TokenKind.In)
+                if (binary.op == TokenKind.Coalesce || binary.op == TokenKind.In)
                 {
                     err.error(node.pos, "Operador ainda não suportado na avaliação em tempo de compilação.");
                     return false;
@@ -141,6 +183,19 @@ private:
 
             case NodeKind.AssignStmt:
                 AssignStmt ass = cast(AssignStmt) node;
+                if (Identifier leftId = cast(Identifier) ass.left)
+                {
+                    if (leftId.variableRef !is null && leftId.variableRef !in locals)
+                    {
+                        err.errorCode(ass.left.pos, impureState, leftId.value);
+                        return false;
+                    }
+                }
+                else
+                {
+                    err.error(ass.left.pos, "Atribuição de índice ou membro não é suportada em função pura.");
+                    return false;
+                }
                 return (nodeAnalysis(ass.left) == true) && (nodeAnalysis(ass.value) == true);
 
             case NodeKind.BlockStmt:
@@ -167,11 +222,17 @@ private:
             case NodeKind.MemberExpr:
                 if ((cast(MemberExpr) node).enumValue !is null)
                     return true;
-                goto case NodeKind.ArrayLit;
-            case NodeKind.ArrayLit:
-            case NodeKind.IndexExpr:
                 err.error(node.pos, "Essa expressão não é pura.");
                 return false;
+            case NodeKind.ArrayLit:
+                ArrayLit arr = cast(ArrayLit) node;
+                foreach (Node el; arr.elements)
+                    if (!nodeAnalysis(el))
+                        return false;
+                return true;
+            case NodeKind.IndexExpr:
+                IndexExpr idx = cast(IndexExpr) node;
+                return nodeAnalysis(idx.value) && nodeAnalysis(idx.idx);
         }
     }
 

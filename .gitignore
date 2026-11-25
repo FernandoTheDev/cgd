@@ -33,3 +33,5 @@ __pycache__/
 /extensao-vscode/bin/
 /extensao-vscode/.vscode-test/
 *.vsix
+compilacao/
+*.cgd.dbg.json

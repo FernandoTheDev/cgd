@@ -18,6 +18,8 @@ final class CTFECompile
     size_t tmp, nextSlot;
     VMInstruction[][dstring] instructions;
     dstring[] labelOrder;
+    dstring[] breakTargets;
+    dstring[] continueTargets;
 
     pragma(inline, true) void emit(VMInstruction instr)
     {
@@ -67,6 +69,33 @@ final class CTFECompile
             case NodeKind.BinaryExpr:
                 BinaryExpr bexpr = cast(BinaryExpr) node;
 
+                if (bexpr.op == TokenKind.And)
+                {
+                    dstring shortLbl = newLabel();
+                    dstring endLbl = newLabel();
+                    compile(bexpr.left);
+                    emit(VMInstruction.instr(VMOpCode.Jz, CGDValue.texto(shortLbl)));
+                    compile(bexpr.right);
+                    emit(VMInstruction.instr(VMOpCode.Jmp, CGDValue.texto(endLbl)));
+                    enterLabel(shortLbl);
+                    emit(VMInstruction.instr(VMOpCode.Push, CGDValue.logico(false)));
+                    enterLabel(endLbl);
+                    return;
+                }
+                if (bexpr.op == TokenKind.Or)
+                {
+                    dstring shortLbl = newLabel();
+                    dstring endLbl = newLabel();
+                    compile(bexpr.left);
+                    emit(VMInstruction.instr(VMOpCode.Jnz, CGDValue.texto(shortLbl)));
+                    compile(bexpr.right);
+                    emit(VMInstruction.instr(VMOpCode.Jmp, CGDValue.texto(endLbl)));
+                    enterLabel(shortLbl);
+                    emit(VMInstruction.instr(VMOpCode.Push, CGDValue.logico(true)));
+                    enterLabel(endLbl);
+                    return;
+                }
+
                 compile(bexpr.left);
                 compile(bexpr.right);
 
@@ -74,6 +103,7 @@ final class CTFECompile
                     TokenKind.Star: VMOpCode.Mul, TokenKind.Plus: VMOpCode.Add,
                     TokenKind.Slash: VMOpCode.Div, TokenKind.IntDiv: VMOpCode.IDiv,
                     TokenKind.Minus: VMOpCode.Sub, TokenKind.Modulo: VMOpCode.Mod,
+                    TokenKind.Pow: VMOpCode.Pow,
 
                     TokenKind.LEquals: VMOpCode.Le, TokenKind.LThan: VMOpCode.Lt,
                     TokenKind.GEquals: VMOpCode.Ge, TokenKind.GThan: VMOpCode.Gt,
@@ -85,6 +115,31 @@ final class CTFECompile
                 ];
 
                 return emit(VMInstruction.instr(operators[bexpr.op]));
+
+            case NodeKind.ConditionalExpr:
+                ConditionalExpr cond = cast(ConditionalExpr) node;
+                dstring noLbl = newLabel();
+                dstring endLbl = newLabel();
+                compile(cond.condition);
+                emit(VMInstruction.instr(VMOpCode.Jz, CGDValue.texto(noLbl)));
+                compile(cond.yes);
+                emit(VMInstruction.instr(VMOpCode.Jmp, CGDValue.texto(endLbl)));
+                enterLabel(noLbl);
+                compile(cond.no);
+                enterLabel(endLbl);
+                return;
+
+            case NodeKind.ArrayLit:
+                ArrayLit arr = cast(ArrayLit) node;
+                foreach (Node el; arr.elements)
+                    compile(el);
+                return emit(VMInstruction.instr(VMOpCode.MakeArray, arr.elements.length));
+
+            case NodeKind.IndexExpr:
+                IndexExpr idx = cast(IndexExpr) node;
+                compile(idx.value);
+                compile(idx.idx);
+                return emit(VMInstruction.instr(VMOpCode.IndexGet));
 
             case NodeKind.UnaryExpr:
                 UnaryExpr un = cast(UnaryExpr) node;
@@ -115,8 +170,16 @@ final class CTFECompile
                 Identifier id = cast(Identifier) node;
 
                 size_t* slot = id.value in fnVars;
-                enforce(slot !is null, "Símbolo sem slot na avaliação em tempo de compilação.");
-                return emit(VMInstruction.instr(VMOpCode.Load, *slot));
+                if (slot !is null)
+                    return emit(VMInstruction.instr(VMOpCode.Load, *slot));
+                if (id.variableRef !is null && id.variableRef.isConst && !id.variableRef.uninitialized
+                        && id.variableRef.value !is null)
+                {
+                    CGDValue val = nodeToCgdValue(id.variableRef.value);
+                    return emit(VMInstruction.instr(VMOpCode.Push, val));
+                }
+                enforce(false, "Símbolo sem slot na avaliação em tempo de compilação.");
+                return;
 
             case NodeKind.CallExpr:
                 CallExpr call = cast(CallExpr) node;
@@ -174,12 +237,111 @@ final class CTFECompile
                 emit(VMInstruction.instr(VMOpCode.Jz, CGDValue.texto(l2)));
 
                 enterLabel(l1);
+                breakTargets ~= l2;
+                continueTargets ~= l0;
                 compileBody(wstmt.body);
+                breakTargets.length--;
+                continueTargets.length--;
 
                 // volta pro inicio
                 emit(VMInstruction.instr(VMOpCode.Jmp, CGDValue.texto(l0)));
 
                 enterLabel(l2);
+                return;
+
+            case NodeKind.ForStmt:
+                ForStmt fstmt = cast(ForStmt) node;
+                size_t[dstring] savedVars = fnVars.dup;
+                scope (exit)
+                    fnVars = savedVars;
+                if (fstmt.init !is null)
+                {
+                    compile(fstmt.init);
+                    if (isExprResult(fstmt.init))
+                        emit(VMInstruction.instr(VMOpCode.Drop));
+                }
+                dstring condLbl = newLabel();
+                dstring stepLbl = newLabel();
+                dstring endLbl = newLabel();
+                enterLabel(condLbl);
+                if (fstmt.condition !is null)
+                {
+                    compile(fstmt.condition);
+                    emit(VMInstruction.instr(VMOpCode.Jz, CGDValue.texto(endLbl)));
+                }
+                breakTargets ~= endLbl;
+                continueTargets ~= stepLbl;
+                compileBody(fstmt.body);
+                breakTargets.length--;
+                continueTargets.length--;
+                enterLabel(stepLbl);
+                if (fstmt.step !is null)
+                {
+                    compile(fstmt.step);
+                    if (isExprResult(fstmt.step))
+                        emit(VMInstruction.instr(VMOpCode.Drop));
+                }
+                emit(VMInstruction.instr(VMOpCode.Jmp, CGDValue.texto(condLbl)));
+                enterLabel(endLbl);
+                return;
+
+            case NodeKind.DoStmt:
+                DoStmt dstmt = cast(DoStmt) node;
+                dstring bodyLbl = newLabel();
+                dstring condLbl = newLabel();
+                dstring endLbl = newLabel();
+                enterLabel(bodyLbl);
+                breakTargets ~= endLbl;
+                continueTargets ~= condLbl;
+                compileBody(dstmt.body);
+                breakTargets.length--;
+                continueTargets.length--;
+                enterLabel(condLbl);
+                compile(dstmt.condition);
+                emit(VMInstruction.instr(VMOpCode.Jnz, CGDValue.texto(bodyLbl)));
+                enterLabel(endLbl);
+                return;
+
+            case NodeKind.BreakStmt:
+                enforce(breakTargets.length > 0, "CTFE: sustar fora de laço/escolha.");
+                return emit(VMInstruction.instr(VMOpCode.Jmp, CGDValue.texto(breakTargets[$ - 1])));
+
+            case NodeKind.ContinueStmt:
+                enforce(continueTargets.length > 0, "CTFE: continua fora de laço.");
+                return emit(VMInstruction.instr(VMOpCode.Jmp, CGDValue.texto(continueTargets[$ - 1])));
+
+            case NodeKind.SwitchStmt:
+                SwitchStmt sw = cast(SwitchStmt) node;
+                compile(sw.value);
+                size_t discSlot = nextSlot++;
+                emit(VMInstruction.instr(VMOpCode.Store, discSlot));
+                dstring endLbl = newLabel();
+                dstring fallbackLbl = newLabel();
+                dstring[] caseBodyLabels;
+                foreach (size_t ci, SwitchCase c; sw.cases)
+                {
+                    dstring bodyLbl = newLabel();
+                    caseBodyLabels ~= bodyLbl;
+                    foreach (Node v; c.values)
+                    {
+                        emit(VMInstruction.instr(VMOpCode.Load, discSlot));
+                        compile(v);
+                        emit(VMInstruction.instr(VMOpCode.Eq));
+                        emit(VMInstruction.instr(VMOpCode.Jnz, CGDValue.texto(bodyLbl)));
+                    }
+                }
+                emit(VMInstruction.instr(VMOpCode.Jmp, CGDValue.texto(fallbackLbl)));
+                breakTargets ~= endLbl;
+                foreach (size_t ci, SwitchCase c; sw.cases)
+                {
+                    enterLabel(caseBodyLabels[ci]);
+                    compileBody(c.body);
+                    emit(VMInstruction.instr(VMOpCode.Jmp, CGDValue.texto(endLbl)));
+                }
+                enterLabel(fallbackLbl);
+                compileBody(sw.fallback);
+                breakTargets.length--;
+                enterLabel(endLbl);
                 return;
 
             case NodeKind.AssignStmt:
@@ -220,6 +382,15 @@ final class CTFECompile
         if (node.kind == NodeKind.StringLit)
             return CGDValue.texto((cast(StringLit) node).value);
 
+        if (node.kind == NodeKind.ArrayLit)
+        {
+            ArrayLit arr = cast(ArrayLit) node;
+            CGDValue[] elems;
+            foreach (Node el; arr.elements)
+                elems ~= nodeToCgdValue(el);
+            return CGDValue.vetor(elems);
+        }
+
         throw new Exception("Valor não representável na CTFE.");
     }
 
@@ -237,7 +408,25 @@ final class CTFECompile
         if (value.type == CGDTypeKind.Texto)
             return new StringLit(value.s, Position.init);
 
+        if (value.type == CGDTypeKind.Vetor)
+        {
+            Node[] elems;
+            foreach (CGDValue el; value.arr)
+                elems ~= cgdValueToNode(el);
+            return new ArrayLit(elems, Position.init);
+        }
+
         throw new Exception("Resultado não representável na CTFE.");
+    }
+
+    private static bool isExprResult(Node child)
+    {
+        return cast(CallExpr) child !is null || cast(BinaryExpr) child !is null
+            || cast(UnaryExpr) child !is null || cast(Identifier) child !is null
+            || cast(AssignStmt) child !is null || cast(IntLit) child !is null
+            || cast(DoubleLit) child !is null || cast(StringLit) child !is null
+            || cast(BoolLit) child !is null || cast(ConditionalExpr) child !is null
+            || cast(ArrayLit) child !is null || cast(IndexExpr) child !is null;
     }
 
     void emitTypeCheck(TypeExpr type)
@@ -254,9 +443,7 @@ final class CTFECompile
         foreach (Node child; body)
         {
             compile(child);
-            if (cast(CallExpr) child || cast(BinaryExpr) child || cast(UnaryExpr) child
-                    || cast(Identifier) child || cast(AssignStmt) child || cast(IntLit) child
-                    || cast(DoubleLit) child || cast(StringLit) child || cast(BoolLit) child)
+            if (isExprResult(child))
                 emit(VMInstruction.instr(VMOpCode.Drop));
         }
     }

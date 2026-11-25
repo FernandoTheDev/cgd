@@ -1,0 +1,280 @@
+// Wrappers SDL3 (ABI 3.x real) em português com handles geracionais e renderização em lote.
+
+@definicao(biblioteca = "cgd-sdl3", abi = "delegua")
+classe estrangeira PrimitivasSDL3 {
+    @definicao(simbolo = "delegua_sdl_inicializar")
+    inicializar(audio: logico): logico;
+    @definicao(simbolo = "delegua_sdl_finalizar")
+    finalizar(): vazio;
+    @definicao(simbolo = "delegua_sdl_versao")
+    versao(): texto;
+    @definicao(simbolo = "delegua_sdl_ticks_ms")
+    ticksMs(): inteiro;
+    @definicao(simbolo = "delegua_sdl_atrasar")
+    atrasar(ms: inteiro): vazio;
+
+    @definicao(simbolo = "delegua_sdl_janela_criar")
+    janelaCriar(titulo: texto, largura: inteiro, altura: inteiro, redimensionavel: logico): inteiro;
+    @definicao(simbolo = "delegua_sdl_janela_titulo")
+    janelaTitulo(win: inteiro, titulo: texto): vazio;
+    @definicao(simbolo = "delegua_sdl_janela_tamanho")
+    janelaTamanho(win: inteiro): dicionario;
+    @definicao(simbolo = "delegua_sdl_janela_dpi")
+    janelaDpi(win: inteiro): real;
+    @definicao(simbolo = "delegua_sdl_janela_fechar")
+    janelaFechar(win: inteiro): vazio;
+
+    @definicao(simbolo = "delegua_sdl_rend_criar")
+    rendCriar(win: inteiro): inteiro;
+    @definicao(simbolo = "delegua_sdl_rend_cor")
+    rendCor(rend: inteiro, r: inteiro, g: inteiro, b: inteiro, a: inteiro): vazio;
+    @definicao(simbolo = "delegua_sdl_rend_limpar")
+    rendLimpar(rend: inteiro): vazio;
+    @definicao(simbolo = "delegua_sdl_rend_apresentar")
+    rendApresentar(rend: inteiro): vazio;
+    @definicao(simbolo = "delegua_sdl_rend_preencher_ret")
+    rendPreencherRet(rend: inteiro, x: real, y: real, w: real, h: real): vazio;
+    @definicao(simbolo = "delegua_sdl_rend_desenhar_ret")
+    rendDesenharRet(rend: inteiro, x: real, y: real, w: real, h: real): vazio;
+    @definicao(simbolo = "delegua_sdl_rend_linha")
+    rendLinha(rend: inteiro, x1: real, y1: real, x2: real, y2: real): vazio;
+    @definicao(simbolo = "delegua_sdl_rend_ponto")
+    rendPonto(rend: inteiro, x: real, y: real): vazio;
+    @definicao(simbolo = "delegua_sdl_rend_preencher_lote")
+    rendPreencherLote(rend: inteiro, coords: real[]): inteiro;
+    @definicao(simbolo = "delegua_sdl_rend_escala_logica")
+    rendEscalaLogica(rend: inteiro, largura: inteiro, altura: inteiro): vazio;
+    @definicao(simbolo = "delegua_sdl_rend_blend")
+    rendBlend(rend: inteiro, alpha: logico): vazio;
+    @definicao(simbolo = "delegua_sdl_rend_fechar")
+    rendFechar(rend: inteiro): vazio;
+
+    @definicao(simbolo = "delegua_sdl_tex_criar_rgba")
+    texCriarRgba(rend: inteiro, largura: inteiro, altura: inteiro): inteiro;
+    @definicao(simbolo = "delegua_sdl_tex_desenhar")
+    texDesenhar(rend: inteiro, tex: inteiro, x: real, y: real, w: real, h: real): vazio;
+    @definicao(simbolo = "delegua_sdl_tex_fechar")
+    texFechar(tex: inteiro): vazio;
+
+    @definicao(simbolo = "delegua_sdl_obter_eventos")
+    obterEventos(): dicionario[];
+    @definicao(simbolo = "delegua_sdl_tecla_pressionada")
+    teclaPressionada(nome: texto): logico;
+    @definicao(simbolo = "delegua_sdl_audio_tom")
+    audioTom(freqHz: real, duracaoMs: inteiro, volume: real): logico;
+}
+
+classe EventoSDL {
+    tipo: texto
+    tecla: texto
+    codigo: inteiro
+    x: real
+    y: real
+    botao: inteiro
+    largura: inteiro
+    altura: inteiro
+
+    construtor(dados: dicionario) {
+        isto.tipo = dados.obter("tipo", "")
+        isto.tecla = dados.obter("tecla", "")
+        isto.codigo = dados.obter("codigo", 0)
+        isto.x = dados.obter("x", 0.0)
+        isto.y = dados.obter("y", 0.0)
+        isto.botao = dados.obter("botao", 0)
+        isto.largura = dados.obter("largura", 0)
+        isto.altura = dados.obter("altura", 0)
+    }
+
+    ehSaida(): logico {
+        retorna isto.tipo == "saida"
+    }
+
+    ehTeclaPressionada(): logico {
+        retorna isto.tipo == "tecla_pressionada"
+    }
+
+    ehTeclaSolta(): logico {
+        retorna isto.tipo == "tecla_solta"
+    }
+
+    ehCliqueMouse(): logico {
+        retorna isto.tipo == "mouse_pressionado"
+    }
+
+    ehMovimentoMouse(): logico {
+        retorna isto.tipo == "mouse_movimento"
+    }
+}
+
+classe Textura {
+    privado {
+        _handle: inteiro
+        _fechada: logico = falso
+        _largura: inteiro
+        _altura: inteiro
+    }
+
+    construtor(handle: inteiro, largura: inteiro, altura: inteiro) {
+        isto._handle = handle
+        isto._largura = largura
+        isto._altura = altura
+    }
+
+    idInterno(): inteiro {
+        retorna isto._handle
+    }
+
+    largura(): inteiro {
+        retorna isto._largura
+    }
+
+    altura(): inteiro {
+        retorna isto._altura
+    }
+
+    fechar(): vazio {
+        se !isto._fechada {
+            isto._fechada = verdadeiro
+            PrimitivasSDL3.texFechar(isto._handle)
+        }
+    }
+}
+
+classe Renderizador {
+    privado {
+        _handle: inteiro
+        _fechado: logico = falso
+    }
+
+    construtor(handle: inteiro) {
+        isto._handle = handle
+    }
+
+    definirCor(r: inteiro, g: inteiro, b: inteiro, a: inteiro = 255): vazio {
+        PrimitivasSDL3.rendCor(isto._handle, r, g, b, a)
+    }
+
+    limpar(): vazio {
+        PrimitivasSDL3.rendLimpar(isto._handle)
+    }
+
+    apresentar(): vazio {
+        PrimitivasSDL3.rendApresentar(isto._handle)
+    }
+
+    preencherRetangulo(x: real, y: real, largura: real, altura: real): vazio {
+        PrimitivasSDL3.rendPreencherRet(isto._handle, x, y, largura, altura)
+    }
+
+    desenharRetangulo(x: real, y: real, largura: real, altura: real): vazio {
+        PrimitivasSDL3.rendDesenharRet(isto._handle, x, y, largura, altura)
+    }
+
+    desenharLinha(x1: real, y1: real, x2: real, y2: real): vazio {
+        PrimitivasSDL3.rendLinha(isto._handle, x1, y1, x2, y2)
+    }
+
+    desenharPonto(x: real, y: real): vazio {
+        PrimitivasSDL3.rendPonto(isto._handle, x, y)
+    }
+
+    /// Renderiza vários retângulos em lote [x0, y0, w0, h0, x1, y1, w1, h1, ...].
+    preencherRetangulosLote(coords: real[]): inteiro {
+        retorna PrimitivasSDL3.rendPreencherLote(isto._handle, coords)
+    }
+
+    definirEscalaLogica(largura: inteiro, altura: inteiro): vazio {
+        PrimitivasSDL3.rendEscalaLogica(isto._handle, largura, altura)
+    }
+
+    definirTransparencia(ativo: logico): vazio {
+        PrimitivasSDL3.rendBlend(isto._handle, ativo)
+    }
+
+    criarTextura(largura: inteiro, altura: inteiro): Textura {
+        var h: inteiro = PrimitivasSDL3.texCriarRgba(isto._handle, largura, altura)
+        retorna Textura(h, largura, altura)
+    }
+
+    desenharTextura(textura: Textura, x: real, y: real, largura: real, altura: real): vazio {
+        PrimitivasSDL3.texDesenhar(isto._handle, textura.idInterno(), x, y, largura, altura)
+    }
+
+    fechar(): vazio {
+        se !isto._fechado {
+            isto._fechado = verdadeiro
+            PrimitivasSDL3.rendFechar(isto._handle)
+        }
+    }
+}
+
+classe Janela {
+    privado {
+        _handle: inteiro
+        _fechada: logico = falso
+    }
+
+    construtor(titulo: texto, largura: inteiro, altura: inteiro, redimensionavel: logico = verdadeiro) {
+        isto._handle = PrimitivasSDL3.janelaCriar(titulo, largura, altura, redimensionavel)
+    }
+
+    definirTitulo(titulo: texto): vazio {
+        PrimitivasSDL3.janelaTitulo(isto._handle, titulo)
+    }
+
+    tamanho(): dicionario {
+        retorna PrimitivasSDL3.janelaTamanho(isto._handle)
+    }
+
+    escalaDPI(): real {
+        retorna PrimitivasSDL3.janelaDpi(isto._handle)
+    }
+
+    criarRenderizador(): Renderizador {
+        retorna Renderizador(PrimitivasSDL3.rendCriar(isto._handle))
+    }
+
+    fechar(): vazio {
+        se !isto._fechada {
+            isto._fechada = verdadeiro
+            PrimitivasSDL3.janelaFechar(isto._handle)
+        }
+    }
+}
+
+funcao inicializar(audio: logico = falso): logico {
+    retorna PrimitivasSDL3.inicializar(audio)
+}
+
+funcao finalizar(): vazio {
+    PrimitivasSDL3.finalizar()
+}
+
+funcao versao(): texto {
+    retorna PrimitivasSDL3.versao()
+}
+
+funcao ticksMs(): inteiro {
+    retorna PrimitivasSDL3.ticksMs()
+}
+
+funcao atrasar(ms: inteiro): vazio {
+    PrimitivasSDL3.atrasar(ms)
+}
+
+funcao obterEventos(): EventoSDL[] {
+    var brutos: dicionario[] = PrimitivasSDL3.obterEventos()
+    var lista: EventoSDL[] = []
+    para cada item: dicionario em brutos {
+        lista.adicionar(EventoSDL(item))
+    }
+    retorna lista
+}
+
+funcao teclaPressionada(nome: texto): logico {
+    retorna PrimitivasSDL3.teclaPressionada(nome)
+}
+
+funcao tocarTom(freqHz: real, duracaoMs: inteiro, volume: real = 0.25): logico {
+    retorna PrimitivasSDL3.audioTom(freqHz, duracaoMs, volume)
+}

@@ -15,6 +15,7 @@ import frontend.semantic.defaults;
 import frontend.semantic.foreign;
 import frontend.semantic.assignments;
 import frontend.semantic.native_methods;
+import frontend.semantic.operators;
 import frontend.parser;
 import frontend.lexer;
 import frontend;
@@ -284,6 +285,10 @@ private:
                     variable.type_sema = resolver.resolver(loop.bindingType);
                 else if (TypeSemaArray arrType = cast(TypeSemaArray) loop.iterable.type_sema)
                     variable.type_sema = arrType.base;
+                else if (TypeSemaNativeContainer nc = cast(TypeSemaNativeContainer) loop.iterable.type_sema)
+                    variable.type_sema = (nc.containerKind == NativeContainerKind.VetorNativo
+                            || nc.containerKind == NativeContainerKind.FatiaNativa)
+                        && nc.typeArgs.length >= 1 ? nc.typeArgs[0] : anyType();
                 else if (TypeSemaBuiltin strType = cast(TypeSemaBuiltin) loop.iterable.type_sema)
                     variable.type_sema = strType.base == TypeSemaBase.String ? strType : anyType();
                 else
@@ -416,7 +421,7 @@ private:
         asyncBody = false;
         scope (exit)
             asyncBody = previousAsync;
-        if (node.signature.builtinName.length || node in classesAnalyzed)
+        if (node.signature.builtinName.length || node.analyzed || node in classesAnalyzed)
             return node;
         if (node in classesActive)
         {
@@ -475,13 +480,38 @@ private:
         }
         if (node.superName.length)
         {
-            Symbol* sym = context.get(node.superName);
-            if (sym is null || !sym.isFn() || (cast(SymbolFn*) sym).node.classFactory is null)
-                err.error(node.pos, "Superclasse não encontrada.");
+            if (node.superQualifier.length > 0)
+            {
+                ModuleUnit mod = registry.resolveModule(node.superQualifier);
+                ClassDecl foundSuper;
+                if (mod !is null && mod.program !is null)
+                {
+                    foreach (Node exported; mod.program.body)
+                        if (ClassDecl cls = cast(ClassDecl) exported)
+                            if (cls.name == node.superName)
+                            {
+                                foundSuper = cls;
+                                break;
+                            }
+                }
+                if (foundSuper is null)
+                    err.error(node.pos, "Superclasse não encontrada.");
+                else
+                {
+                    node.superClass = foundSuper;
+                    analyzeClass(node.superClass);
+                }
+            }
             else
             {
-                node.superClass = (cast(SymbolFn*) sym).node.classFactory;
-                analyzeClass(node.superClass);
+                Symbol* sym = context.get(node.superName);
+                if (sym is null || !sym.isFn() || (cast(SymbolFn*) sym).node.classFactory is null)
+                    err.error(node.pos, "Superclasse não encontrada.");
+                else
+                {
+                    node.superClass = (cast(SymbolFn*) sym).node.classFactory;
+                    analyzeClass(node.superClass);
+                }
             }
         }
         bool[dstring] names;
@@ -531,12 +561,28 @@ private:
         foreach (FnDecl method; node.methods)
             if (method.fn == "construtor")
                 constructor = method;
-        node.signature.args = constructor !is null ? constructor.args : node.superClass !is null
-            ? node.superClass.signature.args : [];
+        if (constructor !is null)
+            node.signature.args = constructor.args;
+        else if (node.isValueType)
+        {
+            FnArg[] autoArgs;
+            foreach (ClassField field; node.fields)
+                if (!field.isEnum && !field.isStatic)
+                {
+                    Node defVal = field.value !is null ? field.value : defaultValue(field.type_sema, field.pos);
+                    FnArg fa = new FnArg(field.name, field.type, defVal, field.pos);
+                    fa.type_sema = field.type_sema;
+                    autoArgs ~= fa;
+                }
+            node.signature.args = autoArgs;
+        }
+        else
+            node.signature.args = node.superClass !is null ? node.superClass.signature.args : [];
         // Identidade e assinatura prontas antes dos corpos: referências mútuas
         // entre classes não são ciclos de herança.
         classesActive.remove(node);
         classesAnalyzed[node] = true;
+        node.analyzed = true;
         foreach (FnDecl method; node.methods)
         {
             for (ClassDecl parent = node.superClass; parent !is null; parent = parent.superClass)
@@ -550,13 +596,39 @@ private:
                 constructor = method;
             analyzeFnDecl(method, false);
         }
-        node.signature.args = constructor !is null ? constructor.args : node.superClass !is null
-            ? node.superClass.signature.args : [];
+        if (constructor !is null)
+            node.signature.args = constructor.args;
+        else if (!node.isValueType)
+            node.signature.args = node.superClass !is null ? node.superClass.signature.args : [];
         if (!node.isInterface)
             validateClassContracts(node, err);
+        validateClassOperators(node, err);
         classesActive.remove(node);
         classesAnalyzed[node] = true;
+        node.analyzed = true;
         return node;
+    }
+
+    bool isStaticEnumReceiver(Node target)
+    {
+        if (Identifier id = cast(Identifier) target)
+        {
+            if (id.classRef !is null || id.moduleRef !is null)
+                return true;
+            if (id.variableRef !is null && cast(ImportExpr) id.variableRef.value !is null)
+                return true;
+            return false;
+        }
+        if (MemberExpr member = cast(MemberExpr) target)
+        {
+            if (member.resolvedModule !is null)
+                return true;
+            if (Identifier right = cast(Identifier) member.right)
+                if (right.classRef !is null)
+                    return isStaticEnumReceiver(member.left);
+            return false;
+        }
+        return false;
     }
 
     Node analyzeMemberExpr(MemberExpr node)
@@ -572,9 +644,8 @@ private:
         if (members is null)
             node.left = analyze(node.left);
         if (MemberExpr receiver = cast(MemberExpr) node.left)
-            if (Identifier klass = cast(Identifier) receiver.left)
-                if (klass.classRef !is null)
-                    members = receiver.enumMembers;
+            if (receiver.enumMembers !is null && isStaticEnumReceiver(receiver.left))
+                members = receiver.enumMembers;
         if (members !is null)
             if (Identifier name = cast(Identifier) node.right)
                 if (name.value != "#incompleto")
@@ -629,13 +700,39 @@ private:
         Identifier name = cast(Identifier) node.right;
         if (name is null || name.value == "#incompleto")
             return node;
+        dstring[] leftNamespace;
+        if (Identifier leftNsId = cast(Identifier) node.left)
+            leftNamespace = leftNsId.namespacePath;
+        else if (MemberExpr leftNsMember = cast(MemberExpr) node.left)
+            leftNamespace = leftNsMember.namespacePath;
+        if (leftNamespace.length > 0)
+        {
+            dstring[] candidatePath = leftNamespace ~ name.value;
+            if (ModuleUnit resolvedMod = registry.resolveModule(candidatePath))
+            {
+                node.resolvedModule = resolvedMod;
+                node.namespacePath = candidatePath;
+                return node;
+            }
+            if (registry.hasNamespacePrefix(candidatePath))
+            {
+                node.namespacePath = candidatePath;
+                return node;
+            }
+        }
         ModuleUnit importedModule;
         if (ImportExpr directImport = cast(ImportExpr) node.left)
             importedModule = directImport.target;
+        else if (MemberExpr leftModMember = cast(MemberExpr) node.left)
+            importedModule = leftModMember.resolvedModule;
         else if (Identifier leftId = cast(Identifier) node.left)
-            if (leftId.variableRef !is null)
+        {
+            if (leftId.moduleRef !is null)
+                importedModule = leftId.moduleRef;
+            else if (leftId.variableRef !is null)
                 if (ImportExpr varImport = cast(ImportExpr) leftId.variableRef.value)
                     importedModule = varImport.target;
+        }
         if (importedModule !is null && importedModule.program !is null)
         {
             foreach (Node exported; importedModule.program.body)
@@ -658,10 +755,21 @@ private:
                     if (varDecl.name == name.value)
                     {
                         name.variableRef = varDecl;
+                        if (varDecl.isEnum)
+                        {
+                            node.readonly = true;
+                            node.enumMembers = cast(MapLit) varDecl.value;
+                        }
                         node.type_sema = varDecl.type_sema is null ? anyType() : varDecl.type_sema;
                         return node;
                     }
             }
+        }
+        else if (leftNamespace.length > 0)
+        {
+            err.error(name.pos, format("Módulo ou símbolo '%s' não encontrado no namespace '%s'.",
+                    name.value, leftNamespace.join("."d)));
+            return node;
         }
         if (declaration !is null)
         {
@@ -696,7 +804,187 @@ private:
                 name.functionRef = builtin;
                 node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Function);
             }
+        if (cast(TypeSemaNativeContainer) node.left.type_sema !is null)
+            node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Function);
         return node;
+    }
+
+    private TypeSema resolveNativeContainerMethodReturn(TypeSemaNativeContainer nc, dstring methodName, bool isStaticCall)
+    {
+        TypeSema elem0 = nc.typeArgs.length >= 1 ? nc.typeArgs[0] : anyType();
+        TypeSema elem1 = nc.typeArgs.length >= 2 ? nc.typeArgs[1] : anyType();
+        TypeSema csizeType = new TypeSemaNative(NativeScalarKind.CSize, "csize"d);
+        TypeSema cboolType = new TypeSemaNative(NativeScalarKind.CBool, "cbool"d);
+        TypeSema voidType = new TypeSemaBuiltin(TypeSemaBase.Void);
+        TypeSema strType = new TypeSemaBuiltin(TypeSemaBase.String);
+
+        if (isStaticCall)
+        {
+            if (nc.containerKind == NativeContainerKind.StringNativa
+                    && (methodName == "criar"d || methodName == "vazia"d))
+                return nc;
+            if (nc.containerKind == NativeContainerKind.VisaoTexto && methodName == "deTexto"d)
+                return nc;
+            if (nc.containerKind == NativeContainerKind.OpcionalNativo
+                    && (methodName == "algum"d || methodName == "nenhum"d))
+                return nc;
+            if (nc.containerKind == NativeContainerKind.ResultadoNativo
+                    && (methodName == "ok"d || methodName == "erro"d))
+                return nc;
+            return nc;
+        }
+
+        final switch (nc.containerKind)
+        {
+            case NativeContainerKind.VetorNativo:
+                switch (methodName)
+                {
+                    case "tamanho":
+                    case "capacidade":
+                        return csizeType;
+                    case "obter":
+                    case "removerUltimo":
+                        return elem0;
+                    case "adicionar":
+                    case "definir":
+                    case "limpar":
+                    case "reservar":
+                    case "liberar":
+                        return voidType;
+                    case "vazio":
+                        return cboolType;
+                    case "fatia":
+                        return new TypeSemaNativeContainer(NativeContainerKind.FatiaNativa, [elem0]);
+                    case "clonar":
+                        return nc;
+                    case "paraVetor":
+                        return new TypeSemaArray(elem0);
+                    default:
+                        return anyType();
+                }
+            case NativeContainerKind.MapaNativo:
+                switch (methodName)
+                {
+                    case "tamanho":
+                    case "capacidade":
+                        return csizeType;
+                    case "obter":
+                        return elem1;
+                    case "definir":
+                    case "limpar":
+                    case "liberar":
+                        return voidType;
+                    case "contem":
+                    case "contém":
+                    case "remover":
+                    case "vazio":
+                        return cboolType;
+                    case "clonar":
+                        return nc;
+                    case "paraDicionario":
+                        return new TypeSemaBuiltin(TypeSemaBase.Map);
+                    default:
+                        return anyType();
+                }
+            case NativeContainerKind.FatiaNativa:
+                switch (methodName)
+                {
+                    case "tamanho":
+                        return csizeType;
+                    case "obter":
+                        return elem0;
+                    case "vazio":
+                        return cboolType;
+                    case "fatia":
+                        return nc;
+                    default:
+                        return anyType();
+                }
+            case NativeContainerKind.StringNativa:
+                switch (methodName)
+                {
+                    case "tamanho":
+                    case "capacidade":
+                        return csizeType;
+                    case "anexar":
+                    case "limpar":
+                    case "liberar":
+                        return voidType;
+                    case "visao":
+                    case "visão":
+                        return new TypeSemaNativeContainer(NativeContainerKind.VisaoTexto);
+                    case "igual":
+                    case "comecaCom":
+                    case "vazia":
+                        return cboolType;
+                    case "clonar":
+                        return nc;
+                    case "paraTexto":
+                        return strType;
+                    default:
+                        return anyType();
+                }
+            case NativeContainerKind.VisaoTexto:
+                switch (methodName)
+                {
+                    case "tamanho":
+                        return csizeType;
+                    case "igual":
+                    case "comecaCom":
+                    case "vazia":
+                        return cboolType;
+                    case "paraTexto":
+                        return strType;
+                    default:
+                        return anyType();
+                }
+            case NativeContainerKind.ResultadoNativo:
+                switch (methodName)
+                {
+                    case "ehOk":
+                    case "ehErro":
+                        return cboolType;
+                    case "valor":
+                        return elem0;
+                    case "erro":
+                        return elem1;
+                    case "valorOu":
+                        return elem0;
+                    default:
+                        return anyType();
+                }
+            case NativeContainerKind.OpcionalNativo:
+                switch (methodName)
+                {
+                    case "temValor":
+                    case "ehNenhum":
+                        return cboolType;
+                    case "valor":
+                    case "valorOu":
+                        return elem0;
+                    default:
+                        return anyType();
+                }
+            case NativeContainerKind.MatrizNativa:
+                switch (methodName)
+                {
+                    case "linhas":
+                    case "colunas":
+                    case "tamanho":
+                        return csizeType;
+                    case "obter":
+                        return elem0;
+                    case "definir":
+                    case "liberar":
+                        return voidType;
+                    case "multiplicar":
+                    case "transpor":
+                    case "clonar":
+                        return nc;
+                    default:
+                        return anyType();
+                }
+        }
     }
 
     Node analyzeUnaryExpr(UnaryExpr node)
@@ -707,6 +995,20 @@ private:
         {
             node.type_sema = anyType();
             return node;
+        }
+        if (cast(TypeSemaClass) node.value.type_sema !is null)
+        {
+            dstring sym = tokenToUnaryOperatorSymbol(node.op);
+            if (sym.length)
+            {
+                FnDecl opMethod = resolveUnaryOperator(sym, node.value.type_sema, lexicalOwner, node.pos, err);
+                if (opMethod !is null)
+                {
+                    node.resolvedOperator = opMethod;
+                    node.type_sema = callResult(opMethod);
+                    return node;
+                }
+            }
         }
         if (node.op == TokenKind.Bang)
             node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Bool);
@@ -751,11 +1053,35 @@ private:
         Node value = node.value;
         Node idx = node.idx;
 
-        // permitindo apenas em vetores e textos por enquanto
         if (value.type_sema is null || idx.type_sema is null)
         {
             node.type_sema = anyType();
             return node;
+        }
+        if (TypeSemaNativeContainer nc = cast(TypeSemaNativeContainer) value.type_sema)
+        {
+            if ((nc.containerKind == NativeContainerKind.VetorNativo
+                    || nc.containerKind == NativeContainerKind.FatiaNativa) && nc.typeArgs.length >= 1)
+            {
+                node.type_sema = nc.typeArgs[0];
+                return node;
+            }
+            if (nc.containerKind == NativeContainerKind.MapaNativo && nc.typeArgs.length >= 2)
+            {
+                node.type_sema = nc.typeArgs[1];
+                return node;
+            }
+        }
+        if (cast(TypeSemaClass) value.type_sema !is null)
+        {
+            FnDecl opMethod = resolveIndexOperator("[]"d, value.type_sema, idx.type_sema, null,
+                    lexicalOwner, node.pos, err);
+            if (opMethod !is null)
+            {
+                node.resolvedOperator = opMethod;
+                node.type_sema = callResult(opMethod);
+                return node;
+            }
         }
         dstring type = value.type_sema.toStr();
         if (!value.type_sema.isArray() && type != TypeSemaBase.String && type != TypeSemaBase.Any
@@ -768,8 +1094,9 @@ private:
         }
 
         dstring type2 = idx.type_sema.toStr();
-        if (type != TypeSemaBase.Map && type != TypeSemaBase.Any && type2 != TypeSemaBase.Int
-                && type2 != TypeSemaBase.Any)
+        bool idxIsInt = type2 == TypeSemaBase.Int || type2 == TypeSemaBase.Any
+            || (cast(TypeSemaNative) idx.type_sema !is null && (cast(TypeSemaNative) idx.type_sema).isInteger());
+        if (type != TypeSemaBase.Map && type != TypeSemaBase.Any && !idxIsInt)
         {
             err.error(node.pos, format("O indíce deve ser do tipo '%s', foi recebido '%s'.",
                     TypeSemaBase.Int, type2));
@@ -786,6 +1113,34 @@ private:
 
     Node analyzeAssignStmt(AssignStmt node)
     {
+        if (IndexExpr idxLeft = cast(IndexExpr) node.left)
+        {
+            idxLeft.value = analyze(idxLeft.value);
+            idxLeft.idx = analyze(idxLeft.idx);
+            node.value = analyze(node.value);
+            if (idxLeft.value !is null && cast(TypeSemaClass) idxLeft.value.type_sema !is null)
+            {
+                FnDecl setOp = resolveIndexOperator("[]="d, idxLeft.value.type_sema, idxLeft.idx.type_sema,
+                        node.value.type_sema, lexicalOwner, node.pos, err);
+                if (setOp !is null)
+                {
+                    node.resolvedIndexSetOperator = setOp;
+                    idxLeft.type_sema = node.value.type_sema;
+                    node.type_sema = callResult(setOp);
+                    return node;
+                }
+            }
+            if (idxLeft.value !is null && cast(TypeSemaNativeContainer) idxLeft.value.type_sema !is null)
+            {
+                TypeSemaNativeContainer nc = cast(TypeSemaNativeContainer) idxLeft.value.type_sema;
+                TypeSema elemType = nc.containerKind == NativeContainerKind.MapaNativo && nc.typeArgs.length >= 2
+                    ? nc.typeArgs[1] : (nc.typeArgs.length >= 1 ? nc.typeArgs[0] : anyType());
+                idxLeft.type_sema = elemType;
+                node.type_sema = elemType;
+                checkTypes(node.pos, elemType, node.value.type_sema);
+                return node;
+            }
+        }
         node.left = analyze(node.left);
         node.value = analyze(node.value);
         node.type_sema = node.left.type_sema;
@@ -815,11 +1170,36 @@ private:
             return node;
         }
 
+        if (sym.isModule())
+        {
+            sym.uses++;
+            SymbolModule modSym = cast(SymbolModule)*sym;
+            node.moduleRef = modSym.target;
+            node.namespacePath = [node.value];
+            node.type_sema = anyType();
+            return node;
+        }
+
         if (sym.isFn())
         {
             sym.uses++;
             node.functionRef = (cast(SymbolFn*) sym).node;
             node.classRef = node.functionRef.classFactory;
+            if (cast(TypeExprGeneric) node.type_expr !is null)
+            {
+                node.type_sema = resolver.resolver(node.type_expr);
+                return node;
+            }
+            if (node.value == "StringNativa"d)
+            {
+                node.type_sema = new TypeSemaNativeContainer(NativeContainerKind.StringNativa);
+                return node;
+            }
+            if (node.value == "VisaoTexto"d)
+            {
+                node.type_sema = new TypeSemaNativeContainer(NativeContainerKind.VisaoTexto);
+                return node;
+            }
             node.type_sema = new TypeSemaBuiltin(TypeSemaBase.Function);
             return node;
         }
@@ -900,6 +1280,15 @@ private:
             return node;
         }
         Identifier id = cast(Identifier) node.fn;
+        if (id !is null && cast(TypeExprGeneric) id.type_expr !is null)
+        {
+            TypeSema resolvedGen = resolver.resolver(id.type_expr);
+            id.type_sema = resolvedGen;
+            foreach (ref Node arg; node.args)
+                arg = analyze(arg);
+            node.type_sema = resolvedGen;
+            return node;
+        }
         Symbol* sym = id is null ? null : context.get(id.value);
         if (sym !is null && sym.isFn())
         {
@@ -929,6 +1318,15 @@ private:
         if (MemberExpr member = cast(MemberExpr) node.fn)
             if (Identifier name = cast(Identifier) member.right)
             {
+                if (TypeSemaNativeContainer nc = cast(TypeSemaNativeContainer) member.left.type_sema)
+                {
+                    bool isStaticFactory = (cast(Identifier) member.left) !is null
+                        && ((cast(Identifier) member.left).value == "StringNativa"d
+                            || (cast(Identifier) member.left).value == "VisaoTexto"d
+                            || cast(TypeExprGeneric)(cast(Identifier) member.left).type_expr !is null);
+                    node.type_sema = resolveNativeContainerMethodReturn(nc, name.value, isStaticFactory);
+                    return node;
+                }
                 if (name.functionRef !is null)
                 {
                     FnDecl target = name.functionRef;
@@ -1102,8 +1500,11 @@ private:
         methodOwner = node.isMethod && !node.isStatic ? node.ownerClass : null;
         if (node.isMethod && !node.isStatic)
         {
-            FnArg self = new FnArg("isto", new TypeExprNamed("qualquer", node.pos), null, node.pos);
-            self.type_sema = anyType();
+            TypeExpr selfExpr = node.ownerClass !is null && node.ownerClass.isValueType
+                ? new TypeExprNamed(node.ownerClass.name, node.pos) : new TypeExprNamed("qualquer", node.pos);
+            FnArg self = new FnArg("isto", selfExpr, null, node.pos);
+            self.type_sema = node.ownerClass !is null && node.ownerClass.isValueType
+                ? cast(TypeSema) new TypeSemaClass(node.ownerClass) : anyType();
             context.set("isto", new SymbolParam(self));
         }
         node.type_sema = resolver.resolver(node.type_expr);
@@ -1146,6 +1547,25 @@ private:
         TypeSema l = node.left.type_sema;
         TypeSema r = node.right.type_sema;
 
+        // Resolução de operadores personalizados (@operador) quando ao menos um operando é classe.
+        // Operadores primitivos têm prioridade absoluta.
+        if (cast(TypeSemaClass) l !is null || cast(TypeSemaClass) r !is null)
+        {
+            dstring opSym = tokenToBinaryOperatorSymbol(node.op);
+            if (opSym.length)
+            {
+                bool swapped;
+                FnDecl opMethod = resolveBinaryOperator(opSym, l, r, lexicalOwner, node.pos, err, swapped);
+                if (opMethod !is null)
+                {
+                    node.resolvedOperator = opMethod;
+                    node.operatorSwapped = swapped;
+                    node.type_sema = callResult(opMethod);
+                    return node;
+                }
+            }
+        }
+
         if (node.op == TokenKind.And || node.op == TokenKind.Or || node.op == TokenKind.In
                 || node.op == TokenKind.EEquals || node.op == TokenKind.NEquals)
         {
@@ -1164,8 +1584,11 @@ private:
         }
 
         TypeSema type = l.promote(r);
-        node.left.type_sema = type;
-        node.right.type_sema = type;
+        if (cast(TypeSemaNative) l is null && cast(TypeSemaNative) r is null)
+        {
+            node.left.type_sema = type;
+            node.right.type_sema = type;
+        }
 
         switch (node.op)
         {
@@ -1186,6 +1609,8 @@ private:
 
     Node analyzeVarDecl(VarDecl node)
     {
+        if (node.uninitialized)
+            node.lackedExplicitInit = true;
         if (node.uninitialized && node.type_expr !is null)
         {
             Node initial = defaultValue(resolver.resolver(node.type_expr), node.pos);

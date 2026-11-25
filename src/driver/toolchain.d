@@ -94,8 +94,12 @@ struct CToolchain
     string pkgConfig;
     string target;
     string sysroot;
+    string gcBackend;
     string[] cFlags;
     string[] linkFlags;
+    string[] extraObjects;
+    string[] nativePackages;
+    bool debugInfo;
 
     static CToolchain discover(CGDArguments args)
     {
@@ -110,18 +114,41 @@ struct CToolchain
                 }
         enforce(toolchain.compiler.length && executableAvailable(toolchain.compiler),
                 "Não foi possível encontrar um compilador C. Use --cc ou CC (somente executável).");
+        string rawGc = args.gcBackend.length ? args.gcBackend : environment.get("CGD_GC_BACKEND", "cgd");
+        string lowerGc = rawGc.toLower();
+        enforce(lowerGc == "cgd" || lowerGc == "boehm",
+                "Backend de GC inválido: '" ~ rawGc ~ "'. Use --gc=cgd ou --gc=boehm.");
+        toolchain.gcBackend = lowerGc;
         toolchain.runtimeRoot = args.runtimeRoot.length ? absolutePath(args.runtimeRoot) : dirName(thisExePath());
+        string defaultRtObj = lowerGc == "boehm" ? "libdelegua_rt_boehm.o" : "libdelegua_rt.o";
         toolchain.runtimeObject = args.runtimeObject.length
-            ? absolutePath(args.runtimeObject) : buildPath(toolchain.runtimeRoot, "lib", "libdelegua_rt.o");
+            ? absolutePath(args.runtimeObject) : buildPath(toolchain.runtimeRoot, "lib", defaultRtObj);
         enforce(exists(toolchain.runtimeObject),
-                "Runtime ausente. Execute ./build-runtime ou informe --runtime-object do alvo.");
+                "Runtime ausente (" ~ toolchain.runtimeObject
+                ~ "). Execute ./build-runtime ou informe --runtime-object do alvo.");
         toolchain.pkgConfig = args.pkgConfig.length ? args.pkgConfig : environment.get("PKG_CONFIG", "pkg-config");
         enforce(executableAvailable(toolchain.pkgConfig), "pkg-config ausente. Use --pkg-config ou PKG_CONFIG.");
         toolchain.target = args.target;
         toolchain.sysroot = args.sysroot;
         toolchain.cFlags = args.cFlags;
         toolchain.linkFlags = args.linkFlags;
+        toolchain.extraObjects = args.extraObjects;
+        toolchain.nativePackages = args.nativePackages;
+        toolchain.debugInfo = args.debugInfo;
         return toolchain;
+    }
+
+    string resolveBridgeObject(string bridgeName)
+    {
+        string objName = "libdelegua_" ~ bridgeName ~ ".o";
+        string[] candidates = [
+            buildPath(runtimeRoot, "lib", objName),
+            buildPath(dirName(runtimeObject), objName)
+        ];
+        foreach (string candidate; candidates)
+            if (exists(candidate) && isFile(candidate))
+                return candidate;
+        return null;
     }
 
     string[] command(string source, string output, bool optimized, string[] libraries)
@@ -130,6 +157,13 @@ struct CToolchain
             compiler, "-std=c99", "-Werror=implicit-function-declaration", "-Werror=return-type",
             "-Werror=incompatible-pointer-types"
         ];
+        if (debugInfo)
+        {
+            result ~= "-g";
+            string lowerCc = compiler.toLower;
+            if (!lowerCc.endsWith("tcc") && !lowerCc.canFind("/tcc"))
+                result ~= "-fno-omit-frame-pointer";
+        }
         if (target.length)
             result ~= "--target=" ~ target;
         if (sysroot.length)
@@ -137,6 +171,7 @@ struct CToolchain
         result ~= ["-I", runtimeRoot, source, "-o", output, optimized ? "-O2" : "-O0"];
         result ~= cFlags;
         result ~= runtimeObject;
+        result ~= extraObjects;
         result ~= libraries;
         // Bibliotecas do hospedeiro não são injetadas em um alvo explícito.
         if (target.length)
@@ -160,10 +195,27 @@ struct CToolchain
 
     string[] gcFlags()
     {
+        string[] packages = gcBackend == "boehm" ? ["bdw-gc", "libcurl"] : ["libcurl"];
+        foreach (string pkg; nativePackages)
+        {
+            if (pkg.length && !packages.canFind(pkg))
+            {
+                Tuple!(int, "status", string, "output") check = execute([pkgConfig, "--exists", pkg]);
+                enforce(check.status == 0,
+                        "Biblioteca nativa '" ~ pkg
+                        ~ "' não encontrada via pkg-config. Instale o pacote de desenvolvimento correspondente.");
+                packages ~= pkg;
+            }
+        }
         Tuple!(int, "status", string, "output") pkg = execute([
-            pkgConfig, "--cflags", "--libs", "bdw-gc", "libcurl"
-        ]);
-        enforce(pkg.status == 0, "Não foi possível localizar bdw-gc: " ~ pkg.output);
-        return splitToolFlags(pkg.output);
+            pkgConfig, "--cflags", "--libs"
+        ] ~ packages);
+        enforce(pkg.status == 0, "Não foi possível localizar dependências pkg-config: " ~ pkg.output);
+        string[] flags = splitToolFlags(pkg.output);
+        if (gcBackend == "boehm")
+            flags = ["-DCGD_GC_BACKEND_BOEHM=1"] ~ flags;
+        else
+            flags ~= "-lpthread";
+        return flags;
     }
 }

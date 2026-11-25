@@ -1,0 +1,136 @@
+// Primitivas de terminal POSIX/ANSI com Unicode, cores RGB e restauração segura.
+classe Cores {
+    estatico esc(): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.caractereUnicode(27)
+    }
+
+    estatico resetar(): texto {
+        retorna Cores.esc() + "[0m"
+    }
+
+    estatico negrito(): texto {
+        retorna Cores.esc() + "[1m"
+    }
+
+    estatico tenue(): texto {
+        retorna Cores.esc() + "[2m"
+    }
+
+    estatico italico(): texto {
+        retorna Cores.esc() + "[3m"
+    }
+
+    estatico sublinhado(): texto {
+        retorna Cores.esc() + "[4m"
+    }
+
+    estatico inverso(): texto {
+        retorna Cores.esc() + "[7m"
+    }
+
+    estatico frenteRGB(r: inteiro, g: inteiro, b: inteiro): texto {
+        retorna Cores.esc() + "[38;2;" + texto(r) + ";" + texto(g) + ";" + texto(b) + "m"
+    }
+
+    estatico fundoRGB(r: inteiro, g: inteiro, b: inteiro): texto {
+        retorna Cores.esc() + "[48;2;" + texto(r) + ";" + texto(g) + ";" + texto(b) + "m"
+    }
+
+    estatico frenteAnsi(codigo: inteiro): texto {
+        retorna Cores.esc() + "[" + texto(30 + (codigo % 8)) + "m"
+    }
+
+    estatico fundoAnsi(codigo: inteiro): texto {
+        retorna Cores.esc() + "[" + texto(40 + (codigo % 8)) + "m"
+    }
+
+    estatico frente256(indice: inteiro): texto {
+        retorna Cores.esc() + "[38;5;" + texto(indice) + "m"
+    }
+
+    estatico fundo256(indice: inteiro): texto {
+        retorna Cores.esc() + "[48;5;" + texto(indice) + "m"
+    }
+}
+
+classe Terminal {
+    estatico ehInterativo(): logico {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.termEhTty()
+    }
+
+    estatico tamanho(): dicionario {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.termTamanho()
+    }
+
+    estatico suportaUnicode(): logico {
+        var amb: qualquer = importar("cgd:ambiente").Ambiente
+        var lang: texto = texto(amb.obter("LC_ALL", amb.obter("LANG", ""))).minusculo()
+        var term: texto = texto(amb.obter("TERM", "")).minusculo()
+        se term == "dumb" ou term == "vt100" {
+            retorna falso
+        }
+        retorna lang.contem("utf-8") ou lang.contem("utf8")
+    }
+
+    estatico suportaCores(): logico {
+        var amb: qualquer = importar("cgd:ambiente").Ambiente
+        se amb.contem("NO_COLOR") {
+            retorna falso
+        }
+        var term: texto = texto(amb.obter("TERM", "")).minusculo()
+        retorna term != "dumb" e term != ""
+    }
+
+    estatico suportaTrueColor(): logico {
+        var amb: qualquer = importar("cgd:ambiente").Ambiente
+        se !Terminal.suportaCores() {
+            retorna falso
+        }
+        var ct: texto = texto(amb.obter("COLORTERM", "")).minusculo()
+        retorna ct.contem("truecolor") ou ct.contem("24bit")
+    }
+
+    estatico entrarModoRaw(mouse: logico = falso): logico {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.termEntrarRaw(mouse)
+    }
+
+    estatico sairModoRaw(): vazio {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        nativo.termSairRaw()
+    }
+
+    estatico escrever(dados: texto): inteiro {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.termEscrever(dados)
+    }
+
+    estatico moverCursor(x: inteiro, y: inteiro): texto {
+        retorna Cores.esc() + "[" + texto(y + 1) + ";" + texto(x + 1) + "H"
+    }
+
+    estatico ocultarCursor(): vazio {
+        Terminal.escrever(Cores.esc() + "[?25l")
+    }
+
+    estatico mostrarCursor(): vazio {
+        Terminal.escrever(Cores.esc() + "[?25h")
+    }
+
+    estatico limparTela(): vazio {
+        Terminal.escrever(Cores.esc() + "[2J" + Cores.esc() + "[H")
+    }
+
+    estatico lerEvento(timeoutMs: inteiro = 100): qualquer {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.termLerEvento(timeoutMs)
+    }
+
+    estatico larguraVisual(valor: texto): inteiro {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.termLarguraVisual(valor)
+    }
+}

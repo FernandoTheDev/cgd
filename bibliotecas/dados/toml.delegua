@@ -1,0 +1,308 @@
+// Parser e serializador TOML para configurações de projetos e aplicações.
+
+classe TOML {
+    estatico removerComentario(linha: texto): texto {
+        var emAspasDuplas: logico = falso
+        var emAspasSimples: logico = falso
+        var escapado: logico = falso
+        para (var i: inteiro = 0; i < tamanho(linha); i++) {
+            var ch: texto = linha[i]
+            se escapado {
+                escapado = falso
+                continua
+            }
+            se emAspasDuplas {
+                se ch == "\\" {
+                    escapado = verdadeiro
+                } senao se ch == "\"" {
+                    emAspasDuplas = falso
+                }
+            } senao se emAspasSimples {
+                se ch == "'" {
+                    emAspasSimples = falso
+                }
+            } senao {
+                se ch == "\"" {
+                    emAspasDuplas = verdadeiro
+                } senao se ch == "'" {
+                    emAspasSimples = verdadeiro
+                } senao se ch == "#" {
+                    retorna linha.fatiar(0, i).aparar()
+                }
+            }
+        }
+        retorna linha.aparar()
+    }
+
+    estatico dividirForaAspas(valor: texto, sep: texto): texto[] {
+        var partes: texto[] = []
+        var atual: texto[] = []
+        var emDuplas: logico = falso
+        var emSimples: logico = falso
+        var esc: logico = falso
+        var nivelCol: inteiro = 0
+        var nivelChv: inteiro = 0
+        para (var i: inteiro = 0; i < tamanho(valor); i++) {
+            var ch: texto = valor[i]
+            se esc {
+                atual.adicionar(ch)
+                esc = falso
+                continua
+            }
+            se emDuplas {
+                atual.adicionar(ch)
+                se ch == "\\" {
+                    esc = verdadeiro
+                } senao se ch == "\"" {
+                    emDuplas = falso
+                }
+                continua
+            }
+            se emSimples {
+                atual.adicionar(ch)
+                se ch == "'" {
+                    emSimples = falso
+                }
+                continua
+            }
+            se ch == "\"" {
+                emDuplas = verdadeiro
+                atual.adicionar(ch)
+            } senao se ch == "'" {
+                emSimples = verdadeiro
+                atual.adicionar(ch)
+            } senao se ch == "[" {
+                nivelCol = nivelCol + 1
+                atual.adicionar(ch)
+            } senao se ch == "]" {
+                nivelCol = nivelCol - 1
+                atual.adicionar(ch)
+            } senao se ch == "{" {
+                nivelChv = nivelChv + 1
+                atual.adicionar(ch)
+            } senao se ch == "}" {
+                nivelChv = nivelChv - 1
+                atual.adicionar(ch)
+            } senao se ch == sep e nivelCol == 0 e nivelChv == 0 {
+                partes.adicionar(atual.juntar("").aparar())
+                atual = []
+            } senao {
+                atual.adicionar(ch)
+            }
+        }
+        var resto: texto = atual.juntar("").aparar()
+        se tamanho(resto) > 0 {
+            partes.adicionar(resto)
+        }
+        retorna partes
+    }
+
+    estatico analisarValor(bruto: texto): qualquer {
+        var s: texto = bruto.aparar()
+        var n: inteiro = tamanho(s)
+        se n == 0 {
+            falhar "TOML: valor vazio"
+        }
+        se s == "true" {
+            retorna verdadeiro
+        }
+        se s == "false" {
+            retorna falso
+        }
+        se n >= 2 e s[0] == "\"" e s[n - 1] == "\"" {
+            var interno: texto = s.fatiar(1, n - 1)
+            var out: texto[] = []
+            var i: inteiro = 0
+            enquanto i < tamanho(interno) {
+                var ch: texto = interno[i]
+                se ch == "\\" e i + 1 < tamanho(interno) {
+                    var prox: texto = interno[i + 1]
+                    se prox == "n" {
+                        out.adicionar("\n")
+                    } senao se prox == "t" {
+                        out.adicionar("\t")
+                    } senao se prox == "r" {
+                        out.adicionar("\r")
+                    } senao se prox == "\"" {
+                        out.adicionar("\"")
+                    } senao se prox == "\\" {
+                        out.adicionar("\\")
+                    } senao {
+                        out.adicionar(prox)
+                    }
+                    i = i + 2
+                } senao {
+                    out.adicionar(ch)
+                    i = i + 1
+                }
+            }
+            retorna out.juntar("")
+        }
+        se n >= 2 e s[0] == "'" e s[n - 1] == "'" {
+            retorna s.fatiar(1, n - 1)
+        }
+        se n >= 2 e s[0] == "[" e s[n - 1] == "]" {
+            var miolo: texto = s.fatiar(1, n - 1).aparar()
+            var lista: qualquer[] = []
+            se tamanho(miolo) == 0 {
+                retorna lista
+            }
+            var itens: texto[] = TOML.dividirForaAspas(miolo, ",")
+            para cada item: texto em itens {
+                lista.adicionar(TOML.analisarValor(item))
+            }
+            retorna lista
+        }
+        se n >= 2 e s[0] == "{" e s[n - 1] == "}" {
+            var miolo: texto = s.fatiar(1, n - 1).aparar()
+            var mapa: dicionario = {}
+            se tamanho(miolo) == 0 {
+                retorna mapa
+            }
+            var pares: texto[] = TOML.dividirForaAspas(miolo, ",")
+            para cada par: texto em pares {
+                var eq: inteiro = par.encontrar("=")
+                se eq <= 0 {
+                    falhar "TOML: par inválido em tabela inline: " + par
+                }
+                var k: texto = par.fatiar(0, eq).aparar()
+                var v: texto = par.fatiar(eq + 1).aparar()
+                mapa[k] = TOML.analisarValor(v)
+            }
+            retorna mapa
+        }
+        var limpo: texto = s.substituir("_", "")
+        se limpo.contem(".") ou limpo.contem("e") ou limpo.contem("E") {
+            retorna real(limpo)
+        }
+        retorna inteiro(limpo)
+    }
+
+    estatico garantirTabela(raiz: dicionario, caminho: texto[]): dicionario {
+        var atual: dicionario = raiz
+        para cada parte: texto em caminho {
+            var p: texto = parte.aparar()
+            se !(p em atual) {
+                atual[p] = {}
+            }
+            atual = atual[p]
+        }
+        retorna atual
+    }
+
+    estatico analisar(conteudo: texto): dicionario {
+        var raiz: dicionario = {}
+        var tabelaAtual: dicionario = raiz
+        var linhas: texto[] = conteudo.dividir("\n")
+        para cada linhaBruta: texto em linhas {
+            var linha: texto = TOML.removerComentario(linhaBruta)
+            se tamanho(linha) == 0 {
+                continua
+            }
+            var n: inteiro = tamanho(linha)
+            se n >= 4 e linha.fatiar(0, 2) == "[[" e linha.fatiar(n - 2, n) == "]]" {
+                var caminhoStr: texto = linha.fatiar(2, n - 2).aparar()
+                var partes: texto[] = caminhoStr.dividir(".")
+                var pai: dicionario = raiz
+                para (var i: inteiro = 0; i + 1 < tamanho(partes); i++) {
+                    var seg: texto = partes[i].aparar()
+                    se !(seg em pai) {
+                        pai[seg] = {}
+                    }
+                    pai = pai[seg]
+                }
+                var chaveLista: texto = partes[tamanho(partes) - 1].aparar()
+                se !(chaveLista em pai) {
+                    pai[chaveLista] = []
+                }
+                var novoObj: dicionario = {}
+                pai[chaveLista].adicionar(novoObj)
+                tabelaAtual = novoObj
+                continua
+            }
+            se n >= 2 e linha[0] == "[" e linha[n - 1] == "]" {
+                var caminhoStr: texto = linha.fatiar(1, n - 1).aparar()
+                tabelaAtual = TOML.garantirTabela(raiz, caminhoStr.dividir("."))
+                continua
+            }
+            var eq: inteiro = linha.encontrar("=")
+            se eq <= 0 {
+                falhar "TOML: linha inválida: " + linha
+            }
+            var chave: texto = linha.fatiar(0, eq).aparar()
+            var valorStr: texto = linha.fatiar(eq + 1).aparar()
+            var destino: dicionario = tabelaAtual
+            se chave.contem(".") e !(chave[0] == "\"" ou chave[0] == "'") {
+                var segs: texto[] = chave.dividir(".")
+                para (var i: inteiro = 0; i + 1 < tamanho(segs); i++) {
+                    var s: texto = segs[i].aparar()
+                    se !(s em destino) {
+                        destino[s] = {}
+                    }
+                    destino = destino[s]
+                }
+                chave = segs[tamanho(segs) - 1].aparar()
+            }
+            destino[chave] = TOML.analisarValor(valorStr)
+        }
+        retorna raiz
+    }
+
+    estatico formatarValor(valor: qualquer): texto {
+        var t: texto = tipo de valor
+        se t == "logico" ou t == "lógico" {
+            retorna valor ? "true" : "false"
+        }
+        se t == "inteiro" ou t == "real" ou t == "numero" ou t == "número" {
+            retorna texto(valor)
+        }
+        se t == "texto" {
+            var s: texto = valor
+            s = s.substituir("\\", "\\\\").substituir("\"", "\\\"").substituir("\n", "\\n")
+            retorna "\"" + s + "\""
+        }
+        se t == "vetor" {
+            var itens: texto[] = []
+            para cada el: qualquer em valor {
+                itens.adicionar(TOML.formatarValor(el))
+            }
+            retorna "[" + itens.juntar(", ") + "]"
+        }
+        se t == "dicionario" ou t == "dicionário" {
+            var nativo: qualquer = importar("cgd:nativo").Primitivas
+            var pares: texto[] = []
+            para cada par: qualquer em nativo.dicionarioItens(valor) {
+                pares.adicionar(texto(par[0]) + " = " + TOML.formatarValor(par[1]))
+            }
+            retorna "{ " + pares.juntar(", ") + " }"
+        }
+        retorna "\"" + texto(valor) + "\""
+    }
+
+    estatico serializar(dados: dicionario): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        var linhasEscalar: texto[] = []
+        var linhasSecoes: texto[] = []
+        para cada par: qualquer em nativo.dicionarioItens(dados) {
+            var k: texto = texto(par[0])
+            var v: qualquer = par[1]
+            var tv: texto = tipo de v
+            se tv == "dicionario" ou tv == "dicionário" {
+                linhasSecoes.adicionar("[" + k + "]")
+                para cada sub: qualquer em nativo.dicionarioItens(v) {
+                    linhasSecoes.adicionar(texto(sub[0]) + " = " + TOML.formatarValor(sub[1]))
+                }
+                linhasSecoes.adicionar("")
+            } senao {
+                linhasEscalar.adicionar(k + " = " + TOML.formatarValor(v))
+            }
+        }
+        se tamanho(linhasSecoes) > 0 e tamanho(linhasEscalar) > 0 {
+            linhasEscalar.adicionar("")
+        }
+        para cada l: texto em linhasSecoes {
+            linhasEscalar.adicionar(l)
+        }
+        retorna linhasEscalar.juntar("\n")
+    }
+}

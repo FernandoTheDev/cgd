@@ -11,7 +11,8 @@ enum TypeExprKind : ubyte
     Task,
     Array,
     Tuple,
-    Named
+    Named,
+    Generic
 }
 
 abstract class TypeExpr
@@ -23,19 +24,25 @@ abstract class TypeExpr
 
 class TypeExprNamed : TypeExpr
 {
+    dstring[] qualifier;
     dstring name;
     dstring classLinkName;
 
-    this(dstring name, Position p)
+    this(dstring name, Position p, dstring[] qualifier = null)
     {
         this.kind = TypeExprKind.Named;
+        this.qualifier = qualifier;
         this.name = name;
         this.pos = p;
     }
 
     override dstring toStr()
     {
-        return name;
+        if (!qualifier.length)
+            return name;
+        import std.array : join;
+
+        return qualifier.join("."d) ~ "."d ~ name;
     }
 }
 
@@ -110,5 +117,31 @@ class TypeExprTask : TypeExpr
     override dstring toStr()
     {
         return "Tarefa<" ~ result.toStr() ~ ">";
+    }
+}
+
+class TypeExprGeneric : TypeExpr
+{
+    dstring name;
+    TypeExpr[] typeArgs;
+
+    this(dstring name, TypeExpr[] typeArgs, Position pos)
+    {
+        this.kind = TypeExprKind.Generic;
+        this.name = name;
+        this.typeArgs = typeArgs;
+        this.pos = pos;
+    }
+
+    override dstring toStr()
+    {
+        dstring res = name ~ "<"d;
+        foreach (size_t i, TypeExpr arg; typeArgs)
+        {
+            if (i > 0)
+                res ~= ", "d;
+            res ~= arg.toStr();
+        }
+        return res ~ ">"d;
     }
 }

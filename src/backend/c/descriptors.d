@@ -8,8 +8,39 @@ import backend.c.utils;
 dstring typeDescriptor(TypeExpr type)
 {
     if (TypeExprNamed named = cast(TypeExprNamed) type)
-        return named.classLinkName.length ? formatD("delegua_descr_classe(%s)",
-                cName(named.classLinkName)) : formatD("delegua_descr_nome(%s)", cString(named.name));
+    {
+        if (named.classLinkName.length)
+            return formatD("delegua_descr_classe(%s)", cName(named.classLinkName));
+        switch (named.name)
+        {
+            case "ci8":
+            case "cu8":
+            case "ci16":
+            case "cu16":
+            case "ci32":
+            case "cu32":
+            case "ci64":
+            case "cu64":
+            case "cshort":
+            case "cushort":
+            case "cint":
+            case "cuint":
+            case "clong":
+            case "culong":
+            case "csize":
+            case "cponteiro":
+                return "delegua_descr_nome(\"inteiro\")"d;
+            case "cf32":
+            case "cf64":
+            case "cfloat":
+            case "cdouble":
+                return "delegua_descr_nome(\"real\")"d;
+            case "cbool":
+                return "delegua_descr_nome(\"logico\")"d;
+            default:
+                return formatD("delegua_descr_nome(%s)", cString(named.name));
+        }
+    }
     if (TypeExprPromise promise = cast(TypeExprPromise) type)
         return formatD("delegua_descr_promessa(%s)", typeDescriptor(promise.result));
     if (TypeExprTask task = cast(TypeExprTask) type)

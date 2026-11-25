@@ -96,6 +96,10 @@ class Document
     FnDecl[string] functions;
     TypeSema[Node] expressionTypes;
     VarDecl[string] variableDeclarations;
+    ClassDecl[string] symbolTypeDecls;
+    ClassDecl[ulong] offsetTypeDecls;
+    Position[string] modulePositions;
+    ImportExpr[] statementImports;
     size_t[ulong] symbolOffsets;
     struct LexicalScope
     {
@@ -541,6 +545,141 @@ class Document
         return found;
     }
 
+    Position modulePosition(ModuleUnit unit)
+    {
+        if (unit is null)
+            return null;
+        if (unit.program !is null && unit.program.modulePos !is null)
+            return unit.program.modulePos;
+        if (unit.program !is null && unit.program.pos !is null)
+            return unit.program.pos;
+        return new Position(unit.path, new PosLine(1, 1), new PosLine(1, 1));
+    }
+
+    ModuleUnit resolveImportedModule(Node node)
+    {
+        if (node is null)
+            return null;
+        if (ImportExpr directImport = cast(ImportExpr) node)
+            return directImport.target;
+        if (MemberExpr member = cast(MemberExpr) node)
+            if (member.resolvedModule !is null)
+                return member.resolvedModule;
+        if (Identifier left = cast(Identifier) node)
+        {
+            if (left.moduleRef !is null)
+                return left.moduleRef;
+            if (left.variableRef !is null)
+                if (ImportExpr imported = cast(ImportExpr) left.variableRef.value)
+                    return imported.target;
+        }
+        return null;
+    }
+
+    ClassDecl classFromType(TypeSema type)
+    {
+        if (type is null)
+            return null;
+        if (TypeSemaClass clsType = cast(TypeSemaClass) type)
+            return clsType.declaration;
+        if (TypeSemaArray arrType = cast(TypeSemaArray) type)
+            return classFromType(arrType.base);
+        if (TypeSemaPromise promiseType = cast(TypeSemaPromise) type)
+            return classFromType(promiseType.result);
+        if (TypeSemaTask taskType = cast(TypeSemaTask) type)
+            return classFromType(taskType.result);
+        return null;
+    }
+
+    void recordTypeOffset(Position pos, ClassDecl cls)
+    {
+        if (pos is null || cls is null || pos.filename != path)
+            return;
+        offsetTypeDecls[offsetKey(pos.start.line, pos.start.offset)] = cls;
+    }
+
+    void indexTypeExpr(TypeExpr te, TypeSema resolved)
+    {
+        if (te is null || te.pos is null || te.pos.filename != path)
+            return;
+        if (TypeExprArray arr = cast(TypeExprArray) te)
+        {
+            TypeSema inner = cast(TypeSemaArray) resolved ? (cast(TypeSemaArray) resolved).base : resolved;
+            indexTypeExpr(arr.base, inner);
+            return;
+        }
+        if (TypeExprPromise prom = cast(TypeExprPromise) te)
+        {
+            TypeSema inner = cast(TypeSemaPromise) resolved ? (cast(TypeSemaPromise) resolved).result : resolved;
+            indexTypeExpr(prom.result, inner);
+            return;
+        }
+        if (TypeExprTask task = cast(TypeExprTask) te)
+        {
+            TypeSema inner = cast(TypeSemaTask) resolved ? (cast(TypeSemaTask) resolved).result : resolved;
+            indexTypeExpr(task.result, inner);
+            return;
+        }
+        if (TypeExprTuple tup = cast(TypeExprTuple) te)
+        {
+            foreach (TypeExpr elem; tup.types)
+                indexTypeExpr(elem, null);
+            return;
+        }
+        if (TypeExprNamed named = cast(TypeExprNamed) te)
+        {
+            ClassDecl cls = classFromType(resolved);
+            if (cls is null)
+                return;
+            Position namePos = named.pos;
+            if (named.qualifier.length)
+            {
+                ulong startKey = offsetKey(named.pos.start.line, named.pos.start.offset);
+                size_t dotsNeeded = named.qualifier.length;
+                size_t dotsSeen = 0;
+                bool started = false;
+                foreach (Token tk; analysis.tokens)
+                {
+                    if (tk.pos is null)
+                        continue;
+                    ulong k = offsetKey(tk.pos.start.line, tk.pos.start.offset);
+                    if (!started)
+                    {
+                        if (k == startKey)
+                            started = true;
+                        else
+                            continue;
+                    }
+                    if (tk.kind == TokenKind.Dot)
+                        dotsSeen++;
+                    else if (dotsSeen == dotsNeeded && tk.kind == TokenKind.Identifier && tk.value.s == named.name)
+                    {
+                        namePos = tk.pos;
+                        break;
+                    }
+                    else if (k > startKey && tk.kind != TokenKind.Identifier && tk.kind != TokenKind.Dot)
+                        break;
+                }
+            }
+            add(named.name.to!string, "class", namePos, cls.pos, signature(cls.signature));
+            recordTypeOffset(namePos, cls);
+        }
+    }
+
+    ClassDecl typeDeclAt(JSONValue position)
+    {
+        SymbolEntry* selected = symbolAt(position);
+        if (selected !is null)
+        {
+            if (ClassDecl* direct = offsetKey(selected.position.start.line,
+                    selected.position.start.offset) in offsetTypeDecls)
+                return *direct;
+            if (ClassDecl* byKey = selected.key in symbolTypeDecls)
+                return *byKey;
+        }
+        return null;
+    }
+
     void index(Node node)
     {
         if (node is null || node in visited)
@@ -554,14 +693,42 @@ class Document
             expressionEnds[offsetKey(node.pos.end.line, node.pos.end.offset)] = node;
         if (ModuleUnit unit = cast(ModuleUnit) node)
             dependencies[unit.path] = true;
+        if (ImportExpr imp = cast(ImportExpr) node)
+        {
+            if (imp.target !is null)
+            {
+                dependencies[imp.target.path] = true;
+                Position mpos = modulePosition(imp.target);
+                if (mpos !is null)
+                    modulePositions[identity(mpos)] = mpos;
+            }
+            if (imp.isStatementImport && imp.pos !is null && imp.pos.filename == path)
+                statementImports ~= imp;
+        }
         if (FnDecl fn = cast(FnDecl) node)
         {
             functions[identity(fn.pos)] = fn;
             add(fn.fn.to!string, fn.isMethod ? "method" : "function", fn.pos, fn.pos, signature(fn), true);
+            ClassDecl retCls = classFromType(fn.type_sema);
+            if (retCls !is null)
+            {
+                symbolTypeDecls[identity(fn.pos)] = retCls;
+                recordTypeOffset(fn.pos, retCls);
+            }
+            indexTypeExpr(fn.type_expr, fn.type_sema);
             foreach (FnArg arg; fn.args)
+            {
                 add(arg.name.to!string, "parameter", arg.pos, arg.pos,
                         "parâmetro " ~ arg.name.to!string ~ ": " ~ (arg.type_expr is null
                             ? "qualquer" : arg.type_expr.toStr().to!string), true);
+                ClassDecl argCls = classFromType(arg.type_sema);
+                if (argCls !is null)
+                {
+                    symbolTypeDecls[identity(arg.pos)] = argCls;
+                    recordTypeOffset(arg.pos, argCls);
+                }
+                indexTypeExpr(arg.type_expr, arg.type_sema);
+            }
         }
         if (VarDecl variable = cast(VarDecl) node)
             if (variable.pos !is null && variable.pos.filename == path)
@@ -573,14 +740,32 @@ class Document
             string typeName = inferred is null ? "qualquer" : inferred.toStr().to!string;
             add(variable.name.to!string, "variable", variable.pos, variable.pos,
                     (variable.isConst ? "const " : "var ") ~ variable.name.to!string ~ ": " ~ typeName, true);
+            ClassDecl varCls = classFromType(inferred);
+            if (varCls !is null)
+            {
+                symbolTypeDecls[identity(variable.pos)] = varCls;
+                recordTypeOffset(variable.pos, varCls);
+            }
+            indexTypeExpr(variable.type_expr, inferred);
         }
         if (ClassDecl cls = cast(ClassDecl) node)
         {
             functions[identity(cls.pos)] = cls.signature;
+            symbolTypeDecls[identity(cls.pos)] = cls;
+            recordTypeOffset(cls.pos, cls);
             add(cls.name.to!string, "class", cls.pos, cls.pos, signature(cls.signature), true);
             foreach (ClassField field; cls.fields)
+            {
                 add(field.name.to!string, "property", field.pos, field.pos,
                         "campo " ~ field.name.to!string ~ ": " ~ field.type.toStr().to!string, true);
+                ClassDecl fieldCls = classFromType(field.type_sema);
+                if (fieldCls !is null)
+                {
+                    symbolTypeDecls[identity(field.pos)] = fieldCls;
+                    recordTypeOffset(field.pos, fieldCls);
+                }
+                indexTypeExpr(field.type, field.type_sema);
+            }
         }
         if (MemberExpr member = cast(MemberExpr) node)
         {
@@ -590,6 +775,22 @@ class Document
             Identifier name = cast(Identifier) member.right;
             if (name is null)
                 return;
+            if (member.resolvedModule !is null)
+            {
+                Position mpos = modulePosition(member.resolvedModule);
+                if (mpos !is null)
+                    modulePositions[identity(mpos)] = mpos;
+                string nsName = member.namespacePath.length
+                    ? member.namespacePath.join("."d).to!string : name.value.to!string;
+                add(name.value.to!string, "namespace", name.pos, mpos, "módulo " ~ nsName);
+                return;
+            }
+            if (member.namespacePath.length)
+            {
+                add(name.value.to!string, "namespace", name.pos, null,
+                        "namespace " ~ member.namespacePath.join("."d).to!string);
+                return;
+            }
             if (ClassDecl cls = instanceClass(member.left))
             {
                 import frontend.semantic.members : resolveClassMember, ClassMember;
@@ -601,23 +802,19 @@ class Document
                     {
                         expressionFunctions[member] = resolved.method;
                         add(name.value.to!string, "method", name.pos, resolved.method.pos, signature(resolved.method));
+                        recordTypeOffset(name.pos, classFromType(resolved.method.type_sema));
                         return;
                     }
                     if (resolved.field !is null)
                     {
                         add(name.value.to!string, "property", name.pos, resolved.field.pos,
                                 "campo " ~ name.value.to!string ~ ": " ~ resolved.field.type.toStr().to!string);
+                        recordTypeOffset(name.pos, classFromType(resolved.field.type_sema));
                         return;
                     }
                 }
             }
-            ModuleUnit importedMod;
-            if (ImportExpr directImport = cast(ImportExpr) member.left)
-                importedMod = directImport.target;
-            else if (Identifier left = cast(Identifier) member.left)
-                if (left.variableRef !is null)
-                    if (ImportExpr imported = cast(ImportExpr) left.variableRef.value)
-                        importedMod = imported.target;
+            ModuleUnit importedMod = resolveImportedModule(member.left);
             if (importedMod !is null && importedMod.program !is null)
             {
                 foreach (Node exported; importedMod.program.body)
@@ -626,21 +823,27 @@ class Document
                         if (fn.fn == name.value)
                         {
                             expressionFunctions[member] = fn;
+                            functions[identity(fn.pos)] = fn;
                             add(name.value.to!string, "function", name.pos, fn.pos, signature(fn));
+                            recordTypeOffset(name.pos, classFromType(fn.type_sema));
                             return;
                         }
                     if (VarDecl variable = cast(VarDecl) exported)
                         if (variable.name == name.value)
                         {
-                            add(name.value.to!string, "variable", name.pos, variable.pos,
-                                    "exportação " ~ name.value.to!string);
+                            string varDetail = variable.isEnum ? "enum " ~ name.value.to!string
+                                : "exportação " ~ name.value.to!string;
+                            add(name.value.to!string, "variable", name.pos, variable.pos, varDetail);
+                            recordTypeOffset(name.pos, classFromType(variable.type_sema));
                             return;
                         }
                     if (ClassDecl cls = cast(ClassDecl) exported)
                         if (cls.name == name.value)
                         {
                             expressionClasses[member] = cls;
+                            functions[identity(cls.pos)] = cls.signature;
                             add(name.value.to!string, "class", name.pos, cls.pos, signature(cls.signature));
+                            recordTypeOffset(name.pos, cls);
                             return;
                         }
                 }
@@ -656,12 +859,28 @@ class Document
         }
         if (Identifier id = cast(Identifier) node)
         {
+            if (id.moduleRef !is null)
+            {
+                Position mpos = modulePosition(id.moduleRef);
+                if (mpos !is null)
+                    modulePositions[identity(mpos)] = mpos;
+                add(id.value.to!string, "namespace", id.pos, mpos, "módulo " ~ id.value.to!string);
+                return;
+            }
+            if (id.namespacePath.length)
+            {
+                add(id.value.to!string, "namespace", id.pos, null,
+                        "namespace " ~ id.namespacePath.join("."d).to!string);
+                return;
+            }
             string kind = id.classRef !is null ? "class" : id.functionRef !is null
                 ? "function" : id.parameterRef !is null ? "parameter" : "variable";
             add(id.value.to!string, kind, id.pos, identifierDefinition(id),
                     id.functionRef !is null
                     ? signature(id.functionRef) : kind ~ " " ~ id.value.to!string ~ (id.type_sema is null
                         ? "" : ": " ~ id.type_sema.toStr().to!string));
+            ClassDecl idCls = id.classRef !is null ? id.classRef : classFromType(expressionType(id));
+            recordTypeOffset(id.pos, idCls);
         }
         foreach (Node child; childNodes(node))
             index(child);

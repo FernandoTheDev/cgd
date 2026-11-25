@@ -1,0 +1,481 @@
+// Biblioteca TUI com double buffering incremental, widgets, Unicode e fallback ASCII.
+
+classe Estilo {
+    frente: texto
+    fundo: texto
+    negrito: logico
+    inverso: logico
+    sublinhado: logico
+
+    construtor(frente: texto = "", fundo: texto = "", negrito: logico = falso, inverso: logico = falso,
+        sublinhado: logico = falso) {
+        isto.frente = frente
+        isto.fundo = fundo
+        isto.negrito = negrito
+        isto.inverso = inverso
+        isto.sublinhado = sublinhado
+    }
+
+    codigoAnsi(): texto {
+        var cores: qualquer = importar("cgd:interface/terminal").Cores
+        var seq: texto = cores.resetar()
+        se isto.negrito {
+            seq = seq + cores.negrito()
+        }
+        se isto.inverso {
+            seq = seq + cores.inverso()
+        }
+        se isto.sublinhado {
+            seq = seq + cores.sublinhado()
+        }
+        se tamanho(isto.frente) > 0 {
+            seq = seq + isto.frente
+        }
+        se tamanho(isto.fundo) > 0 {
+            seq = seq + isto.fundo
+        }
+        retorna seq
+    }
+
+    estatico rgb(fr: inteiro, fg: inteiro, fb: inteiro, br: inteiro = -1, bg: inteiro = -1,
+        bb: inteiro = -1, negrito: logico = falso): Estilo {
+        var cores: qualquer = importar("cgd:interface/terminal").Cores
+        var sFrente: texto = fr >= 0 ? cores.frenteRGB(fr, fg, fb) : ""
+        var sFundo: texto = br >= 0 ? cores.fundoRGB(br, bg, bb) : ""
+        retorna Estilo(sFrente, sFundo, negrito, falso, falso)
+    }
+}
+
+classe Tela {
+    privado {
+        _largura: inteiro = 80
+        _altura: inteiro = 24
+        _ativo: logico = falso
+        _simulada: logico = falso
+        _unicode: logico = verdadeiro
+        _cores: logico = verdadeiro
+        _atualChars: texto[]
+        _atualEstilos: texto[]
+        _antChars: texto[]
+        _antEstilos: texto[]
+        _cursorVisivel: logico = falso
+        _cursorX: inteiro = 0
+        _cursorY: inteiro = 0
+        _quadros: inteiro = 0
+    }
+
+    construtor(largura: inteiro = 0, altura: inteiro = 0, simulada: logico = falso, unicode: logico = verdadeiro) {
+        var term: qualquer = importar("cgd:interface/terminal").Terminal
+        isto._simulada = simulada
+        se largura > 0 e altura > 0 {
+            isto._largura = largura
+            isto._altura = altura
+        } senao {
+            var tam: dicionario = term.tamanho()
+            isto._largura = tam["colunas"]
+            isto._altura = tam["linhas"]
+        }
+        isto._unicode = simulada ? unicode : (unicode e term.suportaUnicode())
+        isto._cores = simulada ? verdadeiro : term.suportaCores()
+        isto._alocarBuffers()
+    }
+
+    privado {
+        _alocarBuffers(): vazio {
+            var total: inteiro = isto._largura * isto._altura
+            isto._atualChars = []
+            isto._atualEstilos = []
+            isto._antChars = []
+            isto._antEstilos = []
+            para (var i: inteiro = 0; i < total; i++) {
+                isto._atualChars.adicionar(" ")
+                isto._atualEstilos.adicionar("")
+                isto._antChars.adicionar("")
+                isto._antEstilos.adicionar("#dirty")
+            }
+        }
+    }
+
+    largura(): inteiro {
+        retorna isto._largura
+    }
+
+    altura(): inteiro {
+        retorna isto._altura
+    }
+
+    usaUnicode(): logico {
+        retorna isto._unicode
+    }
+
+    definirUnicode(habilitar: logico): vazio {
+        isto._unicode = habilitar
+    }
+
+    quadrosApresentados(): inteiro {
+        retorna isto._quadros
+    }
+
+    iniciar(mouse: logico = falso): logico {
+        se isto._simulada {
+            isto._ativo = verdadeiro
+            retorna verdadeiro
+        }
+        var term: qualquer = importar("cgd:interface/terminal").Terminal
+        var ok: logico = term.entrarModoRaw(mouse)
+        isto._ativo = ok
+        var tam: dicionario = term.tamanho()
+        se tam["colunas"] != isto._largura ou tam["linhas"] != isto._altura {
+            isto.redimensionar(tam["colunas"], tam["linhas"])
+        }
+        retorna ok
+    }
+
+    finalizar(): vazio {
+        se !isto._ativo {
+            retorna
+        }
+        isto._ativo = falso
+        se !isto._simulada {
+            var term: qualquer = importar("cgd:interface/terminal").Terminal
+            term.sairModoRaw()
+        }
+    }
+
+    destrutor(): vazio {
+        isto.finalizar()
+    }
+
+    redimensionar(largura: inteiro, altura: inteiro): vazio {
+        se largura < 1 ou altura < 1 {
+            retorna
+        }
+        isto._largura = largura
+        isto._altura = altura
+        isto._alocarBuffers()
+    }
+
+    limpar(estilo: texto = ""): vazio {
+        var total: inteiro = isto._largura * isto._altura
+        para (var i: inteiro = 0; i < total; i++) {
+            isto._atualChars[i] = " "
+            isto._atualEstilos[i] = estilo
+        }
+    }
+
+    definirCursor(x: inteiro, y: inteiro, visivel: logico = verdadeiro): vazio {
+        isto._cursorX = x
+        isto._cursorY = y
+        isto._cursorVisivel = visivel
+    }
+
+    celula(x: inteiro, y: inteiro, caractere: texto, estilo: texto = ""): vazio {
+        se x < 0 ou y < 0 ou x >= isto._largura ou y >= isto._altura {
+            retorna
+        }
+        var idx: inteiro = y * isto._largura + x
+        isto._atualChars[idx] = caractere
+        isto._atualEstilos[idx] = estilo
+    }
+
+    escrever(x: inteiro, y: inteiro, conteudo: texto, estilo: texto = "", maxLargura: inteiro = -1): inteiro {
+        se y < 0 ou y >= isto._altura {
+            retorna 0
+        }
+        var term: qualquer = importar("cgd:interface/terminal").Terminal
+        var col: inteiro = x
+        var usados: inteiro = 0
+        var n: inteiro = tamanho(conteudo)
+        para (var i: inteiro = 0; i < n; i++) {
+            var ch: texto = conteudo[i]
+            var w: inteiro = term.larguraVisual(ch)
+            se w <= 0 {
+                w = 1
+            }
+            se maxLargura >= 0 e usados + w > maxLargura {
+                sustar
+            }
+            se col >= isto._largura {
+                sustar
+            }
+            se col >= 0 {
+                isto.celula(col, y, ch, estilo)
+                se w == 2 e col + 1 < isto._largura {
+                    isto.celula(col + 1, y, "", estilo)
+                }
+            }
+            col = col + w
+            usados = usados + w
+        }
+        retorna usados
+    }
+
+    preencherRetangulo(x: inteiro, y: inteiro, w: inteiro, h: inteiro, caractere: texto = " ",
+        estilo: texto = ""): vazio {
+        para (var dy: inteiro = 0; dy < h; dy++) {
+            para (var dx: inteiro = 0; dx < w; dx++) {
+                isto.celula(x + dx, y + dy, caractere, estilo)
+            }
+        }
+    }
+
+    caixa(x: inteiro, y: inteiro, w: inteiro, h: inteiro, titulo: texto = "", estiloBorda: texto = "",
+        estiloTitulo: texto = ""): vazio {
+        se w < 2 ou h < 2 {
+            retorna
+        }
+        var tl: texto = isto._unicode ? "┌" : "+"
+        var tr: texto = isto._unicode ? "┐" : "+"
+        var bl: texto = isto._unicode ? "└" : "+"
+        var br: texto = isto._unicode ? "┘" : "+"
+        var hz: texto = isto._unicode ? "─" : "-"
+        var vt: texto = isto._unicode ? "│" : "|"
+
+        isto.celula(x, y, tl, estiloBorda)
+        isto.celula(x + w - 1, y, tr, estiloBorda)
+        isto.celula(x, y + h - 1, bl, estiloBorda)
+        isto.celula(x + w - 1, y + h - 1, br, estiloBorda)
+        para (var dx: inteiro = 1; dx < w - 1; dx++) {
+            isto.celula(x + dx, y, hz, estiloBorda)
+            isto.celula(x + dx, y + h - 1, hz, estiloBorda)
+        }
+        para (var dy: inteiro = 1; dy < h - 1; dy++) {
+            isto.celula(x, y + dy, vt, estiloBorda)
+            isto.celula(x + w - 1, y + dy, vt, estiloBorda)
+        }
+        se tamanho(titulo) > 0 e w > 4 {
+            var estT: texto = tamanho(estiloTitulo) > 0 ? estiloTitulo : estiloBorda
+            isto.escrever(x + 2, y, " " + titulo + " ", estT, w - 4)
+        }
+    }
+
+    barraProgresso(x: inteiro, y: inteiro, largura: inteiro, fracao: real, estiloCheio: texto = "",
+        estiloVazio: texto = ""): vazio {
+        se largura <= 0 {
+            retorna
+        }
+        var f: real = fracao
+        se f < 0.0 {
+            f = 0.0
+        }
+        se f > 1.0 {
+            f = 1.0
+        }
+        var cheios: inteiro = inteiro(f * largura)
+        var chCheio: texto = isto._unicode ? "█" : "#"
+        var chVazio: texto = isto._unicode ? "░" : "-"
+        para (var i: inteiro = 0; i < largura; i++) {
+            se i < cheios {
+                isto.celula(x + i, y, chCheio, estiloCheio)
+            } senao {
+                isto.celula(x + i, y, chVazio, estiloVazio)
+            }
+        }
+    }
+
+    tabela(x: inteiro, y: inteiro, cabecalhos: texto[], linhas: texto[][], larguras: inteiro[],
+        estiloCabecalho: texto = "", estiloLinha: texto = ""): vazio {
+        var cx: inteiro = x
+        para (var c: inteiro = 0; c < tamanho(cabecalhos) e c < tamanho(larguras); c++) {
+            isto.escrever(cx, y, cabecalhos[c], estiloCabecalho, larguras[c])
+            cx = cx + larguras[c] + 1
+        }
+        var sep: texto = isto._unicode ? "─" : "-"
+        var totalW: inteiro = cx - x - 1
+        para (var dx: inteiro = 0; dx < totalW; dx++) {
+            isto.celula(x + dx, y + 1, sep, estiloLinha)
+        }
+        para (var r: inteiro = 0; r < tamanho(linhas); r++) {
+            var ry: inteiro = y + 2 + r
+            se ry >= isto._altura {
+                sustar
+            }
+            cx = x
+            var linha: texto[] = linhas[r]
+            para (var c: inteiro = 0; c < tamanho(linha) e c < tamanho(larguras); c++) {
+                isto.escrever(cx, ry, linha[c], estiloLinha, larguras[c])
+                cx = cx + larguras[c] + 1
+            }
+        }
+    }
+
+    /// Apresenta somente as células alteradas (double buffering incremental) em uma escrita única.
+    apresentar(): inteiro {
+        var term: qualquer = importar("cgd:interface/terminal").Terminal
+        var cores: qualquer = importar("cgd:interface/terminal").Cores
+        var partes: texto[] = []
+        var ultimoEstilo: texto = "#none"
+        var ultimoX: inteiro = -1
+        var ultimoY: inteiro = -1
+        var alteradas: inteiro = 0
+
+        para (var y: inteiro = 0; y < isto._altura; y++) {
+            para (var x: inteiro = 0; x < isto._largura; x++) {
+                var idx: inteiro = y * isto._largura + x
+                var ch: texto = isto._atualChars[idx]
+                var est: texto = isto._atualEstilos[idx]
+                se ch != isto._antChars[idx] ou est != isto._antEstilos[idx] {
+                    isto._antChars[idx] = ch
+                    isto._antEstilos[idx] = est
+                    alteradas = alteradas + 1
+                    se ch == "" {
+                        continua
+                    }
+                    se y != ultimoY ou x != ultimoX {
+                        partes.adicionar(term.moverCursor(x, y))
+                    }
+                    se isto._cores e est != ultimoEstilo {
+                        partes.adicionar(tamanho(est) > 0 ? est : cores.resetar())
+                        ultimoEstilo = est
+                    }
+                    partes.adicionar(ch)
+                    ultimoX = x + 1
+                    ultimoY = y
+                }
+            }
+        }
+        se isto._cores e alteradas > 0 {
+            partes.adicionar(cores.resetar())
+        }
+        se isto._cursorVisivel {
+            partes.adicionar(term.moverCursor(isto._cursorX, isto._cursorY))
+            partes.adicionar(cores.esc() + "[?25h")
+        } senao se alteradas > 0 {
+            partes.adicionar(cores.esc() + "[?25l")
+        }
+        var saida: texto = partes.juntar("")
+        isto._quadros = isto._quadros + 1
+        se !isto._simulada e tamanho(saida) > 0 {
+            term.escrever(saida)
+        }
+        retorna alteradas
+    }
+
+    /// Renderiza o buffer atual como texto plano (útil para testes automatizados sem TTY).
+    renderizarTexto(): texto {
+        var linhas: texto[] = []
+        para (var y: inteiro = 0; y < isto._altura; y++) {
+            var chars: texto[] = []
+            para (var x: inteiro = 0; x < isto._largura; x++) {
+                var ch: texto = isto._atualChars[y * isto._largura + x]
+                se ch != "" {
+                    chars.adicionar(ch)
+                }
+            }
+            linhas.adicionar(chars.juntar(""))
+        }
+        retorna linhas.juntar("\n")
+    }
+
+    lerEvento(timeoutMs: inteiro = 100): qualquer {
+        se isto._simulada {
+            retorna nulo
+        }
+        var term: qualquer = importar("cgd:interface/terminal").Terminal
+        var ev: qualquer = term.lerEvento(timeoutMs)
+        se ev != nulo e ev["tipo"] == "redimensionar" {
+            isto.redimensionar(ev["colunas"], ev["linhas"])
+        }
+        retorna ev
+    }
+}
+
+classe Menu {
+    itens: texto[]
+    selecionado: inteiro = 0
+    deslocamento: inteiro = 0
+
+    construtor(itens: texto[]) {
+        isto.itens = itens
+    }
+
+    moverCima(): vazio {
+        se isto.selecionado > 0 {
+            isto.selecionado = isto.selecionado - 1
+        }
+    }
+
+    moverBaixo(): vazio {
+        se isto.selecionado + 1 < tamanho(isto.itens) {
+            isto.selecionado = isto.selecionado + 1
+        }
+    }
+
+    itemAtual(): texto {
+        se tamanho(isto.itens) == 0 {
+            retorna ""
+        }
+        retorna isto.itens[isto.selecionado]
+    }
+
+    processarEvento(ev: qualquer): logico {
+        se ev == nulo ou ev["tipo"] != "tecla" {
+            retorna falso
+        }
+        var t: texto = ev["tecla"]
+        se t == "Cima" ou t == "k" {
+            isto.moverCima()
+            retorna falso
+        }
+        se t == "Baixo" ou t == "j" {
+            isto.moverBaixo()
+            retorna falso
+        }
+        retorna t == "Enter"
+    }
+
+    desenhar(tela: Tela, x: inteiro, y: inteiro, largura: inteiro, altura: inteiro,
+        estiloNormal: texto = "", estiloSelecionado: texto = ""): vazio {
+        se isto.selecionado < isto.deslocamento {
+            isto.deslocamento = isto.selecionado
+        }
+        se isto.selecionado >= isto.deslocamento + altura {
+            isto.deslocamento = isto.selecionado - altura + 1
+        }
+        para (var i: inteiro = 0; i < altura; i++) {
+            var idx: inteiro = isto.deslocamento + i
+            se idx >= tamanho(isto.itens) {
+                sustar
+            }
+            var ativo: logico = idx == isto.selecionado
+            var prefixo: texto = ativo ? "> " : "  "
+            var est: texto = ativo ? estiloSelecionado : estiloNormal
+            tela.escrever(x, y + i, prefixo + isto.itens[idx], est, largura)
+        }
+    }
+}
+
+classe CampoTexto {
+    valor: texto = ""
+    focado: logico = verdadeiro
+
+    construtor(inicial: texto = "") {
+        isto.valor = inicial
+    }
+
+    processarEvento(ev: qualquer): logico {
+        se ev == nulo ou ev["tipo"] != "tecla" {
+            retorna falso
+        }
+        var t: texto = ev["tecla"]
+        se t == "Enter" {
+            retorna verdadeiro
+        }
+        se t == "Backspace" {
+            se tamanho(isto.valor) > 0 {
+                isto.valor = isto.valor.fatiar(0, tamanho(isto.valor) - 1)
+            }
+            retorna falso
+        }
+        var ch: texto = ev["caractere"]
+        se tamanho(ch) > 0 e !ev["ctrl"] e !ev["alt"] e t != "Tab" e t != "Escape" {
+            isto.valor = isto.valor + ch
+        }
+        retorna falso
+    }
+
+    desenhar(tela: Tela, x: inteiro, y: inteiro, largura: inteiro, estilo: texto = ""): vazio {
+        tela.preencherRetangulo(x, y, largura, 1, " ", estilo)
+        tela.escrever(x, y, isto.valor, estilo, largura)
+    }
+}

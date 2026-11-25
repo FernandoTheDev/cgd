@@ -1,0 +1,283 @@
+modulo tela_xadrez
+
+importar pecas
+importar tabuleiro
+importar movimentos
+importar regras
+importar busca
+importar cgd.interface.tui como TUI
+importar cgd.interface.terminal como Term
+
+classe InterfaceXadrez {
+    tab: tabuleiro.Tabuleiro
+    motor: busca.MotorBusca
+    tela: TUI.Tela
+    cursorR: inteiro = 6
+    cursorC: inteiro = 4
+    selecionada: inteiro = -1
+    destinosLegais: inteiro[]
+    modoVsIa: logico = verdadeiro
+    corHumano: inteiro = 1
+    profundidadeIa: inteiro = 3
+    ultimoResultado: busca.ResultadoBusca
+    mensagem: texto = "Setas/WASD: mover | Enter: selecionar/jogar | U: desfazer | R: reiniciar | Q: sair"
+    historicoTexto: texto[]
+    usaUnicode: logico = verdadeiro
+
+    construtor(simulada: logico = falso, unicode: logico = verdadeiro, profundidade: inteiro = 3) {
+        isto.tab = tabuleiro.Tabuleiro()
+        isto.motor = busca.MotorBusca()
+        isto.usaUnicode = unicode
+        isto.profundidadeIa = profundidade
+        isto.tela = TUI.Tela(84, 26, simulada, unicode)
+        isto.destinosLegais = []
+        isto.ultimoResultado = busca.ResultadoBusca()
+        isto.historicoTexto = []
+    }
+
+    ehDestinoLegal(sq: inteiro): logico {
+        para (var i: inteiro = 0; i < tamanho(isto.destinosLegais); i++) {
+            se isto.destinosLegais[i] == sq {
+                retorna verdadeiro
+            }
+        }
+        retorna falso
+    }
+
+    atualizarDestinos(): vazio {
+        isto.destinosLegais = []
+        se isto.selecionada < 0 {
+            retorna
+        }
+        var legais: inteiro[] = movimentos.gerarLancesLegais(isto.tab, falso)
+        para (var i: inteiro = 0; i < tamanho(legais); i++) {
+            se movimentos.lanceOrigem(legais[i]) == isto.selecionada {
+                isto.destinosLegais.adicionar(movimentos.lanceDestino(legais[i]))
+            }
+        }
+    }
+
+    desenhar(): inteiro {
+        isto.tela.limpar()
+        var estTitulo: texto = TUI.Estilo.rgb(120, 240, 160, -1, -1, -1, verdadeiro).codigoAnsi()
+        var estBorda: texto = TUI.Estilo.rgb(80, 140, 110).codigoAnsi()
+        var estInfo: texto = TUI.Estilo.rgb(210, 220, 215).codigoAnsi()
+        var estAlerta: texto = TUI.Estilo.rgb(255, 100, 90, -1, -1, -1, verdadeiro).codigoAnsi()
+
+        isto.tela.caixa(0, 0, 42, 22, "CGD Xadrez", estBorda, estTitulo)
+        isto.tela.caixa(43, 0, 39, 11, "Engine & Estado", estBorda, estTitulo)
+        isto.tela.caixa(43, 11, 39, 11, "Histórico de Lances", estBorda, estTitulo)
+
+        // Coordenadas de colunas
+        isto.tela.escrever(6, 2, "a   b   c   d   e   f   g   h", estInfo)
+        isto.tela.escrever(6, 19, "a   b   c   d   e   f   g   h", estInfo)
+
+        var estado: inteiro = regras.estadoDaPartida(isto.tab)
+        var emXeque: logico = movimentos.reiEmXeque(isto.tab, isto.tab.turno)
+        var sqReiAtual: inteiro = isto.tab.turno == pecas.Cor.BRANCAS ? isto.tab.reiBranco : isto.tab.reiPreto
+
+        para (var r: inteiro = 0; r < 8; r++) {
+            var y: inteiro = 3 + r * 2
+            var rankStr: texto = texto(8 - r)
+            isto.tela.escrever(2, y, rankStr, estInfo)
+            isto.tela.escrever(38, y, rankStr, estInfo)
+            para (var c: inteiro = 0; c < 8; c++) {
+                var sq: inteiro = r * 8 + c
+                var p: inteiro = isto.tab.casas[sq]
+                var clara: logico = (r + c) % 2 == 0
+                var br: inteiro = clara ? 210 : 95
+                var bg: inteiro = clara ? 215 : 130
+                var bb: inteiro = clara ? 195 : 105
+
+                se sq == isto.selecionada {
+                    br = 215
+                    bg = 185
+                    bb = 65
+                } senao se isto.ehDestinoLegal(sq) {
+                    br = 90
+                    bg = 190
+                    bb = 110
+                } senao se emXeque e sq == sqReiAtual {
+                    br = 210
+                    bg = 60
+                    bb = 60
+                }
+                se r == isto.cursorR e c == isto.cursorC {
+                    br = 70
+                    bg = 150
+                    bb = 220
+                }
+
+                var fr: inteiro = p > 0 ? 255 : 20
+                var fg: inteiro = p > 0 ? 255 : 20
+                var fb: inteiro = p > 0 ? 255 : 25
+                se p > 0 e clara e r != isto.cursorR {
+                    fr = 20
+                    fg = 35
+                    fb = 20
+                }
+
+                var estCasa: texto = TUI.Estilo.rgb(fr, fg, fb, br, bg, bb, p != 0).codigoAnsi()
+                var sim: texto = isto.usaUnicode ? pecas.simboloUnicode(p) : pecas.simboloAscii(p)
+                isto.tela.escrever(5 + c * 4, y, " " + sim + " ", estCasa, 3)
+            }
+        }
+
+        // Painel Engine & Estado
+        var desc: texto = regras.descricaoEstado(estado, isto.tab.turno)
+        isto.tela.escrever(45, 2, desc, estado != 0 ? estAlerta : estInfo, 35)
+        se emXeque e estado == 0 {
+            isto.tela.escrever(45, 3, "XEQUE!", estAlerta, 35)
+        } senao {
+            isto.tela.escrever(45, 3, "Modo: " + (isto.modoVsIa ? "Humano x IA" : "Humano x Humano"), estInfo, 35)
+        }
+        isto.tela.escrever(45, 5, "Profundidade: " + texto(isto.ultimoResultado.profundidade) + " (alvo " + texto(isto.profundidadeIa) + ")", estInfo, 35)
+        isto.tela.escrever(45, 6, "Avaliação: " + texto(isto.ultimoResultado.pontuacao) + " cp", estInfo, 35)
+        isto.tela.escrever(45, 7, "Nós: " + texto(isto.ultimoResultado.nos) + " (" + texto(isto.ultimoResultado.nosPorSegundo) + " n/s)", estInfo, 35)
+        isto.tela.escrever(45, 8, "50 lances: " + texto(isto.tab.meioMovimentos) + "/100", estInfo, 35)
+        isto.tela.escrever(45, 9, "FEN: " + isto.tab.exportarFEN().fatiar(0, 28), estInfo, 35)
+
+        // Histórico
+        var totalH: inteiro = tamanho(isto.historicoTexto)
+        var inicioH: inteiro = totalH > 8 ? totalH - 8 : 0
+        var rowH: inteiro = 13
+        para (var i: inteiro = inicioH; i < totalH; i++) {
+            isto.tela.escrever(45, rowH, isto.historicoTexto[i], estInfo, 35)
+            rowH = rowH + 1
+        }
+
+        // Rodapé
+        isto.tela.escrever(1, 23, isto.mensagem, estTitulo, 82)
+        retorna isto.tela.apresentar()
+    }
+
+    aplicarLance(lance: inteiro): vazio {
+        var nota: texto = regras.formatarNotacao(isto.tab, lance)
+        var num: inteiro = isto.tab.numeroLance
+        var vezB: logico = isto.tab.turno == pecas.Cor.BRANCAS
+        isto.tab.fazerLance(movimentos.lanceOrigem(lance), movimentos.lanceDestino(lance), movimentos.lancePromocao(lance))
+        se vezB {
+            isto.historicoTexto.adicionar(texto(num) + ". " + nota)
+        } senao se tamanho(isto.historicoTexto) > 0 {
+            var ult: inteiro = tamanho(isto.historicoTexto) - 1
+            isto.historicoTexto[ult] = isto.historicoTexto[ult] + "  " + nota
+        } senao {
+            isto.historicoTexto.adicionar(texto(num) + "... " + nota)
+        }
+        isto.selecionada = -1
+        isto.destinosLegais = []
+    }
+
+    jogarTurnoIA(): vazio {
+        se regras.estadoDaPartida(isto.tab) != regras.EstadoPartida.EM_ANDAMENTO {
+            retorna
+        }
+        isto.mensagem = "IA pensando..."
+        isto.desenhar()
+        var res: busca.ResultadoBusca = isto.motor.buscarMelhorLance(isto.tab, isto.profundidadeIa, 3000.0)
+        isto.ultimoResultado = res
+        se res.melhorLance != 0 {
+            isto.aplicarLance(res.melhorLance)
+            isto.mensagem = "IA jogou " + tabuleiro.Tabuleiro.lanceParaUci(movimentos.lanceOrigem(res.melhorLance), movimentos.lanceDestino(res.melhorLance), movimentos.lancePromocao(res.melhorLance))
+        }
+    }
+
+    executarInterativo(): vazio {
+        isto.tela.iniciar(falso)
+        tente {
+            enquanto verdadeiro {
+                isto.desenhar()
+                se isto.modoVsIa e isto.tab.turno != isto.corHumano e regras.estadoDaPartida(isto.tab) == regras.EstadoPartida.EM_ANDAMENTO {
+                    isto.jogarTurnoIA()
+                    continua
+                }
+                var ev: qualquer = isto.tela.lerEvento(250)
+                se ev == nulo {
+                    continua
+                }
+                se ev["tipo"] == "eof" {
+                    sustar
+                }
+                se ev["tipo"] != "tecla" {
+                    continua
+                }
+                var tecla: texto = ev["tecla"]
+                se tecla == "q" ou tecla == "Q" ou tecla == "Escape" {
+                    sustar
+                }
+                se tecla == "Cima" ou tecla == "w" {
+                    se isto.cursorR > 0 {
+                        isto.cursorR = isto.cursorR - 1
+                    }
+                } senao se tecla == "Baixo" ou tecla == "s" {
+                    se isto.cursorR < 7 {
+                        isto.cursorR = isto.cursorR + 1
+                    }
+                } senao se tecla == "Esquerda" ou tecla == "a" {
+                    se isto.cursorC > 0 {
+                        isto.cursorC = isto.cursorC - 1
+                    }
+                } senao se tecla == "Direita" ou tecla == "d" {
+                    se isto.cursorC < 7 {
+                        isto.cursorC = isto.cursorC + 1
+                    }
+                } senao se tecla == "r" ou tecla == "R" {
+                    isto.tab = tabuleiro.Tabuleiro()
+                    isto.motor.limparTabela()
+                    isto.selecionada = -1
+                    isto.destinosLegais = []
+                    isto.historicoTexto = []
+                    isto.mensagem = "Partida reiniciada."
+                } senao se tecla == "m" ou tecla == "M" {
+                    isto.modoVsIa = !isto.modoVsIa
+                    isto.mensagem = isto.modoVsIa ? "Modo: Humano x IA" : "Modo: Humano x Humano"
+                } senao se tecla == "u" ou tecla == "U" {
+                    se isto.tab.desfazerLance() {
+                        se isto.modoVsIa e isto.tab.turno != isto.corHumano {
+                            isto.tab.desfazerLance()
+                        }
+                        isto.mensagem = "Lance desfeito."
+                        isto.selecionada = -1
+                        isto.destinosLegais = []
+                    }
+                } senao se tecla == "Enter" ou tecla == " " {
+                    var sq: inteiro = isto.cursorR * 8 + isto.cursorC
+                    se isto.selecionada < 0 {
+                        var p: inteiro = isto.tab.casas[sq]
+                        se p != 0 e pecas.corDaPeca(p) == isto.tab.turno {
+                            isto.selecionada = sq
+                            isto.atualizarDestinos()
+                            isto.mensagem = "Selecionada: " + tabuleiro.Tabuleiro.textoDeCasa(sq)
+                        }
+                    } senao se sq == isto.selecionada {
+                        isto.selecionada = -1
+                        isto.destinosLegais = []
+                    } senao {
+                        var legais: inteiro[] = movimentos.gerarLancesLegais(isto.tab, falso)
+                        var escolhido: inteiro = 0
+                        para (var i: inteiro = 0; i < tamanho(legais); i++) {
+                            var l: inteiro = legais[i]
+                            se movimentos.lanceOrigem(l) == isto.selecionada e movimentos.lanceDestino(l) == sq {
+                                var pr: inteiro = movimentos.lancePromocao(l)
+                                se pr == 0 ou pr == pecas.TipoPeca.DAMA {
+                                    escolhido = l
+                                    sustar
+                                }
+                            }
+                        }
+                        se escolhido != 0 {
+                            isto.aplicarLance(escolhido)
+                            isto.mensagem = "Lance jogado."
+                        } senao {
+                            isto.selecionada = -1
+                            isto.destinosLegais = []
+                            isto.mensagem = "Lance ilegal."
+                        }
+                    }
+                }
+            }
+        } finalmente {
+            isto.tela.finalizar()
+        }
+    }
+}

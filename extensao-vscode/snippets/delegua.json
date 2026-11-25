@@ -86,5 +86,61 @@
       "}"
     ],
     "description": "Ligação explícita com ABI C"
+  },
+  "Função Nativa": {
+    "prefix": "nativo",
+    "body": [
+      "@nativo",
+      "funcao ${1:calcular}(${2:a: ci64, b: ci64}): ${3:ci64} {",
+      "    retorna ${0:a + b}",
+      "}"
+    ],
+    "description": "Função @nativo compilada diretamente para C99 sem boxing nem GC"
+  },
+  "Classe por Valor (@pilha)": {
+    "prefix": "pilha",
+    "body": [
+      "@pilha",
+      "classe ${1:Vetor2} {",
+      "    x: cf64",
+      "    y: cf64",
+      "",
+      "    construtor(x: cf64, y: cf64) {",
+      "        isto.x = x",
+      "        isto.y = y",
+      "    }",
+      "}"
+    ],
+    "description": "Classe @pilha com layout C struct e semântica de valor na stack"
+  },
+  "Operador Personalizado": {
+    "prefix": "operador",
+    "body": [
+      "@operador(\"${1:+}\")",
+      "${2:somar}(outro: ${3:Tipo}): ${3:Tipo} {",
+      "    retorna ${0}",
+      "}"
+    ],
+    "description": "Método @operador para sobrecarga tipada de operador"
+  },
+  "Compilação Condicional": {
+    "prefix": "quando",
+    "body": [
+      "@quando(Compilacao.sistemaOperacional() == \"${1:linux}\")",
+      "funcao ${2:especifica}(): ${3:vazio} {",
+      "    ${0}",
+      "}"
+    ],
+    "description": "Inclusão condicional estrutural avaliada em tempo de compilação"
+  },
+  "Kernel GPU": {
+    "prefix": "gpu",
+    "body": [
+      "@gpu",
+      "funcao ${1:kernel}(x: cf64, y: cf64): cf64 {",
+      "    retorna ${0:x + y}",
+      "}"
+    ],
+    "description": "Kernel numérico verificável para backend CPU/GPU"
   }
 }

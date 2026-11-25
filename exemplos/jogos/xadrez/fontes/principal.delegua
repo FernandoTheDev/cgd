@@ -1,0 +1,89 @@
+modulo principal
+
+importar pecas
+importar tabuleiro
+importar movimentos
+importar regras
+importar busca
+importar tela_xadrez
+importar cgd.nativo como Nat
+importar cgd.interface.terminal como Term
+
+funcao rodarAutoPartida(maxLances: inteiro, profundidade: inteiro): vazio {
+    var tab: tabuleiro.Tabuleiro = tabuleiro.Tabuleiro()
+    var motor: busca.MotorBusca = busca.MotorBusca()
+    var totalNos: inteiro = 0
+    var lancesFeitos: inteiro = 0
+    para (var i: inteiro = 0; i < maxLances; i++) {
+        var est: inteiro = regras.estadoDaPartida(tab)
+        se est != regras.EstadoPartida.EM_ANDAMENTO {
+            escreva("Fim: ", regras.descricaoEstado(est, tab.turno), "\n")
+            sustar
+        }
+        var res: busca.ResultadoBusca = motor.buscarMelhorLance(tab, profundidade, 0.0)
+        assercao(res.melhorLance != 0)
+        totalNos = totalNos + res.nos
+        tab.fazerLance(movimentos.lanceOrigem(res.melhorLance), movimentos.lanceDestino(res.melhorLance), movimentos.lancePromocao(res.melhorLance))
+        lancesFeitos = lancesFeitos + 1
+    }
+    escreva("AUTO-XADREZ-OK lances=", lancesFeitos, " nos=", totalNos, " fen=", tab.exportarFEN(), "\n")
+}
+
+funcao main(): vazio {
+    var args: texto[] = Nat.Primitivas.sistemaArgumentos()
+    var profundidade: inteiro = 3
+    var modoAscii: logico = falso
+    var modoPerft: inteiro = 0
+    var modoAuto: inteiro = 0
+    var modoTeste: logico = falso
+
+    para (var i: inteiro = 1; i < tamanho(args); i++) {
+        var a: texto = args[i]
+        se a == "--ascii" {
+            modoAscii = verdadeiro
+        } senao se a == "--teste" {
+            modoTeste = verdadeiro
+        } senao se a == "--perft" e i + 1 < tamanho(args) {
+            i = i + 1
+            modoPerft = inteiro(args[i])
+        } senao se a == "--auto" e i + 1 < tamanho(args) {
+            i = i + 1
+            modoAuto = inteiro(args[i])
+        } senao se a == "--profundidade" e i + 1 < tamanho(args) {
+            i = i + 1
+            profundidade = inteiro(args[i])
+        }
+    }
+
+    se modoPerft > 0 {
+        var tab: tabuleiro.Tabuleiro = tabuleiro.Tabuleiro()
+        var n: inteiro = regras.perft(tab, modoPerft)
+        escreva("perft(", modoPerft, ") = ", n, "\n")
+        retorna
+    }
+
+    se modoAuto > 0 {
+        rodarAutoPartida(modoAuto, profundidade)
+        retorna
+    }
+
+    se modoTeste ou !Term.Terminal.ehInterativo() {
+        // Modo sem TUI / automatizado: valida renderização headless + perft + busca IA
+        var ui: tela_xadrez.InterfaceXadrez = tela_xadrez.InterfaceXadrez(verdadeiro, !modoAscii, 2)
+        var alt: inteiro = ui.desenhar()
+        assercao(alt > 0)
+        var quadro: texto = ui.tela.renderizarTexto()
+        assercao(quadro.contem("CGD Xadrez") e quadro.contem("Engine & Estado"))
+        var n2: inteiro = regras.perft(ui.tab, 2)
+        assercao(n2 == 400)
+        var res: busca.ResultadoBusca = ui.motor.buscarMelhorLance(ui.tab, 2, 0.0)
+        assercao(res.melhorLance != 0 e res.nos > 0)
+        escreva("XADREZ-OK perft2=", n2, " lance=", tabuleiro.Tabuleiro.lanceParaUci(movimentos.lanceOrigem(res.melhorLance), movimentos.lanceDestino(res.melhorLance), movimentos.lancePromocao(res.melhorLance)), " nos=", res.nos, "\n")
+        retorna
+    }
+
+    var uiReal: tela_xadrez.InterfaceXadrez = tela_xadrez.InterfaceXadrez(falso, !modoAscii, profundidade)
+    uiReal.executarInterativo()
+}
+
+main()

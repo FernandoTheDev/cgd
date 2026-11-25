@@ -71,6 +71,24 @@ classe Resposta {
         retorna isto
     }
 
+    texto(conteudo: texto): Resposta {
+        isto.cabecalho("content-type", "text/plain; charset=utf-8")
+        retorna isto.enviar(conteudo)
+    }
+
+    html(conteudo: texto): Resposta {
+        isto.cabecalho("content-type", "text/html; charset=utf-8")
+        retorna isto.enviar(conteudo)
+    }
+
+    binario(dados: qualquer, tipoConteudo: texto = "application/octet-stream"): Resposta {
+        isto.cabecalho("content-type", tipoConteudo)
+        se tipo de dados == "texto" {
+            retorna isto.enviar(dados)
+        }
+        retorna isto.enviar(dados.paraTexto())
+    }
+
     json(valor: qualquer): Resposta {
         var json: qualquer = importar("cgd:json")
         isto.cabecalho("content-type", "application/json; charset=utf-8")

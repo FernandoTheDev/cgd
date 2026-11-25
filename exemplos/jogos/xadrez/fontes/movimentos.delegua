@@ -1,0 +1,314 @@
+modulo movimentos
+
+importar pecas
+importar tabuleiro
+
+// Lance codificado em inteiro para máxima velocidade e zero alocação no hot loop:
+// bits 0..5: origem (0..63)
+// bits 6..11: destino (0..63)
+// bits 12..15: promocao (0 ou TipoPeca 2..5)
+funcao codificarLance(origem: inteiro, destino: inteiro, promocao: inteiro = 0): inteiro {
+    retorna origem | (destino << 6) | (promocao << 12)
+}
+
+funcao lanceOrigem(lance: inteiro): inteiro {
+    retorna lance & 63
+}
+
+funcao lanceDestino(lance: inteiro): inteiro {
+    retorna (lance >> 6) & 63
+}
+
+funcao lancePromocao(lance: inteiro): inteiro {
+    retorna (lance >> 12) & 15
+}
+
+/// Verifica se a casa `sq` (0..63) é atacada por alguma peça da cor `atacante` (+1 ou -1).
+funcao casaAtacada(tab: tabuleiro.Tabuleiro, sq: inteiro, atacante: inteiro): logico {
+    var r: inteiro = sq \ 8
+    var c: inteiro = sq % 8
+    var casas: inteiro[] = tab.casas
+
+    // 1. Ataques de peão
+    var peaoInimigo: inteiro = atacante * pecas.TipoPeca.PEAO
+    var rPeao: inteiro = atacante == pecas.Cor.BRANCAS ? r + 1 : r - 1
+    se rPeao >= 0 e rPeao < 8 {
+        se c > 0 e casas[rPeao * 8 + c - 1] == peaoInimigo {
+            retorna verdadeiro
+        }
+        se c < 7 e casas[rPeao * 8 + c + 1] == peaoInimigo {
+            retorna verdadeiro
+        }
+    }
+
+    // 2. Ataques de cavalo
+    var cavaloInimigo: inteiro = atacante * pecas.TipoPeca.CAVALO
+    var drC: inteiro[] = [-2, -2, -1, -1, 1, 1, 2, 2]
+    var dcC: inteiro[] = [-1, 1, -2, 2, -2, 2, -1, 1]
+    para (var i: inteiro = 0; i < 8; i++) {
+        var nr: inteiro = r + drC[i]
+        var nc: inteiro = c + dcC[i]
+        se nr >= 0 e nr < 8 e nc >= 0 e nc < 8 {
+            se casas[nr * 8 + nc] == cavaloInimigo {
+                retorna verdadeiro
+            }
+        }
+    }
+
+    // 3. Ataques de rei
+    var reiInimigo: inteiro = atacante * pecas.TipoPeca.REI
+    para (var dr: inteiro = -1; dr <= 1; dr++) {
+        para (var dc: inteiro = -1; dc <= 1; dc++) {
+            se dr == 0 e dc == 0 {
+                continua
+            }
+            var nr: inteiro = r + dr
+            var nc: inteiro = c + dc
+            se nr >= 0 e nr < 8 e nc >= 0 e nc < 8 {
+                se casas[nr * 8 + nc] == reiInimigo {
+                    retorna verdadeiro
+                }
+            }
+        }
+    }
+
+    // 4. Raios ortogonais (torre / dama)
+    var torreInimiga: inteiro = atacante * pecas.TipoPeca.TORRE
+    var damaInimiga: inteiro = atacante * pecas.TipoPeca.DAMA
+    var drO: inteiro[] = [-1, 1, 0, 0]
+    var dcO: inteiro[] = [0, 0, -1, 1]
+    para (var d: inteiro = 0; d < 4; d++) {
+        var nr: inteiro = r + drO[d]
+        var nc: inteiro = c + dcO[d]
+        enquanto nr >= 0 e nr < 8 e nc >= 0 e nc < 8 {
+            var p: inteiro = casas[nr * 8 + nc]
+            se p != 0 {
+                se p == torreInimiga ou p == damaInimiga {
+                    retorna verdadeiro
+                }
+                sustar
+            }
+            nr = nr + drO[d]
+            nc = nc + dcO[d]
+        }
+    }
+
+    // 5. Raios diagonais (bispo / dama)
+    var bispoInimigo: inteiro = atacante * pecas.TipoPeca.BISPO
+    var drD: inteiro[] = [-1, -1, 1, 1]
+    var dcD: inteiro[] = [-1, 1, -1, 1]
+    para (var d: inteiro = 0; d < 4; d++) {
+        var nr: inteiro = r + drD[d]
+        var nc: inteiro = c + dcD[d]
+        enquanto nr >= 0 e nr < 8 e nc >= 0 e nc < 8 {
+            var p: inteiro = casas[nr * 8 + nc]
+            se p != 0 {
+                se p == bispoInimigo ou p == damaInimiga {
+                    retorna verdadeiro
+                }
+                sustar
+            }
+            nr = nr + drD[d]
+            nc = nc + dcD[d]
+        }
+    }
+    retorna falso
+}
+
+funcao reiEmXeque(tab: tabuleiro.Tabuleiro, cor: inteiro): logico {
+    var sqRei: inteiro = cor == pecas.Cor.BRANCAS ? tab.reiBranco : tab.reiPreto
+    retorna casaAtacada(tab, sqRei, -cor)
+}
+
+funcao adicionarPromocoes(lista: inteiro[], orig: inteiro, dest: inteiro): vazio {
+    lista.adicionar(codificarLance(orig, dest, pecas.TipoPeca.DAMA))
+    lista.adicionar(codificarLance(orig, dest, pecas.TipoPeca.TORRE))
+    lista.adicionar(codificarLance(orig, dest, pecas.TipoPeca.BISPO))
+    lista.adicionar(codificarLance(orig, dest, pecas.TipoPeca.CAVALO))
+}
+
+funcao gerarPseudoLegais(tab: tabuleiro.Tabuleiro, apenasCapturas: logico = falso): inteiro[] {
+    var lista: inteiro[] = []
+    var cor: inteiro = tab.turno
+    var inimigo: inteiro = -cor
+    var casas: inteiro[] = tab.casas
+
+    para (var sq: inteiro = 0; sq < 64; sq++) {
+        var p: inteiro = casas[sq]
+        se p == 0 ou pecas.corDaPeca(p) != cor {
+            continua
+        }
+        var tp: inteiro = pecas.tipoDaPeca(p)
+        var r: inteiro = sq \ 8
+        var c: inteiro = sq % 8
+
+        se tp == pecas.TipoPeca.PEAO {
+            var dir: inteiro = cor == pecas.Cor.BRANCAS ? -1 : 1
+            var filaInicial: inteiro = cor == pecas.Cor.BRANCAS ? 6 : 1
+            var filaPromo: inteiro = cor == pecas.Cor.BRANCAS ? 0 : 7
+            var nr: inteiro = r + dir
+            se nr >= 0 e nr < 8 {
+                // Avanço simples e duplo
+                se !apenasCapturas {
+                    var frente: inteiro = nr * 8 + c
+                    se casas[frente] == 0 {
+                        se nr == filaPromo {
+                            adicionarPromocoes(lista, sq, frente)
+                        } senao {
+                            lista.adicionar(codificarLance(sq, frente, 0))
+                            se r == filaInicial {
+                                var frente2: inteiro = (r + 2 * dir) * 8 + c
+                                se casas[frente2] == 0 {
+                                    lista.adicionar(codificarLance(sq, frente2, 0))
+                                }
+                            }
+                        }
+                    }
+                }
+                // Capturas diagonais e en passant
+                var dcs: inteiro[] = [-1, 1]
+                para (var k: inteiro = 0; k < 2; k++) {
+                    var nc: inteiro = c + dcs[k]
+                    se nc >= 0 e nc < 8 {
+                        var dest: inteiro = nr * 8 + nc
+                        var alvo: inteiro = casas[dest]
+                        se (alvo != 0 e pecas.corDaPeca(alvo) == inimigo) ou dest == tab.enPassant {
+                            se nr == filaPromo {
+                                adicionarPromocoes(lista, sq, dest)
+                            } senao {
+                                lista.adicionar(codificarLance(sq, dest, 0))
+                            }
+                        }
+                    }
+                }
+            }
+        } senao se tp == pecas.TipoPeca.CAVALO {
+            var drC: inteiro[] = [-2, -2, -1, -1, 1, 1, 2, 2]
+            var dcC: inteiro[] = [-1, 1, -2, 2, -2, 2, -1, 1]
+            para (var i: inteiro = 0; i < 8; i++) {
+                var nr: inteiro = r + drC[i]
+                var nc: inteiro = c + dcC[i]
+                se nr >= 0 e nr < 8 e nc >= 0 e nc < 8 {
+                    var dest: inteiro = nr * 8 + nc
+                    var alvo: inteiro = casas[dest]
+                    se alvo == 0 {
+                        se !apenasCapturas {
+                            lista.adicionar(codificarLance(sq, dest, 0))
+                        }
+                    } senao se pecas.corDaPeca(alvo) == inimigo {
+                        lista.adicionar(codificarLance(sq, dest, 0))
+                    }
+                }
+            }
+        } senao se tp == pecas.TipoPeca.REI {
+            para (var dr: inteiro = -1; dr <= 1; dr++) {
+                para (var dc: inteiro = -1; dc <= 1; dc++) {
+                    se dr == 0 e dc == 0 {
+                        continua
+                    }
+                    var nr: inteiro = r + dr
+                    var nc: inteiro = c + dc
+                    se nr >= 0 e nr < 8 e nc >= 0 e nc < 8 {
+                        var dest: inteiro = nr * 8 + nc
+                        var alvo: inteiro = casas[dest]
+                        se alvo == 0 {
+                            se !apenasCapturas {
+                                lista.adicionar(codificarLance(sq, dest, 0))
+                            }
+                        } senao se pecas.corDaPeca(alvo) == inimigo {
+                            lista.adicionar(codificarLance(sq, dest, 0))
+                        }
+                    }
+                }
+            }
+            // Roques (verifica casas vazias e casas não atacadas, incluindo casa inicial do rei!)
+            se !apenasCapturas {
+                se cor == pecas.Cor.BRANCAS e sq == 60 {
+                    se (tab.roques & 1) != 0 e casas[61] == 0 e casas[62] == 0 e casas[63] == 4 {
+                        se !casaAtacada(tab, 60, inimigo) e !casaAtacada(tab, 61, inimigo) e !casaAtacada(tab, 62, inimigo) {
+                            lista.adicionar(codificarLance(60, 62, 0))
+                        }
+                    }
+                    se (tab.roques & 2) != 0 e casas[59] == 0 e casas[58] == 0 e casas[57] == 0 e casas[56] == 4 {
+                        se !casaAtacada(tab, 60, inimigo) e !casaAtacada(tab, 59, inimigo) e !casaAtacada(tab, 58, inimigo) {
+                            lista.adicionar(codificarLance(60, 58, 0))
+                        }
+                    }
+                } senao se cor == pecas.Cor.PRETAS e sq == 4 {
+                    se (tab.roques & 4) != 0 e casas[5] == 0 e casas[6] == 0 e casas[7] == -4 {
+                        se !casaAtacada(tab, 4, inimigo) e !casaAtacada(tab, 5, inimigo) e !casaAtacada(tab, 6, inimigo) {
+                            lista.adicionar(codificarLance(4, 6, 0))
+                        }
+                    }
+                    se (tab.roques & 8) != 0 e casas[3] == 0 e casas[2] == 0 e casas[1] == 0 e casas[0] == -4 {
+                        se !casaAtacada(tab, 4, inimigo) e !casaAtacada(tab, 3, inimigo) e !casaAtacada(tab, 2, inimigo) {
+                            lista.adicionar(codificarLance(4, 2, 0))
+                        }
+                    }
+                }
+            }
+        } senao {
+            // Deslizantes: bispo, torre, dama
+            var drs: inteiro[] = []
+            var dcs: inteiro[] = []
+            se tp == pecas.TipoPeca.TORRE ou tp == pecas.TipoPeca.DAMA {
+                drs.adicionar(-1)
+                dcs.adicionar(0)
+                drs.adicionar(1)
+                dcs.adicionar(0)
+                drs.adicionar(0)
+                dcs.adicionar(-1)
+                drs.adicionar(0)
+                dcs.adicionar(1)
+            }
+            se tp == pecas.TipoPeca.BISPO ou tp == pecas.TipoPeca.DAMA {
+                drs.adicionar(-1)
+                dcs.adicionar(-1)
+                drs.adicionar(-1)
+                dcs.adicionar(1)
+                drs.adicionar(1)
+                dcs.adicionar(-1)
+                drs.adicionar(1)
+                dcs.adicionar(1)
+            }
+            para (var d: inteiro = 0; d < tamanho(drs); d++) {
+                var nr: inteiro = r + drs[d]
+                var nc: inteiro = c + dcs[d]
+                enquanto nr >= 0 e nr < 8 e nc >= 0 e nc < 8 {
+                    var dest: inteiro = nr * 8 + nc
+                    var alvo: inteiro = casas[dest]
+                    se alvo == 0 {
+                        se !apenasCapturas {
+                            lista.adicionar(codificarLance(sq, dest, 0))
+                        }
+                    } senao {
+                        se pecas.corDaPeca(alvo) == inimigo {
+                            lista.adicionar(codificarLance(sq, dest, 0))
+                        }
+                        sustar
+                    }
+                    nr = nr + drs[d]
+                    nc = nc + dcs[d]
+                }
+            }
+        }
+    }
+    retorna lista
+}
+
+/// Gera exclusivamente lances estritamente legais (nenhum lance deixa o próprio rei em xeque).
+funcao gerarLancesLegais(tab: tabuleiro.Tabuleiro, apenasCapturas: logico = falso): inteiro[] {
+    var pseudo: inteiro[] = gerarPseudoLegais(tab, apenasCapturas)
+    var legais: inteiro[] = []
+    var cor: inteiro = tab.turno
+    para (var i: inteiro = 0; i < tamanho(pseudo); i++) {
+        var l: inteiro = pseudo[i]
+        tab.fazerLance(lanceOrigem(l), lanceDestino(l), lancePromocao(l))
+        var ilegal: logico = reiEmXeque(tab, cor)
+        tab.desfazerLance()
+        se !ilegal {
+            legais.adicionar(l)
+        }
+    }
+    retorna legais
+}

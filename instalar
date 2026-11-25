@@ -59,7 +59,6 @@ while [ "$#" -gt 0 ]; do
 done
 
 command -v pkg-config >/dev/null 2>&1 || fail 'Instale pkg-config.'
-pkg-config --exists bdw-gc || fail 'Instale os headers e a biblioteca Boehm GC (bdw-gc).'
 cd "$project_dir"
 if [ "$build_required" -eq 1 ]; then
     command -v dub >/dev/null 2>&1 || fail 'Instale DUB.'
@@ -80,7 +79,7 @@ fi
 [ -x cgd ] || fail 'Executável cgd ausente. Execute dub build.'
 [ -f lib/libdelegua_rt.o ] || fail 'Runtime ausente. Execute ./build-runtime.'
 
-mkdir -p "$install_prefix/lib" "$install_prefix/vendor/delegua-runtime/src" "$install_bin_dir" "$install_libs_dir"
+mkdir -p "$install_prefix/lib" "$install_prefix/vendor/delegua-runtime/src/gc" "$install_bin_dir" "$install_libs_dir"
 # Caminhos absolutos tornam o link independente do diretório de execução.
 install_prefix=$(CDPATH= cd -- "$install_prefix" && pwd)
 install_bin_dir=$(CDPATH= cd -- "$install_bin_dir" && pwd)
@@ -90,8 +89,12 @@ cp cgd "$install_prefix/.cgd-install-$$"
 chmod +x "$install_prefix/.cgd-install-$$"
 mv -f "$install_prefix/.cgd-install-$$" "$install_prefix/cgd"
 cp lib/libdelegua_rt.o "$install_prefix/lib/"
-cp bibliotecas/*.delegua "$install_libs_dir/"
+for opt_bridge in lib/libdelegua_*.o; do
+    [ -f "$opt_bridge" ] && cp "$opt_bridge" "$install_prefix/lib/"
+done
+cp -R bibliotecas/. "$install_libs_dir/"
 cp vendor/delegua-runtime/src/*.h "$install_prefix/vendor/delegua-runtime/src/"
+cp vendor/delegua-runtime/src/gc/*.h "$install_prefix/vendor/delegua-runtime/src/gc/"
 if [ "$install_bin_dir/cgd" != "$install_prefix/cgd" ]; then
     ln -sf "$install_prefix/cgd" "$install_bin_dir/cgd"
 fi

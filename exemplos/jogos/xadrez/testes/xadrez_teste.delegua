@@ -1,0 +1,113 @@
+importar pecas
+importar tabuleiro
+importar movimentos
+importar regras
+importar busca
+importar tela_xadrez
+
+// 1. Perft oficial na posição inicial: depth 1=20, 2=400, 3=8902
+const tab: tabuleiro.Tabuleiro = tabuleiro.Tabuleiro()
+const fenInicial: texto = tab.exportarFEN()
+const hashInicial: inteiro = tab.hashAtual
+assercao(regras.perft(tab, 1) == 20)
+assercao(regras.perft(tab, 2) == 400)
+assercao(regras.perft(tab, 3) == 8902)
+assercao(tab.exportarFEN() == fenInicial)
+assercao(tab.hashAtual == hashInicial)
+
+// 2. Posição Kiwipete (testa roques, capturas, en passant e promoções): depth 1=48, 2=2039
+tab.carregarFEN("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")
+assercao(regras.perft(tab, 1) == 48)
+assercao(regras.perft(tab, 2) == 2039)
+
+// 3. Roque bloqueado quando casa intermediária está atacada (f1 atacada por bispo em a6)
+tab.carregarFEN("4k3/8/b7/8/8/8/8/4K2R w K - 0 1")
+const lancesRoque: inteiro[] = movimentos.gerarLancesLegais(tab, falso)
+var achouRoque: logico = falso
+para cada l: inteiro em lancesRoque {
+    se movimentos.lanceOrigem(l) == 60 e movimentos.lanceDestino(l) == 62 {
+        achouRoque = verdadeiro
+    }
+}
+assercao(!achouRoque)
+
+// 4. En passant que expõe o rei na mesma fileira (horizontal pin) deve ser rejeitado!
+tab.carregarFEN("8/8/8/K2pP2r/8/8/8/7k w - d6 0 1")
+const lancesEp: inteiro[] = movimentos.gerarLancesLegais(tab, falso)
+var achouEpIlegal: logico = falso
+para cada l: inteiro em lancesEp {
+    se movimentos.lanceOrigem(l) == 28 e movimentos.lanceDestino(l) == 19 {
+        achouEpIlegal = verdadeiro
+    }
+}
+assercao(!achouEpIlegal)
+
+// 5. Promoção (4 opções: Dama, Torre, Bispo, Cavalo)
+tab.carregarFEN("4k3/P7/8/8/8/8/8/4K3 w - - 0 1")
+const lancesPromo: inteiro[] = movimentos.gerarLancesLegais(tab, falso)
+var qtdPromo: inteiro = 0
+para cada l: inteiro em lancesPromo {
+    se movimentos.lanceOrigem(l) == 8 e movimentos.lanceDestino(l) == 0 e movimentos.lancePromocao(l) != 0 {
+        qtdPromo = qtdPromo + 1
+    }
+}
+assercao(qtdPromo == 4)
+
+// 6. Xeque duplo: apenas movimentos de rei são legais
+tab.carregarFEN("4k3/8/8/8/4r3/3n4/8/4K3 w - - 0 1")
+const lancesDuplo: inteiro[] = movimentos.gerarLancesLegais(tab, falso)
+para cada l: inteiro em lancesDuplo {
+    assercao(movimentos.lanceOrigem(l) == 60)
+}
+
+// 7. Pino absoluto: torre em e2 cravada pela torre preta em e8 não pode sair da coluna e
+tab.carregarFEN("4r1k1/8/8/8/8/8/4R3/4K3 w - - 0 1")
+const lancesPino: inteiro[] = movimentos.gerarLancesLegais(tab, falso)
+para cada l: inteiro em lancesPino {
+    se movimentos.lanceOrigem(l) == 52 {
+        assercao((movimentos.lanceDestino(l) % 8) == 4)
+    }
+}
+
+// 8. Afogamento (stalemate)
+tab.carregarFEN("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1")
+assercao(regras.estadoDaPartida(tab) == regras.EstadoPartida.AFOGAMENTO)
+
+// 9. Xeque-mate (Mate do Louco)
+tab.carregarFEN("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3")
+assercao(regras.estadoDaPartida(tab) == regras.EstadoPartida.XEQUE_MATE)
+
+// 10. Material insuficiente (Rei + Bispo vs Rei)
+tab.carregarFEN("4k3/8/8/8/8/8/2B5/4K3 w - - 0 1")
+assercao(regras.estadoDaPartida(tab) == regras.EstadoPartida.EMPATE_MATERIAL_INSUFICIENTE)
+
+// 11. Repetição tripla via hash Zobrist
+tab.carregarFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+// 2 ciclos completos de Cavalo g1-f3-g1 e g8-f6-g8 repetem a posição inicial 3 vezes
+para (var rep: inteiro = 0; rep < 2; rep++) {
+    tab.fazerLance(62, 45, 0)
+    tab.fazerLance(6, 21, 0)
+    tab.fazerLance(45, 62, 0)
+    tab.fazerLance(21, 6, 0)
+}
+assercao(regras.estadoDaPartida(tab) == regras.EstadoPartida.EMPATE_REPETICAO)
+
+// 12. Determinismo da IA com profundidade fixa + mate em 1 encontrado!
+tab.carregarFEN("6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")
+const motor1: busca.MotorBusca = busca.MotorBusca()
+const motor2: busca.MotorBusca = busca.MotorBusca()
+const res1: busca.ResultadoBusca = motor1.buscarMelhorLance(tab, 2, 0.0)
+const res2: busca.ResultadoBusca = motor2.buscarMelhorLance(tab, 2, 0.0)
+assercao(res1.melhorLance == res2.melhorLance)
+// Ra1-a8# (56 -> 0) é mate em 1!
+assercao(movimentos.lanceOrigem(res1.melhorLance) == 56 e movimentos.lanceDestino(res1.melhorLance) == 0)
+
+// 13. Integridade do tabuleiro e TUI headless (Unicode e ASCII)
+const uiU: tela_xadrez.InterfaceXadrez = tela_xadrez.InterfaceXadrez(verdadeiro, verdadeiro, 2)
+assercao(uiU.desenhar() > 0)
+assercao(uiU.tela.renderizarTexto().contem("♔"))
+const uiA: tela_xadrez.InterfaceXadrez = tela_xadrez.InterfaceXadrez(verdadeiro, falso, 2)
+assercao(uiA.desenhar() > 0)
+assercao(uiA.tela.renderizarTexto().contem("K"))
+
+escreva("XADREZ-TESTES-OK\n")

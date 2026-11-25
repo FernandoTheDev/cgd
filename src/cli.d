@@ -10,7 +10,8 @@ enum Flag[] FLAGS = [
     Flag("", "explicar", "explain", "Explica um código de diagnóstico sem compilar"),
     Flag("a", "ajuda", "showHelp", "Exibe esta mensagem de ajuda"),
     Flag("v", "versao", "showVersion", "Exibe a versão atual do compilador"),
-    Flag("d", "depurar", "showDebug", "Ativa o modo de depuração do compilador"),
+    Flag("d", "depurar", "showDebug", "Ativa o modo de depuração interna do compilador"),
+    Flag("g", "depuracao", "debugInfo", "Emite símbolos de depuração (-g) no executável"),
     Flag("o", "otimizar", "opt", "Ativa a otimização do compilador"),
     Flag("t", "tempo", "showPerf", "Exibe o tempo de execução de cada passe"),
     Flag("s", "saida", "output", "Define o caminho do arquivo de saída"),
@@ -25,6 +26,11 @@ enum Flag[] FLAGS = [
     Flag("", "pkg-config", "pkgConfig", "Executável pkg-config do alvo"),
     Flag("", "cflag", "cFlags", "Argumento adicional de C (repetível, sem shell)"),
     Flag("", "ldflag", "linkFlags", "Argumento adicional de link (repetível, sem shell)"),
+    Flag("", "recurso", "features", "Habilita um recurso condicional para Compilacao.temRecurso (repetível)"),
+    Flag("", "gc", "gcBackend", "Backend de GC: cgd (padrão, sem libgc) ou boehm (referência)"),
+    Flag("", "opcoes-memoria", "memOpts", "Controle de otimizações híbridas: padrao, nenhuma ou lista (ans,stack,det,fusao,devirt)"),
+    Flag("", "relatorio-memoria", "memReport", "Exibe relatório de decisões de memória híbrida e ANS"),
+    Flag("", "relatorio-memoria-json", "memReportPath", "Salva relatório JSON de decisões de memória híbrida em arquivo"),
 ];
 
 private struct Flag
@@ -57,13 +63,27 @@ void cli_ajuda()
     cli_versao();
     writeln();
     writeln("USO:");
-    writeln("    cgd [arquivo] [flags]");
+    writeln("    cgd [arquivo.delegua] [flags]");
+    writeln("    cgd iniciar <nome> [--tipo aplicativo|servidor|tui|gtk|sdl|biblioteca]");
+    writeln("    cgd compilar [arquivo] [--modo desenvolvimento|producao] [--depuracao]");
+    writeln("    cgd rodar [arquivo] [-- argumentos...]");
+    writeln("    cgd testar [--filtro texto]");
+    writeln("    cgd verificar [arquivo]");
+    writeln("    cgd formatar [caminho] [--verificar]");
+    writeln("    cgd limpar");
+    writeln("    cgd projeto [validar|informacoes]");
+    writeln("    cgd depurar [arquivo]");
+    writeln("    cgd dap --stdio");
+    writeln("    cgd documentar [--bibliotecas] [--formato markdown|html] [--saida dir] [--validar]");
     writeln("    cgd --formatar arquivo.delegua");
     writeln("    cgd --verificar-formatacao arquivo.delegua");
     writeln("    cgd --lsp --stdio\n");
     writeln("FLAGS:");
     foreach (Flag flag; FLAGS)
-        writefln("    -%-4s --%-10s  %s", flag.curta, flag.longa, flag.descricao);
+        if (flag.curta != "")
+            writefln("    -%-4s --%-10s  %s", flag.curta, flag.longa, flag.descricao);
+        else
+            writefln("    %4s --%-10s  %s", flag.curta, flag.longa, flag.descricao);
     writeln();
 }
 

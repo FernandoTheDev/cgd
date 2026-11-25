@@ -4,6 +4,11 @@ cd "$(dirname "$0")/vendor/delegua-runtime"
 ./build
 mkdir -p ../../lib
 cp libdelegua_rt.o ../../lib/
+for opt_art in libdelegua_rt_boehm.o libdelegua_gtk4.o libdelegua_sdl3.o; do
+    if [ -f "$opt_art" ]; then
+        cp "$opt_art" ../../lib/
+    fi
+done
 if [ "${1:-}" = add ]; then
     git -C ../.. add vendor/delegua-runtime
 fi

@@ -6,12 +6,17 @@ import frontend.semantic.routine_validation;
 import frontend.semantic.static_safety;
 import frontend.semantic.flow;
 import frontend.semantic.purity;
+import frontend.semantic.value_types;
+import frontend.semantic.native_validation;
+import frontend.semantic.gpu_validation;
+import frontend.semantic.ownership;
 
 struct SemanticResult
 {
     Context context;
     TypeRegistry registry;
     FnDecl[] pureFunctions;
+    OwnershipInfo ownership;
 }
 
 /// Única ordem de análise para CLI e ferramentas. Não otimiza nem executa código.
@@ -26,6 +31,18 @@ SemanticResult analyzeSemantics(Program program, Diagnostics diagnostics)
 
     new SemanticAnalyzer(result.context, result.registry, new TypeResolver(result.registry, diagnostics), diagnostics)
         .analyze(program);
+    if (diagnostics.hasErrors())
+        return result;
+    validateValueTypes(program, diagnostics);
+    if (diagnostics.hasErrors())
+        return result;
+    validateGpuKernels(program, diagnostics);
+    if (diagnostics.hasErrors())
+        return result;
+    validateNativeFunctions(program, diagnostics);
+    if (diagnostics.hasErrors())
+        return result;
+    result.ownership = analyzeOwnership(program, diagnostics);
     if (diagnostics.hasErrors())
         return result;
     validateAsyncFeatures(program, diagnostics);

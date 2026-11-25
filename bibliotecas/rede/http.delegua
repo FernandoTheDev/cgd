@@ -1,0 +1,202 @@
+// Servidor HTTP/1.1 assíncrono sobre epoll com API ergonômica em português, métricas e streaming.
+
+classe RespostaHTTP {
+    privado {
+        _inner: qualquer
+        _streamChunks: texto[]
+        _ehStream: logico = falso
+    }
+
+    construtor(inner: qualquer) {
+        isto._inner = inner
+    }
+
+    status(codigo: inteiro): RespostaHTTP {
+        isto._inner.status(codigo)
+        retorna isto
+    }
+
+    cabecalho(nome: texto, valor: texto): RespostaHTTP {
+        isto._inner.cabecalho(nome, valor)
+        retorna isto
+    }
+
+    texto(conteudo: texto): RespostaHTTP {
+        isto._inner.cabecalho("content-type", "text/plain; charset=utf-8")
+        isto._inner.enviar(conteudo)
+        retorna isto
+    }
+
+    html(conteudo: texto): RespostaHTTP {
+        isto._inner.cabecalho("content-type", "text/html; charset=utf-8")
+        isto._inner.enviar(conteudo)
+        retorna isto
+    }
+
+    json(valor: qualquer): RespostaHTTP {
+        isto._inner.json(valor)
+        retorna isto
+    }
+
+    binario(dados: qualquer, tipoConteudo: texto = "application/octet-stream"): RespostaHTTP {
+        isto._inner.cabecalho("content-type", tipoConteudo)
+        se tipo de dados == "texto" {
+            isto._inner.enviar(dados)
+        } senao {
+            isto._inner.enviar(dados.paraTexto())
+        }
+        retorna isto
+    }
+
+    enviar(conteudo: texto = ""): RespostaHTTP {
+        isto._inner.enviar(conteudo)
+        retorna isto
+    }
+
+    escreverPedaco(pedaco: texto): RespostaHTTP {
+        isto._ehStream = verdadeiro
+        isto._streamChunks.adicionar(pedaco)
+        retorna isto
+    }
+
+    finalizarFluxo(): RespostaHTTP {
+        isto._inner.enviar(isto._streamChunks.juntar(""))
+        retorna isto
+    }
+
+    pararServidor(): RespostaHTTP {
+        isto._inner.pararServidor()
+        retorna isto
+    }
+
+    definida(): logico {
+        retorna isto._inner.definida()
+    }
+}
+
+classe Servidor {
+    privado {
+        _base: qualquer
+        _totalConexoes: inteiro = 0
+        _totalRequisicoes: inteiro = 0
+        _totalErros: inteiro = 0
+        _latenciaTotalMs: real = 0.0
+        _maxConexoes: inteiro = 256
+    }
+
+    construtor(maxCabecalhos: inteiro = 16384, maxCorpo: inteiro = 1048576, leituraMs: inteiro = 10000,
+        escritaMs: inteiro = 10000, maxConexoes: inteiro = 256) {
+        var srvMod: qualquer = importar("cgd:servidor")
+        isto._base = srvMod.HTTP(maxCabecalhos, maxCorpo, leituraMs, escritaMs)
+        isto._maxConexoes = maxConexoes
+    }
+
+    rota(metodo: texto, caminho: texto, tratar: funcao): Servidor {
+        isto._base.rota(metodo, caminho, tratar)
+        retorna isto
+    }
+
+    obter(caminho: texto, tratar: funcao): Servidor {
+        retorna isto.rota("GET", caminho, tratar)
+    }
+
+    get(caminho: texto, tratar: funcao): Servidor {
+        retorna isto.rota("GET", caminho, tratar)
+    }
+
+    publicar(caminho: texto, tratar: funcao): Servidor {
+        retorna isto.rota("POST", caminho, tratar)
+    }
+
+    post(caminho: texto, tratar: funcao): Servidor {
+        retorna isto.rota("POST", caminho, tratar)
+    }
+
+    atualizar(caminho: texto, tratar: funcao): Servidor {
+        retorna isto.rota("PUT", caminho, tratar)
+    }
+
+    put(caminho: texto, tratar: funcao): Servidor {
+        retorna isto.rota("PUT", caminho, tratar)
+    }
+
+    remendar(caminho: texto, tratar: funcao): Servidor {
+        retorna isto.rota("PATCH", caminho, tratar)
+    }
+
+    patch(caminho: texto, tratar: funcao): Servidor {
+        retorna isto.rota("PATCH", caminho, tratar)
+    }
+
+    remover(caminho: texto, tratar: funcao): Servidor {
+        retorna isto.rota("DELETE", caminho, tratar)
+    }
+
+    delete(caminho: texto, tratar: funcao): Servidor {
+        retorna isto.rota("DELETE", caminho, tratar)
+    }
+
+    usar(middleware: funcao): Servidor {
+        isto._base.usar(middleware)
+        retorna isto
+    }
+
+    abrir(endereco: texto = "127.0.0.1", porta: inteiro = 8080): Servidor {
+        isto._base.abrir(endereco, porta)
+        retorna isto
+    }
+
+    ativo(): logico {
+        retorna isto._base.ativo()
+    }
+
+    portaLocal(): inteiro {
+        retorna isto._base.portaLocal()
+    }
+
+    fechar(): vazio {
+        isto._base.fechar()
+    }
+
+    atenderUma(timeoutMs: inteiro = 1000): logico {
+        var tempo: qualquer = importar("cgd:tempo").Tempo
+        var t0: real = tempo.agoraMs()
+        var ok: logico = isto._base.atenderUma(timeoutMs)
+        se ok {
+            isto._totalConexoes = isto._totalConexoes + 1
+            isto._totalRequisicoes = isto._totalRequisicoes + 1
+            isto._latenciaTotalMs = isto._latenciaTotalMs + (tempo.agoraMs() - t0)
+        }
+        retorna ok
+    }
+
+    /// Escuta assíncrona concorrente sobre epoll com keep-alive HTTP/1.1.
+    assincrona escutarAsync(endereco: texto = "127.0.0.1", porta: inteiro = 8080,
+        maxRequisicoesPorConexao: inteiro = 100): vazio {
+        aguardar isto._base.escutarAsync(endereco, porta, maxRequisicoesPorConexao)
+    }
+
+    /// Inicia o servidor assíncrono em loop de eventos até encerramento gracioso.
+    escutar(endereco: texto = "127.0.0.1", porta: inteiro = 8080, maxRequisicoesPorConexao: inteiro = 100): vazio {
+        isto.escutarAsync(endereco, porta, maxRequisicoesPorConexao)
+    }
+
+    escutarSincrono(endereco: texto = "127.0.0.1", porta: inteiro = 8080): vazio {
+        isto._base.escutar(endereco, porta)
+    }
+
+    metricas(): dicionario {
+        var media: real = 0.0
+        se isto._totalRequisicoes > 0 {
+            media = isto._latenciaTotalMs / isto._totalRequisicoes
+        }
+        retorna {
+            conexoes: isto._totalConexoes,
+            requisicoes: isto._totalRequisicoes,
+            erros: isto._totalErros,
+            latenciaMediaMs: media,
+            maxConexoes: isto._maxConexoes,
+            ativo: isto._base.ativo()
+        }
+    }
+}

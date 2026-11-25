@@ -201,8 +201,35 @@ public:
             if (kind == TokenKind.LParen)
                 depth++;
             if (kind == TokenKind.RParen && --depth == 0)
-                return cursor < tokens.length && (tokens[cursor].kind == TokenKind.Arrow
-                        || tokens[cursor].kind == TokenKind.Colon);
+            {
+                if (cursor >= tokens.length)
+                    return false;
+                if (tokens[cursor].kind == TokenKind.Arrow)
+                    return true;
+                if (tokens[cursor].kind == TokenKind.Colon)
+                {
+                    // Só é arrow com tipo de retorno `(args): Ret => ...` se houver `=>` após o tipo.
+                    size_t scan = cursor + 1;
+                    size_t typeDepth = 0;
+                    while (scan < tokens.length)
+                    {
+                        TokenKind tk = tokens[scan].kind;
+                        if (tk == TokenKind.Arrow && typeDepth == 0)
+                            return true;
+                        if (tk == TokenKind.LThan || tk == TokenKind.LParen || tk == TokenKind.LBracket)
+                            typeDepth++;
+                        else if ((tk == TokenKind.GThan || tk == TokenKind.RParen || tk == TokenKind.RBracket)
+                                && typeDepth > 0)
+                            typeDepth--;
+                        else if (typeDepth == 0 && (tk == TokenKind.Semicolon || tk == TokenKind.LBrace
+                                || tk == TokenKind.RBrace || tk == TokenKind.Equals
+                                || tk == TokenKind.Question || tk == TokenKind.Comma))
+                            return false;
+                        scan++;
+                    }
+                }
+                return false;
+            }
         }
         return false;
     }
@@ -256,10 +283,22 @@ public:
             {
                 while (!isAtEnd() && !check(TokenKind.RParen))
                 {
-                    Token key = consumeName("Esperado nome do argumento do decorador.");
-                    consume(TokenKind.Equals, "Esperado '=' após argumento do decorador.");
-                    d.keys ~= key.value.s;
-                    d.values ~= parseExpr.parse();
+                    // Suporta tanto argumentos nomeados (`chave = expr`) quanto posicionais (`expr`),
+                    // ex.: `@quando(Compilacao.sistemaOperacional() == "linux")`, `@operador("+")`.
+                    bool isNamedArg = (check(TokenKind.Identifier) || peek().kind <= TokenKind.Of)
+                        && checkNext(TokenKind.Equals);
+                    if (isNamedArg)
+                    {
+                        Token key = consumeName("Esperado nome do argumento do decorador.");
+                        consume(TokenKind.Equals, "Esperado '=' após argumento do decorador.");
+                        d.keys ~= key.value.s;
+                        d.values ~= parseExpr.parse();
+                    }
+                    else
+                    {
+                        d.keys ~= ""d;
+                        d.values ~= parseExpr.parse();
+                    }
                     if (!check(TokenKind.RParen))
                         consume(TokenKind.Comma, "Esperado ',' após argumento.");
                 }
@@ -284,8 +323,9 @@ public:
         {
             Decorator[] decorators = parseDecorators();
             node = parseIntern();
-            node.decorators = decorators;
+            node.decorators = decorators ~ node.decorators;
             foreach (Decorator d; decorators)
+            {
                 if (d.name == "puro")
                 {
                     if (d.keys.length)
@@ -295,8 +335,40 @@ public:
                     else
                         err.error(node.pos, "O decorador @puro exige uma função ou método estático.");
                 }
+                else if (d.name == "nativo")
+                {
+                    if (d.keys.length)
+                        err.error(node.pos, "O decorador @nativo não aceita argumentos.");
+                    if (FnDecl fn = cast(FnDecl) node)
+                        fn.isNative = true;
+                    else
+                        err.errorCode(node.pos, nativeInvalidTarget, "exige uma função ou método");
+                }
+                else if (d.name == "pilha" || d.name == "valor")
+                {
+                    if (d.keys.length)
+                        err.error(node.pos, "O decorador @" ~ (d.name == "valor" ? "valor" : "pilha")
+                                ~ " não aceita argumentos.");
+                    if (ClassDecl cls = cast(ClassDecl) node)
+                        cls.isValueType = true;
+                    else
+                        err.error(node.pos, "O decorador @" ~ (d.name == "valor" ? "valor" : "pilha")
+                                ~ " exige uma declaração de classe.");
+                }
+                else if (d.name == "gpu")
+                {
+                    if (d.keys.length)
+                        err.error(node.pos, "O decorador @gpu não aceita argumentos.");
+                    if (FnDecl fn = cast(FnDecl) node)
+                        fn.isGpu = true;
+                    else
+                        err.errorCode(node.pos, gpuUnsupportedFeature, "o decorador @gpu exige uma função");
+                }
+            }
             return node;
         }
+        if (check(TokenKind.Import) && !checkNext(TokenKind.LParen))
+            return parseImportStmt();
         if (isDecl())
             node = parseDecl.parse();
         else if (isStmt())
@@ -306,6 +378,32 @@ public:
 
         checkSemiColon(node.kind);
         return node;
+    }
+
+    private Node parseImportStmt()
+    {
+        Token tk = advance();
+        dstring[] segments;
+        Token first = consume(TokenKind.Identifier, "Esperado nome de módulo após 'importar'.");
+        segments ~= first.value.s;
+        while (match(TokenKind.Dot))
+        {
+            Token seg = consumeName("Esperado segmento de módulo após '.'.");
+            segments ~= seg.value.s;
+        }
+        dstring aliasName;
+        if (!isAtEnd() && check(TokenKind.Identifier) && peek().value.s == "como")
+        {
+            advance();
+            Token aliasTk = consume(TokenKind.Identifier, "Esperado alias após 'como'.");
+            aliasName = aliasTk.value.s;
+        }
+        match(TokenKind.Semicolon);
+        ImportExpr imported = new ImportExpr(null, tk.pos);
+        imported.modulePath = segments;
+        imported.aliasName = aliasName;
+        imported.isStatementImport = true;
+        return imported;
     }
 
     Node[] parseBody(bool simpleStatemet = false)
@@ -369,6 +467,26 @@ public:
 
     Program parse()
     {
+        dstring[] modulePath;
+        Position modulePos;
+        while (match(TokenKind.Semicolon))
+        {
+        }
+        if (!isAtEnd() && check(TokenKind.Identifier)
+                && (peek().value.s == "modulo" || peek().value.s == "módulo")
+                && checkNext(TokenKind.Identifier))
+        {
+            Token modTk = advance();
+            modulePos = modTk.pos;
+            Token first = consume(TokenKind.Identifier, "Esperado nome do módulo.");
+            modulePath ~= first.value.s;
+            while (match(TokenKind.Dot))
+            {
+                Token seg = consumeName("Esperado segmento do módulo após '.'.");
+                modulePath ~= seg.value.s;
+            }
+            match(TokenKind.Semicolon);
+        }
         Node[] body;
         while (!isAtEnd())
         {
@@ -384,6 +502,9 @@ public:
                 synchronize(before, false);
             resetFlags();
         }
-        return new Program(body);
+        Program program = new Program(body);
+        program.modulePath = modulePath;
+        program.modulePos = modulePos;
+        return program;
     }
 }

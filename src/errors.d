@@ -34,11 +34,11 @@ string label(Severity severity)
     final switch (severity)
     {
         case Severity.Hint:
-            return "hint";
+            return "dica";
         case Severity.Warning:
-            return "warning";
+            return "aviso";
         case Severity.Error:
-            return "error";
+            return "erro";
     }
 }
 

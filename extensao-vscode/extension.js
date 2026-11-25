@@ -161,10 +161,42 @@ async function activate(extensionContext) {
       guarded(() => build(false, true)),
     ),
     vscode.commands.registerCommand('cgd.reiniciarServidor', guarded(start)),
+    vscode.debug.registerDebugAdapterDescriptorFactory('cgd', {
+      createDebugAdapterDescriptor() {
+        return new vscode.DebugAdapterExecutable(compiler(), ['dap', '--stdio']);
+      },
+    }),
     vscode.debug.registerDebugConfigurationProvider('cgd', {
-      async resolveDebugConfiguration() {
-        await guarded(() => build(true))();
-        return undefined; // F5 é execução; DAP está explicitamente adiado.
+      async resolveDebugConfiguration(folder, config) {
+        if (!vscode.workspace.isTrusted) {
+          vscode.window.showErrorMessage('Confie no workspace antes de depurar programas CGD.');
+          return undefined;
+        }
+        const resolved = Object.assign(
+          {
+            type: 'cgd',
+            request: 'launch',
+            name: 'CGD: Depurar Delégua',
+            modo: 'desenvolvimento',
+          },
+          config || {},
+        );
+        if (!resolved.cwd && folder) resolved.cwd = folder.uri.fsPath;
+        if (!resolved.program) {
+          const hasManifest =
+            resolved.cwd && fs.existsSync(path.join(resolved.cwd, 'projeto.json'));
+          const editor = vscode.window.activeTextEditor;
+          if (editor && editor.document.languageId === 'cgd' && !hasManifest) {
+            await editor.document.save();
+            resolved.program = editor.document.uri.fsPath;
+          } else if (!hasManifest) {
+            vscode.window.showErrorMessage(
+              'Abra um arquivo .delegua ou um workspace com projeto.json para depurar.',
+            );
+            return undefined;
+          }
+        }
+        return resolved;
       },
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {

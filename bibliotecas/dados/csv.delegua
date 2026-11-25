@@ -1,0 +1,136 @@
+// Parser e escritor CSV (RFC 4180) com leitura incremental (streaming).
+
+classe LeitorCSV {
+    privado {
+        _texto: texto
+        _pos: inteiro = 0
+        _tam: inteiro = 0
+        _delimitador: texto = ","
+    }
+
+    construtor(conteudo: texto, delimitador: texto = ",") {
+        isto._texto = conteudo
+        isto._tam = tamanho(conteudo)
+        isto._delimitador = delimitador
+    }
+
+    fim(): logico {
+        retorna isto._pos >= isto._tam
+    }
+
+    /// Lê a próxima linha lógica CSV (suportando campos entre aspas com quebras de linha e "").
+    lerLinha(): qualquer {
+        se isto._pos >= isto._tam {
+            retorna nulo
+        }
+        var campos: texto[] = []
+        var partes: texto[] = []
+        var emAspas: logico = falso
+        var inicioCampo: logico = verdadeiro
+
+        enquanto isto._pos < isto._tam {
+            var ch: texto = isto._texto[isto._pos]
+            isto._pos = isto._pos + 1
+            se emAspas {
+                se ch == "\"" {
+                    se isto._pos < isto._tam e isto._texto[isto._pos] == "\"" {
+                        partes.adicionar("\"")
+                        isto._pos = isto._pos + 1
+                    } senao {
+                        emAspas = falso
+                    }
+                } senao {
+                    partes.adicionar(ch)
+                }
+            } senao {
+                se inicioCampo e ch == "\"" {
+                    emAspas = verdadeiro
+                    inicioCampo = falso
+                } senao se ch == isto._delimitador {
+                    campos.adicionar(partes.juntar(""))
+                    partes = []
+                    inicioCampo = verdadeiro
+                } senao se ch == "\r" {
+                    se isto._pos < isto._tam e isto._texto[isto._pos] == "\n" {
+                        isto._pos = isto._pos + 1
+                    }
+                    campos.adicionar(partes.juntar(""))
+                    retorna campos
+                } senao se ch == "\n" {
+                    campos.adicionar(partes.juntar(""))
+                    retorna campos
+                } senao {
+                    partes.adicionar(ch)
+                    inicioCampo = falso
+                }
+            }
+        }
+        campos.adicionar(partes.juntar(""))
+        retorna campos
+    }
+}
+
+classe CSV {
+    estatico analisar(conteudo: texto, delimitador: texto = ","): texto[][] {
+        var leitor: LeitorCSV = LeitorCSV(conteudo, delimitador)
+        var linhas: texto[][] = []
+        enquanto !leitor.fim() {
+            var linha: qualquer = leitor.lerLinha()
+            se linha != nulo {
+                linhas.adicionar(linha)
+            }
+        }
+        retorna linhas
+    }
+
+    estatico analisarObjetos(conteudo: texto, delimitador: texto = ","): dicionario[] {
+        var linhas: texto[][] = CSV.analisar(conteudo, delimitador)
+        se tamanho(linhas) == 0 {
+            retorna []
+        }
+        var cabecalhos: texto[] = linhas[0]
+        var resultado: dicionario[] = []
+        para (var i: inteiro = 1; i < tamanho(linhas); i++) {
+            var linha: texto[] = linhas[i]
+            se tamanho(linha) == 1 e linha[0] == "" {
+                continua
+            }
+            var obj: dicionario = {}
+            para (var c: inteiro = 0; c < tamanho(cabecalhos); c++) {
+                obj[cabecalhos[c]] = c < tamanho(linha) ? linha[c] : ""
+            }
+            resultado.adicionar(obj)
+        }
+        retorna resultado
+    }
+
+    estatico escaparCampo(valor: texto, delimitador: texto = ","): texto {
+        var precisaAspas: logico = valor.contem(delimitador) ou valor.contem("\"") ou valor.contem("\n") ou valor.contem("\r")
+        se !precisaAspas {
+            retorna valor
+        }
+        var partes: texto[] = ["\""]
+        para (var i: inteiro = 0; i < tamanho(valor); i++) {
+            var ch: texto = valor[i]
+            se ch == "\"" {
+                partes.adicionar("\"\"")
+            } senao {
+                partes.adicionar(ch)
+            }
+        }
+        partes.adicionar("\"")
+        retorna partes.juntar("")
+    }
+
+    estatico serializar(linhas: texto[][], delimitador: texto = ","): texto {
+        var saida: texto[] = []
+        para cada linha: texto[] em linhas {
+            var campos: texto[] = []
+            para cada campo: texto em linha {
+                campos.adicionar(CSV.escaparCampo(campo, delimitador))
+            }
+            saida.adicionar(campos.juntar(delimitador))
+        }
+        retorna saida.juntar("\n")
+    }
+}

@@ -1,0 +1,380 @@
+// Variante experimental nativa da engine de xadrez usando @pilha, @nativo e VetorNativo<ci32>
+// Preserva a engine principal em exemplos/jogos/xadrez/ e valida perft(1..4) idêntico (20, 400, 8902, 197281).
+importar cgd.tempo como TempoMod
+
+@pilha
+classe LanceNativo {
+    origem: ci32
+    destino: ci32
+    capturada: ci32
+    promocao: ci32
+}
+
+@nativo
+funcao criarTabuleiroInicial(): VetorNativo < ci32 > {
+    var casas = VetorNativo < ci32 > ()
+    casas.reservar(64)
+    // Positivo = brancas (1=P,2=N,3=B,4=R,5=Q,6=K); Negativo = pretas; 0 = vazio
+    // Linha 0 (rank 8): pretas
+    casas.adicionar(-4)
+    casas.adicionar(-2)
+    casas.adicionar(-3)
+    casas.adicionar(-5)
+    casas.adicionar(-6)
+    casas.adicionar(-3)
+    casas.adicionar(-2)
+    casas.adicionar(-4)
+    // Linha 1 (rank 7): peões pretos
+    para var c: ci32 = 0; c < 8; c = c + 1 {
+        casas.adicionar(-1)
+    }
+
+    // Linhas 2..5: vazias
+    para var i: ci32 = 0; i < 32; i = i + 1 {
+        casas.adicionar(0)
+    }
+
+    // Linha 6 (rank 2): peões brancos
+    para var c: ci32 = 0; c < 8; c = c + 1 {
+        casas.adicionar(1)
+    }
+
+    // Linha 7 (rank 1): brancas
+    casas.adicionar(4)
+    casas.adicionar(2)
+    casas.adicionar(3)
+    casas.adicionar(5)
+    casas.adicionar(6)
+    casas.adicionar(3)
+    casas.adicionar(2)
+    casas.adicionar(4)
+    retorna casas
+}
+
+@nativo
+funcao casaAtacada(casas: VetorNativo < ci32 >, sq: ci32, porBrancas: cbool): cbool {
+    const r: ci32 = sq \ 8
+    const c: ci32 = sq % 8
+    const sinal: ci32 = porBrancas ? 1 : -1
+
+    // Ataques de peão
+    const pr: ci32 = porBrancas ? (r + 1) : (r - 1)
+    se pr >= 0 e pr < 8 {
+        se c > 0 e casas[pr * 8 + (c - 1)] == sinal {
+            retorna verdadeiro
+        }
+        se c < 7 e casas[pr * 8 + (c + 1)] == sinal {
+            retorna verdadeiro
+        }
+    }
+
+    // Ataques de cavalo
+    var knR = VetorNativo < ci32 > ()
+    knR.adicionar(-2)
+    knR.adicionar(-2)
+    knR.adicionar(-1)
+    knR.adicionar(-1)
+    knR.adicionar(1)
+    knR.adicionar(1)
+    knR.adicionar(2)
+    knR.adicionar(2)
+    var knC = VetorNativo < ci32 > ()
+    knC.adicionar(-1)
+    knC.adicionar(1)
+    knC.adicionar(-2)
+    knC.adicionar(2)
+    knC.adicionar(-2)
+    knC.adicionar(2)
+    knC.adicionar(-1)
+    knC.adicionar(1)
+    const cav: ci32 = 2 * sinal
+    para var k: ci32 = 0; k < 8; k = k + 1 {
+        const nr: ci32 = r + knR[k]
+        const nc: ci32 = c + knC[k]
+        se nr >= 0 e nr < 8 e nc >= 0 e nc < 8 {
+            se casas[nr * 8 + nc] == cav {
+                retorna verdadeiro
+            }
+        }
+    }
+
+    // Ataques de rei
+    const rei: ci32 = 6 * sinal
+    para var dr: ci32 = -1; dr <= 1; dr = dr + 1 {
+        para var dc: ci32 = -1; dc <= 1; dc = dc + 1 {
+            se dr != 0 ou dc != 0 {
+                const nr: ci32 = r + dr
+                const nc: ci32 = c + dc
+                se nr >= 0 e nr < 8 e nc >= 0 e nc < 8 {
+                    se casas[nr * 8 + nc] == rei {
+                        retorna verdadeiro
+                    }
+                }
+            }
+        }
+    }
+
+    // Deslizantes ortogonais (Torre/Dama)
+    const torre: ci32 = 4 * sinal
+    const dama: ci32 = 5 * sinal
+    var oR = VetorNativo < ci32 > ()
+    oR.adicionar(-1)
+    oR.adicionar(1)
+    oR.adicionar(0)
+    oR.adicionar(0)
+    var oC = VetorNativo < ci32 > ()
+    oC.adicionar(0)
+    oC.adicionar(0)
+    oC.adicionar(-1)
+    oC.adicionar(1)
+    para var d: ci32 = 0; d < 4; d = d + 1 {
+        var nr: ci32 = r + oR[d]
+        var nc: ci32 = c + oC[d]
+        enquanto nr >= 0 e nr < 8 e nc >= 0 e nc < 8 {
+            const p: ci32 = casas[nr * 8 + nc]
+            se p != 0 {
+                se p == torre ou p == dama {
+                    retorna verdadeiro
+                }
+                sustar
+            }
+            nr += oR[d]
+            nc += oC[d]
+        }
+    }
+
+    // Deslizantes diagonais (Bispo/Dama)
+    const bispo: ci32 = 3 * sinal
+    var dR = VetorNativo < ci32 > ()
+    dR.adicionar(-1)
+    dR.adicionar(-1)
+    dR.adicionar(1)
+    dR.adicionar(1)
+    var dC = VetorNativo < ci32 > ()
+    dC.adicionar(-1)
+    dC.adicionar(1)
+    dC.adicionar(-1)
+    dC.adicionar(1)
+    para var d: ci32 = 0; d < 4; d = d + 1 {
+        var nr: ci32 = r + dR[d]
+        var nc: ci32 = c + dC[d]
+        enquanto nr >= 0 e nr < 8 e nc >= 0 e nc < 8 {
+            const p: ci32 = casas[nr * 8 + nc]
+            se p != 0 {
+                se p == bispo ou p == dama {
+                    retorna verdadeiro
+                }
+                sustar
+            }
+            nr += dR[d]
+            nc += dC[d]
+        }
+    }
+
+    retorna falso
+}
+
+@nativo
+funcao gerarLancesPseudo(casas: VetorNativo < ci32 >, vezBrancas: cbool): VetorNativo < LanceNativo > {
+    var lances = VetorNativo < LanceNativo > ()
+    lances.reservar(48)
+    const sinal: ci32 = vezBrancas ? 1 : -1
+
+    para var sq: ci32 = 0; sq < 64; sq = sq + 1 {
+        const p: ci32 = casas[sq]
+        se p == 0 ou (vezBrancas e p < 0) ou (!vezBrancas e p > 0) {
+            continua
+        }
+        const tipoPeca: ci32 = p > 0 ? p : -p
+        const r: ci32 = sq \ 8
+        const c: ci32 = sq % 8
+
+        se tipoPeca == 1 {
+            // Peão
+            const dir: ci32 = vezBrancas ? -1 : 1
+            const nr: ci32 = r + dir
+            se nr >= 0 e nr < 8 {
+                const frente: ci32 = nr * 8 + c
+                se casas[frente] == 0 {
+                    lances.adicionar(LanceNativo(sq, frente, 0, 0))
+                    const linhaInicial: ci32 = vezBrancas ? 6 : 1
+                    se r == linhaInicial {
+                        const duplo: ci32 = (r + 2 * dir) * 8 + c
+                        se casas[duplo] == 0 {
+                            lances.adicionar(LanceNativo(sq, duplo, 0, 0))
+                        }
+                    }
+                }
+                se c > 0 {
+                    const capE: ci32 = nr * 8 + (c - 1)
+                    const alvoE: ci32 = casas[capE]
+                    se alvoE != 0 e ((vezBrancas e alvoE < 0) ou (!vezBrancas e alvoE > 0)) {
+                        lances.adicionar(LanceNativo(sq, capE, alvoE, 0))
+                    }
+                }
+                se c < 7 {
+                    const capD: ci32 = nr * 8 + (c + 1)
+                    const alvoD: ci32 = casas[capD]
+                    se alvoD != 0 e ((vezBrancas e alvoD < 0) ou (!vezBrancas e alvoD > 0)) {
+                        lances.adicionar(LanceNativo(sq, capD, alvoD, 0))
+                    }
+                }
+            }
+        } senao se tipoPeca == 2 {
+            // Cavalo
+            para var dr: ci32 = -2; dr <= 2; dr = dr + 1 {
+                para var dc: ci32 = -2; dc <= 2; dc = dc + 1 {
+                    se dr * dr + dc * dc == 5 {
+                        const nr: ci32 = r + dr
+                        const nc: ci32 = c + dc
+                        se nr >= 0 e nr < 8 e nc >= 0 e nc < 8 {
+                            const dst: ci32 = nr * 8 + nc
+                            const alvo: ci32 = casas[dst]
+                            se alvo == 0 ou (alvo * sinal < 0) {
+                                lances.adicionar(LanceNativo(sq, dst, alvo, 0))
+                            }
+                        }
+                    }
+                }
+            }
+        } senao se tipoPeca == 6 {
+            // Rei
+            para var dr: ci32 = -1; dr <= 1; dr = dr + 1 {
+                para var dc: ci32 = -1; dc <= 1; dc = dc + 1 {
+                    se dr != 0 ou dc != 0 {
+                        const nr: ci32 = r + dr
+                        const nc: ci32 = c + dc
+                        se nr >= 0 e nr < 8 e nc >= 0 e nc < 8 {
+                            const dst: ci32 = nr * 8 + nc
+                            const alvo: ci32 = casas[dst]
+                            se alvo == 0 ou (alvo * sinal < 0) {
+                                lances.adicionar(LanceNativo(sq, dst, alvo, 0))
+                            }
+                        }
+                    }
+                }
+            }
+        } senao {
+            // Bispo (3), Torre (4), Dama (5)
+            para var dr: ci32 = -1; dr <= 1; dr = dr + 1 {
+                para var dc: ci32 = -1; dc <= 1; dc = dc + 1 {
+                    se dr == 0 e dc == 0 {
+                        continua
+                    }
+                    const ehDiag: cbool = (dr != 0) e (dc != 0)
+                    se tipoPeca == 3 e !ehDiag {
+                        continua
+                    }
+                    se tipoPeca == 4 e ehDiag {
+                        continua
+                    }
+                    var nr: ci32 = r + dr
+                    var nc: ci32 = c + dc
+                    enquanto nr >= 0 e nr < 8 e nc >= 0 e nc < 8 {
+                        const dst: ci32 = nr * 8 + nc
+                        const alvo: ci32 = casas[dst]
+                        se alvo == 0 {
+                            lances.adicionar(LanceNativo(sq, dst, 0, 0))
+                        } senao {
+                            se alvo * sinal < 0 {
+                                lances.adicionar(LanceNativo(sq, dst, alvo, 0))
+                            }
+                            sustar
+                        }
+                        nr += dr
+                        nc += dc
+                    }
+                }
+            }
+        }
+    }
+
+    retorna lances
+}
+
+@nativo
+funcao encontrarRei(casas: VetorNativo < ci32 >, brancas: cbool): ci32 {
+    const alvo: ci32 = brancas ? 6 : -6
+    para var sq: ci32 = 0; sq < 64; sq = sq + 1 {
+        se casas[sq] == alvo {
+            retorna sq
+        }
+    }
+
+    retorna -1
+}
+
+@nativo
+funcao perftRec(casas: VetorNativo < ci32 >, prof: ci32, vezBrancas: cbool): ci64 {
+    se prof == 0 {
+        retorna 1
+    }
+
+    const lances = gerarLancesPseudo(casas, vezBrancas)
+    var nos: ci64 = 0
+    const qtd: ci64 = ci64(lances.tamanho())
+    para var i: ci64 = 0; i < qtd; i = i + 1 {
+        const l = lances[i]
+        const movida: ci32 = casas[l.origem]
+        casas[l.destino] = movida
+        casas[l.origem] = 0
+        const reiSq: ci32 = encontrarRei(casas, vezBrancas)
+        se reiSq >= 0 e !casaAtacada(casas, reiSq, !vezBrancas) {
+            nos += perftRec(casas, prof - 1, !vezBrancas)
+        }
+        casas[l.origem] = movida
+        casas[l.destino] = l.capturada
+    }
+
+    retorna nos
+}
+
+@nativo
+funcao avaliarMaterial(casas: VetorNativo < ci32 >): ci32 {
+    var score: ci32 = 0
+    para var sq: ci32 = 0; sq < 64; sq = sq + 1 {
+        const p: ci32 = casas[sq]
+        const a: ci32 = p > 0 ? p : -p
+        var v: ci32 = 0
+        se a == 1 {
+            v = 100
+        } senao se a == 2 {
+            v = 320
+        } senao se a == 3 {
+            v = 330
+        } senao se a == 4 {
+            v = 500
+        } senao se a == 5 {
+            v = 900
+        }
+        score += p > 0 ? v : -v
+    }
+
+    retorna score
+}
+
+@nativo
+funcao executarPerftNativo(prof: ci32): ci64 {
+    var tab = criarTabuleiroInicial()
+    retorna perftRec(tab, prof, verdadeiro)
+}
+
+@nativo
+funcao avaliarInicial(): ci32 {
+    var tab = criarTabuleiroInicial()
+    retorna avaliarMaterial(tab)
+}
+
+assercao(avaliarInicial() == 0)
+const p1 = executarPerftNativo(1)
+const p2 = executarPerftNativo(2)
+const p3 = executarPerftNativo(3)
+const t0: real = TempoMod.Tempo.agoraMs()
+const p4 = executarPerftNativo(4)
+const dt: real = TempoMod.Tempo.agoraMs() - t0
+assercao(p1 == 20)
+assercao(p2 == 400)
+assercao(p3 == 8902)
+assercao(p4 == 197281)
+escreva("XADREZ-NATIVO-OK perft1=", p1, " perft2=", p2, " perft3=", p3, " perft4=", p4, " ms_p4=",
+    dt)

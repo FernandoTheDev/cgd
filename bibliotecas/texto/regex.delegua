@@ -1,0 +1,56 @@
+// Expressões regulares POSIX estendidas (ERE) encapsuladas com validação segura.
+
+classe Regex {
+    expressao: texto
+    ignorarCaso: logico
+
+    construtor(expressao: texto, ignorarCaso: logico = falso) {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        se !nativo.regexValidar(expressao, ignorarCaso) {
+            falhar "Regex inválida: " + expressao
+        }
+        isto.expressao = expressao
+        isto.ignorarCaso = ignorarCaso
+    }
+
+    estatico valida(expressao: texto, ignorarCaso: logico = falso): logico {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.regexValidar(expressao, ignorarCaso)
+    }
+
+    corresponde(alvo: texto): logico {
+        retorna isto.encontrar(alvo) != nulo
+    }
+
+    encontrar(alvo: texto, inicio: inteiro = 0): qualquer {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.regexEncontrar(isto.expressao, alvo, inicio, isto.ignorarCaso)
+    }
+
+    encontrarTodos(alvo: texto, limite: inteiro = 10000): dicionario[] {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.regexEncontrarTodos(isto.expressao, alvo, isto.ignorarCaso, limite)
+    }
+
+    substituir(alvo: texto, substituto: texto, todos: logico = verdadeiro): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.regexSubstituir(isto.expressao, alvo, substituto, isto.ignorarCaso, todos)
+    }
+
+    dividir(alvo: texto): texto[] {
+        var matches: dicionario[] = isto.encontrarTodos(alvo)
+        var partes: texto[] = []
+        var bytesMod: qualquer = importar("cgd:bytes").Bytes
+        var buf: qualquer = bytesMod.deTexto(alvo)
+        var total: inteiro = buf.tamanho()
+        var cursor: inteiro = 0
+        para cada m: dicionario em matches {
+            var ini: inteiro = m["inicio"]
+            var fim: inteiro = m["fim"]
+            partes.adicionar(buf.fatiar(cursor, ini).paraTexto())
+            cursor = fim
+        }
+        partes.adicionar(buf.fatiar(cursor, total).paraTexto())
+        retorna partes
+    }
+}

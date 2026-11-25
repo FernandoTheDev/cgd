@@ -1,0 +1,8 @@
+{
+  "nome": "chat-ws",
+  "versao": "1.0.0",
+  "tipo": "servidor",
+  "entrada": "fontes/principal.delegua",
+  "saida": "compilacao/chat-ws",
+  "compilacao": { "modo": "producao", "otimizacao": 2, "depuracao": false }
+}

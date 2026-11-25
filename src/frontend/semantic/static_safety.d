@@ -510,6 +510,57 @@ class StaticSafety
             if (builtin.base == TypeSemaBase.Map || builtin.base == TypeSemaBase.Any
                     || builtin.base == TypeSemaBase.Function || builtin.base == TypeSemaBase.Void)
                 return;
+        if (TypeSemaNativeContainer nc = cast(TypeSemaNativeContainer) recvType)
+        {
+            string[] ncAllowed;
+            final switch (nc.containerKind)
+            {
+                case NativeContainerKind.VetorNativo:
+                    ncAllowed = [
+                        "tamanho", "capacidade", "vazio", "adicionar", "obter", "definir",
+                        "removerUltimo", "limpar", "reservar", "fatia", "clonar", "liberar", "paraVetor"
+                    ];
+                    break;
+                case NativeContainerKind.MapaNativo:
+                    ncAllowed = [
+                        "tamanho", "capacidade", "vazio", "definir", "obter", "contem", "contém",
+                        "remover", "limpar", "clonar", "liberar", "paraDicionario"
+                    ];
+                    break;
+                case NativeContainerKind.FatiaNativa:
+                    ncAllowed = ["tamanho", "vazio", "obter", "fatia"];
+                    break;
+                case NativeContainerKind.StringNativa:
+                    ncAllowed = [
+                        "criar", "vazia", "tamanho", "capacidade", "anexar", "visao", "visão",
+                        "igual", "comecaCom", "limpar", "clonar", "liberar", "paraTexto"
+                    ];
+                    break;
+                case NativeContainerKind.VisaoTexto:
+                    ncAllowed = ["deTexto", "tamanho", "vazia", "igual", "comecaCom", "paraTexto"];
+                    break;
+                case NativeContainerKind.OpcionalNativo:
+                    ncAllowed = ["algum", "nenhum", "temValor", "ehNenhum", "valor", "valorOu"];
+                    break;
+                case NativeContainerKind.ResultadoNativo:
+                    ncAllowed = ["ok", "erro", "ehOk", "ehErro", "valor", "valorOu"];
+                    break;
+                case NativeContainerKind.MatrizNativa:
+                    ncAllowed = [
+                        "linhas", "colunas", "tamanho", "obter", "definir", "transpor",
+                        "multiplicar", "clonar", "liberar"
+                    ];
+                    break;
+            }
+            if (!ncAllowed.canFind(memberName))
+            {
+                issue(right, unknownMember, memberName, recvType.toStr().to!string);
+                string hint = closestName(memberName, ncAllowed);
+                if (hint.length)
+                    diagnostics.hintCode(right.pos, suggestion, hint);
+            }
+            return;
+        }
         string[] allowed = builtinMethods(recvType);
         if (TypeSemaBuiltin builtin = cast(TypeSemaBuiltin) recvType)
             if (builtin.base == TypeSemaBase.Tuple)

@@ -1,0 +1,156 @@
+// Ray Tracer Nativo usando @pilha, @operador e @nativo — exatamente a mesma cena de principal.delegua
+importar cgd.tempo como TempoMod
+
+@pilha
+classe Vec3Nativo {
+    x: cf64
+    y: cf64
+    z: cf64
+
+    @operador("+")
+    somar(o: Vec3Nativo): Vec3Nativo {
+        retorna Vec3Nativo(isto.x + o.x, isto.y + o.y, isto.z + o.z)
+    }
+
+    @operador("-")
+    subtrair(o: Vec3Nativo): Vec3Nativo {
+        retorna Vec3Nativo(isto.x - o.x, isto.y - o.y, isto.z - o.z)
+    }
+
+    @operador("*")
+    escalar(s: cf64): Vec3Nativo {
+        retorna Vec3Nativo(isto.x * s, isto.y * s, isto.z * s)
+    }
+
+    dot(o: Vec3Nativo): cf64 {
+        retorna isto.x * o.x + isto.y * o.y + isto.z * o.z
+    }
+
+    normalizar(): Vec3Nativo {
+        const len: cf64 = Matematica.raiz(isto.x * isto.x + isto.y * isto.y + isto.z * isto.z)
+        se len == 0.0 {
+            retorna Vec3Nativo(0.0, 0.0, 0.0)
+        }
+        const inv: cf64 = 1.0 / len
+        retorna Vec3Nativo(isto.x * inv, isto.y * inv, isto.z * inv)
+    }
+}
+
+@pilha
+classe EsferaNativa {
+    centro: Vec3Nativo
+    raio: cf64
+    r: cf64
+    g: cf64
+    b: cf64
+
+    intersecao(orig: Vec3Nativo, dir: Vec3Nativo): cf64 {
+        const oc = orig - isto.centro
+        const bVal: cf64 = oc.dot(dir)
+        const cVal: cf64 = oc.dot(oc) - isto.raio * isto.raio
+        const disc: cf64 = bVal * bVal - cVal
+        se disc < 0.0 {
+            retorna -1.0
+        }
+        const t: cf64 = -bVal - Matematica.raiz(disc)
+        retorna t > 0.001 ? t : -1.0
+    }
+}
+
+@pilha
+classe ResultadoRay {
+    acertos: ci64
+    checksum: ci64
+}
+
+@nativo
+funcao limitarByteNativo(v: cf64): ci64 {
+    const n: ci64 = ci64(v * 255.0)
+    se n < 0 {
+        retorna 0
+    }
+
+    se n > 255 {
+        retorna 255
+    }
+
+    retorna n
+}
+
+@nativo
+funcao renderizarNativo(largura: ci64, altura: ci64): ResultadoRay {
+    var esferas = VetorNativo < EsferaNativa > ()
+    esferas.adicionar(EsferaNativa(Vec3Nativo(-1.1, 0.2, -3.5), 0.9, 0.25, 0.85, 0.45))
+    esferas.adicionar(EsferaNativa(Vec3Nativo(1.1, 0.0, -3.2), 0.75, 0.85, 0.30, 0.35))
+    esferas.adicionar(EsferaNativa(Vec3Nativo(0.0, -100.8, -3.5), 100.0, 0.65, 0.70, 0.72))
+
+    const luz = Vec3Nativo(-4.0, 6.0, 1.0).normalizar()
+    const orig = Vec3Nativo(0.0, 0.4, 0.5)
+    var somaR: ci64 = 0
+    var somaG: ci64 = 0
+    var somaB: ci64 = 0
+    var acertos: ci64 = 0
+
+    const fLarg: cf64 = cf64(largura)
+    const fAlt: cf64 = cf64(altura)
+    const aspect: cf64 = fLarg / fAlt
+
+    para var y: ci64 = 0; y < altura; y = y + 1 {
+        const ny: cf64 = 1.0 - 2.0 * (cf64(y) + 0.5) / fAlt
+        para var x: ci64 = 0; x < largura; x = x + 1 {
+            const nx: cf64 = (2.0 * (cf64(x) + 0.5) / fLarg - 1.0) * aspect
+            const dir = Vec3Nativo(nx, ny, -1.6).normalizar()
+
+            var melhorT: cf64 = 1000000.0
+            var atingida: ci64 = -1
+            para var i: ci64 = 0; i < 3; i = i + 1 {
+                const esfI = esferas[i]
+                const t: cf64 = esfI.intersecao(orig, dir)
+                se t > 0.0 e t < melhorT {
+                    melhorT = t
+                    atingida = i
+                }
+            }
+
+            var cr: cf64 = 0.12
+            var cg: cf64 = 0.18
+            var cb: cf64 = 0.26
+            se atingida >= 0 {
+                acertos += 1
+                const esf = esferas[atingida]
+                const ponto = orig + dir * melhorT
+                const normal = (ponto - esf.centro).normalizar()
+                var difusa: cf64 = normal.dot(luz)
+                se difusa < 0.0 {
+                    difusa = 0.0
+                }
+                var emSombra: cbool = falso
+                para var j: ci64 = 0; j < 3; j = j + 1 {
+                    se j != atingida {
+                        const esfJ = esferas[j]
+                        se esfJ.intersecao(ponto, luz) > 0.0 {
+                            emSombra = verdadeiro
+                            sustar
+                        }
+                    }
+                }
+                const intensidade: cf64 = emSombra ? 0.15 : (0.15 + 0.85 * difusa)
+                cr = esf.r * intensidade
+                cg = esf.g * intensidade
+                cb = esf.b * intensidade
+            }
+            somaR += limitarByteNativo(cr)
+            somaG += limitarByteNativo(cg)
+            somaB += limitarByteNativo(cb)
+        }
+    }
+
+    retorna ResultadoRay(acertos, somaR * 3 + somaG * 5 + somaB * 7)
+}
+
+const t0: real = TempoMod.Tempo.agoraMs()
+const res = renderizarNativo(160, 90)
+const dt: real = TempoMod.Tempo.agoraMs() - t0
+assercao(res.acertos > 1000 e res.checksum > 0)
+escreva("RAYTRACER-NATIVO-OK pixels=14400 acertos=", res.acertos, " checksum=", res.checksum,
+    " ms=", dt)

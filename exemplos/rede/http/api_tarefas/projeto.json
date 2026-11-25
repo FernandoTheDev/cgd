@@ -1,0 +1,8 @@
+{
+  "nome": "api-tarefas",
+  "versao": "1.0.0",
+  "tipo": "servidor",
+  "entrada": "fontes/principal.delegua",
+  "saida": "compilacao/api-tarefas",
+  "compilacao": { "modo": "producao", "otimizacao": 2, "depuracao": false }
+}

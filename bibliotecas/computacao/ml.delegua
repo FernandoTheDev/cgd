@@ -1,0 +1,525 @@
+modulo cgd.computacao.ml
+
+importar cgd.computacao.tensores como Tensores
+importar cgd.json como JSON
+
+/// Funções de ativação numéricas compiláveis nativamente.
+///
+/// ```delegua
+/// importar cgd.computacao.ml como ML
+/// assercao(ML.ativacaoRelu(-2.0) == 0.0)
+/// assercao(ML.ativacaoRelu(3.5) == 3.5)
+/// ```
+@nativo
+funcao ativacaoRelu(x: cf64): cf64 {
+    se x > 0.0 {
+        retorna x
+    }
+
+    retorna 0.0
+}
+
+@nativo
+funcao derivadaRelu(x: cf64): cf64 {
+    se x > 0.0 {
+        retorna 1.0
+    }
+
+    retorna 0.0
+}
+
+@nativo
+funcao ativacaoSigmoid(x: cf64): cf64 {
+    se x < -40.0 {
+        retorna 0.0
+    }
+
+    se x > 40.0 {
+        retorna 1.0
+    }
+
+    retorna 1.0 / (1.0 + Matematica.exponencial(-x))
+}
+
+@nativo
+funcao derivadaSigmoidSaida(y: cf64): cf64 {
+    retorna y * (1.0 - y)
+}
+
+@nativo
+funcao ativacaoTanh(x: cf64): cf64 {
+    const ePos: cf64 = Matematica.exponencial(x)
+    const eNeg: cf64 = Matematica.exponencial(-x)
+    retorna (ePos - eNeg) / (ePos + eNeg)
+}
+
+/// Erro Quadrático Médio (MSE).
+funcao perdaMSE(previsto: real[], alvo: real[]): real {
+    const n: inteiro = tamanho(previsto)
+    se n == 0 {
+        retorna 0.0
+    }
+
+    var soma: real = 0.0
+    para var i: inteiro = 0; i < n; i = i + 1 {
+        const d: real = previsto[i] - alvo[i]
+        soma = soma + d * d
+    }
+
+    retorna soma / real(n)
+}
+
+/// Entropia Cruzada Binária (BCE).
+funcao perdaBCE(previsto: real[], alvo: real[]): real {
+    const n: inteiro = tamanho(previsto)
+    se n == 0 {
+        retorna 0.0
+    }
+
+    var soma: real = 0.0
+    para var i: inteiro = 0; i < n; i = i + 1 {
+        var p: real = previsto[i]
+        se p < 0.0000001 {
+            p = 0.0000001
+        }
+        se p > 0.9999999 {
+            p = 0.9999999
+        }
+        const y: real = alvo[i]
+        soma = soma - (y * Matematica.logaritmo(p) + (1.0 - y) * Matematica.logaritmo(1.0 - p))
+    }
+
+    retorna soma / real(n)
+}
+
+/// Softmax numericamente estável para um vetor de logits.
+funcao softmax(logits: real[]): real[] {
+    const n: inteiro = tamanho(logits)
+    se n == 0 {
+        retorna []
+    }
+
+    var maxVal: real = logits[0]
+    para var i: inteiro = 1; i < n; i = i + 1 {
+        se logits[i] > maxVal {
+            maxVal = logits[i]
+        }
+    }
+
+    var exps: real[] = []
+    var soma: real = 0.0
+    para var i: inteiro = 0; i < n; i = i + 1 {
+        const expVal: real = Matematica.exponencial(logits[i] - maxVal)
+        exps.adicionar(expVal)
+        soma = soma + expVal
+    }
+
+    var out: real[] = []
+    para var i: inteiro = 0; i < n; i = i + 1 {
+        out.adicionar(exps[i] / soma)
+    }
+
+    retorna out
+}
+
+/// Estado do otimizador Adam para um vetor de parâmetros.
+classe EstadoAdam {
+    m: real[]
+    v: real[]
+    passo: inteiro
+    beta1: real
+    beta2: real
+    epsilon: real
+
+    construtor(quantidade: inteiro, beta1: real = 0.9, beta2: real = 0.999, epsilon: real = 0.00000001) {
+        isto.m = []
+        isto.v = []
+        para var i: inteiro = 0; i < quantidade; i = i + 1 {
+            isto.m.adicionar(0.0)
+            isto.v.adicionar(0.0)
+        }
+        isto.passo = 0
+        isto.beta1 = beta1
+        isto.beta2 = beta2
+        isto.epsilon = epsilon
+    }
+
+    atualizar(params: real[], grads: real[], taxa: real): vazio {
+        isto.passo = isto.passo + 1
+        const b1t: real = Matematica.potencia(isto.beta1, real(isto.passo))
+        const b2t: real = Matematica.potencia(isto.beta2, real(isto.passo))
+        para var i: inteiro = 0; i < tamanho(params); i = i + 1 {
+            const g: real = grads[i]
+            isto.m[i] = isto.beta1 * isto.m[i] + (1.0 - isto.beta1) * g
+            isto.v[i] = isto.beta2 * isto.v[i] + (1.0 - isto.beta2) * g * g
+            const mHat: real = isto.m[i] / (1.0 - b1t)
+            const vHat: real = isto.v[i] / (1.0 - b2t)
+            params[i] = params[i] - taxa * mHat / (Matematica.raiz(vHat) + isto.epsilon)
+        }
+    }
+}
+
+/// Regressão Linear multivariada treinada por gradiente descendente (SGD ou Adam).
+classe RegressaoLinear {
+    pesos: real[]
+    vies: real
+
+    construtor(nCaracteristicas: inteiro) {
+        isto.pesos = []
+        para var i: inteiro = 0; i < nCaracteristicas; i = i + 1 {
+            isto.pesos.adicionar(0.0)
+        }
+        isto.vies = 0.0
+    }
+
+    prever(x: real[]): real {
+        var y: real = isto.vies
+        para var i: inteiro = 0; i < tamanho(isto.pesos); i = i + 1 {
+            y = y + isto.pesos[i] * x[i]
+        }
+        retorna y
+    }
+
+    treinar(xs: qualquer[], ys: real[], epocas: inteiro, taxa: real = 0.01, usarAdam: logico = falso): real {
+        const nAmostras: inteiro = tamanho(xs)
+        const d: inteiro = tamanho(isto.pesos)
+        const adam: EstadoAdam = EstadoAdam(d + 1)
+        var ultimaPerda: real = 0.0
+        para var ep: inteiro = 0; ep < epocas; ep = ep + 1 {
+            var grads: real[] = []
+            para var j: inteiro = 0; j <= d; j = j + 1 {
+                grads.adicionar(0.0)
+            }
+            var perda: real = 0.0
+            para var i: inteiro = 0; i < nAmostras; i = i + 1 {
+                const xi: real[] = xs[i]
+                const pred: real = isto.prever(xi)
+                const erro: real = pred - ys[i]
+                perda = perda + erro * erro
+                para var j: inteiro = 0; j < d; j = j + 1 {
+                    grads[j] = grads[j] + (2.0 * erro * xi[j]) / real(nAmostras)
+                }
+                grads[d] = grads[d] + (2.0 * erro) / real(nAmostras)
+            }
+            ultimaPerda = perda / real(nAmostras)
+            se usarAdam {
+                var todos: real[] = clonar(isto.pesos)
+                todos.adicionar(isto.vies)
+                adam.atualizar(todos, grads, taxa)
+                para var j: inteiro = 0; j < d; j = j + 1 {
+                    isto.pesos[j] = todos[j]
+                }
+                isto.vies = todos[d]
+            } senao {
+                para var j: inteiro = 0; j < d; j = j + 1 {
+                    isto.pesos[j] = isto.pesos[j] - taxa * grads[j]
+                }
+                isto.vies = isto.vies - taxa * grads[d]
+            }
+        }
+        retorna ultimaPerda
+    }
+
+    serializar(): texto {
+        const dados: dicionario = {
+            "tipo": "RegressaoLinear",
+            "pesos": isto.pesos,
+            "vies": isto.vies
+        }
+        retorna JSON.serializar(dados)
+    }
+
+    estatico desserializar(jsonStr: texto): RegressaoLinear {
+        const dados: dicionario = JSON.analisar(jsonStr)
+        const p: qualquer[] = dados["pesos"]
+        const modelo: RegressaoLinear = RegressaoLinear(tamanho(p))
+        para var i: inteiro = 0; i < tamanho(p); i = i + 1 {
+            modelo.pesos[i] = real(p[i])
+        }
+        modelo.vies = real(dados["vies"])
+        retorna modelo
+    }
+}
+
+/// Regressão Logística binária treinada com BCE e gradiente descendente.
+classe RegressaoLogistica {
+    pesos: real[]
+    vies: real
+
+    construtor(nCaracteristicas: inteiro) {
+        isto.pesos = []
+        para var i: inteiro = 0; i < nCaracteristicas; i = i + 1 {
+            isto.pesos.adicionar(0.0)
+        }
+        isto.vies = 0.0
+    }
+
+    probabilidade(x: real[]): real {
+        var z: real = isto.vies
+        para var i: inteiro = 0; i < tamanho(isto.pesos); i = i + 1 {
+            z = z + isto.pesos[i] * x[i]
+        }
+        retorna ativacaoSigmoid(z)
+    }
+
+    preverClasse(x: real[]): inteiro {
+        retorna isto.probabilidade(x) >= 0.5 ? 1 : 0
+    }
+
+    treinar(xs: qualquer[], ys: real[], epocas: inteiro, taxa: real = 0.1): real {
+        const n: inteiro = tamanho(xs)
+        const d: inteiro = tamanho(isto.pesos)
+        var perda: real = 0.0
+        para var ep: inteiro = 0; ep < epocas; ep = ep + 1 {
+            var gw: real[] = []
+            para var j: inteiro = 0; j < d; j = j + 1 {
+                gw.adicionar(0.0)
+            }
+            var gb: real = 0.0
+            var preds: real[] = []
+            para var i: inteiro = 0; i < n; i = i + 1 {
+                const xi: real[] = xs[i]
+                const p: real = isto.probabilidade(xi)
+                preds.adicionar(p)
+                const diff: real = p - ys[i]
+                para var j: inteiro = 0; j < d; j = j + 1 {
+                    gw[j] = gw[j] + diff * xi[j] / real(n)
+                }
+                gb = gb + diff / real(n)
+            }
+            perda = perdaBCE(preds, ys)
+            para var j: inteiro = 0; j < d; j = j + 1 {
+                isto.pesos[j] = isto.pesos[j] - taxa * gw[j]
+            }
+            isto.vies = isto.vies - taxa * gb
+        }
+        retorna perda
+    }
+}
+
+/// Perceptron clássico com regra de atualização de Rosenblatt.
+classe Perceptron {
+    pesos: real[]
+    vies: real
+
+    construtor(nCaracteristicas: inteiro) {
+        isto.pesos = []
+        para var i: inteiro = 0; i < nCaracteristicas; i = i + 1 {
+            isto.pesos.adicionar(0.0)
+        }
+        isto.vies = 0.0
+    }
+
+    prever(x: real[]): inteiro {
+        var soma: real = isto.vies
+        para var i: inteiro = 0; i < tamanho(isto.pesos); i = i + 1 {
+            soma = soma + isto.pesos[i] * x[i]
+        }
+        retorna soma >= 0.0 ? 1 : 0
+    }
+
+    treinar(xs: qualquer[], ys: inteiro[], epocas: inteiro, taxa: real = 0.1): inteiro {
+        var errosUltima: inteiro = 0
+        para var ep: inteiro = 0; ep < epocas; ep = ep + 1 {
+            errosUltima = 0
+            para var i: inteiro = 0; i < tamanho(xs); i = i + 1 {
+                const xi: real[] = xs[i]
+                const pred: inteiro = isto.prever(xi)
+                const erro: inteiro = ys[i] - pred
+                se erro != 0 {
+                    errosUltima = errosUltima + 1
+                    para var j: inteiro = 0; j < tamanho(isto.pesos); j = j + 1 {
+                        isto.pesos[j] = isto.pesos[j] + taxa * real(erro) * xi[j]
+                    }
+                    isto.vies = isto.vies + taxa * real(erro)
+                }
+            }
+            se errosUltima == 0 {
+                sustar
+            }
+        }
+        retorna errosUltima
+    }
+}
+
+/// Rede Neural Multicamadas (MLP) com 1 camada oculta, backpropagation completo,
+/// suporte a SGD/Adam e serialização JSON.
+classe MLP {
+    entrada: inteiro
+    oculta: inteiro
+    saida: inteiro
+    w1: real[]
+    b1: real[]
+    w2: real[]
+    b2: real[]
+
+    construtor(entrada: inteiro, oculta: inteiro, saida: inteiro, semente: inteiro = 42) {
+        isto.entrada = entrada
+        isto.oculta = oculta
+        isto.saida = saida
+        isto.w1 = []
+        isto.b1 = []
+        isto.w2 = []
+        isto.b2 = []
+        var st: inteiro = semente
+        const escala1: real = 1.0 / Matematica.raiz(real(entrada))
+        para var i: inteiro = 0; i < entrada * oculta; i = i + 1 {
+            st = (st * 1103515245 + 12345) & 2147483647
+            const u: real = (real(st % 2000) / 1000.0) - 1.0
+            isto.w1.adicionar(u * escala1)
+        }
+        para var i: inteiro = 0; i < oculta; i = i + 1 {
+            isto.b1.adicionar(0.0)
+        }
+        const escala2: real = 1.0 / Matematica.raiz(real(oculta))
+        para var i: inteiro = 0; i < oculta * saida; i = i + 1 {
+            st = (st * 1103515245 + 12345) & 2147483647
+            const u: real = (real(st % 2000) / 1000.0) - 1.0
+            isto.w2.adicionar(u * escala2)
+        }
+        para var i: inteiro = 0; i < saida; i = i + 1 {
+            isto.b2.adicionar(0.0)
+        }
+    }
+
+    prever(x: real[]): real[] {
+        var h: real[] = []
+        para var j: inteiro = 0; j < isto.oculta; j = j + 1 {
+            var z: real = isto.b1[j]
+            para var i: inteiro = 0; i < isto.entrada; i = i + 1 {
+                z = z + x[i] * isto.w1[i * isto.oculta + j]
+            }
+            h.adicionar(ativacaoSigmoid(z))
+        }
+        var out: real[] = []
+        para var k: inteiro = 0; k < isto.saida; k = k + 1 {
+            var z: real = isto.b2[k]
+            para var j: inteiro = 0; j < isto.oculta; j = j + 1 {
+                z = z + h[j] * isto.w2[j * isto.saida + k]
+            }
+            out.adicionar(ativacaoSigmoid(z))
+        }
+        retorna out
+    }
+
+    treinar(xs: qualquer[], ys: qualquer[], epocas: inteiro, taxa: real = 0.5): real {
+        const n: inteiro = tamanho(xs)
+        var perda: real = 0.0
+        para var ep: inteiro = 0; ep < epocas; ep = ep + 1 {
+            var gw1: real[] = []
+            para var i: inteiro = 0; i < tamanho(isto.w1); i = i + 1 {
+                gw1.adicionar(0.0)
+            }
+            var gb1: real[] = []
+            para var i: inteiro = 0; i < isto.oculta; i = i + 1 {
+                gb1.adicionar(0.0)
+            }
+            var gw2: real[] = []
+            para var i: inteiro = 0; i < tamanho(isto.w2); i = i + 1 {
+                gw2.adicionar(0.0)
+            }
+            var gb2: real[] = []
+            para var i: inteiro = 0; i < isto.saida; i = i + 1 {
+                gb2.adicionar(0.0)
+            }
+            perda = 0.0
+            para var s: inteiro = 0; s < n; s = s + 1 {
+                const x: real[] = xs[s]
+                const y: real[] = ys[s]
+                // Forward
+                var h: real[] = []
+                para var j: inteiro = 0; j < isto.oculta; j = j + 1 {
+                    var z: real = isto.b1[j]
+                    para var i: inteiro = 0; i < isto.entrada; i = i + 1 {
+                        z = z + x[i] * isto.w1[i * isto.oculta + j]
+                    }
+                    h.adicionar(ativacaoSigmoid(z))
+                }
+                var o: real[] = []
+                para var k: inteiro = 0; k < isto.saida; k = k + 1 {
+                    var z: real = isto.b2[k]
+                    para var j: inteiro = 0; j < isto.oculta; j = j + 1 {
+                        z = z + h[j] * isto.w2[j * isto.saida + k]
+                    }
+                    o.adicionar(ativacaoSigmoid(z))
+                }
+                // Backward
+                var dOut: real[] = []
+                para var k: inteiro = 0; k < isto.saida; k = k + 1 {
+                    const diff: real = o[k] - y[k]
+                    perda = perda + diff * diff
+                    dOut.adicionar(2.0 * diff * derivadaSigmoidSaida(o[k]) / real(n))
+                }
+                para var j: inteiro = 0; j < isto.oculta; j = j + 1 {
+                    para var k: inteiro = 0; k < isto.saida; k = k + 1 {
+                        gw2[j * isto.saida + k] = gw2[j * isto.saida + k] + h[j] * dOut[k]
+                    }
+                }
+                para var k: inteiro = 0; k < isto.saida; k = k + 1 {
+                    gb2[k] = gb2[k] + dOut[k]
+                }
+                para var j: inteiro = 0; j < isto.oculta; j = j + 1 {
+                    var acc: real = 0.0
+                    para var k: inteiro = 0; k < isto.saida; k = k + 1 {
+                        acc = acc + dOut[k] * isto.w2[j * isto.saida + k]
+                    }
+                    const dH: real = acc * derivadaSigmoidSaida(h[j])
+                    gb1[j] = gb1[j] + dH
+                    para var i: inteiro = 0; i < isto.entrada; i = i + 1 {
+                        gw1[i * isto.oculta + j] = gw1[i * isto.oculta + j] + x[i] * dH
+                    }
+                }
+            }
+            perda = perda / real(n * isto.saida)
+            para var i: inteiro = 0; i < tamanho(isto.w1); i = i + 1 {
+                isto.w1[i] = isto.w1[i] - taxa * gw1[i]
+            }
+            para var i: inteiro = 0; i < isto.oculta; i = i + 1 {
+                isto.b1[i] = isto.b1[i] - taxa * gb1[i]
+            }
+            para var i: inteiro = 0; i < tamanho(isto.w2); i = i + 1 {
+                isto.w2[i] = isto.w2[i] - taxa * gw2[i]
+            }
+            para var i: inteiro = 0; i < isto.saida; i = i + 1 {
+                isto.b2[i] = isto.b2[i] - taxa * gb2[i]
+            }
+        }
+        retorna perda
+    }
+
+    serializar(): texto {
+        const dados: dicionario = {
+            "tipo": "MLP",
+            "entrada": isto.entrada,
+            "oculta": isto.oculta,
+            "saida": isto.saida,
+            "w1": isto.w1,
+            "b1": isto.b1,
+            "w2": isto.w2,
+            "b2": isto.b2
+        }
+        retorna JSON.serializar(dados)
+    }
+
+    estatico desserializar(jsonStr: texto): MLP {
+        const dados: dicionario = JSON.analisar(jsonStr)
+        const m: MLP = MLP(inteiro(dados["entrada"]), inteiro(dados["oculta"]), inteiro(dados["saida"]))
+        const w1: qualquer[] = dados["w1"]
+        const b1: qualquer[] = dados["b1"]
+        const w2: qualquer[] = dados["w2"]
+        const b2: qualquer[] = dados["b2"]
+        para var i: inteiro = 0; i < tamanho(w1); i = i + 1 {
+            m.w1[i] = real(w1[i])
+        }
+        para var i: inteiro = 0; i < tamanho(b1); i = i + 1 {
+            m.b1[i] = real(b1[i])
+        }
+        para var i: inteiro = 0; i < tamanho(w2); i = i + 1 {
+            m.w2[i] = real(w2[i])
+        }
+        para var i: inteiro = 0; i < tamanho(b2); i = i + 1 {
+            m.b2[i] = real(b2[i])
+        }
+        retorna m
+    }
+}

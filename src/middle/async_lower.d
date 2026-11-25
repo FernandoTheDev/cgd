@@ -149,7 +149,11 @@ class AsyncLowering
             return node;
         }
         if (MemberExpr member = cast(MemberExpr) node)
+        {
+            if (member.resolvedModule !is null)
+                return member;
             return metadata(new MemberExpr(expression(member.left), member.right, node.pos), node);
+        }
         if (IndexExpr index = cast(IndexExpr) node)
         {
             Node receiver = expression(index.value);
@@ -282,6 +286,8 @@ class AsyncLowering
         {
             if (member.enumValue !is null)
                 return expression(member.enumValue);
+            if (member.resolvedModule !is null)
+                return store(member);
             return store(metadata(new MemberExpr(expression(member.left), member.right, node.pos), node));
         }
         if (IndexExpr index = cast(IndexExpr) node)

@@ -1,0 +1,444 @@
+modulo tabuleiro
+
+importar pecas
+
+// Bits de roque: 1=K (brancas curto), 2=Q (brancas longo), 4=k (pretas curto), 8=q (pretas longo)
+classe RegistroLance {
+    origem: inteiro
+    destino: inteiro
+    promocao: inteiro
+    capturada: inteiro
+    roqueAntes: inteiro
+    enPassantAntes: inteiro
+    meioMovAntes: inteiro
+    hashAntes: inteiro
+    foiEnPassant: logico
+    foiRoque: logico
+
+    construtor(origem: inteiro, destino: inteiro, promocao: inteiro, capturada: inteiro,
+        roqueAntes: inteiro, enPassantAntes: inteiro, meioMovAntes: inteiro, hashAntes: inteiro,
+        foiEnPassant: logico, foiRoque: logico) {
+        isto.origem = origem
+        isto.destino = destino
+        isto.promocao = promocao
+        isto.capturada = capturada
+        isto.roqueAntes = roqueAntes
+        isto.enPassantAntes = enPassantAntes
+        isto.meioMovAntes = meioMovAntes
+        isto.hashAntes = hashAntes
+        isto.foiEnPassant = foiEnPassant
+        isto.foiRoque = foiRoque
+    }
+}
+
+classe Tabuleiro {
+    casas: inteiro[]
+    turno: inteiro = 1
+    roques: inteiro = 15
+    enPassant: inteiro = -1
+    meioMovimentos: inteiro = 0
+    numeroLance: inteiro = 1
+    reiBranco: inteiro = 60
+    reiPreto: inteiro = 4
+    hashAtual: inteiro = 0
+    zPecas: inteiro[]
+    zRoque: inteiro[]
+    zEp: inteiro[]
+    zTurno: inteiro = 0
+    historico: RegistroLance[]
+    historicoHashes: inteiro[]
+    historicoUci: texto[]
+
+    construtor() {
+        isto.casas = []
+        para (var i: inteiro = 0; i < 64; i++) {
+            isto.casas.adicionar(0)
+        }
+        isto.historico = []
+        isto.historicoHashes = []
+        isto.historicoUci = []
+        isto.iniciarZobrist()
+        isto.carregarFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    }
+
+    iniciarZobrist(): vazio {
+        // Gerador determinístico xorshift em 62 bits (sem overflow em aritmética segura de int64).
+        var estado: inteiro = 0x1E3779B97F4A7C15
+        var masc: inteiro = 0x3FFFFFFFFFFFFFFF
+        isto.zPecas = []
+        para (var i: inteiro = 0; i < 13 * 64; i++) {
+            estado = (estado ^ ((estado << 13) & masc)) & masc
+            estado = (estado ^ (estado >> 7)) & masc
+            estado = (estado ^ ((estado << 17) & masc)) & masc
+            isto.zPecas.adicionar(estado)
+        }
+        isto.zRoque = []
+        para (var i: inteiro = 0; i < 16; i++) {
+            estado = (estado ^ ((estado << 13) & masc)) & masc
+            estado = (estado ^ (estado >> 7)) & masc
+            estado = (estado ^ ((estado << 17) & masc)) & masc
+            isto.zRoque.adicionar(estado)
+        }
+        isto.zEp = []
+        para (var i: inteiro = 0; i < 9; i++) {
+            estado = (estado ^ ((estado << 13) & masc)) & masc
+            estado = (estado ^ (estado >> 7)) & masc
+            estado = (estado ^ ((estado << 17) & masc)) & masc
+            isto.zEp.adicionar(estado)
+        }
+        estado = (estado ^ ((estado << 13) & masc)) & masc
+        estado = (estado ^ (estado >> 7)) & masc
+        estado = (estado ^ ((estado << 17) & masc)) & masc
+        isto.zTurno = estado
+    }
+
+    indiceZobristPeca(codigo: inteiro): inteiro {
+        // Mapeia -6..+6 para 0..12
+        retorna codigo + 6
+    }
+
+    recalcularHash(): inteiro {
+        var h: inteiro = 0
+        para (var sq: inteiro = 0; sq < 64; sq++) {
+            var p: inteiro = isto.casas[sq]
+            se p != 0 {
+                h = h ^ isto.zPecas[(p + 6) * 64 + sq]
+            }
+        }
+        h = h ^ isto.zRoque[isto.roques & 15]
+        se isto.enPassant >= 0 {
+            h = h ^ isto.zEp[isto.enPassant % 8]
+        } senao {
+            h = h ^ isto.zEp[8]
+        }
+        se isto.turno == pecas.Cor.PRETAS {
+            h = h ^ isto.zTurno
+        }
+        isto.hashAtual = h
+        retorna h
+    }
+
+    carregarFEN(fen: texto): vazio {
+        var partes: texto[] = fen.aparar().dividir(" ")
+        se tamanho(partes) < 4 {
+            falhar "FEN inválido: " + fen
+        }
+        para (var i: inteiro = 0; i < 64; i++) {
+            isto.casas[i] = 0
+        }
+        var linhas: texto[] = partes[0].dividir("/")
+        se tamanho(linhas) != 8 {
+            falhar "FEN inválido (8 fileiras esperadas)"
+        }
+        para (var r: inteiro = 0; r < 8; r++) {
+            var c: inteiro = 0
+            var linha: texto = linhas[r]
+            para (var k: inteiro = 0; k < tamanho(linha); k++) {
+                var ch: texto = linha[k]
+                se ch >= "1" e ch <= "8" {
+                    c = c + inteiro(ch)
+                } senao {
+                    var p: inteiro = pecas.pecaDeCaractere(ch)
+                    var sq: inteiro = r * 8 + c
+                    isto.casas[sq] = p
+                    se p == 6 {
+                        isto.reiBranco = sq
+                    } senao se p == -6 {
+                        isto.reiPreto = sq
+                    }
+                    c = c + 1
+                }
+            }
+        }
+        isto.turno = partes[1] == "w" ? pecas.Cor.BRANCAS : pecas.Cor.PRETAS
+        var rStr: texto = partes[2]
+        isto.roques = 0
+        se rStr.contem("K") {
+            isto.roques = isto.roques | 1
+        }
+        se rStr.contem("Q") {
+            isto.roques = isto.roques | 2
+        }
+        se rStr.contem("k") {
+            isto.roques = isto.roques | 4
+        }
+        se rStr.contem("q") {
+            isto.roques = isto.roques | 8
+        }
+        var epStr: texto = partes[3]
+        se epStr == "-" ou tamanho(epStr) != 2 {
+            isto.enPassant = -1
+        } senao {
+            isto.enPassant = Tabuleiro.casaDeTexto(epStr)
+        }
+        isto.meioMovimentos = tamanho(partes) >= 5 ? inteiro(partes[4]) : 0
+        isto.numeroLance = tamanho(partes) >= 6 ? inteiro(partes[5]) : 1
+        isto.historico = []
+        isto.historicoUci = []
+        isto.recalcularHash()
+        isto.historicoHashes = [isto.hashAtual]
+    }
+
+    exportarFEN(): texto {
+        var fileiras: texto[] = []
+        para (var r: inteiro = 0; r < 8; r++) {
+            var s: texto = ""
+            var vazias: inteiro = 0
+            para (var c: inteiro = 0; c < 8; c++) {
+                var p: inteiro = isto.casas[r * 8 + c]
+                se p == 0 {
+                    vazias = vazias + 1
+                } senao {
+                    se vazias > 0 {
+                        s = s + texto(vazias)
+                        vazias = 0
+                    }
+                    s = s + pecas.simboloAscii(p)
+                }
+            }
+            se vazias > 0 {
+                s = s + texto(vazias)
+            }
+            fileiras.adicionar(s)
+        }
+        var turnoStr: texto = isto.turno == pecas.Cor.BRANCAS ? "w" : "b"
+        var rStr: texto = ""
+        se (isto.roques & 1) != 0 {
+            rStr = rStr + "K"
+        }
+        se (isto.roques & 2) != 0 {
+            rStr = rStr + "Q"
+        }
+        se (isto.roques & 4) != 0 {
+            rStr = rStr + "k"
+        }
+        se (isto.roques & 8) != 0 {
+            rStr = rStr + "q"
+        }
+        se tamanho(rStr) == 0 {
+            rStr = "-"
+        }
+        var epStr: texto = isto.enPassant >= 0 ? Tabuleiro.textoDeCasa(isto.enPassant) : "-"
+        retorna fileiras.juntar("/") + " " + turnoStr + " " + rStr + " " + epStr + " " + texto(isto.meioMovimentos) + " " + texto(isto.numeroLance)
+    }
+
+    estatico textoDeCasa(sq: inteiro): texto {
+        var colunas: texto = "abcdefgh"
+        var col: inteiro = sq % 8
+        var lin: inteiro = 8 - (sq \ 8)
+        retorna colunas[col] + texto(lin)
+    }
+
+    estatico casaDeTexto(nome: texto): inteiro {
+        se tamanho(nome) != 2 {
+            retorna -1
+        }
+        var colunas: texto = "abcdefgh"
+        var col: inteiro = colunas.encontrar(nome[0])
+        var linChar: texto = nome[1]
+        se col < 0 ou linChar < "1" ou linChar > "8" {
+            retorna -1
+        }
+        var lin: inteiro = 8 - inteiro(linChar)
+        retorna lin * 8 + col
+    }
+
+    estatico lanceParaUci(origem: inteiro, destino: inteiro, promocao: inteiro): texto {
+        retorna Tabuleiro.textoDeCasa(origem) + Tabuleiro.textoDeCasa(destino) + pecas.letraPromocao(promocao)
+    }
+
+    fazerLance(origem: inteiro, destino: inteiro, promocao: inteiro = 0): vazio {
+        var peca: inteiro = isto.casas[origem]
+        var tp: inteiro = pecas.tipoDaPeca(peca)
+        var capturada: inteiro = isto.casas[destino]
+        var foiEp: logico = falso
+        var foiRoque: logico = falso
+
+        var reg: RegistroLance = RegistroLance(
+            origem, destino, promocao, capturada,
+            isto.roques, isto.enPassant, isto.meioMovimentos, isto.hashAtual,
+            falso, falso
+        )
+
+        var h: inteiro = isto.hashAtual
+        // Remove en passant e roque antigos do hash
+        h = h ^ isto.zRoque[isto.roques & 15]
+        h = h ^ (isto.enPassant >= 0 ? isto.zEp[isto.enPassant % 8] : isto.zEp[8])
+
+        // Remove peça da origem
+        h = h ^ isto.zPecas[(peca + 6) * 64 + origem]
+        isto.casas[origem] = 0
+
+        // Captura en passant
+        se tp == pecas.TipoPeca.PEAO e destino == isto.enPassant {
+            foiEp = verdadeiro
+            reg.foiEnPassant = verdadeiro
+            var sqCap: inteiro = isto.turno == pecas.Cor.BRANCAS ? destino + 8 : destino - 8
+            var pCap: inteiro = isto.casas[sqCap]
+            reg.capturada = pCap
+            h = h ^ isto.zPecas[(pCap + 6) * 64 + sqCap]
+            isto.casas[sqCap] = 0
+        } senao se capturada != 0 {
+            h = h ^ isto.zPecas[(capturada + 6) * 64 + destino]
+        }
+
+        // Coloca peça no destino (ou peça promovida)
+        var pecaFinal: inteiro = promocao != 0 ? (isto.turno * promocao) : peca
+        isto.casas[destino] = pecaFinal
+        h = h ^ isto.zPecas[(pecaFinal + 6) * 64 + destino]
+
+        // Atualiza posição dos reis e move torre em roque
+        se tp == pecas.TipoPeca.REI {
+            se isto.turno == pecas.Cor.BRANCAS {
+                isto.reiBranco = destino
+            } senao {
+                isto.reiPreto = destino
+            }
+            var diff: inteiro = destino - origem
+            se diff == 2 {
+                foiRoque = verdadeiro
+                reg.foiRoque = verdadeiro
+                var tOrig: inteiro = destino + 1
+                var tDest: inteiro = destino - 1
+                var torre: inteiro = isto.casas[tOrig]
+                h = h ^ isto.zPecas[(torre + 6) * 64 + tOrig]
+                h = h ^ isto.zPecas[(torre + 6) * 64 + tDest]
+                isto.casas[tOrig] = 0
+                isto.casas[tDest] = torre
+            } senao se diff == -2 {
+                foiRoque = verdadeiro
+                reg.foiRoque = verdadeiro
+                var tOrig: inteiro = destino - 2
+                var tDest: inteiro = destino + 1
+                var torre: inteiro = isto.casas[tOrig]
+                h = h ^ isto.zPecas[(torre + 6) * 64 + tOrig]
+                h = h ^ isto.zPecas[(torre + 6) * 64 + tDest]
+                isto.casas[tOrig] = 0
+                isto.casas[tDest] = torre
+            }
+        }
+
+        // Atualiza direitos de roque
+        se origem == 60 ou destino == 60 {
+            isto.roques = isto.roques & 12
+        }
+        se origem == 4 ou destino == 4 {
+            isto.roques = isto.roques & 3
+        }
+        se origem == 63 ou destino == 63 {
+            isto.roques = isto.roques & 14
+        }
+        se origem == 56 ou destino == 56 {
+            isto.roques = isto.roques & 13
+        }
+        se origem == 7 ou destino == 7 {
+            isto.roques = isto.roques & 11
+        }
+        se origem == 0 ou destino == 0 {
+            isto.roques = isto.roques & 7
+        }
+
+        // Atualiza en passant
+        isto.enPassant = -1
+        se tp == pecas.TipoPeca.PEAO {
+            var d: inteiro = destino - origem
+            se d == -16 {
+                isto.enPassant = origem - 8
+            } senao se d == 16 {
+                isto.enPassant = origem + 8
+            }
+        }
+
+        // Relógio de 50 lances
+        se tp == pecas.TipoPeca.PEAO ou reg.capturada != 0 {
+            isto.meioMovimentos = 0
+        } senao {
+            isto.meioMovimentos = isto.meioMovimentos + 1
+        }
+
+        se isto.turno == pecas.Cor.PRETAS {
+            isto.numeroLance = isto.numeroLance + 1
+        }
+        isto.turno = -isto.turno
+
+        // Atualiza hash com novos roques, en passant e turno
+        h = h ^ isto.zRoque[isto.roques & 15]
+        h = h ^ (isto.enPassant >= 0 ? isto.zEp[isto.enPassant % 8] : isto.zEp[8])
+        h = h ^ isto.zTurno
+        isto.hashAtual = h
+
+        isto.historico.adicionar(reg)
+        isto.historicoHashes.adicionar(h)
+        isto.historicoUci.adicionar(Tabuleiro.lanceParaUci(origem, destino, promocao))
+    }
+
+    desfazerLance(): logico {
+        se tamanho(isto.historico) == 0 {
+            retorna falso
+        }
+        var reg: RegistroLance = isto.historico.removerUltimo()
+        isto.historicoHashes.removerUltimo()
+        isto.historicoUci.removerUltimo()
+
+        isto.turno = -isto.turno
+        se isto.turno == pecas.Cor.PRETAS {
+            isto.numeroLance = isto.numeroLance - 1
+        }
+        isto.roques = reg.roqueAntes
+        isto.enPassant = reg.enPassantAntes
+        isto.meioMovimentos = reg.meioMovAntes
+        isto.hashAtual = reg.hashAntes
+
+        var pecaMovida: inteiro = isto.casas[reg.destino]
+        se reg.promocao != 0 {
+            pecaMovida = isto.turno * pecas.TipoPeca.PEAO
+        }
+        isto.casas[reg.origem] = pecaMovida
+
+        se reg.foiEnPassant {
+            isto.casas[reg.destino] = 0
+            var sqCap: inteiro = isto.turno == pecas.Cor.BRANCAS ? reg.destino + 8 : reg.destino - 8
+            isto.casas[sqCap] = reg.capturada
+        } senao {
+            isto.casas[reg.destino] = reg.capturada
+        }
+
+        se pecas.tipoDaPeca(pecaMovida) == pecas.TipoPeca.REI {
+            se isto.turno == pecas.Cor.BRANCAS {
+                isto.reiBranco = reg.origem
+            } senao {
+                isto.reiPreto = reg.origem
+            }
+            se reg.foiRoque {
+                var diff: inteiro = reg.destino - reg.origem
+                se diff == 2 {
+                    isto.casas[reg.destino + 1] = isto.casas[reg.destino - 1]
+                    isto.casas[reg.destino - 1] = 0
+                } senao se diff == -2 {
+                    isto.casas[reg.destino - 2] = isto.casas[reg.destino + 1]
+                    isto.casas[reg.destino + 1] = 0
+                }
+            }
+        }
+        retorna verdadeiro
+    }
+
+    exportarPGN(): texto {
+        var out: texto[] = [
+            '[Event "Partida CGD Xadrez"]',
+            '[Site "Local"]',
+            '[White "Brancas"]',
+            '[Black "Pretas"]',
+            ""
+        ]
+        var linha: texto[] = []
+        para (var i: inteiro = 0; i < tamanho(isto.historicoUci); i++) {
+            se i % 2 == 0 {
+                linha.adicionar(texto((i \ 2) + 1) + ".")
+            }
+            linha.adicionar(isto.historicoUci[i])
+        }
+        out.adicionar(linha.juntar(" "))
+        retorna out.juntar("\n")
+    }
+}

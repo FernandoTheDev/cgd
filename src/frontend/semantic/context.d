@@ -118,10 +118,10 @@ public:
             if (Symbol* sym = sc.get(name))
                 return sym;
         }
-        // Funções globais não precisam capturar o ambiente externo.
+        // Funções globais e namespaces de módulo não precisam capturar o ambiente externo.
         foreach_reverse (Scope sc; scopes[0 .. limit])
             if (Symbol* sym = sc.get(name))
-                return sym.isFn() ? sym : null;
+                return (sym.isFn() || sym.isModule()) ? sym : null;
         return null;
     }
 
@@ -141,7 +141,7 @@ public:
         size_t limit = functionBoundaries[$ - 1];
         foreach_reverse (Scope sc; scopes[0 .. limit])
             if (Symbol* sym = sc.get(name))
-                return !sym.isFn();
+                return !sym.isFn() && !sym.isModule();
         return false;
     }
 

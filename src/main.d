@@ -5,12 +5,56 @@ import std.getopt;
 
 import driver.compile;
 import driver.args;
+import driver.project;
+import driver.docgen;
+import dap.server;
 import utils;
 import cli;
 import errors;
 
 void main(string[] args)
 {
+    if (args.length >= 2)
+    {
+        switch (args[1])
+        {
+            case "iniciar":
+                runInitCommand(args[2 .. $]);
+                return;
+            case "compilar":
+                runBuildCommand(args[2 .. $]);
+                return;
+            case "rodar":
+                runRunCommand(args[2 .. $]);
+                return;
+            case "testar":
+                runTestCommand(args[2 .. $]);
+                return;
+            case "limpar":
+                runCleanCommand(args[2 .. $]);
+                return;
+            case "verificar":
+                runCheckCommand(args[2 .. $]);
+                return;
+            case "formatar":
+                runFormatCommand(args[2 .. $]);
+                return;
+            case "projeto":
+                runProjectCommand(args[2 .. $]);
+                return;
+            case "depurar":
+                runDebugCliCommand(args[2 .. $]);
+                return;
+            case "dap":
+                runDapServer(args[2 .. $]);
+                return;
+            case "documentar":
+                runDocumentCommand(args[2 .. $]);
+                return;
+            default:
+                break;
+        }
+    }
     if (args.length >= 2 && args[1] == "--lsp" && (args.length == 2 || (args.length == 3 && args[2] == "--stdio")))
     {
         import lsp.server : runLanguageServer;

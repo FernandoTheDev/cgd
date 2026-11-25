@@ -1,0 +1,168 @@
+// Álgebra linear básica: Vetor2, Vetor3 e Matriz densa.
+
+classe Vetor2 {
+    x: real
+    y: real
+
+    construtor(x: real = 0.0, y: real = 0.0) {
+        isto.x = x
+        isto.y = y
+    }
+
+    somar(outro: Vetor2): Vetor2 {
+        retorna Vetor2(isto.x + outro.x, isto.y + outro.y)
+    }
+
+    subtrair(outro: Vetor2): Vetor2 {
+        retorna Vetor2(isto.x - outro.x, isto.y - outro.y)
+    }
+
+    escalar(k: real): Vetor2 {
+        retorna Vetor2(isto.x * k, isto.y * k)
+    }
+
+    produtoEscalar(outro: Vetor2): real {
+        retorna isto.x * outro.x + isto.y * outro.y
+    }
+
+    norma(): real {
+        var mat: qualquer = importar("cgd:matematica").Matematica
+        retorna mat.raizQuadrada(isto.x * isto.x + isto.y * isto.y)
+    }
+
+    normalizar(): Vetor2 {
+        var n: real = isto.norma()
+        se n == 0.0 {
+            retorna Vetor2(0.0, 0.0)
+        }
+        retorna Vetor2(isto.x / n, isto.y / n)
+    }
+}
+
+classe Vetor3 {
+    x: real
+    y: real
+    z: real
+
+    construtor(x: real = 0.0, y: real = 0.0, z: real = 0.0) {
+        isto.x = x
+        isto.y = y
+        isto.z = z
+    }
+
+    somar(outro: Vetor3): Vetor3 {
+        retorna Vetor3(isto.x + outro.x, isto.y + outro.y, isto.z + outro.z)
+    }
+
+    subtrair(outro: Vetor3): Vetor3 {
+        retorna Vetor3(isto.x - outro.x, isto.y - outro.y, isto.z - outro.z)
+    }
+
+    escalar(k: real): Vetor3 {
+        retorna Vetor3(isto.x * k, isto.y * k, isto.z * k)
+    }
+
+    produtoEscalar(outro: Vetor3): real {
+        retorna isto.x * outro.x + isto.y * outro.y + isto.z * outro.z
+    }
+
+    produtoVetorial(outro: Vetor3): Vetor3 {
+        retorna Vetor3(
+            isto.y * outro.z - isto.z * outro.y,
+            isto.z * outro.x - isto.x * outro.z,
+            isto.x * outro.y - isto.y * outro.x
+        )
+    }
+
+    norma(): real {
+        var mat: qualquer = importar("cgd:matematica").Matematica
+        retorna mat.raizQuadrada(isto.x * isto.x + isto.y * isto.y + isto.z * isto.z)
+    }
+
+    normalizar(): Vetor3 {
+        var n: real = isto.norma()
+        se n == 0.0 {
+            retorna Vetor3(0.0, 0.0, 0.0)
+        }
+        retorna Vetor3(isto.x / n, isto.y / n, isto.z / n)
+    }
+}
+
+classe Matriz {
+    linhas: inteiro
+    colunas: inteiro
+    dados: real[]
+
+    construtor(linhas: inteiro, colunas: inteiro, valorInicial: real = 0.0) {
+        se linhas <= 0 ou colunas <= 0 {
+            falhar "Matriz exige dimensões positivas"
+        }
+        isto.linhas = linhas
+        isto.colunas = colunas
+        isto.dados = []
+        var total: inteiro = linhas * colunas
+        para (var i: inteiro = 0; i < total; i++) {
+            isto.dados.adicionar(valorInicial)
+        }
+    }
+
+    estatico identidade(n: inteiro): Matriz {
+        var m: Matriz = Matriz(n, n, 0.0)
+        para (var i: inteiro = 0; i < n; i++) {
+            m.definir(i, i, 1.0)
+        }
+        retorna m
+    }
+
+    obter(r: inteiro, c: inteiro): real {
+        se r < 0 ou r >= isto.linhas ou c < 0 ou c >= isto.colunas {
+            falhar "Índice fora dos limites da matriz"
+        }
+        retorna isto.dados[r * isto.colunas + c]
+    }
+
+    definir(r: inteiro, c: inteiro, valor: real): vazio {
+        se r < 0 ou r >= isto.linhas ou c < 0 ou c >= isto.colunas {
+            falhar "Índice fora dos limites da matriz"
+        }
+        isto.dados[r * isto.colunas + c] = valor
+    }
+
+    somar(outra: Matriz): Matriz {
+        se isto.linhas != outra.linhas ou isto.colunas != outra.colunas {
+            falhar "Dimensões incompatíveis para soma de matrizes"
+        }
+        var res: Matriz = Matriz(isto.linhas, isto.colunas, 0.0)
+        para (var i: inteiro = 0; i < tamanho(isto.dados); i++) {
+            res.dados[i] = isto.dados[i] + outra.dados[i]
+        }
+        retorna res
+    }
+
+    multiplicar(outra: Matriz): Matriz {
+        se isto.colunas != outra.linhas {
+            falhar "Dimensões incompatíveis para multiplicação de matrizes"
+        }
+        var res: Matriz = Matriz(isto.linhas, outra.colunas, 0.0)
+        para (var i: inteiro = 0; i < isto.linhas; i++) {
+            para (var k: inteiro = 0; k < isto.colunas; k++) {
+                var a: real = isto.dados[i * isto.colunas + k]
+                para (var j: inteiro = 0; j < outra.colunas; j++) {
+                    var idx: inteiro = i * outra.colunas + j
+                    res.dados[idx] = res.dados[idx] + a * outra.dados[k * outra.colunas + j]
+                }
+            }
+        }
+        retorna res
+    }
+
+    transpor(): Matriz {
+        var res: Matriz = Matriz(isto.colunas, isto.linhas, 0.0)
+        para (var i: inteiro = 0; i < isto.linhas; i++) {
+            para (var j: inteiro = 0; j < isto.colunas; j++) {
+                res.definir(j, i, isto.obter(i, j))
+            }
+        }
+        retorna res
+    }
+}

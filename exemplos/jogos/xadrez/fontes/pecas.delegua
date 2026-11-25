@@ -1,0 +1,166 @@
+modulo pecas
+
+// Representação compacta de peças: 0 = vazia, +1..+6 = brancas, -1..-6 = pretas.
+enum TipoPeca {
+    VAZIA = 0,
+    PEAO = 1,
+    CAVALO = 2,
+    BISPO = 3,
+    TORRE = 4,
+    DAMA = 5,
+    REI = 6
+}
+
+enum Cor {
+    BRANCAS = 1,
+    PRETAS = -1
+}
+
+funcao tipoDaPeca(codigo: inteiro): inteiro {
+    retorna codigo < 0 ? -codigo : codigo
+}
+
+funcao corDaPeca(codigo: inteiro): inteiro {
+    se codigo > 0 {
+        retorna Cor.BRANCAS
+    }
+    se codigo < 0 {
+        retorna Cor.PRETAS
+    }
+    retorna 0
+}
+
+funcao ehBranca(codigo: inteiro): logico {
+    retorna codigo > 0
+}
+
+funcao ehPreta(codigo: inteiro): logico {
+    retorna codigo < 0
+}
+
+funcao simboloAscii(codigo: inteiro): texto {
+    escolha codigo {
+        caso 1:
+            retorna "P"
+        caso 2:
+            retorna "N"
+        caso 3:
+            retorna "B"
+        caso 4:
+            retorna "R"
+        caso 5:
+            retorna "Q"
+        caso 6:
+            retorna "K"
+        caso -1:
+            retorna "p"
+        caso -2:
+            retorna "n"
+        caso -3:
+            retorna "b"
+        caso -4:
+            retorna "r"
+        caso -5:
+            retorna "q"
+        caso -6:
+            retorna "k"
+        padrao:
+            retorna "."
+    }
+}
+
+funcao simboloUnicode(codigo: inteiro): texto {
+    escolha codigo {
+        caso 1:
+            retorna "♙"
+        caso 2:
+            retorna "♘"
+        caso 3:
+            retorna "♗"
+        caso 4:
+            retorna "♖"
+        caso 5:
+            retorna "♕"
+        caso 6:
+            retorna "♔"
+        caso -1:
+            retorna "♟"
+        caso -2:
+            retorna "♞"
+        caso -3:
+            retorna "♝"
+        caso -4:
+            retorna "♜"
+        caso -5:
+            retorna "♛"
+        caso -6:
+            retorna "♚"
+        padrao:
+            retorna " "
+    }
+}
+
+funcao pecaDeCaractere(ch: texto): inteiro {
+    escolha ch {
+        caso "P":
+            retorna 1
+        caso "N":
+            retorna 2
+        caso "B":
+            retorna 3
+        caso "R":
+            retorna 4
+        caso "Q":
+            retorna 5
+        caso "K":
+            retorna 6
+        caso "p":
+            retorna -1
+        caso "n":
+            retorna -2
+        caso "b":
+            retorna -3
+        caso "r":
+            retorna -4
+        caso "q":
+            retorna -5
+        caso "k":
+            retorna -6
+        padrao:
+            retorna 0
+    }
+}
+
+funcao letraPromocao(tp: inteiro): texto {
+    escolha tp {
+        caso 5:
+            retorna "q"
+        caso 4:
+            retorna "r"
+        caso 3:
+            retorna "b"
+        caso 2:
+            retorna "n"
+        padrao:
+            retorna ""
+    }
+}
+
+funcao valorMaterial(tp: inteiro): inteiro {
+    escolha tp {
+        caso 1:
+            retorna 100
+        caso 2:
+            retorna 320
+        caso 3:
+            retorna 330
+        caso 4:
+            retorna 500
+        caso 5:
+            retorna 900
+        caso 6:
+            retorna 20000
+        padrao:
+            retorna 0
+    }
+}

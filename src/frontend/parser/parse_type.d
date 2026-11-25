@@ -50,7 +50,32 @@ public:
                     p.consumeTypeClose();
                     return new TypeExprTask(result, tk.pos);
                 }
-                return new TypeExprNamed(tk.value.s, tk.pos);
+                if (tk.value.s == "VetorNativo" || tk.value.s == "FatiaNativa"
+                        || tk.value.s == "OpcionalNativo" || tk.value.s == "MatrizNativa")
+                {
+                    p.consume(TokenKind.LThan, "Tipo genérico exige '<T>'.");
+                    TypeExpr arg = parse();
+                    p.consumeTypeClose();
+                    return new TypeExprGeneric(tk.value.s, [arg], tk.pos);
+                }
+                if (tk.value.s == "MapaNativo" || tk.value.s == "ResultadoNativo")
+                {
+                    p.consume(TokenKind.LThan, "Tipo genérico exige '<A, B>'.");
+                    TypeExpr first = parse();
+                    p.consume(TokenKind.Comma, "Esperado ',' entre argumentos de tipo.");
+                    TypeExpr second = parse();
+                    p.consumeTypeClose();
+                    return new TypeExprGeneric(tk.value.s, [first, second], tk.pos);
+                }
+                dstring[] qualifier;
+                dstring currentName = tk.value.s;
+                while (p.match(TokenKind.Dot))
+                {
+                    qualifier ~= currentName;
+                    Token part = p.consume(TokenKind.Identifier, "Esperado nome de tipo após '.'.");
+                    currentName = part.value.s;
+                }
+                return new TypeExprNamed(currentName, tk.pos, qualifier);
 
             default:
                 p.err.error(tk.pos, "Tipo inválido.");

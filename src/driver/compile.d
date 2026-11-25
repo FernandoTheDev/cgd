@@ -10,9 +10,12 @@ import std.path;
 
 import opt.pass_manager;
 import driver.toolchain;
+import driver.target_info;
 import frontend.semantic.pipeline;
+import frontend.semantic.interprocedural;
 import frontend.validation;
 import middle.lowering;
+import middle.memory_model;
 import middle.async_ir : AsyncLimitException;
 import driver.args;
 import driver.time;
@@ -68,7 +71,9 @@ void compile(CGDArguments args, string filename)
     }
 
     timer.start("Carregamento de módulos");
-    new ModuleLoader(diag).load(program, filename);
+    TargetInfo targetInfo = TargetInfo.fromArgs(args);
+    ModuleLoader loader = new ModuleLoader(diag, null, args.moduleRoots, targetInfo);
+    loader.load(program, filename);
     timer.show();
     verificar_erros(diag);
     validateStructure(program, diag);
@@ -102,7 +107,22 @@ void compile(CGDArguments args, string filename)
     if (args.showDebug)
         program.print();
 
+    string memSpec = args.memOpts.length ? args.memOpts : environment.get("CGD_MEM_OPTS", "padrao");
+    MemoryOptConfig memCfg = MemoryOptConfig.fromSpec(memSpec);
+    if (args.debugInfo)
+    {
+        memCfg.enableAns = false;
+        memCfg.enableStackAlloc = false;
+        memCfg.enableDetFree = false;
+    }
+    timer.start("Análise interprocedimental de memória híbrida e ANS");
+    MemoryPlan memPlan = analyzeHybridMemory(program, memCfg);
+    timer.show();
+
     BackendC cg = new BackendC();
+    cg.emitDebugLines = args.debugInfo;
+    cg.ownershipInfo = semantic.ownership;
+    cg.memoryPlan = memPlan;
     timer.start("Gerando código C");
     dstring code;
     try
@@ -115,21 +135,54 @@ void compile(CGDArguments args, string filename)
     }
     timer.show();
 
+    if (args.memReport)
+        wrt(memPlan.toTextReport());
+    if (args.memReportPath.length)
+        write(args.memReportPath, memPlan.toJsonReport());
+
     if (args.showDebug)
         writeln(code);
 
     string cSource = code.to!string; // UTF-32 -> UTF-8
     //                                                          .delegua
     string output = args.output == "" ? baseName(filename)[0 .. $ - 8] : args.output;
+    string outDir = dirName(output);
+    if (outDir.length && outDir != "." && !exists(outDir))
+        mkdirRecurse(outDir);
     string outc = output ~ ".c";
 
     timer.start("Escrevendo o arquivo '.c'");
     write(outc, cSource);
+    if (args.debugInfo)
+    {
+        import std.json : JSONValue;
+
+        JSONValue[string] fnMap;
+        fnMap["delegua_main"] = JSONValue("<principal>");
+        foreach (string k, string v; cg.debugFunctionNames)
+            fnMap[k] = JSONValue(v);
+        JSONValue dbgMeta = JSONValue([
+            "entrada": JSONValue(absolutePath(filename).asNormalizedPath.to!string),
+            "cSource": JSONValue(absolutePath(outc).asNormalizedPath.to!string),
+            "funcoes": JSONValue(fnMap)
+        ]);
+        string metaPath = args.debugMapPath.length ? args.debugMapPath : (output ~ ".cgd.dbg.json");
+        write(metaPath, dbgMeta.toPrettyString() ~ "\n");
+    }
     timer.show();
 
     if (args.emitC)
         return;
     bool[Node] nativeVisited;
+    string[] bridgeNames;
+    void addUnique(ref string[] list, string item)
+    {
+        import std.algorithm : canFind;
+
+        if (item.length && !list.canFind(item))
+            list ~= item;
+    }
+
     void nativeLibraries(Node node)
     {
         if (node is null || node in nativeVisited)
@@ -142,7 +195,27 @@ void compile(CGDArguments args, string filename)
             if (!cg.isReachable(declaration))
                 return;
             if (declaration.foreignLibrary.length && declaration.foreignLibrary != "cgd-runtime")
-                args.linkFlags ~= "-l" ~ declaration.foreignLibrary.to!string;
+            {
+                string lib = declaration.foreignLibrary.to!string;
+                if (lib == "cgd-gtk4")
+                {
+                    addUnique(bridgeNames, "gtk4");
+                    addUnique(args.nativePackages, "gtk4");
+                }
+                else if (lib == "cgd-sdl3")
+                {
+                    addUnique(bridgeNames, "sdl3");
+                    addUnique(args.nativePackages, "sdl3");
+                }
+                else if (lib == "cgd-tui")
+                {
+                    addUnique(bridgeNames, "tui");
+                }
+                else if (lib.length > 0 && lib[0] == '/')
+                    addUnique(args.linkFlags, lib);
+                else
+                    addUnique(args.linkFlags, "-l" ~ lib);
+            }
         }
         foreach (Node child; childNodes(node))
             nativeLibraries(child);
@@ -150,6 +223,14 @@ void compile(CGDArguments args, string filename)
 
     nativeLibraries(program);
     CToolchain toolchain = CToolchain.discover(args);
+    foreach (string bridge; bridgeNames)
+    {
+        string obj = toolchain.resolveBridgeObject(bridge);
+        if (!obj.length)
+            cgd_erro(format("Ponte nativa opcional 'libdelegua_%s.o' não encontrada. Recompile com ./build-runtime.",
+                    bridge));
+        addUnique(toolchain.extraObjects, obj);
+    }
     string[] command = toolchain.command(absolutePath(outc), absolutePath(output), args.opt, toolchain.gcFlags());
     if (args.showDebug)
         writeln(command);

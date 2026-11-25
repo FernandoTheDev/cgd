@@ -1,0 +1,187 @@
+modulo principal
+
+importar cgd.interface.gtk como GTK
+importar cgd.nativo como Nat
+
+classe CalculadoraGTK {
+    app: GTK.Aplicacao
+    janela: qualquer
+    visor: qualquer
+    acumulador: real = 0.0
+    operacao: texto = ""
+    textoAtual: texto = "0"
+    limparProximo: logico = falso
+    modoTeste: logico = falso
+    btn7: qualquer
+    btnMais: qualquer
+    btn5: qualquer
+    btnIgual: qualquer
+
+    construtor(modoTeste: logico = falso) {
+        isto.modoTeste = modoTeste
+        isto.app = GTK.Aplicacao("dev.cgd.calculadora")
+    }
+
+    atualizarVisor(): vazio {
+        isto.visor.definirTexto(isto.textoAtual)
+    }
+
+    digitar(d: texto): vazio {
+        se isto.limparProximo ou isto.textoAtual == "0" {
+            isto.textoAtual = d
+            isto.limparProximo = falso
+        } senao {
+            isto.textoAtual = isto.textoAtual + d
+        }
+        isto.atualizarVisor()
+    }
+
+    definirOperacao(op: texto): vazio {
+        isto.acumulador = real(isto.textoAtual)
+        isto.operacao = op
+        isto.limparProximo = verdadeiro
+    }
+
+    calcular(): vazio {
+        var b: real = real(isto.textoAtual)
+        var r: real = b
+        se isto.operacao == "+" {
+            r = isto.acumulador + b
+        } senao se isto.operacao == "-" {
+            r = isto.acumulador - b
+        } senao se isto.operacao == "*" {
+            r = isto.acumulador * b
+        } senao se isto.operacao == "/" {
+            r = b != 0.0 ? (isto.acumulador / b) : 0.0
+        }
+        isto.textoAtual = texto(r)
+        isto.operacao = ""
+        isto.limparProximo = verdadeiro
+        isto.atualizarVisor()
+    }
+
+    limpar(): vazio {
+        isto.acumulador = 0.0
+        isto.operacao = ""
+        isto.textoAtual = "0"
+        isto.limparProximo = falso
+        isto.atualizarVisor()
+    }
+
+    d0(): vazio { isto.digitar("0") }
+    d1(): vazio { isto.digitar("1") }
+    d2(): vazio { isto.digitar("2") }
+    d3(): vazio { isto.digitar("3") }
+    d4(): vazio { isto.digitar("4") }
+    d5(): vazio { isto.digitar("5") }
+    d6(): vazio { isto.digitar("6") }
+    d7(): vazio { isto.digitar("7") }
+    d8(): vazio { isto.digitar("8") }
+    d9(): vazio { isto.digitar("9") }
+    opMais(): vazio { isto.definirOperacao("+") }
+    opMenos(): vazio { isto.definirOperacao("-") }
+    opMult(): vazio { isto.definirOperacao("*") }
+    opDiv(): vazio { isto.definirOperacao("/") }
+
+    validarEFechar(): logico {
+        isto.btn7.simularClique()
+        isto.btnMais.simularClique()
+        isto.btn5.simularClique()
+        isto.btnIgual.simularClique()
+        assercao(real(isto.visor.obterTexto()) == 12.0)
+        escreva("CALC-GTK-OK visor=", isto.visor.obterTexto(), "\n")
+        isto.janela.fechar()
+        retorna falso
+    }
+
+    aoAtivar(): vazio {
+        GTK.aplicarCSS("window { background: #101614; color: #e8f5ee; } button { font-size: 16px; min-width: 56px; min-height: 44px; } .visor { font-size: 26px; font-weight: bold; padding: 10px; background: #18231f; border-radius: 6px; }")
+        var win: GTK.Janela = GTK.Janela(isto.app)
+        isto.janela = win
+        win.definirTitulo("Calculadora CGD (GTK4)").definirTamanho(290, 340)
+
+        var raiz: GTK.CaixaVertical = GTK.CaixaVertical(8)
+        raiz.definirMargem(12)
+
+        var visor: GTK.Rotulo = GTK.Rotulo("0")
+        visor.adicionarClasseCss("visor")
+        isto.visor = visor
+        raiz.adicionar(visor)
+
+        var l1: GTK.CaixaHorizontal = GTK.CaixaHorizontal(6)
+        var b7: GTK.Botao = GTK.Botao("7")
+        b7.aoClicar(isto.d7)
+        isto.btn7 = b7
+        var b8: GTK.Botao = GTK.Botao("8")
+        b8.aoClicar(isto.d8)
+        var b9: GTK.Botao = GTK.Botao("9")
+        b9.aoClicar(isto.d9)
+        var bDiv: GTK.Botao = GTK.Botao("/")
+        bDiv.aoClicar(isto.opDiv)
+        l1.adicionar(b7).adicionar(b8).adicionar(b9).adicionar(bDiv)
+
+        var l2: GTK.CaixaHorizontal = GTK.CaixaHorizontal(6)
+        var b4: GTK.Botao = GTK.Botao("4")
+        b4.aoClicar(isto.d4)
+        var b5: GTK.Botao = GTK.Botao("5")
+        b5.aoClicar(isto.d5)
+        isto.btn5 = b5
+        var b6: GTK.Botao = GTK.Botao("6")
+        b6.aoClicar(isto.d6)
+        var bMul: GTK.Botao = GTK.Botao("*")
+        bMul.aoClicar(isto.opMult)
+        l2.adicionar(b4).adicionar(b5).adicionar(b6).adicionar(bMul)
+
+        var l3: GTK.CaixaHorizontal = GTK.CaixaHorizontal(6)
+        var b1: GTK.Botao = GTK.Botao("1")
+        b1.aoClicar(isto.d1)
+        var b2: GTK.Botao = GTK.Botao("2")
+        b2.aoClicar(isto.d2)
+        var b3: GTK.Botao = GTK.Botao("3")
+        b3.aoClicar(isto.d3)
+        var bSub: GTK.Botao = GTK.Botao("-")
+        bSub.aoClicar(isto.opMenos)
+        l3.adicionar(b1).adicionar(b2).adicionar(b3).adicionar(bSub)
+
+        var l4: GTK.CaixaHorizontal = GTK.CaixaHorizontal(6)
+        var bC: GTK.Botao = GTK.Botao("C")
+        bC.aoClicar(isto.limpar)
+        var b0: GTK.Botao = GTK.Botao("0")
+        b0.aoClicar(isto.d0)
+        var bEq: GTK.Botao = GTK.Botao("=")
+        bEq.aoClicar(isto.calcular)
+        isto.btnIgual = bEq
+        var bAdd: GTK.Botao = GTK.Botao("+")
+        bAdd.aoClicar(isto.opMais)
+        isto.btnMais = bAdd
+        l4.adicionar(bC).adicionar(b0).adicionar(bEq).adicionar(bAdd)
+
+        raiz.adicionar(l1).adicionar(l2).adicionar(l3).adicionar(l4)
+        win.definirConteudo(raiz)
+        win.mostrar()
+
+        se isto.modoTeste {
+            GTK.temporizador(100, isto.validarEFechar)
+        }
+    }
+
+    executar(): inteiro {
+        isto.app.aoAtivar(isto.aoAtivar)
+        retorna isto.app.executar()
+    }
+}
+
+funcao main(): vazio {
+    var args: texto[] = Nat.Primitivas.sistemaArgumentos()
+    var teste: logico = falso
+    para cada a: texto em args {
+        se a == "--teste" {
+            teste = verdadeiro
+        }
+    }
+    var calc: CalculadoraGTK = CalculadoraGTK(teste)
+    var st: inteiro = calc.executar()
+    assercao(st == 0)
+}
+
+main()

@@ -1,0 +1,144 @@
+modulo regras
+
+importar pecas
+importar tabuleiro
+importar movimentos
+
+enum EstadoPartida {
+    EM_ANDAMENTO = 0,
+    XEQUE_MATE = 1,
+    AFOGAMENTO = 2,
+    EMPATE_50_LANCES = 3,
+    EMPATE_REPETICAO = 4,
+    EMPATE_MATERIAL_INSUFICIENTE = 5
+}
+
+funcao contarRepeticoes(tab: tabuleiro.Tabuleiro): inteiro {
+    var atual: inteiro = tab.hashAtual
+    var n: inteiro = tamanho(tab.historicoHashes)
+    var cont: inteiro = 0
+    para (var i: inteiro = 0; i < n; i++) {
+        se tab.historicoHashes[i] == atual {
+            cont = cont + 1
+        }
+    }
+    retorna cont
+}
+
+funcao materialInsuficiente(tab: tabuleiro.Tabuleiro): logico {
+    var menoresBrancas: inteiro = 0
+    var menoresPretas: inteiro = 0
+    var casas: inteiro[] = tab.casas
+    para (var sq: inteiro = 0; sq < 64; sq++) {
+        var p: inteiro = casas[sq]
+        se p == 0 {
+            continua
+        }
+        var t: inteiro = pecas.tipoDaPeca(p)
+        se t == pecas.TipoPeca.PEAO ou t == pecas.TipoPeca.TORRE ou t == pecas.TipoPeca.DAMA {
+            retorna falso
+        }
+        se t == pecas.TipoPeca.CAVALO ou t == pecas.TipoPeca.BISPO {
+            se p > 0 {
+                menoresBrancas = menoresBrancas + 1
+            } senao {
+                menoresPretas = menoresPretas + 1
+            }
+        }
+    }
+    retorna menoresBrancas <= 1 e menoresPretas <= 1 e (menoresBrancas + menoresPretas) <= 1
+}
+
+funcao estadoDaPartida(tab: tabuleiro.Tabuleiro): inteiro {
+    var legais: inteiro[] = movimentos.gerarLancesLegais(tab, falso)
+    se tamanho(legais) == 0 {
+        se movimentos.reiEmXeque(tab, tab.turno) {
+            retorna EstadoPartida.XEQUE_MATE
+        }
+        retorna EstadoPartida.AFOGAMENTO
+    }
+    se tab.meioMovimentos >= 100 {
+        retorna EstadoPartida.EMPATE_50_LANCES
+    }
+    se contarRepeticoes(tab) >= 3 {
+        retorna EstadoPartida.EMPATE_REPETICAO
+    }
+    se materialInsuficiente(tab) {
+        retorna EstadoPartida.EMPATE_MATERIAL_INSUFICIENTE
+    }
+    retorna EstadoPartida.EM_ANDAMENTO
+}
+
+funcao descricaoEstado(estado: inteiro, turno: inteiro): texto {
+    escolha estado {
+        caso 1:
+            retorna turno == pecas.Cor.BRANCAS ? "Xeque-mate! Vitória das Pretas." : "Xeque-mate! Vitória das Brancas."
+        caso 2:
+            retorna "Empate por afogamento."
+        caso 3:
+            retorna "Empate pela regra dos 50 lances."
+        caso 4:
+            retorna "Empate por repetição tripla."
+        caso 5:
+            retorna "Empate por material insuficiente."
+        padrao:
+            retorna turno == pecas.Cor.BRANCAS ? "Vez das Brancas" : "Vez das Pretas"
+    }
+}
+
+/// Conta exatamente todos os nós folha legais na profundidade dada (validação de regras).
+funcao perft(tab: tabuleiro.Tabuleiro, profundidade: inteiro): inteiro {
+    se profundidade <= 0 {
+        retorna 1
+    }
+    var legais: inteiro[] = movimentos.gerarLancesLegais(tab, falso)
+    se profundidade == 1 {
+        retorna tamanho(legais)
+    }
+    var nos: inteiro = 0
+    para (var i: inteiro = 0; i < tamanho(legais); i++) {
+        var l: inteiro = legais[i]
+        tab.fazerLance(movimentos.lanceOrigem(l), movimentos.lanceDestino(l), movimentos.lancePromocao(l))
+        nos = nos + perft(tab, profundidade - 1)
+        tab.desfazerLance()
+    }
+    retorna nos
+}
+
+/// Converte lance em notação algébrica legível (ex: e2e4, O-O, Nf3, exd5, e8=Q).
+funcao formatarNotacao(tab: tabuleiro.Tabuleiro, lance: inteiro): texto {
+    var orig: inteiro = movimentos.lanceOrigem(lance)
+    var dest: inteiro = movimentos.lanceDestino(lance)
+    var promo: inteiro = movimentos.lancePromocao(lance)
+    var peca: inteiro = tab.casas[orig]
+    var tp: inteiro = pecas.tipoDaPeca(peca)
+    se tp == pecas.TipoPeca.REI {
+        se dest - orig == 2 {
+            retorna "O-O"
+        }
+        se dest - orig == -2 {
+            retorna "O-O-O"
+        }
+    }
+    var captura: logico = tab.casas[dest] != 0 ou (tp == pecas.TipoPeca.PEAO e dest == tab.enPassant)
+    var prefixo: texto = ""
+    escolha tp {
+        caso 2:
+            prefixo = "C"
+        caso 3:
+            prefixo = "B"
+        caso 4:
+            prefixo = "T"
+        caso 5:
+            prefixo = "D"
+        caso 6:
+            prefixo = "R"
+        padrao:
+            se captura {
+                prefixo = tabuleiro.Tabuleiro.textoDeCasa(orig)[0]
+            }
+    }
+    var sep: texto = captura ? "x" : ""
+    var suf: texto = promo != 0 ? ("=" + pecas.letraPromocao(promo).maiusculo()) : ""
+    retorna prefixo + sep + tabuleiro.Tabuleiro.textoDeCasa(dest) + suf
+}

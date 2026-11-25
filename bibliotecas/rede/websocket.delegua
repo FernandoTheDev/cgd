@@ -1,0 +1,495 @@
+// Implementação WebSocket RFC 6455 (handshake, framing, masking, ping/pong, servidor assíncrono e cliente).
+
+enum OpcodeWS {
+    CONTINUACAO = 0,
+    TEXTO = 1,
+    BINARIO = 2,
+    FECHAR = 8,
+    PING = 9,
+    PONG = 10
+}
+
+classe QuadroWS {
+    fin: logico
+    opcode: inteiro
+    mascarado: logico
+    payload: texto
+
+    construtor(opcode: inteiro, payload: texto = "", fin: logico = verdadeiro, mascarado: logico = falso) {
+        isto.opcode = opcode
+        isto.payload = payload
+        isto.fin = fin
+        isto.mascarado = mascarado
+    }
+}
+
+classe ProtocoloWS {
+    estatico calcularAccept(chaveCliente: texto): texto {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        retorna nativo.criptoWebsocketAccept(chaveCliente.aparar())
+    }
+
+    estatico formatarHandshakeResposta(chaveCliente: texto): texto {
+        var accept: texto = ProtocoloWS.calcularAccept(chaveCliente)
+        retorna "HTTP/1.1 101 Switching Protocols\r\n" + "Upgrade: websocket\r\n" + "Connection: Upgrade\r\n" + "Sec-WebSocket-Accept: " + accept + "\r\n\r\n"
+    }
+
+    estatico codificarQuadro(opcode: inteiro, payload: texto, mascarar: logico = falso): texto {
+        var bytesMod: qualquer = importar("cgd:bytes").Bytes
+        var dados: qualquer = bytesMod.deTexto(payload)
+        var tam: inteiro = dados.tamanho()
+        var out: qualquer = bytesMod.criarReservado(tam + 16)
+
+        var b0: inteiro = 128 | (opcode & 15)
+        out.anexarByte(b0)
+
+        var maskBit: inteiro = mascarar ? 128 : 0
+        se tam < 126 {
+            out.anexarByte(maskBit | tam)
+        } senao se tam < 65536 {
+            out.anexarByte(maskBit | 126)
+            out.anexarByte((tam >> 8) & 255)
+            out.anexarByte(tam & 255)
+        } senao {
+            out.anexarByte(maskBit | 127)
+            out.anexarByte(0)
+            out.anexarByte(0)
+            out.anexarByte(0)
+            out.anexarByte(0)
+            out.anexarByte((tam >> 24) & 255)
+            out.anexarByte((tam >> 16) & 255)
+            out.anexarByte((tam >> 8) & 255)
+            out.anexarByte(tam & 255)
+        }
+
+        se mascarar {
+            var m0: inteiro = 0x37
+            var m1: inteiro = 0xFA
+            var m2: inteiro = 0x21
+            var m3: inteiro = 0x3D
+            out.anexarByte(m0)
+            out.anexarByte(m1)
+            out.anexarByte(m2)
+            out.anexarByte(m3)
+            var mascara: inteiro[] = [m0, m1, m2, m3]
+            para (var i: inteiro = 0; i < tam; i++) {
+                var orig: inteiro = dados.obter(i)
+                out.anexarByte(orig ^ mascara[i % 4])
+            }
+        } senao {
+            out.anexarBytes(dados)
+        }
+        retorna out.paraTexto()
+    }
+
+    /// Tenta decodificar um quadro RFC 6455 do buffer (Bytes ou texto bruto).
+    estatico decodificarQuadro(buffer: qualquer, maxPayload: inteiro = 1048576): dicionario {
+        var bytesMod: qualquer = importar("cgd:bytes").Bytes
+        var buf: qualquer = tipo de buffer == "texto" ? bytesMod.deTexto(buffer) : buffer
+        var total: inteiro = buf.tamanho()
+        se total < 2 {
+            retorna { incompleto: verdadeiro, erro: "", quadro: nulo, resto: buf }
+        }
+        var b0: inteiro = buf.obter(0)
+        var b1: inteiro = buf.obter(1)
+        var fin: logico = (b0 & 128) != 0
+        var opcode: inteiro = b0 & 15
+        var mascarado: logico = (b1 & 128) != 0
+        var tam: inteiro = b1 & 127
+        var pos: inteiro = 2
+
+        se tam == 126 {
+            se total < 4 {
+                retorna { incompleto: verdadeiro, erro: "", quadro: nulo, resto: buf }
+            }
+            tam = (buf.obter(2) << 8) | buf.obter(3)
+            pos = 4
+        } senao se tam == 127 {
+            se total < 10 {
+                retorna { incompleto: verdadeiro, erro: "", quadro: nulo, resto: buf }
+            }
+            se buf.obter(2) != 0 ou buf.obter(3) != 0 ou buf.obter(4) != 0 ou buf.obter(5) != 0 {
+                retorna { incompleto: falso, erro: "Payload WebSocket excede limite suportado", quadro: nulo, resto: bytesMod.criar(0) }
+            }
+            tam = (buf.obter(6) << 24) | (buf.obter(7) << 16) | (buf.obter(8) << 8) | buf.obter(9)
+            pos = 10
+        }
+
+        se tam > maxPayload {
+            retorna { incompleto: falso, erro: "Payload WebSocket excede tamanho máximo", quadro: nulo, resto: bytesMod.criar(0) }
+        }
+
+        var tamCabecalho: inteiro = pos + (mascarado ? 4 : 0)
+        se total < tamCabecalho + tam {
+            retorna { incompleto: verdadeiro, erro: "", quadro: nulo, resto: buf }
+        }
+
+        var payloadBytes: qualquer = bytesMod.criarReservado(tam)
+        se mascarado {
+            var mascara: inteiro[] = [buf.obter(pos), buf.obter(pos + 1), buf.obter(pos + 2), buf.obter(pos + 3)]
+            pos = pos + 4
+            para (var i: inteiro = 0; i < tam; i++) {
+                payloadBytes.anexarByte(buf.obter(pos + i) ^ mascara[i % 4])
+            }
+        } senao {
+            para (var i: inteiro = 0; i < tam; i++) {
+                payloadBytes.anexarByte(buf.obter(pos + i))
+            }
+        }
+        var consumido: inteiro = pos + tam
+        var resto: qualquer = consumido < total ? buf.fatiar(consumido, total) : bytesMod.criar(0)
+        retorna {
+            incompleto: falso,
+            erro: "",
+            quadro: QuadroWS(opcode, payloadBytes.paraTexto(), fin, mascarado),
+            resto: resto
+        }
+    }
+}
+
+classe ConexaoWS {
+    privado {
+        _socket: qualquer
+        _aberta: logico = verdadeiro
+        _timeoutMs: inteiro = 15000
+        _id: inteiro = 0
+        _buffer: qualquer
+    }
+
+    construtor(socket: qualquer, id: inteiro = 0, bufferInicial: texto = "", timeoutMs: inteiro = 15000) {
+        var bytesMod: qualquer = importar("cgd:bytes").Bytes
+        isto._socket = socket
+        isto._id = id
+        isto._buffer = bytesMod.deTexto(bufferInicial)
+        isto._timeoutMs = timeoutMs
+    }
+
+    id(): inteiro {
+        retorna isto._id
+    }
+
+    aberta(): logico {
+        retorna isto._aberta
+    }
+
+    enviarTexto(mensagem: texto): vazio {
+        se !isto._aberta {
+            retorna
+        }
+        var quadro: texto = ProtocoloWS.codificarQuadro(OpcodeWS.TEXTO, mensagem, falso)
+        isto._socket.enviar(quadro, isto._timeoutMs)
+    }
+
+    assincrona enviarTextoAsync(mensagem: texto): vazio {
+        se !isto._aberta {
+            retorna
+        }
+        var quadro: texto = ProtocoloWS.codificarQuadro(OpcodeWS.TEXTO, mensagem, falso)
+        aguardar isto._socket.enviarAsync(quadro, isto._timeoutMs)
+    }
+
+    assincrona enviarPong(payload: texto = ""): vazio {
+        se !isto._aberta {
+            retorna
+        }
+        var quadro: texto = ProtocoloWS.codificarQuadro(OpcodeWS.PONG, payload, falso)
+        aguardar isto._socket.enviarAsync(quadro, isto._timeoutMs)
+    }
+
+    assincrona receberQuadro(maxPayload: inteiro = 1048576): qualquer {
+        var bytesMod: qualquer = importar("cgd:bytes").Bytes
+        enquanto isto._aberta {
+            var dec: dicionario = ProtocoloWS.decodificarQuadro(isto._buffer, maxPayload)
+            se tamanho(dec["erro"]) > 0 {
+                isto.fechar()
+                falhar dec["erro"]
+            }
+            se !dec["incompleto"] {
+                isto._buffer = dec["resto"]
+                retorna dec["quadro"]
+            }
+            var pedaco: texto = aguardar isto._socket.receberAsync(65536, isto._timeoutMs)
+            var bPed: qualquer = bytesMod.deTexto(pedaco)
+            se bPed.tamanho() == 0 {
+                isto.fechar()
+                retorna nulo
+            }
+            isto._buffer.anexarBytes(bPed)
+        }
+        retorna nulo
+    }
+
+    fechar(): vazio {
+        se !isto._aberta {
+            retorna
+        }
+        isto._aberta = falso
+        tente {
+            isto._socket.enviar(ProtocoloWS.codificarQuadro(OpcodeWS.FECHAR, "", falso), 1000)
+        } pegue (erro: Excecao) {
+        }
+        isto._socket.fechar()
+    }
+}
+
+classe ServidorWebSocket {
+    privado {
+        _ouvinte: qualquer
+        _ativo: logico = falso
+        _proximoId: inteiro = 1
+        _clientes: ConexaoWS[]
+        _aoConectar: qualquer
+        _aoMensagem: qualquer
+        _aoFechar: qualquer
+        _timeoutMs: inteiro = 15000
+    }
+
+    construtor(timeoutMs: inteiro = 15000) {
+        isto._timeoutMs = timeoutMs
+    }
+
+    aoConectar(tratar: funcao): ServidorWebSocket {
+        isto._aoConectar = tratar
+        retorna isto
+    }
+
+    aoMensagem(tratar: funcao): ServidorWebSocket {
+        isto._aoMensagem = tratar
+        retorna isto
+    }
+
+    aoFechar(tratar: funcao): ServidorWebSocket {
+        isto._aoFechar = tratar
+        retorna isto
+    }
+
+    abrir(endereco: texto = "127.0.0.1", porta: inteiro = 8081): ServidorWebSocket {
+        var sockets: qualquer = importar("cgd:sockets")
+        isto._ouvinte = sockets.OuvinteTCP(endereco, porta)
+        isto._ativo = verdadeiro
+        retorna isto
+    }
+
+    portaLocal(): inteiro {
+        retorna isto._ouvinte.portaLocal()
+    }
+
+    ativo(): logico {
+        retorna isto._ativo
+    }
+
+    fechar(): vazio {
+        se !isto._ativo {
+            retorna
+        }
+        isto._ativo = falso
+        para cada cli: ConexaoWS em isto._clientes {
+            cli.fechar()
+        }
+        isto._clientes = []
+        isto._ouvinte.fechar()
+    }
+
+    assincrona difundir(mensagem: texto, ignorarId: inteiro = -1): vazio {
+        para cada cli: ConexaoWS em isto._clientes {
+            se cli.aberta() e cli.id() != ignorarId {
+                tente {
+                    aguardar cli.enviarTextoAsync(mensagem)
+                } pegue (erro: Excecao) {
+                    cli.fechar()
+                }
+            }
+        }
+    }
+
+    assincrona atenderCliente(sock: qualquer): vazio {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        var buf: texto = ""
+        tente {
+            var dados: dicionario = {}
+            enquanto verdadeiro {
+                dados = nativo.httpAnalisarTexto(buf, 16384, 0)
+                se dados.obter("erro", 0) != 0 {
+                    sock.fechar()
+                    retorna
+                }
+                se !dados.obter("incompleto", falso) {
+                    sustar
+                }
+                var pedaco: texto = aguardar sock.receberAsync(8192, isto._timeoutMs)
+                se tamanho(pedaco) == 0 {
+                    sock.fechar()
+                    retorna
+                }
+                buf = buf + pedaco
+            }
+            var cabecalhos: dicionario = dados["cabecalhos"]
+            var chave: texto = texto(cabecalhos.obter("sec-websocket-key", ""))
+            se tamanho(chave) == 0 {
+                aguardar sock.enviarAsync("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n", 2000)
+                sock.fechar()
+                retorna
+            }
+            var consumido: inteiro = dados.obter("consumido", 0)
+            var bytesMod: qualquer = importar("cgd:bytes").Bytes
+            var bBuf: qualquer = bytesMod.deTexto(buf)
+            var resto: texto = consumido < bBuf.tamanho() ? bBuf.fatiar(consumido, bBuf.tamanho()).paraTexto() : ""
+
+            var resp: texto = ProtocoloWS.formatarHandshakeResposta(chave)
+            aguardar sock.enviarAsync(resp, isto._timeoutMs)
+
+            var cid: inteiro = isto._proximoId
+            isto._proximoId = isto._proximoId + 1
+            var conn: ConexaoWS = ConexaoWS(sock, cid, resto, isto._timeoutMs)
+            isto._clientes.adicionar(conn)
+            se isto._aoConectar != nulo {
+                var fnCon: funcao = isto._aoConectar
+                fnCon(conn)
+            }
+            enquanto conn.aberta() e isto._ativo {
+                var quadro: qualquer = aguardar conn.receberQuadro()
+                se quadro == nulo {
+                    sustar
+                }
+                se quadro.opcode == OpcodeWS.FECHAR {
+                    sustar
+                }
+                se quadro.opcode == OpcodeWS.PING {
+                    aguardar conn.enviarPong(quadro.payload)
+                    continua
+                }
+                se (quadro.opcode == OpcodeWS.TEXTO ou quadro.opcode == OpcodeWS.BINARIO) e isto._aoMensagem != nulo {
+                    var fnMsg: funcao = isto._aoMensagem
+                    fnMsg(conn, quadro.payload)
+                }
+            }
+            se isto._aoFechar != nulo {
+                var fnFec: funcao = isto._aoFechar
+                fnFec(conn)
+            }
+            conn.fechar()
+        } pegue (erro: Excecao) {
+            sock.fechar()
+        }
+    }
+
+    assincrona escutarAsync(endereco: texto = "127.0.0.1", porta: inteiro = 8081): vazio {
+        se !isto._ativo {
+            isto.abrir(endereco, porta)
+        }
+        var tarefas: qualquer[] = []
+        tente {
+            enquanto isto._ativo {
+                tente {
+                    var sock: qualquer = aguardar isto._ouvinte.aceitarAsync(500)
+                    var t: Promessa<vazio> = isto.atenderCliente(sock)
+                    tarefas.adicionar(t)
+                } pegue (erro: Excecao) {
+                    se !isto._ativo {
+                        sustar
+                    }
+                }
+            }
+            para cada t: qualquer em tarefas {
+                tente {
+                    aguardar t
+                } pegue (ign: Excecao) {
+                }
+            }
+        } finalmente {
+            isto.fechar()
+        }
+    }
+}
+
+classe ClienteWebSocket {
+    privado {
+        _socket: qualquer
+        _buffer: qualquer
+        _aberta: logico = falso
+        _timeoutMs: inteiro = 10000
+    }
+
+    construtor(endereco: texto, porta: inteiro, caminho: texto = "/", timeoutMs: inteiro = 10000) {
+        var sockets: qualquer = importar("cgd:sockets")
+        var bytesMod: qualquer = importar("cgd:bytes").Bytes
+        isto._timeoutMs = timeoutMs
+        isto._buffer = bytesMod.criar(0)
+        isto._socket = sockets.conectar(endereco, porta, timeoutMs)
+        var chave: texto = "dGhlIHNhbXBsZSBub25jZQ=="
+        var req: texto = "GET " + caminho + " HTTP/1.1\r\n" + "Host: " + endereco + ":" + texto(porta) + "\r\n" + "Upgrade: websocket\r\n" + "Connection: Upgrade\r\n" + "Sec-WebSocket-Key: " + chave + "\r\n" + "Sec-WebSocket-Version: 13\r\n\r\n"
+        isto._socket.enviar(req, timeoutMs)
+        var resp: texto = ""
+        enquanto !resp.contem("\r\n\r\n") {
+            var pedaco: texto = isto._socket.receber(4096, timeoutMs)
+            var bPed: qualquer = bytesMod.deTexto(pedaco)
+            se bPed.tamanho() == 0 {
+                isto._socket.fechar()
+                falhar "WebSocket: conexão encerrada durante handshake"
+            }
+            resp = resp + pedaco
+        }
+        var esperado: texto = ProtocoloWS.calcularAccept(chave)
+        se !resp.contem("101") ou !resp.contem(esperado) {
+            isto._socket.fechar()
+            falhar "WebSocket: handshake rejeitado pelo servidor"
+        }
+        var sep: inteiro = resp.encontrar("\r\n\r\n")
+        se sep >= 0 {
+            var bResp: qualquer = bytesMod.deTexto(resp)
+            se sep + 4 < bResp.tamanho() {
+                isto._buffer = bResp.fatiar(sep + 4, bResp.tamanho())
+            }
+        }
+        isto._aberta = verdadeiro
+    }
+
+    enviarTexto(mensagem: texto): vazio {
+        se !isto._aberta {
+            falhar "WebSocket: cliente fechado"
+        }
+        isto._socket.enviar(ProtocoloWS.codificarQuadro(OpcodeWS.TEXTO, mensagem, verdadeiro), isto._timeoutMs)
+    }
+
+    enviarPing(payload: texto = "ping"): vazio {
+        se !isto._aberta {
+            falhar "WebSocket: cliente fechado"
+        }
+        isto._socket.enviar(ProtocoloWS.codificarQuadro(OpcodeWS.PING, payload, verdadeiro), isto._timeoutMs)
+    }
+
+    receber(): qualquer {
+        var bytesMod: qualquer = importar("cgd:bytes").Bytes
+        enquanto isto._aberta {
+            var dec: dicionario = ProtocoloWS.decodificarQuadro(isto._buffer)
+            se tamanho(dec["erro"]) > 0 {
+                isto.fechar()
+                falhar dec["erro"]
+            }
+            se !dec["incompleto"] {
+                isto._buffer = dec["resto"]
+                retorna dec["quadro"]
+            }
+            var pedaco: texto = isto._socket.receber(65536, isto._timeoutMs)
+            var bPed: qualquer = bytesMod.deTexto(pedaco)
+            se bPed.tamanho() == 0 {
+                isto.fechar()
+                retorna nulo
+            }
+            isto._buffer.anexarBytes(bPed)
+        }
+        retorna nulo
+    }
+
+    fechar(): vazio {
+        se !isto._aberta {
+            retorna
+        }
+        isto._aberta = falso
+        tente {
+            isto._socket.enviar(ProtocoloWS.codificarQuadro(OpcodeWS.FECHAR, "", verdadeiro), 1000)
+        } pegue (erro: Excecao) {
+        }
+        isto._socket.fechar()
+    }
+}

@@ -1,0 +1,177 @@
+// Grafos ponderados (dirigidos ou não) com BFS, DFS, Dijkstra e ordenação topológica.
+
+classe Grafo {
+    privado {
+        _dirigido: logico
+        _adj: dicionario
+    }
+
+    construtor(dirigido: logico = verdadeiro) {
+        isto._dirigido = dirigido
+        isto._adj = {}
+    }
+
+    adicionarVertice(v: texto): vazio {
+        se !(v em isto._adj) {
+            isto._adj[v] = []
+        }
+    }
+
+    adicionarAresta(origem: texto, destino: texto, peso: real = 1.0): vazio {
+        isto.adicionarVertice(origem)
+        isto.adicionarVertice(destino)
+        isto._adj[origem].adicionar({ destino: destino, peso: peso })
+        se !isto._dirigido {
+            isto._adj[destino].adicionar({ destino: origem, peso: peso })
+        }
+    }
+
+    vizinhos(v: texto): dicionario[] {
+        se !(v em isto._adj) {
+            retorna []
+        }
+        retorna isto._adj[v]
+    }
+
+    buscaLargura(inicio: texto): texto[] {
+        se !(inicio em isto._adj) {
+            retorna []
+        }
+        var col: qualquer = importar("cgd:nucleo/colecoes")
+        var fila: qualquer = col.Deque()
+        var visitados: dicionario = {}
+        var ordem: texto[] = []
+        visitados[inicio] = verdadeiro
+        fila.empilharFim(inicio)
+        enquanto !fila.vazio() {
+            var atual: texto = fila.desempilharInicio()
+            ordem.adicionar(atual)
+            para cada aresta: dicionario em isto._adj[atual] {
+                var prox: texto = aresta["destino"]
+                se !(prox em visitados) {
+                    visitados[prox] = verdadeiro
+                    fila.empilharFim(prox)
+                }
+            }
+        }
+        retorna ordem
+    }
+
+    buscaProfundidade(inicio: texto): texto[] {
+        se !(inicio em isto._adj) {
+            retorna []
+        }
+        var pilha: texto[] = [inicio]
+        var visitados: dicionario = {}
+        var ordem: texto[] = []
+        enquanto tamanho(pilha) > 0 {
+            var atual: texto = pilha.removerUltimo()
+            se atual em visitados {
+                continua
+            }
+            visitados[atual] = verdadeiro
+            ordem.adicionar(atual)
+            var lista: dicionario[] = isto._adj[atual]
+            para (var i: inteiro = tamanho(lista) - 1; i >= 0; i--) {
+                var prox: texto = lista[i]["destino"]
+                se !(prox em visitados) {
+                    pilha.adicionar(prox)
+                }
+            }
+        }
+        retorna ordem
+    }
+
+    dijkstra(inicio: texto, destino: texto): dicionario {
+        var col: qualquer = importar("cgd:nucleo/colecoes")
+        var heap: qualquer = col.HeapMin()
+        var dist: dicionario = {}
+        var anterior: dicionario = {}
+        dist[inicio] = 0.0
+        heap.inserir(0.0, inicio)
+
+        enquanto !heap.vazio() {
+            var dAtual: real = heap.topoPrioridade()
+            var u: texto = heap.removerMin()
+            se dAtual > dist[u] {
+                continua
+            }
+            se u == destino {
+                sustar
+            }
+            se !(u em isto._adj) {
+                continua
+            }
+            para cada aresta: dicionario em isto._adj[u] {
+                var v: texto = aresta["destino"]
+                var peso: real = aresta["peso"]
+                se peso < 0.0 {
+                    falhar "Dijkstra não suporta pesos negativos"
+                }
+                var cand: real = dAtual + peso
+                se !(v em dist) ou cand < dist[v] {
+                    dist[v] = cand
+                    anterior[v] = u
+                    heap.inserir(cand, v)
+                }
+            }
+        }
+        se !(destino em dist) {
+            retorna { encontrado: falso, distancia: -1.0, caminho: [] }
+        }
+        var rev: texto[] = []
+        var cur: texto = destino
+        enquanto verdadeiro {
+            rev.adicionar(cur)
+            se cur == inicio {
+                sustar
+            }
+            cur = anterior[cur]
+        }
+        var caminho: texto[] = []
+        para (var i: inteiro = tamanho(rev) - 1; i >= 0; i--) {
+            caminho.adicionar(rev[i])
+        }
+        retorna { encontrado: verdadeiro, distancia: dist[destino], caminho: caminho }
+    }
+
+    ordenacaoTopologica(): texto[] {
+        var nativo: qualquer = importar("cgd:nativo").Primitivas
+        var grau: dicionario = {}
+        var vertices: texto[] = []
+        para cada par: qualquer em nativo.dicionarioItens(isto._adj) {
+            var v: texto = texto(par[0])
+            vertices.adicionar(v)
+            grau[v] = 0
+        }
+        para cada v: texto em vertices {
+            para cada aresta: dicionario em isto._adj[v] {
+                var dest: texto = aresta["destino"]
+                grau[dest] = grau.obter(dest, 0) + 1
+            }
+        }
+        var col: qualquer = importar("cgd:nucleo/colecoes")
+        var fila: qualquer = col.Deque()
+        para cada v: texto em vertices {
+            se grau[v] == 0 {
+                fila.empilharFim(v)
+            }
+        }
+        var ordem: texto[] = []
+        enquanto !fila.vazio() {
+            var u: texto = fila.desempilharInicio()
+            ordem.adicionar(u)
+            para cada aresta: dicionario em isto._adj[u] {
+                var dest: texto = aresta["destino"]
+                grau[dest] = grau[dest] - 1
+                se grau[dest] == 0 {
+                    fila.empilharFim(dest)
+                }
+            }
+        }
+        se tamanho(ordem) != tamanho(vertices) {
+            falhar "Grafo contém ciclo; ordenação topológica impossível"
+        }
+        retorna ordem
+    }
+}

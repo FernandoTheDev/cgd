@@ -2,7 +2,7 @@
   "name": "cgd",
   "displayName": "CGD — Delégua compilada",
   "description": "LSP local do CGD, tokens semânticos, navegação e compilação explícita de Delégua.",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "publisher": "fernandothedev",
   "license": "Apache-2.0",
   "repository": {
@@ -18,7 +18,8 @@
   "main": "./extension.js",
   "activationEvents": [
     "onLanguage:cgd",
-    "onDebugResolve:cgd"
+    "onDebugResolve:cgd",
+    "onDebugInitialConfigurations"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -175,7 +176,7 @@
     "debuggers": [
       {
         "type": "cgd",
-        "label": "CGD — executar sem depurador",
+        "label": "CGD — Depurador Delégua (DAP)",
         "languages": [
           "cgd"
         ],
@@ -183,15 +184,64 @@
           {
             "type": "cgd",
             "request": "launch",
-            "name": "CGD: compilar e executar (sem depuração)"
+            "name": "CGD: Depurar arquivo atual",
+            "program": "${file}",
+            "cwd": "${workspaceFolder}",
+            "modo": "desenvolvimento",
+            "stopOnEntry": false
+          },
+          {
+            "type": "cgd",
+            "request": "launch",
+            "name": "CGD: Depurar projeto (projeto.json)",
+            "cwd": "${workspaceFolder}",
+            "modo": "desenvolvimento",
+            "stopOnEntry": false
           }
         ],
         "configurationAttributes": {
           "launch": {
             "required": [],
-            "properties": {}
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Caminho do arquivo .delegua (opcional quando há projeto.json)."
+              },
+              "cwd": {
+                "type": "string",
+                "default": "${workspaceFolder}",
+                "description": "Diretório de trabalho da depuração."
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": [],
+                "description": "Argumentos passados ao programa Delégua."
+              },
+              "modo": {
+                "type": "string",
+                "enum": [
+                  "desenvolvimento",
+                  "producao"
+                ],
+                "default": "desenvolvimento",
+                "description": "Modo de compilação usado antes da depuração."
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "default": false,
+                "description": "Pausar na entrada do programa (delegua_main)."
+              }
+            }
           }
         }
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "cgd"
       }
     ],
     "grammars": [

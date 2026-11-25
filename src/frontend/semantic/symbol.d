@@ -1,12 +1,14 @@
 module frontend.semantic.symbol;
 
 import frontend.parser.ast;
+import frontend.lexer.token : Position;
 
 enum SymbolKind : ubyte
 {
     Var,
     Fn,
     Param,
+    Module,
 }
 
 abstract class Symbol
@@ -16,6 +18,7 @@ abstract class Symbol
     bool isVar() => kind == SymbolKind.Var;
     bool isFn() => kind == SymbolKind.Fn;
     bool isParam() => kind == SymbolKind.Param;
+    bool isModule() => kind == SymbolKind.Module;
 }
 
 class SymbolVar : Symbol
@@ -52,5 +55,19 @@ class SymbolParam : Symbol
     {
         this.kind = SymbolKind.Param;
         this.node = node;
+    }
+}
+
+class SymbolModule : Symbol
+{
+    dstring name;
+    ModuleUnit target;
+    Position pos;
+    this(dstring name, ModuleUnit target, Position pos)
+    {
+        this.kind = SymbolKind.Module;
+        this.name = name;
+        this.target = target;
+        this.pos = pos;
     }
 }

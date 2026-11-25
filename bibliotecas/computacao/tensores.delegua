@@ -1,0 +1,343 @@
+modulo cgd.computacao.tensores
+
+importar cgd.computacao.gpu como GPU
+
+/// Calcula os passos (strides) contíguos em row-major para uma forma N-dimensional.
+funcao calcularPassos(forma: inteiro[]): inteiro[] {
+    const n: inteiro = tamanho(forma)
+    var passos: inteiro[] = []
+    para var i: inteiro = 0; i < n; i = i + 1 {
+        passos.adicionar(1)
+    }
+
+    var acc: inteiro = 1
+    para var i: inteiro = n - 1; i >= 0; i = i - 1 {
+        passos[i] = acc
+        acc = acc * forma[i]
+    }
+
+    retorna passos
+}
+
+/// Calcula o número total de elementos de uma forma N-dimensional.
+funcao totalElementos(forma: inteiro[]): inteiro {
+    var total: inteiro = 1
+    para cada dim em forma {
+        se dim < 0 {
+            falhar ("Tensor: dimensão negativa inválida.")
+        }
+        total = total * dim
+    }
+
+    retorna total
+}
+
+/// Tensor N-dimensional sobre buffer numérico nativo fora do GC (`cf32`, `cf64`, `ci32`, `ci64`).
+///
+/// ```delegua
+/// importar cgd.computacao.tensores como Tensores
+/// const t = Tensores.Tensor.deVetor([1.0, 2.0, 3.0, 4.0], [2, 2], "cf64")
+/// assercao(t.soma() == 10.0)
+/// t.liberar()
+/// ```
+classe Tensor {
+    forma: inteiro[]
+    passos: inteiro[]
+    deslocamento: inteiro
+    dtype: texto
+    backend: texto
+    buffer: GPU.BufferGPU
+    proprietario: logico
+
+    construtor(forma: inteiro[], dtype: texto = "cf64", backend: texto = "cpu") {
+        isto.forma = clonar(forma)
+        isto.passos = calcularPassos(forma)
+        isto.deslocamento = 0
+        isto.dtype = dtype
+        isto.backend = backend
+        const total: inteiro = totalElementos(forma)
+        isto.buffer = GPU.BufferGPU(0, total, dtype)
+        isto.proprietario = verdadeiro
+    }
+
+    estatico zeros(forma: inteiro[], dtype: texto = "cf64", backend: texto = "cpu"): Tensor {
+        retorna Tensor(forma, dtype, backend)
+    }
+
+    estatico uns(forma: inteiro[], dtype: texto = "cf64", backend: texto = "cpu"): Tensor {
+        const t: Tensor = Tensor(forma, dtype, backend)
+        const n: inteiro = totalElementos(forma)
+        para var i: inteiro = 0; i < n; i = i + 1 {
+            t.buffer.definir(i, 1.0)
+        }
+        retorna t
+    }
+
+    estatico deVetor(dados: qualquer[], forma: inteiro[], dtype: texto = "cf64", backend: texto = "cpu"): Tensor {
+        const t: Tensor = Tensor(forma, dtype, backend)
+        t.buffer.enviar(dados)
+        retorna t
+    }
+
+    dimensoes(): inteiro {
+        retorna tamanho(isto.forma)
+    }
+
+    quantidade(): inteiro {
+        retorna totalElementos(isto.forma)
+    }
+
+    ehContiguo(): logico {
+        const esperado: inteiro[] = calcularPassos(isto.forma)
+        se tamanho(esperado) != tamanho(isto.passos) {
+            retorna falso
+        }
+        para var i: inteiro = 0; i < tamanho(esperado); i = i + 1 {
+            se esperado[i] != isto.passos[i] {
+                retorna falso
+            }
+        }
+        retorna isto.deslocamento == 0 e isto.quantidade() == isto.buffer.tamanho()
+    }
+
+    indiceLinear(indices: inteiro[]): inteiro {
+        se tamanho(indices) != tamanho(isto.forma) {
+            falhar ("Tensor: número de índices incompatível com a dimensionalidade.")
+        }
+        var pos: inteiro = isto.deslocamento
+        para var i: inteiro = 0; i < tamanho(indices); i = i + 1 {
+            const idx: inteiro = indices[i]
+            se idx < 0 ou idx >= isto.forma[i] {
+                falhar ("Tensor: índice fora dos limites.")
+            }
+            pos = pos + idx * isto.passos[i]
+        }
+        retorna pos
+    }
+
+    obter(indices: inteiro[]): real {
+        retorna isto.buffer.obter(isto.indiceLinear(indices))
+    }
+
+    definir(indices: inteiro[], valor: real): vazio {
+        isto.buffer.definir(isto.indiceLinear(indices), valor)
+    }
+
+    obterLinear(i: inteiro): real {
+        retorna isto.buffer.obter(isto.deslocamento + i)
+    }
+
+    definirLinear(i: inteiro, valor: real): vazio {
+        isto.buffer.definir(isto.deslocamento + i, valor)
+    }
+
+    /// Cria uma visão (view) sem copiar dados com nova forma compatível.
+    remodelar(novaForma: inteiro[]): Tensor {
+        se totalElementos(novaForma) != isto.quantidade() {
+            falhar ("Tensor.remodelar: quantidade total de elementos deve permanecer igual.")
+        }
+        se !isto.ehContiguo() {
+            const materializado: Tensor = isto.contiguo()
+            retorna materializado.remodelar(novaForma)
+        }
+        const v: Tensor = Tensor([0], isto.dtype, isto.backend)
+        v.buffer.liberar()
+        v.forma = clonar(novaForma)
+        v.passos = calcularPassos(novaForma)
+        v.deslocamento = isto.deslocamento
+        v.buffer = isto.buffer
+        v.proprietario = falso
+        retorna v
+    }
+
+    /// Fatiamento ao longo da primeira dimensão `[inicio .. fim)` como visão sem cópia.
+    fatiar(inicio: inteiro, fim: inteiro): Tensor {
+        se tamanho(isto.forma) == 0 ou inicio < 0 ou fim < inicio ou fim > isto.forma[0] {
+            falhar ("Tensor.fatiar: intervalo inválido.")
+        }
+        var novaForma: inteiro[] = clonar(isto.forma)
+        novaForma[0] = fim - inicio
+        const v: Tensor = Tensor([0], isto.dtype, isto.backend)
+        v.buffer.liberar()
+        v.forma = novaForma
+        v.passos = clonar(isto.passos)
+        v.deslocamento = isto.deslocamento + inicio * isto.passos[0]
+        v.buffer = isto.buffer
+        v.proprietario = falso
+        retorna v
+    }
+
+    /// Transposta 2D como visão de passos trocados.
+    transpor(): Tensor {
+        se tamanho(isto.forma) != 2 {
+            falhar ("Tensor.transpor exige tensor 2D.")
+        }
+        const v: Tensor = Tensor([0], isto.dtype, isto.backend)
+        v.buffer.liberar()
+        v.forma = [isto.forma[1], isto.forma[0]]
+        v.passos = [isto.passos[1], isto.passos[0]]
+        v.deslocamento = isto.deslocamento
+        v.buffer = isto.buffer
+        v.proprietario = falso
+        retorna v
+    }
+
+    /// Materializa uma cópia contígua independente.
+    contiguo(): Tensor {
+        const out: Tensor = Tensor(isto.forma, isto.dtype, isto.backend)
+        const dims: inteiro = tamanho(isto.forma)
+        se dims == 1 {
+            para var i: inteiro = 0; i < isto.forma[0]; i = i + 1 {
+                out.buffer.definir(i, isto.obter([i]))
+            }
+            retorna out
+        }
+        se dims == 2 {
+            const linhas: inteiro = isto.forma[0]
+            const cols: inteiro = isto.forma[1]
+            para var i: inteiro = 0; i < linhas; i = i + 1 {
+                para var j: inteiro = 0; j < cols; j = j + 1 {
+                    out.buffer.definir(i * cols + j, isto.obter([i, j]))
+                }
+            }
+            retorna out
+        }
+        const n: inteiro = isto.quantidade()
+        para var i: inteiro = 0; i < n; i = i + 1 {
+            var rem: inteiro = i
+            var pos: inteiro = isto.deslocamento
+            const passosPadrao: inteiro[] = calcularPassos(isto.forma)
+            para var d: inteiro = 0; d < dims; d = d + 1 {
+                const coord: inteiro = rem \ passosPadrao[d]
+                rem = rem % passosPadrao[d]
+                pos = pos + coord * isto.passos[d]
+            }
+            out.buffer.definir(i, isto.buffer.obter(pos))
+        }
+        retorna out
+    }
+
+    privado {
+        aplicarBinario(op: texto, outro: Tensor): Tensor {
+            se isto.ehContiguo() e outro.ehContiguo() e isto.quantidade() == outro.quantidade() e tamanho(isto.forma) == tamanho(outro.forma) {
+                const fila: GPU.FilaGPU = GPU.criarFila(isto.backend == "gpu")
+                const saida: Tensor = Tensor(isto.forma, isto.dtype, isto.backend)
+                se op == "somar" {
+                    fila.somar(isto.buffer, outro.buffer, saida.buffer)
+                } senao se op == "subtrair" {
+                    fila.subtrair(isto.buffer, outro.buffer, saida.buffer)
+                } senao se op == "multiplicar" {
+                    fila.multiplicar(isto.buffer, outro.buffer, saida.buffer)
+                } senao {
+                    fila.dividir(isto.buffer, outro.buffer, saida.buffer)
+                }
+                retorna saida
+            }
+            // Broadcasting 2D + 1D (ex.: matriz [M, N] + bias [N]) ou 1D + escalar [1]
+            const a: Tensor = isto.ehContiguo() ? isto : isto.contiguo()
+            const b: Tensor = outro.ehContiguo() ? outro : outro.contiguo()
+            const nA: inteiro = a.quantidade()
+            const nB: inteiro = b.quantidade()
+            const saida: Tensor = Tensor(a.forma, a.dtype, a.backend)
+            para var i: inteiro = 0; i < nA; i = i + 1 {
+                const va: real = a.buffer.obter(i)
+                const vb: real = b.buffer.obter(i % nB)
+                var r: real = 0.0
+                se op == "somar" {
+                    r = va + vb
+                } senao se op == "subtrair" {
+                    r = va - vb
+                } senao se op == "multiplicar" {
+                    r = va * vb
+                } senao {
+                    r = va / vb
+                }
+                saida.buffer.definir(i, r)
+            }
+            retorna saida
+        }
+    }
+
+    somar(outro: Tensor): Tensor {
+        retorna isto.aplicarBinario("somar", outro)
+    }
+
+    subtrair(outro: Tensor): Tensor {
+        retorna isto.aplicarBinario("subtrair", outro)
+    }
+
+    multiplicar(outro: Tensor): Tensor {
+        retorna isto.aplicarBinario("multiplicar", outro)
+    }
+
+    dividir(outro: Tensor): Tensor {
+        retorna isto.aplicarBinario("dividir", outro)
+    }
+
+    escala(fator: real): Tensor {
+        const base: Tensor = isto.ehContiguo() ? isto : isto.contiguo()
+        const fila: GPU.FilaGPU = GPU.criarFila(isto.backend == "gpu")
+        const saida: Tensor = Tensor(base.forma, base.dtype, base.backend)
+        fila.escala(base.buffer, fator, saida.buffer)
+        retorna saida
+    }
+
+    /// Multiplicação matricial 2D acelerada pelo kernel nativo `matmul`.
+    matmul(outro: Tensor): Tensor {
+        se tamanho(isto.forma) != 2 ou tamanho(outro.forma) != 2 {
+            falhar ("Tensor.matmul exige tensores 2D.")
+        }
+        se isto.forma[1] != outro.forma[0] {
+            falhar ("Tensor.matmul: dimensões internas incompatíveis.")
+        }
+        const a: Tensor = isto.ehContiguo() ? isto : isto.contiguo()
+        const b: Tensor = outro.ehContiguo() ? outro : outro.contiguo()
+        const m: inteiro = a.forma[0]
+        const k: inteiro = a.forma[1]
+        const n: inteiro = b.forma[1]
+        const saida: Tensor = Tensor([m, n], a.dtype, a.backend)
+        const fila: GPU.FilaGPU = GPU.criarFila(isto.backend == "gpu")
+        fila.matmul(a.buffer, b.buffer, saida.buffer, m, k, n)
+        retorna saida
+    }
+
+    soma(): real {
+        const base: Tensor = isto.ehContiguo() ? isto : isto.contiguo()
+        const fila: GPU.FilaGPU = GPU.criarFila(isto.backend == "gpu")
+        retorna fila.reducao("soma", base.buffer)
+    }
+
+    media(): real {
+        const base: Tensor = isto.ehContiguo() ? isto : isto.contiguo()
+        const fila: GPU.FilaGPU = GPU.criarFila(isto.backend == "gpu")
+        retorna fila.reducao("media", base.buffer)
+    }
+
+    maximo(): real {
+        const base: Tensor = isto.ehContiguo() ? isto : isto.contiguo()
+        const fila: GPU.FilaGPU = GPU.criarFila(isto.backend == "gpu")
+        retorna fila.reducao("maximo", base.buffer)
+    }
+
+    minimo(): real {
+        const base: Tensor = isto.ehContiguo() ? isto : isto.contiguo()
+        const fila: GPU.FilaGPU = GPU.criarFila(isto.backend == "gpu")
+        retorna fila.reducao("minimo", base.buffer)
+    }
+
+    paraVetor(): qualquer[] {
+        const base: Tensor = isto.ehContiguo() ? isto : isto.contiguo()
+        retorna base.buffer.ler()
+    }
+
+    liberar(): vazio {
+        se isto.proprietario {
+            isto.buffer.liberar()
+            isto.proprietario = falso
+        }
+    }
+
+    destrutor(): vazio {
+        isto.liberar()
+    }
+}

@@ -40,7 +40,11 @@ def main():
         raise SystemExit(
             "Execute ./build-runtime para preparar a tabela libcurl antes deste teste."
         )
-    sources = sorted(str(path) for path in (RUNTIME / "src").glob("*.c"))
+    sources = sorted(str(path) for path in (RUNTIME / "src").glob("*.c")) + sorted(
+        str(path)
+        for path in (RUNTIME / "src/gc").glob("*.c")
+        if path.name != "gc_boehm_compat.c"
+    )
     variants = [
         ("clang", []),
         ("gcc", ["-O2"]),

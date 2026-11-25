@@ -1,0 +1,191 @@
+// Estruturas de dados avançadas: Deque, HeapMin, HeapMax e FilaPrioridade.
+
+classe Deque {
+    privado {
+        _dados: qualquer[]
+        _inicio: inteiro = 0
+    }
+
+    tamanho(): inteiro {
+        retorna tamanho(isto._dados) - isto._inicio
+    }
+
+    vazio(): logico {
+        retorna isto.tamanho() == 0
+    }
+
+    empilharFim(valor: qualquer): vazio {
+        isto._dados.adicionar(valor)
+    }
+
+    empilharInicio(valor: qualquer): vazio {
+        se isto._inicio > 0 {
+            isto._inicio = isto._inicio - 1
+            isto._dados[isto._inicio] = valor
+            retorna
+        }
+        var novo: qualquer[] = [valor]
+        para (var i: inteiro = isto._inicio; i < tamanho(isto._dados); i++) {
+            novo.adicionar(isto._dados[i])
+        }
+        isto._dados = novo
+        isto._inicio = 0
+    }
+
+    desempilharInicio(): qualquer {
+        se isto.vazio() {
+            falhar "Deque vazio"
+        }
+        var v: qualquer = isto._dados[isto._inicio]
+        isto._dados[isto._inicio] = nulo
+        isto._inicio = isto._inicio + 1
+        se isto._inicio > 64 e isto._inicio * 2 >= tamanho(isto._dados) {
+            var novo: qualquer[] = []
+            para (var i: inteiro = isto._inicio; i < tamanho(isto._dados); i++) {
+                novo.adicionar(isto._dados[i])
+            }
+            isto._dados = novo
+            isto._inicio = 0
+        }
+        retorna v
+    }
+
+    desempilharFim(): qualquer {
+        se isto.vazio() {
+            falhar "Deque vazio"
+        }
+        retorna isto._dados.removerUltimo()
+    }
+
+    primeiro(): qualquer {
+        se isto.vazio() {
+            falhar "Deque vazio"
+        }
+        retorna isto._dados[isto._inicio]
+    }
+
+    ultimo(): qualquer {
+        se isto.vazio() {
+            falhar "Deque vazio"
+        }
+        retorna isto._dados[tamanho(isto._dados) - 1]
+    }
+}
+
+classe HeapMin {
+    privado {
+        _chaves: real[]
+        _valores: qualquer[]
+    }
+
+    tamanho(): inteiro {
+        retorna tamanho(isto._chaves)
+    }
+
+    vazio(): logico {
+        retorna tamanho(isto._chaves) == 0
+    }
+
+    inserir(prioridade: real, valor: qualquer): vazio {
+        isto._chaves.adicionar(prioridade)
+        isto._valores.adicionar(valor)
+        var i: inteiro = tamanho(isto._chaves) - 1
+        enquanto i > 0 {
+            var pai: inteiro = (i - 1) \ 2
+            se isto._chaves[i] < isto._chaves[pai] {
+                var tc: real = isto._chaves[i]
+                var tv: qualquer = isto._valores[i]
+                isto._chaves[i] = isto._chaves[pai]
+                isto._valores[i] = isto._valores[pai]
+                isto._chaves[pai] = tc
+                isto._valores[pai] = tv
+                i = pai
+            } senao {
+                sustar
+            }
+        }
+    }
+
+    topo(): qualquer {
+        se isto.vazio() {
+            falhar "Heap vazio"
+        }
+        retorna isto._valores[0]
+    }
+
+    topoPrioridade(): real {
+        se isto.vazio() {
+            falhar "Heap vazio"
+        }
+        retorna isto._chaves[0]
+    }
+
+    removerMin(): qualquer {
+        se isto.vazio() {
+            falhar "Heap vazio"
+        }
+        var resultado: qualquer = isto._valores[0]
+        var ultimaChave: real = isto._chaves.removerUltimo()
+        var ultimoVal: qualquer = isto._valores.removerUltimo()
+        var n: inteiro = tamanho(isto._chaves)
+        se n > 0 {
+            isto._chaves[0] = ultimaChave
+            isto._valores[0] = ultimoVal
+            var i: inteiro = 0
+            enquanto verdadeiro {
+                var esq: inteiro = 2 * i + 1
+                var dir: inteiro = 2 * i + 2
+                var menor: inteiro = i
+                se esq < n e isto._chaves[esq] < isto._chaves[menor] {
+                    menor = esq
+                }
+                se dir < n e isto._chaves[dir] < isto._chaves[menor] {
+                    menor = dir
+                }
+                se menor == i {
+                    sustar
+                }
+                var tc: real = isto._chaves[i]
+                var tv: qualquer = isto._valores[i]
+                isto._chaves[i] = isto._chaves[menor]
+                isto._valores[i] = isto._valores[menor]
+                isto._chaves[menor] = tc
+                isto._valores[menor] = tv
+                i = menor
+            }
+        }
+        retorna resultado
+    }
+}
+
+classe FilaPrioridade {
+    privado {
+        _heap: HeapMin
+        _maximo: logico
+    }
+
+    construtor(maximo: logico = falso) {
+        isto._heap = HeapMin()
+        isto._maximo = maximo
+    }
+
+    tamanho(): inteiro {
+        retorna isto._heap.tamanho()
+    }
+
+    vazio(): logico {
+        retorna isto._heap.vazio()
+    }
+
+    enfileirar(valor: qualquer, prioridade: real): vazio {
+        isto._heap.inserir(isto._maximo ? -prioridade : prioridade, valor)
+    }
+
+    desenfileirar(): qualquer {
+        retorna isto._heap.removerMin()
+    }
+
+    espiar(): qualquer {
+        retorna isto._heap.topo()
+    }
+}

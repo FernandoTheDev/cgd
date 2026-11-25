@@ -1,0 +1,280 @@
+modulo cgd.computacao.gpu
+
+/// Primitivas nativas de computação GPU/CPU expostas pelo runtime C do CGD.
+@definicao(biblioteca = "cgd-runtime", abi = "delegua")
+classe estrangeira PrimitivasGPU {
+    @definicao(simbolo = "delegua_ffi_gpuDescobrirDispositivos")
+    descobrirDispositivos(): qualquer[]
+
+    @definicao(simbolo = "delegua_ffi_gpuBufferCriar")
+    bufferCriar(dispositivoId: inteiro, quantidade: inteiro, dtype: texto): inteiro
+
+    @definicao(simbolo = "delegua_ffi_gpuBufferLiberar")
+    bufferLiberar(handle: inteiro): vazio
+
+    @definicao(simbolo = "delegua_ffi_gpuBufferEnviar")
+    bufferEnviar(handle: inteiro, valores: qualquer[]): vazio
+
+    @definicao(simbolo = "delegua_ffi_gpuBufferLer")
+    bufferLer(handle: inteiro): qualquer[]
+
+    @definicao(simbolo = "delegua_ffi_gpuBufferObter")
+    bufferObter(handle: inteiro, indice: inteiro): real
+
+    @definicao(simbolo = "delegua_ffi_gpuBufferDefinir")
+    bufferDefinir(handle: inteiro, indice: inteiro, valor: real): vazio
+
+    @definicao(simbolo = "delegua_ffi_gpuExecutarBinario")
+    executarBinario(op: texto, a: inteiro, b: inteiro, saida: inteiro): inteiro
+
+    @definicao(simbolo = "delegua_ffi_gpuExecutarUnario")
+    executarUnario(op: texto, a: inteiro, saida: inteiro, alpha: real): inteiro
+
+    @definicao(simbolo = "delegua_ffi_gpuMatmul")
+    matmul(a: inteiro, b: inteiro, saida: inteiro, m: inteiro, k: inteiro, n: inteiro): inteiro
+
+    @definicao(simbolo = "delegua_ffi_gpuReducao")
+    reducao(op: texto, a: inteiro): real
+
+    @definicao(simbolo = "delegua_ffi_gpuProdutoEscalar")
+    produtoEscalar(a: inteiro, b: inteiro): real
+}
+
+/// Representa um dispositivo de computação descoberto (CPU nativa ou GPU Vulkan).
+classe DispositivoGPU {
+    id: inteiro
+    nome: texto
+    backend: texto
+    categoria: texto
+    computeDisponivel: logico
+    vendorId: inteiro
+
+    construtor(id: inteiro, nome: texto, backend: texto, categoria: texto, computeDisponivel: logico,
+        vendorId: inteiro) {
+        isto.id = id
+        isto.nome = nome
+        isto.backend = backend
+        isto.categoria = categoria
+        isto.computeDisponivel = computeDisponivel
+        isto.vendorId = vendorId
+    }
+
+    ehGpu(): logico {
+        retorna isto.backend != "cpu"
+    }
+
+    resumo(): texto {
+        retorna isto.nome + " [" + isto.backend + "/" + isto.categoria + "]"
+    }
+}
+
+/// Evento de medição retornado por operações enfileiradas na GPU/CPU.
+classe EventoGPU {
+    operacao: texto
+    duracaoNs: inteiro
+    backendUsado: texto
+    fallbackCpu: logico
+
+    construtor(operacao: texto, duracaoNs: inteiro, backendUsado: texto, fallbackCpu: logico) {
+        isto.operacao = operacao
+        isto.duracaoNs = duracaoNs
+        isto.backendUsado = backendUsado
+        isto.fallbackCpu = fallbackCpu
+    }
+
+    duracaoMs(): real {
+        retorna real(isto.duracaoNs) / 1000000.0
+    }
+}
+
+/// Buffer numérico contíguo fora do GC (`cf32`, `cf64`, `ci32`, `ci64`).
+classe BufferGPU {
+    privado {
+        handle: inteiro
+        liberado: logico
+    }
+
+    dispositivoId: inteiro
+    quantidade: inteiro
+    dtype: texto
+
+    construtor(dispositivoId: inteiro, quantidade: inteiro, dtype: texto = "cf64") {
+        isto.dispositivoId = dispositivoId
+        isto.quantidade = quantidade
+        isto.dtype = dtype
+        isto.handle = PrimitivasGPU.bufferCriar(dispositivoId, quantidade, dtype)
+        isto.liberado = falso
+    }
+
+    handleInterno(): inteiro {
+        retorna isto.handle
+    }
+
+    enviar(valores: qualquer[]): vazio {
+        PrimitivasGPU.bufferEnviar(isto.handle, valores)
+    }
+
+    ler(): qualquer[] {
+        retorna PrimitivasGPU.bufferLer(isto.handle)
+    }
+
+    obter(indice: inteiro): real {
+        retorna PrimitivasGPU.bufferObter(isto.handle, indice)
+    }
+
+    definir(indice: inteiro, valor: real): vazio {
+        PrimitivasGPU.bufferDefinir(isto.handle, indice, valor)
+    }
+
+    tamanho(): inteiro {
+        retorna isto.quantidade
+    }
+
+    liberar(): vazio {
+        se !isto.liberado {
+            PrimitivasGPU.bufferLiberar(isto.handle)
+            isto.liberado = verdadeiro
+        }
+    }
+
+    destrutor(): vazio {
+        isto.liberar()
+    }
+}
+
+/// Fila de comandos de computação associada a um dispositivo (com fallback explícito auditável).
+///
+/// ```delegua
+/// importar cgd.computacao.gpu como GPU
+/// const fila = GPU.criarFila()
+/// const a = fila.criarBuffer(3, "cf64")
+/// const b = fila.criarBuffer(3, "cf64")
+/// const c = fila.criarBuffer(3, "cf64")
+/// a.enviar([1.0, 2.0, 3.0])
+/// b.enviar([4.0, 5.0, 6.0])
+/// fila.somar(a, b, c)
+/// assercao(c.obter(2) == 9.0)
+/// a.liberar()
+/// b.liberar()
+/// c.liberar()
+/// ```
+classe FilaGPU {
+    dispositivo: DispositivoGPU
+    permitirFallbackCpu: logico
+    totalOperacoes: inteiro
+    tempoTotalNs: inteiro
+
+    construtor(dispositivo: DispositivoGPU, permitirFallbackCpu: logico = verdadeiro) {
+        isto.dispositivo = dispositivo
+        isto.permitirFallbackCpu = permitirFallbackCpu
+        isto.totalOperacoes = 0
+        isto.tempoTotalNs = 0
+    }
+
+    privado {
+        registrar(op: texto, ns: inteiro): EventoGPU {
+            isto.totalOperacoes = isto.totalOperacoes + 1
+            isto.tempoTotalNs = isto.tempoTotalNs + ns
+            const usouFallback: logico = isto.dispositivo.backend != "cpu"
+            retorna EventoGPU(op, ns, "cpu", usouFallback)
+        }
+    }
+
+    criarBuffer(quantidade: inteiro, dtype: texto = "cf64"): BufferGPU {
+        retorna BufferGPU(isto.dispositivo.id, quantidade, dtype)
+    }
+
+    somar(a: BufferGPU, b: BufferGPU, saida: BufferGPU): EventoGPU {
+        const ns: inteiro = PrimitivasGPU.executarBinario("somar", a.handleInterno(), b.handleInterno(),
+            saida.handleInterno())
+        retorna isto.registrar("somar", ns)
+    }
+
+    subtrair(a: BufferGPU, b: BufferGPU, saida: BufferGPU): EventoGPU {
+        const ns: inteiro = PrimitivasGPU.executarBinario("subtrair", a.handleInterno(),
+            b.handleInterno(), saida.handleInterno())
+        retorna isto.registrar("subtrair", ns)
+    }
+
+    multiplicar(a: BufferGPU, b: BufferGPU, saida: BufferGPU): EventoGPU {
+        const ns: inteiro = PrimitivasGPU.executarBinario("multiplicar", a.handleInterno(),
+            b.handleInterno(), saida.handleInterno())
+        retorna isto.registrar("multiplicar", ns)
+    }
+
+    dividir(a: BufferGPU, b: BufferGPU, saida: BufferGPU): EventoGPU {
+        const ns: inteiro = PrimitivasGPU.executarBinario("dividir", a.handleInterno(), b.handleInterno(),
+            saida.handleInterno())
+        retorna isto.registrar("dividir", ns)
+    }
+
+    escala(a: BufferGPU, alpha: real, saida: BufferGPU): EventoGPU {
+        const ns: inteiro = PrimitivasGPU.executarUnario("escala", a.handleInterno(), saida.handleInterno(),
+            alpha)
+        retorna isto.registrar("escala", ns)
+    }
+
+    saxpy(x: BufferGPU, alpha: real, y: BufferGPU): EventoGPU {
+        const ns: inteiro = PrimitivasGPU.executarUnario("saxpy", x.handleInterno(), y.handleInterno(),
+            alpha)
+        retorna isto.registrar("saxpy", ns)
+    }
+
+    ativar(op: texto, entrada: BufferGPU, saida: BufferGPU): EventoGPU {
+        const ns: inteiro = PrimitivasGPU.executarUnario(op, entrada.handleInterno(), saida.handleInterno(),
+            0.0)
+        retorna isto.registrar(op, ns)
+    }
+
+    matmul(a: BufferGPU, b: BufferGPU, saida: BufferGPU, m: inteiro, k: inteiro, n: inteiro): EventoGPU {
+        const ns: inteiro = PrimitivasGPU.matmul(a.handleInterno(), b.handleInterno(), saida.handleInterno(),
+            m, k, n)
+        retorna isto.registrar("matmul", ns)
+    }
+
+    reducao(op: texto, a: BufferGPU): real {
+        retorna PrimitivasGPU.reducao(op, a.handleInterno())
+    }
+
+    produtoEscalar(a: BufferGPU, b: BufferGPU): real {
+        retorna PrimitivasGPU.produtoEscalar(a.handleInterno(), b.handleInterno())
+    }
+
+    sincronizar(): vazio {
+        // Execução síncrona determinística garante visibilidade imediata dos buffers.
+    }
+}
+
+/// Descobre todos os dispositivos disponíveis (CPU nativa + dispositivos Vulkan reais, se presentes).
+funcao descobrirDispositivos(): DispositivoGPU[] {
+    const brutos: qualquer[] = PrimitivasGPU.descobrirDispositivos()
+    var lista: DispositivoGPU[] = []
+    para cada item em brutos {
+        const d: dicionario = item
+        const dev: DispositivoGPU = DispositivoGPU(inteiro(d["id"]), texto(d["nome"]), texto(d["backend"]),
+            texto(d["tipo"]), d["computeDisponivel"], inteiro(d["vendorId"]))
+        lista.adicionar(dev)
+    }
+
+    retorna lista
+}
+
+/// Retorna o dispositivo padrão (CPU nativa se `preferirGpu` for falso, ou GPU se disponível).
+funcao dispositivoPadrao(preferirGpu: logico = falso): DispositivoGPU {
+    const lista: DispositivoGPU[] = descobrirDispositivos()
+    se preferirGpu {
+        para cada dev em lista {
+            se dev.ehGpu() {
+                retorna dev
+            }
+        }
+    }
+
+    retorna lista[0]
+}
+
+/// Cria uma fila pronta no dispositivo padrão.
+funcao criarFila(preferirGpu: logico = falso): FilaGPU {
+    const dev: DispositivoGPU = dispositivoPadrao(preferirGpu)
+    retorna FilaGPU(dev, verdadeiro)
+}

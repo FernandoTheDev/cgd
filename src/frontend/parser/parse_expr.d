@@ -225,6 +225,21 @@ public:
             case TokenKind.Identifier:
                 if (p.match(TokenKind.Arrow))
                     return parseArrow(tk, false);
+                if (p.check(TokenKind.LThan) && (tk.value.s == "VetorNativo"d
+                        || tk.value.s == "MapaNativo"d || tk.value.s == "FatiaNativa"d
+                        || tk.value.s == "ResultadoNativo"d || tk.value.s == "OpcionalNativo"d
+                        || tk.value.s == "MatrizNativa"d))
+                {
+                    p.advance();
+                    TypeExpr[] typeArgs;
+                    typeArgs ~= p.parseType.parse();
+                    while (p.match(TokenKind.Comma))
+                        typeArgs ~= p.parseType.parse();
+                    p.consumeTypeClose();
+                    Identifier genId = new Identifier(tk.value.s, tk.pos);
+                    genId.type_expr = new TypeExprGeneric(tk.value.s, typeArgs, tk.pos);
+                    return genId;
+                }
                 return new Identifier(tk.value.s, tk.pos);
 
             case TokenKind.Int:

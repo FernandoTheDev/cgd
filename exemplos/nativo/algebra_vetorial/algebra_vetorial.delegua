@@ -1,0 +1,161 @@
+//! ALGEBRA_VETORIAL_OK
+// Exemplo completo: Biblioteca de Álgebra Vetorial usando @pilha, @operador e @nativo
+
+@pilha
+classe Vetor2 {
+    x: cf64
+    y: cf64
+
+    construtor(x: cf64, y: cf64) {
+        isto.x = x
+        isto.y = y
+    }
+
+    @operador("+")
+    somar(outro: Vetor2): Vetor2 {
+        retorna Vetor2(isto.x + outro.x, isto.y + outro.y)
+    }
+
+    @operador("-")
+    subtrair(outro: Vetor2): Vetor2 {
+        retorna Vetor2(isto.x - outro.x, isto.y - outro.y)
+    }
+
+    @operador("*")
+    escalar(s: cf64): Vetor2 {
+        retorna Vetor2(isto.x * s, isto.y * s)
+    }
+
+    @operador("unario-")
+    negar(): Vetor2 {
+        retorna Vetor2(-isto.x, -isto.y)
+    }
+
+    @operador("==")
+    igual(outro: Vetor2): cbool {
+        retorna isto.x == outro.x e isto.y == outro.y
+    }
+
+    produtoEscalar(outro: Vetor2): cf64 {
+        retorna isto.x * outro.x + isto.y * outro.y
+    }
+
+    comprimento(): cf64 {
+        retorna Matematica.raiz(isto.x * isto.x + isto.y * isto.y)
+    }
+}
+
+@pilha
+classe Vetor3 {
+    x: cf64
+    y: cf64
+    z: cf64
+
+    construtor(x: cf64, y: cf64, z: cf64) {
+        isto.x = x
+        isto.y = y
+        isto.z = z
+    }
+
+    @operador("+")
+    somar(outro: Vetor3): Vetor3 {
+        retorna Vetor3(isto.x + outro.x, isto.y + outro.y, isto.z + outro.z)
+    }
+
+    @operador("-")
+    subtrair(outro: Vetor3): Vetor3 {
+        retorna Vetor3(isto.x - outro.x, isto.y - outro.y, isto.z - outro.z)
+    }
+
+    @operador("*")
+    escalar(s: cf64): Vetor3 {
+        retorna Vetor3(isto.x * s, isto.y * s, isto.z * s)
+    }
+
+    @operador("unario-")
+    negar(): Vetor3 {
+        retorna Vetor3(-isto.x, -isto.y, -isto.z)
+    }
+
+    produtoEscalar(outro: Vetor3): cf64 {
+        retorna isto.x * outro.x + isto.y * outro.y + isto.z * outro.z
+    }
+
+    produtoVetorial(outro: Vetor3): Vetor3 {
+        retorna Vetor3(isto.y * outro.z - isto.z * outro.y, isto.z * outro.x - isto.x * outro.z,
+            isto.x * outro.y - isto.y * outro.x)
+    }
+
+    comprimento(): cf64 {
+        retorna Matematica.raiz(isto.x * isto.x + isto.y * isto.y + isto.z * isto.z)
+    }
+
+    normalizado(): Vetor3 {
+        const len: cf64 = isto.comprimento()
+        se len == 0.0 {
+            retorna Vetor3(0.0, 0.0, 0.0)
+        }
+        const inv: cf64 = 1.0 / len
+        retorna Vetor3(isto.x * inv, isto.y * inv, isto.z * inv)
+    }
+}
+
+@pilha
+classe Matriz3 {
+    m00: cf64
+    m01: cf64
+    m02: cf64
+    m10: cf64
+    m11: cf64
+    m12: cf64
+    m20: cf64
+    m21: cf64
+    m22: cf64
+
+    transformar(v: Vetor3): Vetor3 {
+        retorna Vetor3(isto.m00 * v.x + isto.m01 * v.y + isto.m02 * v.z, isto.m10 * v.x + isto.m11 * v.y + isto.m12 * v.z,
+            isto.m20 * v.x + isto.m21 * v.y + isto.m22 * v.z)
+    }
+}
+
+@nativo
+funcao rotacaoZ(angulo: cf64): Matriz3 {
+    const c: cf64 = Matematica.cosseno(angulo)
+    const s: cf64 = Matematica.seno(angulo)
+    retorna Matriz3(c, -s, 0.0, s, c, 0.0, 0.0, 0.0, 1.0)
+}
+
+@nativo
+funcao benchmarkAlgebra(iteracoes: ci64): cf64 {
+    var acc = Vetor3(1.0, 2.0, 3.0)
+    const passo = Vetor3(0.001, -0.002, 0.003)
+    const eixo = Vetor3(0.0, 0.0, 1.0)
+    var soma: cf64 = 0.0
+    para var i: ci64 = 0; i < iteracoes; i = i + 1 {
+        acc = (acc + passo) * 0.999999
+        const cross = acc.produtoVetorial(eixo)
+        soma += cross.produtoEscalar(acc) + acc.comprimento()
+    }
+
+    retorna soma
+}
+
+const v2a = Vetor2(3.0, 4.0)
+const v2b = Vetor2(1.0, 2.0)
+const v2c = v2a + v2b * 2.0
+assercao(v2a.comprimento() == 5.0)
+assercao(v2c == Vetor2(5.0, 8.0))
+assercao(v2a.produtoEscalar(v2b) == 11.0)
+
+const iEixo = Vetor3(1.0, 0.0, 0.0)
+const jEixo = Vetor3(0.0, 1.0, 0.0)
+const kEixo = iEixo.produtoVetorial(jEixo)
+assercao(kEixo.x == 0.0 e kEixo.y == 0.0 e kEixo.z == 1.0)
+
+const rot = rotacaoZ(1.5707963267948966)
+const girado = rot.transformar(Vetor3(1.0, 0.0, 0.0))
+assercao(Matematica.absoluto(girado.x) < 0.000001 e Matematica.absoluto(girado.y - 1.0) < 0.000001)
+
+const resBench = benchmarkAlgebra(50000)
+assercao(resBench > 0.0)
+escreva("ALGEBRA_VETORIAL_OK")

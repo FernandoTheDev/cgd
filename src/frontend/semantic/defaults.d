@@ -24,5 +24,13 @@ Node defaultValue(TypeSema type, Position position)
         default:
             return null;
     }
+    if (TypeSemaNative nat = cast(TypeSemaNative) type)
+    {
+        if (nat.isBool())
+            return new BoolLit(false, position);
+        if (nat.isFloat())
+            return new DoubleLit(0.0, position);
+        return new IntLit(0, position);
+    }
     return null;
 }
